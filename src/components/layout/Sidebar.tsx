@@ -17,7 +17,8 @@ import {
   X,
   Home,
   FileSpreadsheet,
-  FolderOpen
+  FolderOpen,
+  BookOpen
 } from 'lucide-react';
 import { CurrentUser } from '../../types';
 import { SakaLogo } from '../common/SakaLogo';
@@ -199,6 +200,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Award className={`w-4 h-4 ${currentTab === 'skills' ? 'text-purple-400' : 'text-slate-400'}`} />
           <span className="flex-1">Direktori Keahlian</span>
+        </button>
+
+        {/* Modul SKK & Silabus 4 Krida */}
+        <button
+          onClick={() => handleItemClick('krida-modules')}
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+            currentTab === 'krida-modules'
+              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <BookOpen className={`w-4 h-4 ${currentTab === 'krida-modules' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Modul & SKK 4 Krida</span>
+          <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded-md font-bold">23 SKK</span>
         </button>
 
         {/* Activities / Agenda */}

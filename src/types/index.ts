@@ -422,3 +422,90 @@ export interface KtaCardSettings {
   updatedBy?: string;
 }
 
+// ==========================================
+// 4 KRIDA MODULES & CURRICULUM TYPES
+// ==========================================
+export type KridaId = 'pemandu' | 'penyuluh' | 'kuliner' | 'mice';
+
+export interface KridaCategoryInfo {
+  id: KridaId;
+  name: string;
+  shortTitle: string;
+  subtitle: string;
+  badge: string;
+  color: string;
+  borderGlow: string;
+  description: string;
+  desc?: string;
+  topicsCount: number;
+}
+
+export interface KridaCurriculumSession {
+  sessionNumber: number;
+  title: string;
+  duration: string;
+  competency: string;
+  method: string;
+}
+
+export interface KridaTestRequirements {
+  purwa: string[];
+  madya: string[];
+  utama: string[];
+}
+
+export interface KridaCompetencyRow {
+  code: string;
+  element: string;
+  indicator: string;
+  assessment: string;
+}
+
+export interface KridaImage {
+  id: string;
+  url: string;
+  caption: string;
+}
+
+export interface KridaLink {
+  id: string;
+  title: string;
+  url: string;
+  type: 'VIDEO' | 'REFERENCE' | 'REGULATION';
+}
+
+export interface KridaDownloadFile {
+  id: string;
+  title: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: string;
+}
+
+// Aliases for editor and modal components
+export type CompetencyRow = KridaCompetencyRow;
+export type ModuleImage = KridaImage;
+export type ModuleLink = KridaLink;
+export type DownloadableResource = KridaDownloadFile;
+export type CurriculumSession = KridaCurriculumSession;
+
+export interface KridaModuleItem {
+  id: string;
+  kridaId: KridaId;
+  kridaName: string;
+  code: string; // e.g. '(a)', '(b)'
+  title: string;
+  badge: string;
+  levelSKK: string;
+  description: string;
+  content: string; // Rich formatted text/markdown
+  curriculum: KridaCurriculumSession[];
+  testRequirements: KridaTestRequirements;
+  competencyTable: KridaCompetencyRow[];
+  images: KridaImage[];
+  links: KridaLink[];
+  downloads: KridaDownloadFile[];
+  updatedAt: string;
+  updatedBy: string;
+}
+

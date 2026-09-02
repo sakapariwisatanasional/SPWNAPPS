@@ -41,6 +41,7 @@ interface DatabaseSchema {
   tours: any[];
   culinaryItems: any[];
   activities: any[];
+  kridaModules?: any[];
   users: any[];
   auditLogs: any[];
   lastUpdated: string;
@@ -62,6 +63,7 @@ let db: DatabaseSchema = {
   tours: [],
   culinaryItems: [],
   activities: [],
+  kridaModules: [],
   users: [],
   auditLogs: [],
   lastUpdated: new Date().toISOString(),
@@ -468,6 +470,7 @@ app.get('/api/data', (req, res) => {
     tours: db.tours,
     culinaryItems: db.culinaryItems,
     activities: db.activities,
+    kridaModules: db.kridaModules,
     users: db.users,
     auditLogs: db.auditLogs,
     config: db.config,
@@ -676,6 +679,21 @@ app.post('/api/mutate', async (req, res) => {
           sheet: 'Agenda_Kegiatan',
           id: payload.id
         });
+      }
+    } else if (type === 'KRIDA_MODULE') {
+      const moduleItem = payload;
+      if (!Array.isArray(db.kridaModules)) db.kridaModules = [];
+      if (action === 'UPDATE' || action === 'CREATE') {
+        const idx = db.kridaModules.findIndex(m => m.id === moduleItem.id);
+        if (idx !== -1) {
+          db.kridaModules[idx] = { ...db.kridaModules[idx], ...moduleItem };
+        } else {
+          db.kridaModules.push(moduleItem);
+        }
+      } else if (action === 'BATCH_UPDATE') {
+        if (Array.isArray(payload)) {
+          db.kridaModules = payload;
+        }
       }
     }
 

@@ -29,6 +29,7 @@ import { TerritoryManagementView } from './pages/TerritoryManagementView';
 import { AuditLogsView } from './pages/AuditLogsView';
 import { PublicPortalView } from './pages/PublicPortalView';
 import { MyCardView } from './pages/MyCardView';
+import { KridaModulesView } from './pages/KridaModulesView';
 
 // Modals
 import { AuthModal } from './components/auth/AuthModal';
@@ -468,6 +469,12 @@ export default function App() {
                 members={members}
                 skills={skills}
                 onOpenVerifyModal={(m) => setVerifyingMember(m)}
+              />
+            )}
+
+            {currentTab === 'krida-modules' && (
+              <KridaModulesView
+                currentUser={currentUser}
               />
             )}
 

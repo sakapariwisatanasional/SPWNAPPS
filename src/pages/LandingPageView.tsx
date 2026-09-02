@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Search, 
@@ -29,15 +29,26 @@ import {
   ShoppingBag,
   BadgeCheck,
   Check,
-  LayoutDashboard
+  LayoutDashboard,
+  BookOpen,
+  Edit3,
+  Download,
+  FileText,
+  Video,
+  Table as TableIcon
 } from 'lucide-react';
-import { Member, TourPackage, CulinarySouvenirItem, CurrentUser, Activity } from '../types';
+import { Member, TourPackage, CulinarySouvenirItem, CurrentUser, Activity, KridaId, KridaModuleItem } from '../types';
 import { SakaLogo, formatDriveImageUrl } from '../components/common/SakaLogo';
 import { DEFAULT_SPREADSHEET_URL } from '../services/spreadsheetService';
 import { GOOGLE_DRIVE_MAIN_FOLDER } from '../services/driveRepository';
 import { CompetentGuidesSection } from '../components/common/CompetentGuidesSection';
 import { LandingActivitiesSection } from '../components/activities/LandingActivitiesSection';
 import { PROVINCES_DATA } from '../data/indonesiaTerritories';
+import { KRIDA_CATEGORIES } from '../data/kridaData';
+import { storage } from '../services/storage';
+import { KridaExplorerModal } from '../components/krida/KridaExplorerModal';
+import { KridaMaterialEditorModal } from '../components/krida/KridaMaterialEditorModal';
+import { CompactKridaPortal } from '../components/krida/CompactKridaPortal';
 
 interface LandingPageViewProps {
   currentUser: CurrentUser;
@@ -106,36 +117,37 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
     }
   };
 
-  const kridaList = [
-    {
-      title: 'Krida Pemandu',
-      subtitle: 'Bina Pemandu Wisata',
-      desc: 'Keahlian kepemanduan wisata alam, sejarah, budaya, interpretasi objek wisata, dan keselamatan perjalanan.',
-      badge: 'Tour Guide & Storyteller',
-      color: 'from-amber-600 to-orange-600'
-    },
-    {
-      title: 'Krida Penyuluh',
-      subtitle: 'Bina Objek & Penyuluhan',
-      desc: 'Penyuluhan sadar wisata, penerapan 7 unsur Sapta Pesona, pelestarian lingkungan, dan edukasi kepariwisataan.',
-      badge: 'Sapta Pesona & Edukasi',
-      color: 'from-emerald-600 to-teal-600'
-    },
-    {
-      title: 'Krida Mice & Event',
-      subtitle: 'Bina Atraksi & MICE',
-      desc: 'Pengelolaan atraksi budaya, festival kepemudaan, pameran pariwisata, pertemuan (MICE), dan kreasi seni tradisi.',
-      badge: 'Event Organizer & Atraksi',
-      color: 'from-purple-600 to-indigo-600'
-    },
-    {
-      title: 'Krida Kuliner & Cinderamata',
-      subtitle: 'Karya Khas Daerah',
-      desc: 'Pengembangan kuliner warisan lokal, kerajinan tangan, cinderamata kreatif khas daerah, dan pemberdayaan UMKM.',
-      badge: 'Gastronomi & Kriya UMKM',
-      color: 'from-rose-600 to-pink-600'
-    }
-  ];
+  // Krida Folder & Modules state
+  const [kridaModules, setKridaModules] = useState<KridaModuleItem[]>(() => storage.getKridaModules());
+  const [isKridaExplorerOpen, setIsKridaExplorerOpen] = useState(false);
+  const [activeExplorerKrida, setActiveExplorerKrida] = useState<KridaId>('pemandu');
+  const [activeExplorerModuleId, setActiveExplorerModuleId] = useState<string | undefined>(undefined);
+  const [isKridaEditorOpen, setIsKridaEditorOpen] = useState(false);
+  const [editingKridaModule, setEditingKridaModule] = useState<KridaModuleItem | null>(null);
+
+  // Cross-device sync listener
+  useEffect(() => {
+    const unsub = storage.subscribe(() => {
+      setKridaModules(storage.getKridaModules());
+    });
+    return () => unsub();
+  }, []);
+
+  const handleOpenKridaFolder = (kridaId: KridaId, moduleId?: string) => {
+    setActiveExplorerKrida(kridaId);
+    setActiveExplorerModuleId(moduleId);
+    setIsKridaExplorerOpen(true);
+  };
+
+  const handleOpenEditor = (moduleItem: KridaModuleItem) => {
+    setEditingKridaModule(moduleItem);
+    setIsKridaEditorOpen(true);
+  };
+
+  const handleSaveKridaModule = (updatedItem: KridaModuleItem) => {
+    storage.updateKridaModule(updatedItem, currentUser.name);
+    setKridaModules(storage.getKridaModules());
+  };
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-purple-600 selection:text-white">
@@ -291,43 +303,43 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </div>
       </section>
 
-      {/* 5. 4 KRIDA SAKA PARIWISATA */}
-      <section className="py-16 px-4 sm:px-8 max-w-7xl mx-auto space-y-8">
-        <div className="text-center space-y-2 max-w-2xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-heading">
-            4 Krida Pembinaan Saka Pariwisata
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-400">
-            Spesialisasi keahlian dan kecakapan khusus (SKK) untuk mengembangkan potensi kepariwisataan berbasis kearifan lokal.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {kridaList.map((k, idx) => (
-            <div
-              key={idx}
-              className="bg-slate-950/80 border border-slate-800 rounded-3xl p-6 hover:border-purple-500/50 transition-all space-y-4 group hover:-translate-y-1 shadow-lg"
-            >
-              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${k.color} flex items-center justify-center text-white shadow-md font-bold text-lg font-heading`}>
-                {idx + 1}
-              </div>
-
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
-                  {k.badge}
-                </span>
-                <h3 className="text-lg font-bold text-white font-heading mt-0.5 group-hover:text-purple-300 transition-colors">
-                  {k.title}
-                </h3>
-                <p className="text-xs font-semibold text-slate-400">{k.subtitle}</p>
-              </div>
-
-              <p className="text-xs text-slate-400 leading-relaxed">
-                {k.desc}
-              </p>
+      {/* 5. 4 KRIDA SAKA PARIWISATA: FOLDER KATEGORI MATERI & KURIKULUM SKK (SIMPEL, RINGKAS, TANPA SCROLLING) */}
+      <section id="krida-learning-portal" className="py-14 px-4 sm:px-8 max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="space-y-2 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-800/60 text-purple-300 text-[11px] font-bold uppercase tracking-wider">
+              <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+              <span>Folder Pembelajaran & Kurikulum SKK Resmi</span>
             </div>
-          ))}
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white font-heading">
+              Folder 4 Krida & Kurikulum SKK
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+              Tampilan interaktif dan ringkas tanpa scrolling. Pilih folder krida untuk melihat mata krida, lalu klik untuk membuka naskah materi, silabus pelatihan, dan instrumen uji syarat kecakapan khusus (SKK).
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              onClick={() => handleOpenKridaFolder('pemandu')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-purple-950/50 cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4 text-amber-300" />
+              <span>Buka Penjelajah Lengkap (23 SKK)</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        {/* COMPACT KRIDA PORTAL: What user clicks is what they see, with on-demand material opening */}
+        <CompactKridaPortal
+          modules={kridaModules}
+          currentUser={currentUser}
+          onOpenFullExplorer={handleOpenKridaFolder}
+          onOpenEditor={handleOpenEditor}
+          variant="dark"
+          initialKridaId={activeExplorerKrida}
+        />
       </section>
 
       {/* 6. PREVIEW ANGGOTA BERKOMPETENSI & PEMANDU TERDEKAT */}
@@ -733,6 +745,31 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </p>
         </div>
       </footer>
+
+      {/* 9. MODALS PEMBELAJARAN KRIDA & CMS SUPER ADMIN */}
+      <KridaExplorerModal
+        isOpen={isKridaExplorerOpen}
+        onClose={() => {
+          setIsKridaExplorerOpen(false);
+          setActiveExplorerModuleId(undefined);
+        }}
+        modules={kridaModules}
+        currentUser={currentUser}
+        initialKridaId={activeExplorerKrida}
+        initialModuleId={activeExplorerModuleId}
+        onOpenEditor={handleOpenEditor}
+      />
+
+      <KridaMaterialEditorModal
+        isOpen={isKridaEditorOpen}
+        onClose={() => {
+          setIsKridaEditorOpen(false);
+          setEditingKridaModule(null);
+        }}
+        moduleItem={editingKridaModule}
+        currentUser={currentUser}
+        onSave={handleSaveKridaModule}
+      />
     </div>
   );
 };

@@ -18,7 +18,9 @@ import {
   SkillProficiency,
   KtaCardSettings,
   CulinarySouvenirItem,
-  ProductModerationStatus
+  ProductModerationStatus,
+  KridaId,
+  KridaModuleItem
 } from '../types';
 import { PROVINCES_DATA, REGENCIES_DATA, DISTRICTS_DATA, BRANCHES_DATA, getDistrictsForRegency } from '../data/indonesiaTerritories';
 import { 
@@ -30,6 +32,7 @@ import {
   DEMO_USERS,
   INITIAL_CULINARY_SOUVENIRS
 } from '../data/initialData';
+import { INITIAL_KRIDA_MODULES } from '../data/kridaData';
 import { SAKA_CARD_BG_DRIVE_DIRECT_URL } from '../components/common/SakaLogo';
 
 export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
@@ -57,7 +60,7 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
 };
 
 export type StorageMutationEvent = {
-  type: 'MEMBER' | 'TOUR' | 'CULINARY' | 'ACTIVITY' | 'SYSTEM';
+  type: 'MEMBER' | 'TOUR' | 'CULINARY' | 'ACTIVITY' | 'KRIDA_MODULE' | 'SYSTEM';
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'PHOTO_UPDATE' | 'SYNC';
   id?: string;
   payload?: any;
@@ -76,28 +79,68 @@ const STORAGE_KEYS = {
   USERS: 'saka_users_v2',
   CUSTOM_BRANCHES: 'saka_custom_branches_v2',
   KTA_SETTINGS: 'saka_kta_settings_v2',
-  CULINARY_SOUVENIRS: 'saka_culinary_souvenirs_v2'
+  CULINARY_SOUVENIRS: 'saka_culinary_souvenirs_v2',
+  KRIDA_MODULES: 'saka_krida_modules_v2'
 };
 
 class StorageService {
   private listeners: (() => void)[] = [];
   private mutationListeners: MutationListener[] = [];
+  private isSyncing: boolean = false;
+  private autoSyncInterval: any = null;
+  private broadcastChannel: BroadcastChannel | null = null;
 
   constructor() {
     this.init();
     this.initCrossTabListener();
     this.syncWithServer().catch(() => {});
+    this.startAutoSyncInterval();
   }
 
   private initCrossTabListener() {
     if (typeof window !== 'undefined') {
+      // 1. Storage event listener for other tabs
       window.addEventListener('storage', (e) => {
         if (e.key && Object.values(STORAGE_KEYS).includes(e.key)) {
-          // Immediately notify local subscribers when another tab updates data
           this.notify();
         }
       });
+
+      // 2. BroadcastChannel for instant cross-tab communication
+      if ('BroadcastChannel' in window) {
+        try {
+          this.broadcastChannel = new BroadcastChannel('saka_sync_channel');
+          this.broadcastChannel.onmessage = (event) => {
+            if (event.data && event.data.type === 'SYNC_MUTATION') {
+              this.notify();
+            }
+          };
+        } catch (e) {
+          console.warn('[Storage] BroadcastChannel not supported:', e);
+        }
+      }
+
+      // 3. Auto-sync on window focus (when user switches back to browser/tab)
+      window.addEventListener('focus', () => {
+        this.syncWithServer().catch(() => {});
+      });
+
+      // 4. Auto-sync on visibility change (mobile browsers, tab switching)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.syncWithServer().catch(() => {});
+        }
+      });
     }
+  }
+
+  private startAutoSyncInterval() {
+    if (typeof window === 'undefined') return;
+    if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
+    // Poll central server every 5 seconds for cross-device consistency
+    this.autoSyncInterval = setInterval(() => {
+      this.syncWithServer().catch(() => {});
+    }, 5000);
   }
 
   private init() {
@@ -252,6 +295,11 @@ class StorageService {
       if (mutationType.includes('DELETE')) action = 'DELETE';
       else if (mutationType.includes('CREATE') || mutationType.includes('ADD')) action = 'CREATE';
       else action = 'UPDATE';
+    } else if (mutationType.includes('KRIDA_MODULE')) {
+      type = 'KRIDA_MODULE';
+      if (mutationType.includes('DELETE')) action = 'DELETE';
+      else if (mutationType.includes('CREATE')) action = 'CREATE';
+      else action = 'UPDATE';
     }
 
     const event: StorageMutationEvent = {
@@ -269,6 +317,15 @@ class StorageService {
       }
     });
 
+    // Broadcast instantly to other tabs on same device
+    if (this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({ type: 'SYNC_MUTATION', mutationType, payload });
+      } catch (e) {
+        // ignore
+      }
+    }
+
     // Forward to central full-stack server for cross-device synchronization
     if (typeof window !== 'undefined' && type !== 'SYSTEM') {
       try {
@@ -284,29 +341,31 @@ class StorageService {
   }
 
   public async syncWithServer(): Promise<boolean> {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined' || this.isSyncing) return false;
+    this.isSyncing = true;
     try {
       const res = await fetch('/api/data', { cache: 'no-store' });
       if (!res.ok) return false;
       const data = await res.json();
 
       let hasChanges = false;
-      if (Array.isArray(data.members) && data.members.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(data.members));
-        hasChanges = true;
-      }
-      if (Array.isArray(data.tours) && data.tours.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(data.tours));
-        hasChanges = true;
-      }
-      if (Array.isArray(data.activities) && data.activities.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(data.activities));
-        hasChanges = true;
-      }
-      if (Array.isArray(data.culinaryItems) && data.culinaryItems.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(data.culinaryItems));
-        hasChanges = true;
-      }
+
+      const syncCollection = (key: string, incoming: any[] | undefined) => {
+        if (!Array.isArray(incoming)) return false;
+        const currentStr = localStorage.getItem(key);
+        const incomingStr = JSON.stringify(incoming);
+        if (currentStr !== incomingStr) {
+          localStorage.setItem(key, incomingStr);
+          return true;
+        }
+        return false;
+      };
+
+      if (syncCollection(STORAGE_KEYS.MEMBERS, data.members)) hasChanges = true;
+      if (syncCollection(STORAGE_KEYS.TOURS, data.tours)) hasChanges = true;
+      if (syncCollection(STORAGE_KEYS.ACTIVITIES, data.activities)) hasChanges = true;
+      if (syncCollection(STORAGE_KEYS.CULINARY_SOUVENIRS, data.culinaryItems)) hasChanges = true;
+      if (syncCollection(STORAGE_KEYS.KRIDA_MODULES, data.kridaModules)) hasChanges = true;
 
       if (hasChanges) {
         this.listeners.forEach(cb => cb());
@@ -314,6 +373,8 @@ class StorageService {
       return true;
     } catch (e) {
       return false;
+    } finally {
+      this.isSyncing = false;
     }
   }
 
@@ -377,6 +438,69 @@ class StorageService {
   public setActivities(activities: Activity[]) {
     localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
     this.notify();
+  }
+
+  // --- Krida Learning Modules & SKK Curriculum ---
+  public getKridaModules(): KridaModuleItem[] {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.KRIDA_MODULES);
+      if (!data) {
+        localStorage.setItem(STORAGE_KEYS.KRIDA_MODULES, JSON.stringify(INITIAL_KRIDA_MODULES));
+        return INITIAL_KRIDA_MODULES;
+      }
+      const stored: KridaModuleItem[] = JSON.parse(data);
+      if (!Array.isArray(stored) || stored.length === 0) {
+        localStorage.setItem(STORAGE_KEYS.KRIDA_MODULES, JSON.stringify(INITIAL_KRIDA_MODULES));
+        return INITIAL_KRIDA_MODULES;
+      }
+      // Merge with initial if any new modules are missing
+      const mergedMap = new Map<string, KridaModuleItem>();
+      INITIAL_KRIDA_MODULES.forEach(m => mergedMap.set(m.id, m));
+      stored.forEach(m => mergedMap.set(m.id, { ...mergedMap.get(m.id), ...m }));
+      return Array.from(mergedMap.values());
+    } catch {
+      return INITIAL_KRIDA_MODULES;
+    }
+  }
+
+  public getKridaModuleById(id: string): KridaModuleItem | undefined {
+    return this.getKridaModules().find(m => m.id === id);
+  }
+
+  public getKridaModulesByKrida(kridaId: KridaId): KridaModuleItem[] {
+    return this.getKridaModules().filter(m => m.kridaId === kridaId);
+  }
+
+  public updateKridaModule(updatedModule: KridaModuleItem, updatedBy?: string): KridaModuleItem {
+    const modules = this.getKridaModules();
+    const idx = modules.findIndex(m => m.id === updatedModule.id);
+    const now = new Date().toISOString();
+    const finalItem: KridaModuleItem = {
+      ...updatedModule,
+      updatedAt: now,
+      updatedBy: updatedBy || 'Super Admin Kwartir Nasional'
+    };
+
+    if (idx !== -1) {
+      modules[idx] = finalItem;
+    } else {
+      modules.push(finalItem);
+    }
+
+    localStorage.setItem(STORAGE_KEYS.KRIDA_MODULES, JSON.stringify(modules));
+    this.notify('UPDATE_KRIDA_MODULE', finalItem);
+    return finalItem;
+  }
+
+  public setKridaModules(modules: KridaModuleItem[]) {
+    localStorage.setItem(STORAGE_KEYS.KRIDA_MODULES, JSON.stringify(modules));
+    this.notify('BATCH_UPDATE_KRIDA_MODULE', modules);
+  }
+
+  public resetKridaModules(): KridaModuleItem[] {
+    localStorage.setItem(STORAGE_KEYS.KRIDA_MODULES, JSON.stringify(INITIAL_KRIDA_MODULES));
+    this.notify('BATCH_UPDATE_KRIDA_MODULE', INITIAL_KRIDA_MODULES);
+    return INITIAL_KRIDA_MODULES;
   }
 
   public assignMemberAsOperator(
