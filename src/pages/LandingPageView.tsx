@@ -49,6 +49,7 @@ import { storage } from '../services/storage';
 import { KridaExplorerModal } from '../components/krida/KridaExplorerModal';
 import { KridaMaterialEditorModal } from '../components/krida/KridaMaterialEditorModal';
 import { CompactKridaPortal } from '../components/krida/CompactKridaPortal';
+import { KridaFullScreenReaderModal } from '../components/krida/KridaFullScreenReaderModal';
 
 interface LandingPageViewProps {
   currentUser: CurrentUser;
@@ -124,6 +125,13 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   const [activeExplorerModuleId, setActiveExplorerModuleId] = useState<string | undefined>(undefined);
   const [isKridaEditorOpen, setIsKridaEditorOpen] = useState(false);
   const [editingKridaModule, setEditingKridaModule] = useState<KridaModuleItem | null>(null);
+  const [isFullScreenReaderOpen, setIsFullScreenReaderOpen] = useState(false);
+  const [readerModuleId, setReaderModuleId] = useState<string | undefined>();
+
+  const handleOpenFullScreenReader = (moduleId?: string) => {
+    setReaderModuleId(moduleId);
+    setIsFullScreenReaderOpen(true);
+  };
 
   // Cross-device sync listener
   useEffect(() => {
@@ -303,16 +311,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </div>
       </section>
 
-      {/* 5. 4 KRIDA SAKA PARIWISATA: FOLDER KATEGORI MATERI & KURIKULUM SKK (SIMPEL, RINGKAS, TANPA SCROLLING) */}
+      {/* 5. 4 KRIDA SAKA PARIWISATA: DRAFT 4 KRIDA DAN SKK (SIMPEL, RINGKAS, TANPA SCROLLING) */}
       <section id="krida-learning-portal" className="py-14 px-4 sm:px-8 max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-800/60 text-purple-300 text-[11px] font-bold uppercase tracking-wider">
               <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-              <span>Folder Pembelajaran & Kurikulum SKK Resmi</span>
+              <span>Draft Materi Pembelajaran & Kurikulum SKK Resmi</span>
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white font-heading">
-              Folder 4 Krida & Kurikulum SKK
+              Draft 4 Krida dan SKK
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
               Tampilan interaktif dan ringkas tanpa scrolling. Pilih folder krida untuk melihat mata krida, lalu klik untuk membuka naskah materi, silabus pelatihan, dan instrumen uji syarat kecakapan khusus (SKK).
@@ -321,11 +329,21 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
+              type="button"
+              onClick={() => handleOpenFullScreenReader(activeExplorerModuleId || kridaModules[0]?.id)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-950/90 hover:bg-purple-900 text-purple-200 hover:text-white border border-purple-700/60 text-xs font-bold transition-all shadow-md cursor-pointer"
+              title="Baca naskah materi & SKK dalam mode layar penuh (tanpa scrolling, kendali next >> dan back <<)"
+            >
+              <BookOpen className="w-4 h-4 text-amber-300" />
+              <span>Layar Penuh (Next &gt;&gt; / Back &lt;&lt;)</span>
+            </button>
+
+            <button
               onClick={() => handleOpenKridaFolder('pemandu')}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-purple-950/50 cursor-pointer"
             >
-              <BookOpen className="w-4 h-4 text-amber-300" />
-              <span>Buka Penjelajah Lengkap (23 SKK)</span>
+              <Layers className="w-4 h-4 text-purple-200" />
+              <span>Buka Penjelajah (23 SKK)</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -336,6 +354,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           modules={kridaModules}
           currentUser={currentUser}
           onOpenFullExplorer={handleOpenKridaFolder}
+          onOpenFullScreenReader={handleOpenFullScreenReader}
           onOpenEditor={handleOpenEditor}
           variant="dark"
           initialKridaId={activeExplorerKrida}
@@ -769,6 +788,14 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         moduleItem={editingKridaModule}
         currentUser={currentUser}
         onSave={handleSaveKridaModule}
+      />
+
+      {/* 10. FULLSCREEN READER (NO SCROLLING, NEXT >> & BACK << NAVIGATION) */}
+      <KridaFullScreenReaderModal
+        isOpen={isFullScreenReaderOpen}
+        onClose={() => setIsFullScreenReaderOpen(false)}
+        modules={kridaModules}
+        initialModuleId={readerModuleId}
       />
     </div>
   );

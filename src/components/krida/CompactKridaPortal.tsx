@@ -22,11 +22,13 @@ import {
 } from 'lucide-react';
 import { KridaCategoryInfo, KridaId, KridaModuleItem, CurrentUser } from '../../types';
 import { KRIDA_CATEGORIES } from '../../data/kridaData';
+import { KridaFullScreenReaderModal } from './KridaFullScreenReaderModal';
 
 interface CompactKridaPortalProps {
   modules: KridaModuleItem[];
   currentUser?: CurrentUser;
   onOpenFullExplorer?: (kridaId: KridaId, moduleId?: string) => void;
+  onOpenFullScreenReader?: (moduleId?: string) => void;
   onOpenEditor?: (moduleItem: KridaModuleItem) => void;
   variant?: 'dark' | 'light';
   initialKridaId?: KridaId;
@@ -38,11 +40,14 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
   modules,
   currentUser,
   onOpenFullExplorer,
+  onOpenFullScreenReader,
   onOpenEditor,
   variant = 'dark',
   initialKridaId = 'pemandu'
 }) => {
   const [selectedKridaId, setSelectedKridaId] = useState<KridaId>(initialKridaId);
+  const [isInternalReaderOpen, setIsInternalReaderOpen] = useState(false);
+  const [readerModuleId, setReaderModuleId] = useState<string | undefined>();
   
   // Filter modules by category
   const categoryModules = useMemo(() => {
@@ -53,6 +58,16 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
   const [selectedModuleId, setSelectedModuleId] = useState<string>(() => {
     return categoryModules[0]?.id || modules[0]?.id || '';
   });
+
+  const handleTriggerFullScreenReader = (modId?: string) => {
+    const targetId = modId || selectedModuleId;
+    if (onOpenFullScreenReader) {
+      onOpenFullScreenReader(targetId);
+    } else {
+      setReaderModuleId(targetId);
+      setIsInternalReaderOpen(true);
+    }
+  };
 
   // Keep track of which detail section is currently opened by user click
   const [activeSection, setActiveSection] = useState<ActiveDetailSection>('NONE');
@@ -177,6 +192,16 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
 
           {/* Quick action buttons */}
           <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => handleTriggerFullScreenReader(selectedModuleId)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-purple-950/40 cursor-pointer"
+              title="Baca naskah & kurikulum dalam mode layar penuh (tanpa scroll, kendali next >> dan back <<)"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-amber-300" />
+              <span>Layar Penuh (Next &gt;&gt; / Back &lt;&lt;)</span>
+            </button>
+
             {onOpenFullExplorer && (
               <button
                 type="button"
@@ -188,8 +213,8 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 }`}
                 title="Buka Penjelajah Lengkap (Mode Modal)"
               >
-                <Maximize2 className="w-3.5 h-3.5 text-purple-500" />
-                <span className="hidden sm:inline">Layar Penuh</span>
+                <Maximize2 className="w-3.5 h-3.5 text-purple-400" />
+                <span className="hidden sm:inline">Penjelajah</span>
               </button>
             )}
 
@@ -354,15 +379,27 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 </p>
               </div>
 
-              {/* Status Pill */}
-              <div className={`shrink-0 text-right sm:border-l sm:pl-4 ${isDark ? 'border-slate-800' : 'border-purple-200'}`}>
-                <div className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Kelengkapan
+              {/* Status Pill & Fullscreen Reader Button */}
+              <div className={`shrink-0 text-right sm:border-l sm:pl-4 flex flex-col justify-between items-end gap-2 ${isDark ? 'border-slate-800' : 'border-purple-200'}`}>
+                <div>
+                  <div className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Kelengkapan
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1 text-xs font-bold text-emerald-500">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Siap Dipelajari</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 mt-1 text-xs font-bold text-emerald-500">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Siap Dipelajari</span>
-                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleTriggerFullScreenReader(currentModule.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-purple-900/30 transition-all cursor-pointer"
+                  title="Baca materi modul ini dalam tampilan layar penuh tanpa sistem scrolling (tombol next >> dan back <<)"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Baca Layar Penuh</span>
+                </button>
               </div>
             </div>
           </div>
@@ -811,6 +848,13 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
           </div>
         </div>
       )}
+      {/* Fullscreen Reader Modal (No Scrolling, Only Next >> & Back <<) */}
+      <KridaFullScreenReaderModal
+        isOpen={isInternalReaderOpen}
+        onClose={() => setIsInternalReaderOpen(false)}
+        modules={modules}
+        initialModuleId={readerModuleId || selectedModuleId}
+      />
     </div>
   );
 };

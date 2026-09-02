@@ -21,6 +21,7 @@ import { storage } from '../services/storage';
 import { KridaExplorerModal } from '../components/krida/KridaExplorerModal';
 import { KridaMaterialEditorModal } from '../components/krida/KridaMaterialEditorModal';
 import { CompactKridaPortal } from '../components/krida/CompactKridaPortal';
+import { KridaFullScreenReaderModal } from '../components/krida/KridaFullScreenReaderModal';
 
 interface KridaModulesViewProps {
   currentUser: CurrentUser;
@@ -39,6 +40,14 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser 
   
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<KridaModuleItem | null>(null);
+
+  const [isFullScreenReaderOpen, setIsFullScreenReaderOpen] = useState(false);
+  const [readerModuleId, setReaderModuleId] = useState<string | undefined>();
+
+  const handleOpenFullScreenReader = (moduleId?: string) => {
+    setReaderModuleId(moduleId);
+    setIsFullScreenReaderOpen(true);
+  };
 
   // Auto-sync storage changes
   useEffect(() => {
@@ -104,13 +113,22 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser 
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            <button
+              onClick={() => handleOpenFullScreenReader(activeModuleId || modules[0]?.id)}
+              className="px-4 py-2.5 rounded-2xl bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-xs border border-purple-200 flex items-center gap-2 cursor-pointer transition-all shadow-2xs"
+              title="Buka naskah materi & SKK dalam mode layar penuh (tanpa scrolling, kendali next >> dan back <<)"
+            >
+              <BookOpen className="w-4 h-4 text-purple-700" />
+              <span>Layar Penuh (Next &gt;&gt; / Back &lt;&lt;)</span>
+            </button>
+
             <button
               onClick={() => handleOpenExplorer('pemandu')}
               className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-purple-900/20 flex items-center gap-2 cursor-pointer transition-all"
             >
-              <BookOpen className="w-4 h-4 text-amber-300" />
-              <span>Buka Pembaca Modul</span>
+              <Layers className="w-4 h-4 text-purple-200" />
+              <span>Buka Penjelajah</span>
             </button>
             {isSuperAdmin && (
               <div className="px-3 py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold flex items-center gap-1.5">
@@ -239,6 +257,7 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser 
           modules={modules}
           currentUser={currentUser}
           onOpenFullExplorer={handleOpenExplorer}
+          onOpenFullScreenReader={handleOpenFullScreenReader}
           onOpenEditor={handleOpenEditor}
           variant="light"
           initialKridaId={selectedKrida !== 'ALL' ? (selectedKrida as KridaId) : 'pemandu'}
@@ -319,6 +338,14 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser 
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
 
+                  <button
+                    onClick={() => handleOpenFullScreenReader(item.id)}
+                    className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700 border border-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    title="Baca modul ini dalam mode layar penuh tanpa scrolling (Next >> dan Back <<)"
+                  >
+                    <span>Layar Penuh</span>
+                  </button>
+
                   {isSuperAdmin && (
                     <button
                       onClick={() => handleOpenEditor(item)}
@@ -361,6 +388,14 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser 
         moduleItem={editingModule}
         currentUser={currentUser}
         onSave={handleSaveModule}
+      />
+
+      {/* Fullscreen Reader Modal (No Scrolling, Only Next >> & Back << Navigation) */}
+      <KridaFullScreenReaderModal
+        isOpen={isFullScreenReaderOpen}
+        onClose={() => setIsFullScreenReaderOpen(false)}
+        modules={modules}
+        initialModuleId={readerModuleId}
       />
     </div>
   );
