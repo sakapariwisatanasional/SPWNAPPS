@@ -64,6 +64,29 @@ class SpreadsheetService {
     this.initBroadcastChannel();
     this.initAutoSync();
     this.startLiveSyncEngine((this.config.autoRefreshIntervalSeconds || 6) * 1000); // Poll every 6 seconds for real-time cloud data
+    this.fetchServerConfig().catch(() => {});
+  }
+
+  public async fetchServerConfig() {
+    if (typeof window === 'undefined') return;
+    try {
+      const res = await fetch('/api/config');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.config) {
+          this.config = {
+            ...this.config,
+            ...data.config,
+            spreadsheetId: data.config.spreadsheetId || DEFAULT_SPREADSHEET_ID,
+            spreadsheetUrl: data.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL
+          };
+          localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
+          this.notifySyncState();
+        }
+      }
+    } catch (err) {
+      // offline fallback
+    }
   }
 
   private initBroadcastChannel() {
@@ -169,6 +192,20 @@ class SpreadsheetService {
     this.config = { ...this.config, ...updates };
     localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
     this.notifySyncState();
+
+    // Persist to central server so ALL devices and browsers share this configuration
+    if (typeof window !== 'undefined') {
+      try {
+        fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.config)
+        }).catch(err => console.warn('[SpreadsheetService] Save config to server notice:', err));
+      } catch (err) {
+        console.warn('[SpreadsheetService] Save config to server error:', err);
+      }
+    }
+
     return this.config;
   }
 
@@ -1077,9 +1114,9 @@ class SpreadsheetService {
 
           activityRows.forEach((row, idx) => {
             const actId = this.getRowValue(row, ['ID', 'id', 'col_0']) || `act-sheet-${idx + 1}`;
-            const title = this.getRowValue(row, ['Judul Kegiatan', 'Nama Kegiatan', 'title', 'col_1']) || `Kegiatan Saka ${idx + 1}`;
+            const title = this.getRowValue(row, ['Nama Agenda', 'Judul Kegiatan', 'Nama Kegiatan', 'title', 'col_1']) || `Kegiatan Saka ${idx + 1}`;
             const cat = this.getRowValue(row, ['Kategori', 'category', 'col_2']) || 'Pelatihan';
-            const levelRaw = (this.getRowValue(row, ['Tingkat', 'Level', 'organizerLevel', 'col_3']) || 'NASIONAL').toUpperCase();
+            const levelRaw = (this.getRowValue(row, ['Skala Tingkat', 'Tingkat', 'Level', 'organizerLevel', 'col_3']) || 'NASIONAL').toUpperCase();
             let organizerLevel: any = 'NASIONAL';
             if (levelRaw.includes('INTERNASIONAL')) organizerLevel = 'INTERNASIONAL';
             else if (levelRaw.includes('PROVINSI') || levelRaw.includes('KWARDA')) organizerLevel = 'PROVINSI';
@@ -1090,12 +1127,12 @@ class SpreadsheetService {
             const location = this.getRowValue(row, ['Lokasi', 'Tempat', 'locationName', 'col_5']) || 'Bumi Perkemahan';
             const prov = this.getRowValue(row, ['Provinsi', 'province', 'provinceName', 'col_6']) || 'Jawa Barat';
             const reg = this.getRowValue(row, ['Kabupaten/Kota', 'regency', 'regencyName', 'col_7']) || 'Kota Bandung';
-            const startD = this.parseGvizDate(this.getRowValue(row, ['Tanggal Mulai', 'startDate', 'col_8']));
-            const endD = this.parseGvizDate(this.getRowValue(row, ['Tanggal Selesai', 'endDate', 'col_9']));
-            const feeTypeRaw = (this.getRowValue(row, ['Biaya', 'feeType', 'col_10']) || 'GRATIS').toUpperCase();
+            const startD = this.parseGvizDate(this.getRowValue(row, ['Tanggal Mulai', 'startDate', 'col_8', 'col_7']));
+            const endD = this.parseGvizDate(this.getRowValue(row, ['Tanggal Selesai', 'endDate', 'col_9', 'col_8']));
+            const feeTypeRaw = (this.getRowValue(row, ['Jenis Biaya', 'Biaya', 'feeType', 'col_9', 'col_10']) || 'GRATIS').toUpperCase();
             const feeType: any = feeTypeRaw.includes('BERBAYAR') ? 'BERBAYAR' : feeTypeRaw.includes('SUBSIDI') ? 'SUBSIDI' : 'GRATIS';
-            const fee = parseFloat(this.getRowValue(row, ['Nominal Biaya', 'feeAmount', 'col_11'])) || 0;
-            const phone = this.normalizePhoneNumber(this.getRowValue(row, ['Kontak WA', 'phone', 'contactPhone', 'col_12']));
+            const fee = parseFloat(this.getRowValue(row, ['Nominal Biaya', 'feeAmount', 'col_10', 'col_11'])) || 0;
+            const phone = this.normalizePhoneNumber(this.getRowValue(row, ['Kontak Narahubung', 'Kontak WA', 'phone', 'contactPhone', 'col_11', 'col_12']));
             const banner = this.cleanDriveImageUrl(this.getRowValue(row, ['Banner URL', 'Foto', 'image', 'bannerUrl', 'col_13'])) || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200&auto=format&fit=crop&q=80';
             const desc = this.getRowValue(row, ['Deskripsi', 'description', 'col_14']) || `Kegiatan resmi Saka Pariwisata: ${title}. Terbuka untuk seluruh anggota dan insan kepariwisataan.`;
 

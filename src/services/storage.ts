@@ -86,6 +86,7 @@ class StorageService {
   constructor() {
     this.init();
     this.initCrossTabListener();
+    this.syncWithServer().catch(() => {});
   }
 
   private initCrossTabListener() {
@@ -141,7 +142,7 @@ class StorageService {
       const rawActivities = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
       if (rawActivities) {
         const acts: Activity[] = JSON.parse(rawActivities);
-        const filteredActs = acts.filter(a => !a.id.startsWith('act-showcase-') && !a.id.startsWith('act-nasional-') && !a.id.startsWith('act-provinsi-') && !a.id.startsWith('act-cabang-'));
+        const filteredActs = acts.filter(a => !a.id.startsWith('act-showcase-') && !a.id.startsWith('act-dummy-'));
         localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(filteredActs));
       } else {
         localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify([]));
@@ -267,6 +268,53 @@ class StorageService {
         console.warn('Storage mutation listener error:', err);
       }
     });
+
+    // Forward to central full-stack server for cross-device synchronization
+    if (typeof window !== 'undefined' && type !== 'SYSTEM') {
+      try {
+        fetch('/api/mutate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, action, payload })
+        }).catch(err => console.warn('[Storage] Server mutation notice:', err));
+      } catch (err) {
+        console.warn('[Storage] Send server mutation error:', err);
+      }
+    }
+  }
+
+  public async syncWithServer(): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    try {
+      const res = await fetch('/api/data', { cache: 'no-store' });
+      if (!res.ok) return false;
+      const data = await res.json();
+
+      let hasChanges = false;
+      if (Array.isArray(data.members) && data.members.length > 0) {
+        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(data.members));
+        hasChanges = true;
+      }
+      if (Array.isArray(data.tours) && data.tours.length > 0) {
+        localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(data.tours));
+        hasChanges = true;
+      }
+      if (Array.isArray(data.activities) && data.activities.length > 0) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(data.activities));
+        hasChanges = true;
+      }
+      if (Array.isArray(data.culinaryItems) && data.culinaryItems.length > 0) {
+        localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(data.culinaryItems));
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
+        this.listeners.forEach(cb => cb());
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   private notify(mutationType?: string, payload?: any) {
