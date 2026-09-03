@@ -1226,55 +1226,175 @@ class SpreadsheetService {
   /**
    * Kirim data anggota baru ke Google Spreadsheet melalui Google Apps Script Web App
    */
-  public async appendMemberToSpreadsheet(member: Member): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.config.scriptUrl;
+  public async appendMemberToSpreadsheet(member: Member): Promise<{ success: boolean; message: string; requestId?: string }> {
+    // Pastikan konfigurasi server terbaru sudah termuat sebelum transaksi dimulai.
+    await this.fetchServerConfig();
 
+    const scriptUrl = (this.config.scriptUrl || '').trim();
     if (!scriptUrl) {
-      return {
-        success: true,
-        message: 'Data tersimpan di database lokal. Untuk sinkronisasi otomatis ke Google Spreadsheet, masukkan Web App URL di Pengaturan Database.'
-      };
+      const message = 'Google Apps Script Web App URL belum dikonfigurasi. Pendaftaran TIDAK dianggap tersimpan di Spreadsheet.';
+      this.saveConfig({ status: 'ERROR', lastError: message });
+      return { success: false, message };
     }
 
-    try {
-      const payload = {
-        action: 'UPSERT_MEMBER',
-        sheet: 'Anggota',
-        memberId: member.id,
-        rowData: [
-          member.id,
-          member.nationalMemberNumber || '',
-          member.fullName,
-          member.email,
-          member.phone,
-          member.provinceName,
-          member.regencyName,
-          member.branchName,
-          member.gugusDepan,
-          member.krida || '',
-          member.status,
-          member.avatarUrl,
-          member.registeredAt,
-          window.location.origin + '/?verifyId=' + (member.nationalMemberNumber || member.id)
-        ]
-      };
+    const requestId = `MEMBER_${member.id}_${Date.now()}`;
+    const payload = {
+      action: 'UPSERT_MEMBER',
+      requestId,
+      sheet: 'Anggota',
+      memberId: member.id,
+      secondaryId: member.nationalMemberNumber || '',
+      rowData: [
+        member.id,
+        member.nationalMemberNumber || '',
+        member.fullName,
+        member.email,
+        member.phone,
+        member.provinceName,
+        member.regencyName,
+        member.branchName,
+        member.gugusDepan,
+        member.krida || '',
+        member.status,
+        member.avatarUrl || '',
+        member.registeredAt,
+        window.location.origin + '/?verifyId=' + (member.nationalMemberNumber || member.id)
+      ]
+    };
 
+    try {
+      // IMPORTANT: text/plain adalah CORS-safelisted Content-Type.
+      // application/json + no-cors dapat ditolak browser sebelum request dikirim.
       await fetch(scriptUrl, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        cache: 'no-store'
       });
+
+      this.syncState.isSaving = true;
+      this.syncState.lastSavedAction = `Menunggu verifikasi Google Spreadsheet untuk ${member.fullName}...`;
+      this.syncState.error = null;
+      this.notifySyncState();
 
       return {
         success: true,
-        message: 'Data anggota berhasil dikirimkan ke Google Spreadsheet.'
+        requestId,
+        message: 'Request UPSERT_MEMBER telah dikirim ke Google Apps Script.'
       };
     } catch (err: any) {
-      console.error('Failed to append row to spreadsheet', err);
+      const message = `Gagal mengirim pendaftaran ke Google Spreadsheet: ${err?.message || err}`;
+      this.saveConfig({ status: 'ERROR', lastError: message });
+      return { success: false, requestId, message };
+    }
+  }
+
+  /**
+   * Transaksi registrasi anggota yang BENAR-BENAR menunggu sampai
+   * record ditemukan kembali di Google Spreadsheet.
+   * Tidak mengandalkan response POST no-cors sebagai bukti sukses.
+   */
+  public async saveMemberAndWaitForSync(member: Member): Promise<{
+    success: boolean;
+    synced: boolean;
+    requestId?: string;
+    message: string;
+    row?: number | null;
+  }> {
+    const maxAttempts = 12;
+    const intervalMs = 500;
+
+    try {
+      await this.fetchServerConfig();
+
+      const config = this.getConfig();
+      if (!config.scriptUrl || !config.scriptUrl.trim()) {
+        return {
+          success: false,
+          synced: false,
+          message: 'Google Apps Script Web App URL belum tersedia. Pendaftaran dibatalkan agar tidak hanya tersimpan di browser.'
+        };
+      }
+
+      const sendResult = await this.appendMemberToSpreadsheet(member);
+      if (!sendResult.success) {
+        return {
+          success: false,
+          synced: false,
+          requestId: sendResult.requestId,
+          message: sendResult.message
+        };
+      }
+
+      const spreadsheetId = member.id;
+      const secondaryId = member.nationalMemberNumber || '';
+      const email = (member.email || '').trim().toLowerCase();
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const rows = await this.fetchSheetRows('Anggota');
+          const foundIndex = rows.findIndex((row: any) => {
+            const id = String(row.id ?? row.ID ?? '').trim();
+            const kta = String(row.nomor_kta ?? row['Nomor KTA'] ?? '').trim();
+            const rowEmail = String(row.email ?? row.Email ?? '').trim().toLowerCase();
+            return (
+              (spreadsheetId && id === spreadsheetId) ||
+              (secondaryId && kta === secondaryId) ||
+              (email && rowEmail === email)
+            );
+          });
+
+          if (foundIndex >= 0) {
+            const rowNumber = foundIndex + 2; // + header + zero-based index
+            this.syncState.isSaving = false;
+            this.syncState.error = null;
+            this.syncState.lastSavedTime = new Date().toLocaleTimeString('id-ID', {
+              hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) + ' WIB';
+            this.syncState.lastSavedAction = `Data anggota ${member.fullName} terverifikasi di Spreadsheet (baris ${rowNumber}).`;
+            this.saveConfig({
+              status: 'CONNECTED',
+              lastSyncedAt: new Date().toISOString(),
+              lastError: undefined
+            });
+            this.notifySyncState();
+
+            return {
+              success: true,
+              synced: true,
+              requestId: sendResult.requestId,
+              row: rowNumber,
+              message: `Data anggota berhasil disimpan dan diverifikasi di Google Spreadsheet pada baris ${rowNumber}.`
+            };
+          }
+        } catch (verifyErr) {
+          console.warn(`[SpreadsheetService] Verifikasi attempt ${attempt} gagal:`, verifyErr);
+        }
+
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, intervalMs));
+        }
+      }
+
+      this.syncState.isSaving = false;
+      this.syncState.error = `Record ${member.id} tidak ditemukan di Spreadsheet setelah ${maxAttempts} kali verifikasi.`;
+      this.notifySyncState();
+
       return {
         success: false,
-        message: 'Gagal mengirim ke spreadsheet: ' + err.message
+        synced: false,
+        requestId: sendResult.requestId,
+        message: `Pendaftaran dikirim tetapi BELUM ditemukan di Google Spreadsheet setelah ${maxAttempts} kali verifikasi. Data tidak dianggap berhasil.`
+      };
+    } catch (err: any) {
+      this.syncState.isSaving = false;
+      this.syncState.error = err?.message || String(err);
+      this.notifySyncState();
+      return {
+        success: false,
+        synced: false,
+        message: err?.message || 'Transaksi pendaftaran gagal.'
       };
     }
   }
