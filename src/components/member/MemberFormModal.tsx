@@ -248,47 +248,40 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       return;
     }
 
-    if (!/^\d{16}$/.test(nik)) {
-      alert('NIK harus terdiri dari 16 digit angka.');
-      return;
-    }
-
+    // Strict validation for Operator Cabang
     if (isRegencyOperator && currentUser?.jurisdictionId && selectedRegencyId !== currentUser.jurisdictionId) {
       alert(`Peringatan Akses: Anda hanya diizinkan mendaftarkan anggota pada Kwartir Cabang Anda (${currentUser.jurisdictionName}).`);
       return;
     }
 
-    if (isUploadingPhoto) {
-      alert('Foto masih diproses. Tunggu sampai proses foto selesai.');
-      return;
-    }
-
     setIsSubmitting(true);
 
+    const currentProvince = provinces.find(p => p.id === selectedProvinceId);
+    const currentRegency = regencies.find(r => r.id === selectedRegencyId);
+    const currentDistrict = districts.find(d => d.id === selectedDistrictId);
+    const currentBranch = branches.find(b => b.id === selectedBranchId);
+
+    // Mask NIK for security
+    const maskedNik = nik.length >= 10 
+      ? nik.substring(0, 6) + '******' + nik.substring(nik.length - 4)
+      : nik;
+
+    // Build skills array
+    const memberSkills: MemberSkill[] = selectedSkillIds.map((sId, idx) => {
+      const sObj = skillsList.find(s => s.id === sId);
+      return {
+        id: `ms-new-${idx}-${Date.now()}`,
+        skillId: sId,
+        skillName: sObj?.name || 'Keahlian Wisata',
+        category: sObj?.category || 'Umum',
+        proficiency: skillProficiency,
+        yearsOfExperience: 2,
+        isVerified: false
+      };
+    });
+
     try {
-      const currentProvince = provinces.find(p => p.id === selectedProvinceId);
-      const currentRegency = regencies.find(r => r.id === selectedRegencyId);
-      const currentDistrict = districts.find(d => d.id === selectedDistrictId);
-      const currentBranch = branches.find(b => b.id === selectedBranchId);
-
-      const maskedNik = nik.length >= 10
-        ? nik.substring(0, 6) + '******' + nik.substring(nik.length - 4)
-        : nik;
-
-      const memberSkills: MemberSkill[] = selectedSkillIds.map((sId, idx) => {
-        const sObj = skillsList.find(s => s.id === sId);
-        return {
-          id: `ms-new-${idx}-${Date.now()}`,
-          skillId: sId,
-          skillName: sObj?.name || 'Keahlian Wisata',
-          category: sObj?.category || 'Umum',
-          proficiency: skillProficiency,
-          yearsOfExperience: 2,
-          isVerified: false
-        };
-      });
-
-      // 1. Buat record lokal agar seluruh ID/data anggota terbentuk konsisten.
+      // STEP 1: buat record lokal dengan status PENDING.
       const member = storage.registerMember({
         userId: `user-${Date.now()}`,
         fullName,
@@ -300,6 +293,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         phone,
         email,
         address: address || 'Jl. Pramuka Raya',
+        
         provinceId: selectedProvinceId,
         provinceName: currentProvince?.name || 'Jawa Barat',
         regencyId: selectedRegencyId,
@@ -308,6 +302,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         districtName: currentDistrict?.name || 'Kecamatan',
         branchId: selectedBranchId || 'branch-default',
         branchName: currentBranch?.name || `Kwarran ${currentDistrict?.name || 'Pariwisata'}`,
+        
         gugusDepan,
         joinYear,
         currentPosition: `Calon Anggota ${krida}`,
@@ -319,32 +314,22 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         certifications: []
       });
 
-      // 2. Tunggu sampai Google Spreadsheet benar-benar memiliki record.
+      // STEP 2: POST UPSERT_MEMBER -> STEP 3: CHECK_RECORD.
+      // Jangan navigasi / menutup modal sebelum Google Spreadsheet benar-benar
+      // mengembalikan found=true.
       const syncResult = await spreadsheetService.saveMemberAndWaitForSync(member);
 
-      if (!syncResult.success || !syncResult.synced) {
-        setIsSubmitting(false);
-        alert(
-          'Pendaftaran BELUM berhasil diselesaikan.\n\n' +
-          syncResult.message + '\n\n' +
-          'User belum boleh melanjutkan ke proses login.'
-        );
-        return;
+      if (!syncResult.synced) {
+        throw new Error(syncResult.message || 'Data belum terverifikasi di Google Spreadsheet.');
       }
 
+      alert(`Pendaftaran berhasil disimpan dan diverifikasi di Google Spreadsheet (baris ${syncResult.row || '-'}).`);
       setIsSubmitting(false);
-      alert(
-        'Pendaftaran berhasil dan telah terverifikasi di Google Spreadsheet.\n\n' +
-        `Nomor KTA: ${member.nationalMemberNumber || '-'}\n` +
-        `Baris Spreadsheet: ${syncResult.row || '-'}\n\n` +
-        'Akun sekarang dapat digunakan untuk login.'
-      );
       onSuccess();
       onClose();
     } catch (err: any) {
-      console.error('[MemberFormModal] Registration error:', err);
       setIsSubmitting(false);
-      alert('Gagal mendaftarkan anggota: ' + (err?.message || 'Terjadi kesalahan.'));
+      alert('Gagal mendaftarkan anggota: ' + err.message);
     }
   };
 
@@ -864,7 +849,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-950/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4" />
-              <span>{isSubmitting ? 'Memverifikasi Spreadsheet...' : 'Kirim Pendaftaran'}</span>
+              <span>{isSubmitting ? 'Menyimpan & Memverifikasi...' : 'Kirim Pendaftaran'}</span>
             </button>
           </div>
         </form>
