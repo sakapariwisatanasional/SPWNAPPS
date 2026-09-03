@@ -21,7 +21,8 @@ import {
   CheckSquare,
   Square,
   Share2,
-  Table as TableIcon
+  Table as TableIcon,
+  AlertTriangle
 } from 'lucide-react';
 import { KridaCategoryInfo, KridaId, KridaModuleItem, CurrentUser } from '../../types';
 import { KRIDA_CATEGORIES } from '../../data/kridaData';
@@ -353,7 +354,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                 {/* DETAIL HEADER */}
                 <div className="p-4 sm:p-6 border-b border-slate-800 bg-slate-950/60 shrink-0 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="px-2.5 py-1 rounded-xl bg-purple-950/80 text-purple-300 text-xs font-bold border border-purple-800/60 flex items-center gap-1.5">
                         <Award className="w-3.5 h-3.5 text-amber-400" />
                         <span>Mata Krida {currentModule.code}</span>
@@ -361,6 +362,11 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       <span className="text-xs text-slate-400 font-medium">
                         {currentModule.kridaName}
                       </span>
+                      {currentModule.skkniReference && (
+                        <span className="px-2 py-0.5 rounded-lg bg-emerald-950/80 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-800/60">
+                          SKKNI: {currentModule.skkniReference}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -639,13 +645,19 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                   {/* TAB 3: SKK TEST REQUIREMENTS */}
                   {activeTab === 'TEST' && (
                     <div className="space-y-6 max-w-4xl">
-                      <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-800/40 text-xs text-amber-200">
-                        <p className="font-bold flex items-center gap-2">
-                          <Award className="w-4 h-4 text-amber-400" />
-                          <span>Tingkatan Tanda Kecakapan Khusus (TKK)</span>
-                        </p>
-                        <p className="text-slate-400 text-[11px] mt-1">
-                          Pramuka Penegak/Pandega dapat menempuh pengujian TKK secara bertahap mulai dari tingkat Purwa, Madya, hingga Utama bersama Pembina/Penguji Ahli.
+                      {/* 2026 Standard Scoring Banner */}
+                      <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-800/40 text-xs text-amber-200 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-bold flex items-center gap-2">
+                            <Award className="w-4 h-4 text-amber-400" />
+                            <span>Standar Pengujian SKK & TKK Saka Pariwisata 2026</span>
+                          </p>
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold border border-amber-500/30">
+                            Passing Grade: Nilai Akhir ≥ 80
+                          </span>
+                        </div>
+                        <p className="text-slate-300 text-[11px] leading-relaxed">
+                          Formula Penilaian 100%: <strong className="text-amber-300">Pengetahuan (20%)</strong> + <strong className="text-purple-300">Keterampilan (40%)</strong> + <strong className="text-blue-300">Sikap Kerja (20%)</strong> + <strong className="text-emerald-300">Produk/Praktik Nyata (20%)</strong>.
                         </p>
                       </div>
 
@@ -655,14 +667,14 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-emerald-500" />
                             <h4 className="text-sm font-extrabold text-white uppercase tracking-wider font-heading">
-                              Tingkat Purwa (Dasar)
+                              Tingkat Purwa (7–15 Thn / Dasar)
                             </h4>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 text-[10px] font-bold border border-emerald-800/60">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 text-[10px] font-bold border border-emerald-800/60 font-mono">
                             Bingkai Bulat
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400">Syarat Kecakapan Khusus awal bagi anggota baru:</p>
+                        <p className="text-xs text-slate-400">Kriteria penguasaan materi dan simulasi awal bagi peserta didik:</p>
                         <div className="space-y-2 pt-1">
                           {((currentModule.testRequirements?.purwa && currentModule.testRequirements.purwa.length > 0)
                             ? currentModule.testRequirements.purwa
@@ -688,6 +700,13 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                             );
                           })}
                         </div>
+
+                        {currentModule.practiceProduct?.purwa && (
+                          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-emerald-800/40 text-xs text-emerald-300">
+                            <span className="font-bold text-emerald-400 block mb-1">📦 Produk Nyata / Bukti Uji Wajib Purwa:</span>
+                            <p className="text-slate-300 text-[11px] leading-relaxed">{currentModule.practiceProduct.purwa}</p>
+                          </div>
+                        )}
                       </div>
 
                       {/* MADYA */}
@@ -696,14 +715,14 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-amber-500" />
                             <h4 className="text-sm font-extrabold text-white uppercase tracking-wider font-heading">
-                              Tingkat Madya (Lanjutan)
+                              Tingkat Madya (15–20 Thn / Penerapan)
                             </h4>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 text-[10px] font-bold border border-amber-800/60">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 text-[10px] font-bold border border-amber-800/60 font-mono">
                             Bingkai Persegi
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400">Penguasaan kecakapan tingkat praktik dan simulasi lapangan:</p>
+                        <p className="text-xs text-slate-400">Penguasaan kecakapan tingkat praktik mandiri dan simulasi lapangan:</p>
                         <div className="space-y-2 pt-1">
                           {((currentModule.testRequirements?.madya && currentModule.testRequirements.madya.length > 0)
                             ? currentModule.testRequirements.madya
@@ -729,6 +748,13 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                             );
                           })}
                         </div>
+
+                        {currentModule.practiceProduct?.madya && (
+                          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-amber-800/40 text-xs text-amber-300">
+                            <span className="font-bold text-amber-400 block mb-1">📦 Produk Nyata / Bukti Uji Wajib Madya:</span>
+                            <p className="text-slate-300 text-[11px] leading-relaxed">{currentModule.practiceProduct.madya}</p>
+                          </div>
+                        )}
                       </div>
 
                       {/* UTAMA */}
@@ -737,14 +763,14 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-purple-500" />
                             <h4 className="text-sm font-extrabold text-white uppercase tracking-wider font-heading">
-                              Tingkat Utama (Mahir & Instruktur)
+                              Tingkat Utama (21–25 Thn / Pengembangan)
                             </h4>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 text-[10px] font-bold border border-purple-800/60">
+                          <span className="px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 text-[10px] font-bold border border-purple-800/60 font-mono">
                             Bingkai Segilima
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400">Tingkat tertinggi dengan kemampuan melatih dan memimpin operasi kepariwisataan:</p>
+                        <p className="text-xs text-slate-400">Tingkat tertinggi dengan kemampuan membimbing, evaluasi, dan inovasi:</p>
                         <div className="space-y-2 pt-1">
                           {((currentModule.testRequirements?.utama && currentModule.testRequirements.utama.length > 0)
                             ? currentModule.testRequirements.utama
@@ -770,7 +796,45 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                             );
                           })}
                         </div>
+
+                        {currentModule.practiceProduct?.utama && (
+                          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-purple-800/40 text-xs text-purple-300">
+                            <span className="font-bold text-purple-400 block mb-1">📦 Produk Nyata / Bukti Uji Wajib Utama:</span>
+                            <p className="text-slate-300 text-[11px] leading-relaxed">{currentModule.practiceProduct.utama}</p>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Special Safety Notes */}
+                      {currentModule.specialSafetyNotes && (
+                        <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-800/40 text-xs text-rose-200 flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-sm text-rose-400 block">Prosedur Keselamatan Kerja & Etika Wisata (K3 Wisata):</span>
+                            <p className="text-slate-300 text-xs leading-relaxed mt-1">{currentModule.specialSafetyNotes}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 8 Components Portfolio */}
+                      {currentModule.portfolioItems && currentModule.portfolioItems.length > 0 && (
+                        <div className="p-5 rounded-3xl bg-slate-950 border border-slate-800 space-y-3">
+                          <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2 font-heading">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>8 Komponen Bukti Portofolio Uji Resmi 2026</span>
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            {currentModule.portfolioItems.map((item, idx) => (
+                              <div key={idx} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/70 text-slate-300 flex items-start gap-2">
+                                <span className="w-5 h-5 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <span className="text-[11px] leading-relaxed">{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -493,7 +493,7 @@ export interface KridaModuleItem {
   id: string;
   kridaId: KridaId;
   kridaName: string;
-  code: string; // e.g. '(a)', '(b)'
+  code: string; // e.g. 'PM-01', 'PY-01', 'ME-01', 'KC-01'
   title: string;
   badge: string;
   levelSKK: string;
@@ -507,5 +507,21 @@ export interface KridaModuleItem {
   downloads: KridaDownloadFile[];
   updatedAt: string;
   updatedBy: string;
+  // Standar Buku Panduan SKK Saka Pariwisata 2026:
+  skkniReference?: string;
+  practiceProduct?: {
+    purwa: string;
+    madya: string;
+    utama: string;
+  };
+  portfolioItems?: string[];
+  scoringWeights?: {
+    knowledge: number; // 20%
+    skill: number;     // 40%
+    attitude: number;  // 20%
+    product: number;   // 20%
+    passingGrade: number; // 80 (Memenuhi)
+  };
+  specialSafetyNotes?: string;
 }
 

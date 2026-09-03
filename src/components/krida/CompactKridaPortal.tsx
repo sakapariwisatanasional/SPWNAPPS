@@ -18,7 +18,8 @@ import {
   Compass,
   CheckSquare,
   Square,
-  Maximize2
+  Maximize2,
+  AlertTriangle
 } from 'lucide-react';
 import { KridaCategoryInfo, KridaId, KridaModuleItem, CurrentUser } from '../../types';
 import { KRIDA_CATEGORIES } from '../../data/kridaData';
@@ -364,6 +365,13 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                   <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     Tingkat: <span className="font-semibold">{currentModule.levelSKK}</span>
                   </span>
+                  {currentModule.skkniReference && (
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                      isDark ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    }`}>
+                      SKKNI: {currentModule.skkniReference}
+                    </span>
+                  )}
                 </div>
 
                 <h3 className={`text-base sm:text-lg font-bold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
@@ -624,11 +632,11 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 {/* SECTION 3: UJI SKK */}
                 {activeSection === 'SKK' && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-2">
                       <div className="flex items-center gap-2">
                         <Award className="w-4 h-4 text-amber-400" />
                         <h4 className={`text-sm sm:text-base font-bold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          Syarat Kecakapan Khusus (SKK) & Lembar Uji
+                          Syarat Kecakapan Khusus (SKK) & Lembar Uji Standar 2026
                         </h4>
                       </div>
                       <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -636,94 +644,178 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                       </span>
                     </div>
 
+                    {/* Standard Formula Banner 2026 */}
+                    <div className={`p-3 rounded-xl border text-xs ${
+                      isDark ? 'bg-amber-950/20 border-amber-800/40 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'
+                    }`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 font-semibold text-[11px]">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                          Formula Penilaian 100%: Pengetahuan (20%) + Keterampilan (40%) + Sikap Kerja (20%) + Produk/Praktik (20%)
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-mono">
+                          Kelulusan: Nilai Akhir ≥ 80
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
                       {/* Purwa */}
-                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-2`}>
-                        <div className="flex items-center justify-between">
-                          <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold">
-                            Tingkat Purwa (Dasar)
-                          </span>
+                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-2 flex flex-col justify-between`}>
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold">
+                              Tingkat Purwa (7–15 Thn)
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">Bingkai Bulat</span>
+                          </div>
+                          <div className="space-y-1.5 pt-1">
+                            {currentModule.competencies?.purwa?.map((item, i) => {
+                              const key = `purwa-${i}`;
+                              const isChecked = !!checkedPurwa[key];
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => setCheckedPurwa(prev => ({ ...prev, [key]: !prev[key] }))}
+                                  className={`p-2 rounded-lg text-[11px] flex items-start gap-2 cursor-pointer transition-colors ${
+                                    isChecked 
+                                      ? isDark ? 'bg-amber-950/40 text-amber-200' : 'bg-amber-100 text-amber-900'
+                                      : isDark ? 'hover:bg-slate-900 text-slate-300' : 'hover:bg-white text-slate-700'
+                                  }`}
+                                >
+                                  {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
+                                  <span className="flex-1 leading-relaxed">{item}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="space-y-1.5 pt-1">
-                          {currentModule.competencies?.purwa?.map((item, i) => {
-                            const key = `purwa-${i}`;
-                            const isChecked = !!checkedPurwa[key];
-                            return (
-                              <div
-                                key={i}
-                                onClick={() => setCheckedPurwa(prev => ({ ...prev, [key]: !prev[key] }))}
-                                className={`p-2 rounded-lg text-[11px] flex items-start gap-2 cursor-pointer transition-colors ${
-                                  isChecked 
-                                    ? isDark ? 'bg-amber-950/40 text-amber-200' : 'bg-amber-100 text-amber-900'
-                                    : isDark ? 'hover:bg-slate-900 text-slate-300' : 'hover:bg-white text-slate-700'
-                                }`}
-                              >
-                                {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
-                                <span className="flex-1">{item}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+
+                        {currentModule.practiceProduct?.purwa && (
+                          <div className={`mt-3 p-2 rounded-lg border text-[10px] ${
+                            isDark ? 'bg-slate-900/80 border-amber-800/30 text-amber-300/90' : 'bg-amber-50 border-amber-200 text-amber-900'
+                          }`}>
+                            <span className="font-bold block text-amber-400 mb-0.5">📦 Produk Uji Wajib Purwa:</span>
+                            {currentModule.practiceProduct.purwa}
+                          </div>
+                        )}
                       </div>
 
                       {/* Madya */}
-                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-2`}>
-                        <div className="flex items-center justify-between">
-                          <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] font-bold">
-                            Tingkat Madya (Menengah)
-                          </span>
+                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-2 flex flex-col justify-between`}>
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] font-bold">
+                              Tingkat Madya (15–20 Thn)
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">Bingkai Persegi</span>
+                          </div>
+                          <div className="space-y-1.5 pt-1">
+                            {currentModule.competencies?.madya?.map((item, i) => {
+                              const key = `madya-${i}`;
+                              const isChecked = !!checkedMadya[key];
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => setCheckedMadya(prev => ({ ...prev, [key]: !prev[key] }))}
+                                  className={`p-2 rounded-lg text-[11px] flex items-start gap-2 cursor-pointer transition-colors ${
+                                    isChecked 
+                                      ? isDark ? 'bg-purple-950/40 text-purple-200' : 'bg-purple-100 text-purple-900'
+                                      : isDark ? 'hover:bg-slate-900 text-slate-300' : 'hover:bg-white text-slate-700'
+                                  }`}
+                                >
+                                  {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
+                                  <span className="flex-1 leading-relaxed">{item}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="space-y-1.5 pt-1">
-                          {currentModule.competencies?.madya?.map((item, i) => {
-                            const key = `madya-${i}`;
-                            const isChecked = !!checkedMadya[key];
-                            return (
-                              <div
-                                key={i}
-                                onClick={() => setCheckedMadya(prev => ({ ...prev, [key]: !prev[key] }))}
-                                className={`p-2 rounded-lg text-[11px] flex items-start gap-2 cursor-pointer transition-colors ${
-                                  isChecked 
-                                    ? isDark ? 'bg-purple-950/40 text-purple-200' : 'bg-purple-100 text-purple-900'
-                                    : isDark ? 'hover:bg-slate-900 text-slate-300' : 'hover:bg-white text-slate-700'
-                                }`}
-                              >
-                                {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
-                                <span className="flex-1">{item}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+
+                        {currentModule.practiceProduct?.madya && (
+                          <div className={`mt-3 p-2 rounded-lg border text-[10px] ${
+                            isDark ? 'bg-slate-900/80 border-purple-800/30 text-purple-300/90' : 'bg-purple-50 border-purple-200 text-purple-900'
+                          }`}>
+                            <span className="font-bold block text-purple-400 mb-0.5">📦 Produk Uji Wajib Madya:</span>
+                            {currentModule.practiceProduct.madya}
+                          </div>
+                        )}
                       </div>
 
                       {/* Utama */}
-                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-2`}>
-                        <div className="flex items-center justify-between">
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
-                            Tingkat Utama (Lanjutan)
-                          </span>
+                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-2 flex flex-col justify-between`}>
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                              Tingkat Utama (21–25 Thn)
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">Bingkai Segilima</span>
+                          </div>
+                          <div className="space-y-1.5 pt-1">
+                            {currentModule.competencies?.utama?.map((item, i) => {
+                              const key = `utama-${i}`;
+                              const isChecked = !!checkedUtama[key];
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => setCheckedUtama(prev => ({ ...prev, [key]: !prev[key] }))}
+                                  className={`p-2 rounded-lg text-[11px] flex items-start gap-2 cursor-pointer transition-colors ${
+                                    isChecked 
+                                      ? isDark ? 'bg-emerald-950/40 text-emerald-200' : 'bg-emerald-100 text-emerald-900'
+                                      : isDark ? 'hover:bg-slate-900 text-slate-300' : 'hover:bg-white text-slate-700'
+                                  }`}
+                                >
+                                  {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
+                                  <span className="flex-1 leading-relaxed">{item}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="space-y-1.5 pt-1">
-                          {currentModule.competencies?.utama?.map((item, i) => {
-                            const key = `utama-${i}`;
-                            const isChecked = !!checkedUtama[key];
-                            return (
-                              <div
-                                key={i}
-                                onClick={() => setCheckedUtama(prev => ({ ...prev, [key]: !prev[key] }))}
-                                className={`p-2 rounded-lg text-[11px] flex items-start gap-2 cursor-pointer transition-colors ${
-                                  isChecked 
-                                    ? isDark ? 'bg-emerald-950/40 text-emerald-200' : 'bg-emerald-100 text-emerald-900'
-                                    : isDark ? 'hover:bg-slate-900 text-slate-300' : 'hover:bg-white text-slate-700'
-                                }`}
-                              >
-                                {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
-                                <span className="flex-1">{item}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+
+                        {currentModule.practiceProduct?.utama && (
+                          <div className={`mt-3 p-2 rounded-lg border text-[10px] ${
+                            isDark ? 'bg-slate-900/80 border-emerald-800/30 text-emerald-300/90' : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                          }`}>
+                            <span className="font-bold block text-emerald-400 mb-0.5">📦 Produk Uji Wajib Utama:</span>
+                            {currentModule.practiceProduct.utama}
+                          </div>
+                        )}
                       </div>
                     </div>
+
+                    {/* Special Safety Notes */}
+                    {currentModule.specialSafetyNotes && (
+                      <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
+                        isDark ? 'bg-rose-950/20 border-rose-800/40 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-900'
+                      }`}>
+                        <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold block text-[11px] text-rose-400">Prosedur Keselamatan & Etika Kerja (K3 Wisata):</span>
+                          <p className="text-[11px] leading-relaxed mt-0.5">{currentModule.specialSafetyNotes}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 8 Components Portfolio Requirements */}
+                    {currentModule.portfolioItems && currentModule.portfolioItems.length > 0 && (
+                      <div className={`p-3.5 rounded-xl border text-xs ${
+                        isDark ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}>
+                        <span className="font-bold text-[11px] text-amber-400 flex items-center gap-1.5 mb-2">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Standar 8 Komponen Portofolio Peserta Didik (Buku Panduan 2026):
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {currentModule.portfolioItems.map((item, idx) => (
+                            <div key={idx} className="flex items-start gap-1.5 text-[11px]">
+                              <span className="text-amber-500 font-bold">•</span>
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

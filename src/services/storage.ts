@@ -80,7 +80,7 @@ const STORAGE_KEYS = {
   CUSTOM_BRANCHES: 'saka_custom_branches_v2',
   KTA_SETTINGS: 'saka_kta_settings_v2',
   CULINARY_SOUVENIRS: 'saka_culinary_souvenirs_v2',
-  KRIDA_MODULES: 'saka_krida_modules_v2'
+  KRIDA_MODULES: 'saka_krida_modules_2026'
 };
 
 class StorageService {

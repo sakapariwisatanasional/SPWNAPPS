@@ -56,6 +56,88 @@ interface OfficialDocument {
 
 const OFFICIAL_DOCUMENTS: OfficialDocument[] = [
   {
+    id: 'doc-panduan-skk-2026',
+    category: 'PANDUAN',
+    title: 'Buku Panduan Krida & Syarat Kecakapan Khusus Saka Pariwisata 2026',
+    subtitle: 'Tim Penyusun: Rohadi Wijaya | Asrul Roza | H. Agus Sulaiman, SE.',
+    code: 'SKK-2026',
+    badge: 'Standar Nasional 2026',
+    description: 'Pedoman resmi pembelajaran, pelatihan, dan pengujian 4 Krida dan 23 SKK Saka Pariwisata dengan standar acuan SKKNI dan formula penilaian 4 komponen.',
+    slides: [
+      {
+        title: 'Bab I: Falsafah Pendidikan & Standar Nasional 2026',
+        sectionTitle: 'Belajar – Berlatih – Berkarya – Mengabdi',
+        tag: 'Falsafah & Prinsip',
+        contentParagraphs: [
+          'Buku Panduan Krida dan Syarat Kecakapan Khusus Saka Pariwisata 2026 disusun oleh Rohadi Wijaya, Asrul Roza, dan H. Agus Sulaiman, SE. sebagai pedoman resmi nasional pembelajaran dan pengujian kecakapan kepramukaan pariwisata.',
+          'Prinsip penyelenggaraan berpegang teguh pada: "Satu Standar Nasional, Dapat Diterapkan Secara Kontekstual di Daerah". Pengujian mengadopsi standar kompetensi kerja nasional (SKKNI) sebagai referensi pembelajaran dan uji kecakapan pendidikan kepramukaan.'
+        ],
+        keyHighlights: [
+          { label: 'Tim Penyusun', value: 'Rohadi Wijaya, Asrul Roza, H. Agus Sulaiman, SE.' },
+          { label: 'Prinsip Karakter', value: 'Belajar – Berlatih – Berkarya – Mengabdi' },
+          { label: 'Cakupan Nasional', value: '4 Krida Spesialisasi & 23 Mata SKK' }
+        ]
+      },
+      {
+        title: 'Bab II: Tingkatan Usia Resmi & Jenjang TKK',
+        sectionTitle: 'Purwa (7-15 Thn) • Madya (15-20 Thn) • Utama (21-25 Thn)',
+        tag: 'Jenjang Usia',
+        contentParagraphs: [
+          'Buku Panduan 2026 menetapkan rentang usia dan capaian pembelajaran terstandar untuk setiap tingkatan kecakapan:',
+          '1. Purwa (7–15 tahun / Tingkat Dasar): Mengenal → Memahami → Berlatih → Mempraktikkan. Fokus pada pemahaman konsep pokok, aturan keselamatan, dan simulasi terbimbing.',
+          '2. Madya (15–20 tahun / Tingkat Penerapan): Memahami → Berlatih → Mempraktikkan → Menghasilkan → Mengevaluasi. Fokus pada kemandirian menghasilkan karya nyata dan menyelesaikan kendala terstruktur.',
+          '3. Utama (21–25 tahun / Tingkat Pengembangan): Memahami → Mempraktikkan → Menghasilkan → Mengelola → Mengevaluasi → Mengembangkan. Fokus pada kepemimpinan teknis, inovasi produk, dan pembimbingan adik angkatan.'
+        ],
+        keyHighlights: [
+          { label: 'Purwa', value: '7–15 Thn (Dasar: Bingkai Bulat)' },
+          { label: 'Madya', value: '15–20 Thn (Penerapan: Bingkai Persegi)' },
+          { label: 'Utama', value: '21–25 Thn (Pengembangan: Bingkai Segilima)' }
+        ]
+      },
+      {
+        title: 'Bab III: Sistem Pengujian & Formula Penilaian 4 Komponen',
+        sectionTitle: 'Formula Penilaian Standar 100% (Kelulusan ≥ 80)',
+        tag: 'Sistem Penilaian',
+        contentParagraphs: [
+          'Setiap pengujian Syarat Kecakapan Khusus (SKK) dinilai secara obyektif berdasarkan 4 (empat) komponen utama dengan total bobot 100%:',
+          'Formula: Nilai Akhir = (Pengetahuan × 20%) + (Keterampilan × 40%) + (Sikap Kerja × 20%) + (Produk/Praktik × 20%).',
+          'Keputusan Kelulusan: Peserta yang memperoleh Nilai Akhir ≥ 80 dinyatakan MEMENUHI dan berhak dilantik menerima TKK. Peserta dengan nilai < 80 dinyatakan BELUM MEMENUHI dan wajib mengikuti pendalaman materi ulang.'
+        ],
+        bulletPoints: [
+          'Komponen 1: Pengetahuan / Penguasaan Teori (Bobot 20%)',
+          'Komponen 2: Keterampilan / Kemahiran Teknis (Bobot 40%)',
+          'Komponen 3: Sikap Kerja, Disiplin & Etika (Bobot 20%)',
+          'Komponen 4: Produk Nyata / Hasil Praktik Lapangan (Bobot 20%)'
+        ],
+        keyHighlights: [
+          { label: 'Passing Grade', value: 'Nilai Akhir ≥ 80 = MEMENUHI' },
+          { label: 'Predikat 90–100', value: 'Sangat Baik' },
+          { label: 'Predikat 80–89', value: 'Baik (Standar Lulus)' }
+        ]
+      },
+      {
+        title: 'Bab IV: Portofolio & 8 Komponen Bukti Kecakapan',
+        sectionTitle: 'Standar Akuntabilitas Portofolio Peserta Didik',
+        tag: 'Bukti Portofolio',
+        contentParagraphs: [
+          'Untuk memastikan pengujian terstandar dan akuntabel, setiap peserta didik wajib mendokumentasikan 8 komponen bukti portofolio:',
+          '1. Bukti Produk Nyata (karya kriya, masakan lokal, itinerary, lembar fakta, desain flyer).',
+          '2. Bukti Hasil Praktik Lapangan (rekaman simulasi pemanduan, outbond, penyelamatan air).',
+          '3. Bukti Foto Dokumentasi Pelaksanaan Kegiatan.',
+          '4. Bukti Rekaman Video Demonstrasi / Presentasi.',
+          '5. Bukti Laporan Tertulis Pelaksanaan Tugas Krida.',
+          '6. Bukti Sertifikat / Surat Tugas / Rekomendasi Kegiatan.',
+          '7. Lembar Hasil Uji Terstandar yang ditandatangani Penguji Resmi.',
+          '8. Catatan Evaluasi dan Masukan Pembina/Pamong Saka.'
+        ],
+        keyHighlights: [
+          { label: 'Verifikasi Penguji', value: 'Pamong & Instruktur Saka Berlisensi' },
+          { label: 'Dokumentasi', value: 'Tersimpan dalam Portofolio Digital Saka' }
+        ]
+      }
+    ]
+  },
+  {
     id: 'doc-juklak-177',
     category: 'REGULASI',
     title: 'Petunjuk Penyelenggaraan Satuan Karya Pramuka Pariwisata',
