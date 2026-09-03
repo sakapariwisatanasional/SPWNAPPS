@@ -75,29 +75,18 @@ export const INITIAL_ACTIVITIES: Activity[] = [];
 // Database Riwayat Audit Log (Kosong)
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 
-// Akun Pengguna Resmi
-export const DEMO_USERS: CurrentUser[] = [
-  {
-    id: 'user-superadmin-rohadi',
-    username: 'rohadiwijaya',
-    password: 'rohadiwijaya',
-    email: 'scoutpreneur@gmail.com',
-    name: 'Rohadi Wijaya',
-    role: 'SUPER_ADMIN',
-    jurisdictionName: 'Kwartir Nasional (Pusat)',
-    memberId: 'member-1788087636201',
-    avatarUrl: 'https://lh3.googleusercontent.com/d/1Ml-oopzoEgnZ75ZoNuA79KytVhYf3qOV'
-  },
-  {
-    id: 'user-public-guest',
-    username: 'wisatawan',
-    email: 'wisatawan@nusantara.id',
-    name: 'Wisatawan / Pengunjung Publik',
-    role: 'PUBLIC',
-    jurisdictionName: 'Pengunjung Umum',
-    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
-  }
-];
+// Profil Pengguna Default (Pengunjung Publik / Tamu)
+export const DEFAULT_PUBLIC_USER: CurrentUser = {
+  id: 'user-public-guest',
+  username: 'pengunjung',
+  email: 'tamu@sakapariwisata.id',
+  name: 'Pengunjung Publik',
+  role: 'PUBLIC',
+  jurisdictionName: 'Pengunjung Umum',
+  avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+};
+
+export const DEMO_USERS: CurrentUser[] = [DEFAULT_PUBLIC_USER];
 
 // Database Kuliner & Cinderamata Daerah (Kosong secara default, bersumber dari Google Spreadsheet)
 export const INITIAL_CULINARY_SOUVENIRS: CulinarySouvenirItem[] = [];

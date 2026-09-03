@@ -140,73 +140,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const regencies = storage.getRegencies(regProvinceId);
   const districts = storage.getDistricts(regRegencyId);
 
-  // Handle Login
-  const handleLogin = (e: React.FormEvent) => {
+  // Handle Login via Secure Backend Authentication API
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      const ident = loginIdentifier.trim();
-      const identLower = ident.toLowerCase();
-      const pass = loginPassword.trim();
-      const passLower = pass.toLowerCase();
+    const ident = loginIdentifier.trim();
+    const pass = loginPassword.trim();
 
-      // 1. Cek user terdaftar di Storage (termasuk Super Admin & Operator dari Database/Spreadsheet)
-      const users = storage.getUsers();
-      const members = storage.getMembers();
-
-      let matchedUser = users.find(u => 
-        (u.username && u.username.toLowerCase() === identLower) ||
-        u.email.toLowerCase() === identLower || 
-        u.name.toLowerCase() === identLower ||
-        (u.memberId && u.memberId.toLowerCase() === identLower)
-      );
-
-      // 2. Cek anggota terdaftar
-      if (!matchedUser) {
-        const matchedMember = members.find(m => 
-          m.email.toLowerCase() === identLower ||
-          (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === identLower) ||
-          m.phone === ident ||
-          m.fullName.toLowerCase() === identLower
-        );
-
-        if (matchedMember) {
-          matchedUser = {
-            id: matchedMember.userId || `user-${matchedMember.id}`,
-            username: matchedMember.email.split('@')[0],
-            email: matchedMember.email,
-            name: matchedMember.fullName,
-            role: matchedMember.isOperator ? (matchedMember.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
-            jurisdictionName: `${matchedMember.branchName}, ${matchedMember.regencyName}`,
-            jurisdictionId: matchedMember.regencyId,
-            avatarUrl: matchedMember.avatarUrl,
-            memberId: matchedMember.id
-          };
-        }
-      }
-
-      if (matchedUser) {
-        // Cek kecocokan password dari database
-        const expectedPass = matchedUser.password || matchedUser.username || matchedUser.email.split('@')[0];
-        if (!matchedUser.password || pass === expectedPass || passLower === expectedPass.toLowerCase()) {
-          setIsLoading(false);
-          storage.setCurrentUser(matchedUser);
-          onLoginSuccess(matchedUser);
-          onClose();
-          return;
-        } else {
-          setIsLoading(false);
-          setLoginError('Kata sandi yang Anda masukkan tidak sesuai.');
-          return;
-        }
-      }
-
-      // 3. Jika akun tidak ditemukan
+    if (!ident || !pass) {
       setIsLoading(false);
-      setLoginError('Kombinasi identitas akun dan kata sandi tidak ditemukan di database.');
-    }, 400);
+      setLoginError('Nama pengguna dan kata sandi wajib diisi.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: ident, password: pass })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setIsLoading(false);
+        setLoginError(result.message || 'Kombinasi nama pengguna atau kata sandi tidak valid.');
+        return;
+      }
+
+      // Save token and authenticated user securely
+      if (result.token) {
+        storage.setAuthToken(result.token);
+      }
+      if (result.user) {
+        storage.setCurrentUser(result.user);
+        onLoginSuccess(result.user);
+      }
+
+      // Trigger sync with server to fetch authorized data (such as operator/superadmin view)
+      storage.syncWithServer().catch(() => {});
+
+      setIsLoading(false);
+      onClose();
+    } catch (err: any) {
+      setIsLoading(false);
+      setLoginError('Gagal terhubung ke server autentikasi. Pastikan koneksi internet stabil.');
+    }
   };
 
   // Handle Registration

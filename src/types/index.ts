@@ -381,7 +381,6 @@ export interface CulinarySouvenirItem {
 export interface CurrentUser {
   id: string;
   username?: string;
-  password?: string;
   email: string;
   name: string;
   role: UserRole;

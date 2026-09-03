@@ -30,6 +30,7 @@ import {
   INITIAL_AUDIT_LOGS, 
   MASTER_SKILLS, 
   DEMO_USERS,
+  DEFAULT_PUBLIC_USER,
   INITIAL_CULINARY_SOUVENIRS
 } from '../data/initialData';
 import { INITIAL_KRIDA_MODULES } from '../data/kridaData';
@@ -213,34 +214,36 @@ class StorageService {
     localStorage.setItem(STORAGE_KEYS.IS_INITIALIZED, 'true');
 
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_USERS[0]));
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_PUBLIC_USER));
     } else {
       try {
         const rawUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        const authToken = localStorage.getItem('saka_auth_token');
         if (rawUser) {
           const u: CurrentUser = JSON.parse(rawUser);
-          if (u.role === 'SUPER_ADMIN' || u.name.includes('Reza') || u.name.includes('Suryadi') || u.memberId === 'mem-nasional-01') {
-            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_USERS[0]));
+          // If the stored user is an admin or operator but no verified backend session token exists, reset to public
+          if (u.role !== 'PUBLIC' && !authToken) {
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_PUBLIC_USER));
           }
         }
       } catch (e) {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_USERS[0]));
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_PUBLIC_USER));
       }
     }
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(DEMO_USERS));
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([DEFAULT_PUBLIC_USER]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
       const initialNotifs: NotificationItem[] = [
         {
           id: 'notif-welcome',
-          userId: 'user-superadmin-rohadi',
-          title: 'Selamat Datang Super Admin Rohadi Wijaya',
-          message: 'Sistem Informasi Manajemen Satuan Karya Pramuka Pariwisata siap digunakan. Database bersih dan siap untuk pendataan.',
+          userId: 'user-public-guest',
+          title: 'Selamat Datang di Portal Saka Pariwisata',
+          message: 'Sistem Informasi Manajemen Satuan Karya Pramuka Pariwisata Tingkat Nasional siap digunakan.',
           type: 'INFO',
           createdAt: new Date().toISOString(),
           isRead: false,
-          actionUrl: '/dashboard'
+          actionUrl: '/'
         }
       ];
       localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(initialNotifs));
@@ -329,9 +332,14 @@ class StorageService {
     // Forward to central full-stack server for cross-device synchronization
     if (typeof window !== 'undefined' && type !== 'SYSTEM') {
       try {
+        const token = this.getAuthToken();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
         fetch('/api/mutate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ type, action, payload })
         }).catch(err => console.warn('[Storage] Server mutation notice:', err));
       } catch (err) {
@@ -340,11 +348,36 @@ class StorageService {
     }
   }
 
+  public getAuthToken(): string | null {
+    try {
+      return localStorage.getItem('saka_auth_token');
+    } catch {
+      return null;
+    }
+  }
+
+  public setAuthToken(token: string | null) {
+    try {
+      if (token) {
+        localStorage.setItem('saka_auth_token', token);
+      } else {
+        localStorage.removeItem('saka_auth_token');
+      }
+    } catch (e) {
+      console.warn('Set auth token error:', e);
+    }
+  }
+
   public async syncWithServer(): Promise<boolean> {
     if (typeof window === 'undefined' || this.isSyncing) return false;
     this.isSyncing = true;
     try {
-      const res = await fetch('/api/data', { cache: 'no-store' });
+      const token = this.getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch('/api/data', { headers, cache: 'no-store' });
       if (!res.ok) return false;
       const data = await res.json();
 
@@ -388,16 +421,24 @@ class StorageService {
   // --- Current User & Roles ---
   public getCurrentUser(): CurrentUser {
     try {
+      const token = this.getAuthToken();
       const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      return data ? JSON.parse(data) : DEMO_USERS[0];
+      if (!data) return DEFAULT_PUBLIC_USER;
+      const user: CurrentUser = JSON.parse(data);
+      // If user is set to an elevated role but lacks an active backend session token, reset to public
+      if (user.role !== 'PUBLIC' && !token) {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_PUBLIC_USER));
+        return DEFAULT_PUBLIC_USER;
+      }
+      return user;
     } catch {
-      return DEMO_USERS[0];
+      return DEFAULT_PUBLIC_USER;
     }
   }
 
   public setCurrentUser(user: CurrentUser) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-    this.addAuditLog(user.id, user.name, user.role, 'SWITCH_ROLE', 'AUTH', user.id, `Beralih peran menjadi ${user.role} (${user.jurisdictionName || 'Nasional'})`);
+    this.addAuditLog(user.id, user.name, user.role, 'SWITCH_ROLE', 'AUTH', user.id, `Status pengguna: ${user.role} (${user.jurisdictionName || 'Nasional'})`);
     this.notify();
   }
 
@@ -405,13 +446,9 @@ class StorageService {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.USERS);
       const storedUsers: CurrentUser[] = data ? JSON.parse(data) : [];
-      // Combine stored users with DEMO_USERS to guarantee all role personas exist
-      const userMap = new Map<string, CurrentUser>();
-      DEMO_USERS.forEach(u => userMap.set(u.id, u));
-      storedUsers.forEach(u => userMap.set(u.id, u));
-      return Array.from(userMap.values());
+      return storedUsers.length > 0 ? storedUsers : [DEFAULT_PUBLIC_USER];
     } catch {
-      return DEMO_USERS;
+      return [DEFAULT_PUBLIC_USER];
     }
   }
 

@@ -10,9 +10,46 @@ import {
   CulinarySouvenirItem
 } from './types';
 import { storage } from './services/storage';
-import { DEMO_USERS } from './data/initialData';
+import { DEFAULT_PUBLIC_USER } from './data/initialData';
 import { spreadsheetService } from './services/spreadsheetService';
 import { verifyMemberUniversal } from './services/ktaVerificationService';
+
+// Route Mappings for Full SPA Navigation
+const TAB_ROUTES: Record<string, string> = {
+  landing: '/',
+  dashboard: '/dashboard',
+  'my-card': '/profile',
+  members: '/members',
+  tours: '/tours',
+  'culinary-souvenirs': '/culinary',
+  skills: '/skills',
+  'krida-modules': '/krida',
+  activities: '/activities',
+  'verify-portal': '/verify',
+  territories: '/territories',
+  'audit-logs': '/audit'
+};
+
+const ROUTE_TO_TAB: Record<string, string> = {
+  '/': 'landing',
+  '/landing': 'landing',
+  '/dashboard': 'dashboard',
+  '/profile': 'my-card',
+  '/my-card': 'my-card',
+  '/members': 'members',
+  '/tours': 'tours',
+  '/culinary': 'culinary-souvenirs',
+  '/culinary-souvenirs': 'culinary-souvenirs',
+  '/skills': 'skills',
+  '/krida': 'krida-modules',
+  '/krida-modules': 'krida-modules',
+  '/activities': 'activities',
+  '/verify': 'verify-portal',
+  '/verify-portal': 'verify-portal',
+  '/territories': 'territories',
+  '/audit': 'audit-logs',
+  '/audit-logs': 'audit-logs'
+};
 
 // Layout Components
 import { Sidebar } from './components/layout/Sidebar';
@@ -54,11 +91,28 @@ import { ActivityFormModal } from './components/activities/ActivityFormModal';
 
 export default function App() {
   // Current logged in user
-  const [currentUser, setCurrentUser] = useState<CurrentUser>(storage.getCurrentUser() || DEMO_USERS[0]);
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(storage.getCurrentUser() || DEFAULT_PUBLIC_USER);
   
-  // Default to Landing Page as requested
-  const [currentTab, setCurrentTab] = useState<string>('landing');
+  // Resolve initial tab directly from URL pathname so direct links work immediately
+  const getInitialTab = (): string => {
+    if (typeof window === 'undefined') return 'landing';
+    const pathname = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+    if (pathname.startsWith('/verify')) return 'verify-portal';
+    return ROUTE_TO_TAB[pathname] || 'landing';
+  };
+
+  const [currentTab, setCurrentTab] = useState<string>(getInitialTab);
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Synchronize URL and History when changing tabs
+  const handleNavigateTab = (tab: string) => {
+    setCurrentTab(tab);
+    setSearchQuery('');
+    const targetPath = TAB_ROUTES[tab] || '/';
+    if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
+      window.history.pushState(null, '', targetPath);
+    }
+  };
 
   // Reactive State from storage service
   const [members, setMembers] = useState<Member[]>([]);
@@ -96,6 +150,36 @@ export default function App() {
   const [selectedTourDetail, setSelectedTourDetail] = useState<TourPackage | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [liveSyncToast, setLiveSyncToast] = useState<{ message: string; visible: boolean } | null>(null);
+
+  // Backend session verification
+  useEffect(() => {
+    const token = storage.getAuthToken();
+    if (token) {
+      fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.user) {
+            setCurrentUser(data.user);
+            storage.setCurrentUser(data.user);
+          } else {
+            storage.setAuthToken(null);
+            storage.setCurrentUser(DEFAULT_PUBLIC_USER);
+            setCurrentUser(DEFAULT_PUBLIC_USER);
+          }
+        })
+        .catch(() => {
+          // Keep offline state
+        });
+    } else {
+      const cur = storage.getCurrentUser();
+      if (cur.role !== 'PUBLIC') {
+        storage.setCurrentUser(DEFAULT_PUBLIC_USER);
+        setCurrentUser(DEFAULT_PUBLIC_USER);
+      }
+    }
+  }, []);
 
   // Synchronize state with reactive storage & auto-fetch live spreadsheet data on initial load
   useEffect(() => {
@@ -149,21 +233,23 @@ export default function App() {
     };
   }, []);
 
-  // Handle URL Query Params & Pathname for KTA Barcode/QR Code live lookup
+  // Handle URL Query Params, Pathname, and browser Back/Forward (popstate)
   useEffect(() => {
     try {
-      const pathname = window.location.pathname;
+      const pathname = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
       let pathVerifyId = '';
       if (pathname.includes('/verify/')) {
-        pathVerifyId = decodeURIComponent(pathname.split('/verify/')[1]?.split('?')[0] || '').trim();
+        pathVerifyId = decodeURIComponent(window.location.pathname.split('/verify/')[1]?.split('?')[0] || '').trim();
       }
 
       const urlParams = new URLSearchParams(window.location.search);
       const verifyId = urlParams.get('verifyId') || urlParams.get('nta') || urlParams.get('id') || urlParams.get('kta') || pathVerifyId;
       const tabParam = urlParams.get('tab');
 
-      if (tabParam === 'verify-portal') {
+      if (pathname.startsWith('/verify') || tabParam === 'verify-portal') {
         setCurrentTab('verify-portal');
+      } else if (ROUTE_TO_TAB[pathname]) {
+        setCurrentTab(ROUTE_TO_TAB[pathname]);
       }
 
       if (verifyId) {
@@ -178,6 +264,18 @@ export default function App() {
     } catch (e) {
       console.warn('URL param parsing error', e);
     }
+
+    const handlePopState = () => {
+      const path = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+      if (path.startsWith('/verify')) {
+        setCurrentTab('verify-portal');
+      } else if (ROUTE_TO_TAB[path]) {
+        setCurrentTab(ROUTE_TO_TAB[path]);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // Handlers for Member Management
@@ -250,7 +348,7 @@ export default function App() {
             setEditingActivity(null);
             setIsActivityFormOpen(true);
           }}
-          onEnterDashboard={(tab) => setCurrentTab(tab || 'dashboard')}
+          onEnterDashboard={(tab) => handleNavigateTab(tab || 'dashboard')}
         />
 
         {/* Global Modals for Landing View */}
@@ -262,9 +360,9 @@ export default function App() {
             setCurrentUser(user);
             setIsAuthModalOpen(false);
             if (user.role === 'MEMBER') {
-              setCurrentTab('my-card');
+              handleNavigateTab('my-card');
             } else {
-              setCurrentTab('dashboard');
+              handleNavigateTab('dashboard');
             }
           }}
         />
@@ -342,13 +440,10 @@ export default function App() {
       {/* Fixed Sidebar */}
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={(tab) => {
-          setCurrentTab(tab);
-          setSearchQuery('');
-        }}
+        onSelectTab={handleNavigateTab}
         currentUser={currentUser}
         onOpenRegisterModal={() => handleOpenAuth('register')}
-        onOpenPublicPortal={() => setCurrentTab('verify-portal')}
+        onOpenPublicPortal={() => handleNavigateTab('verify-portal')}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
         onOpenSpreadsheetModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
@@ -364,13 +459,13 @@ export default function App() {
             setCurrentUser(user);
             storage.setCurrentUser(user);
             if (user.role === 'MEMBER') {
-              setCurrentTab('my-card');
+              handleNavigateTab('my-card');
             }
           }}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenRegisterModal={() => handleOpenAuth('register')}
-          onSelectTab={setCurrentTab}
+          onSelectTab={handleNavigateTab}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           onOpenSpreadsheetModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
           onOpenDriveModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
@@ -387,7 +482,7 @@ export default function App() {
                 tours={tours}
                 provinces={provinces}
                 culinaryItems={culinaryItems}
-                onSelectTab={setCurrentTab}
+                onSelectTab={handleNavigateTab}
                 onOpenRegisterModal={() => handleOpenAuth('register')}
                 onVerifyMember={(m) => setVerifyingMember(m)}
                 onApproveMemberQuick={handleApproveMember}
@@ -505,7 +600,7 @@ export default function App() {
                 onOpenRegisterModal={() => handleOpenAuth('register')}
                 onOpenVerifyModal={(m) => setVerifyingMember(m)}
                 onViewTourDetail={(t) => setSelectedTourDetail(t)}
-                onSelectTab={setCurrentTab}
+                onSelectTab={handleNavigateTab}
               />
             )}
 
@@ -535,9 +630,9 @@ export default function App() {
           setCurrentUser(user);
           setIsAuthModalOpen(false);
           if (user.role === 'MEMBER') {
-            setCurrentTab('my-card');
+            handleNavigateTab('my-card');
           } else {
-            setCurrentTab('dashboard');
+            handleNavigateTab('dashboard');
           }
         }}
       />
@@ -556,7 +651,7 @@ export default function App() {
         onClose={() => setIsRegisterModalOpen(false)}
         onSuccess={() => {
           setIsRegisterModalOpen(false);
-          setCurrentTab('members');
+          handleNavigateTab('members');
         }}
       />
 
@@ -586,7 +681,7 @@ export default function App() {
         onSuccess={() => {
           setIsTourFormModalOpen(false);
           setEditingTour(null);
-          setCurrentTab('tours');
+          handleNavigateTab('tours');
         }}
       />
 

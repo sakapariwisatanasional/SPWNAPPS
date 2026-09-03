@@ -541,7 +541,9 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                     <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
                       activeSection === 'RELATED_MATERIALS' ? 'bg-white/20 text-white' : 'bg-teal-500/20 text-teal-400'
                     }`}>
-                      {(currentModule.materials?.downloads?.length || 0) + (currentModule.materials?.tables?.length || 0) + (currentModule.materials?.images?.length || 0)} File
+                      {((currentModule.downloads?.length || 0) + ((currentModule as any).materials?.downloads?.length || 0)) +
+                       ((currentModule.competencyTable?.length || 0) + ((currentModule as any).materials?.tables?.length || 0)) +
+                       ((currentModule.images?.length || 0) + ((currentModule as any).materials?.images?.length || 0))} File
                     </span>
                     <ChevronDown className={`w-4 h-4 transition-transform ${activeSection === 'RELATED_MATERIALS' ? 'rotate-180 text-white' : 'text-slate-500'}`} />
                   </div>

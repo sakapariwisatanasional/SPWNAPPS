@@ -934,7 +934,6 @@ class SpreadsheetService {
             const userObj: CurrentUser = {
               id: newM.userId,
               username: username,
-              password: password || 'sakapariwisata',
               email: newM.email,
               name: newM.fullName,
               role: parsedRole,

@@ -1,10 +1,23 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 
 const app = express();
 const PORT = 3000;
+
+// Security & Compliance Headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self)');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-ancestors *;"
+  );
+  next();
+});
 
 // Middleware
 app.use(express.json({ limit: '15mb' }));
@@ -20,6 +33,76 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// ==========================================
+// PASSWORD HASHING & SESSION MANAGEMENT
+// ==========================================
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derivedKey = crypto.scryptSync(password, salt, 64);
+  return `${salt}:${derivedKey.toString('hex')}`;
+}
+
+function verifyPassword(password: string, storedHash: string): boolean {
+  try {
+    if (!storedHash || !storedHash.includes(':')) return false;
+    const [salt, key] = storedHash.split(':');
+    const derivedKey = crypto.scryptSync(password, salt, 64);
+    return crypto.timingSafeEqual(Buffer.from(key, 'hex'), derivedKey);
+  } catch {
+    return false;
+  }
+}
+
+interface ActiveSession {
+  token: string;
+  userId: string;
+  username: string;
+  role: string;
+  name: string;
+  jurisdictionName?: string;
+  jurisdictionId?: string;
+  avatarUrl?: string;
+  memberId?: string;
+  expiresAt: number;
+}
+
+const activeSessions = new Map<string, ActiveSession>();
+
+function createSession(user: any): string {
+  const token = crypto.randomBytes(32).toString('hex');
+  activeSessions.set(token, {
+    token,
+    userId: user.id,
+    username: user.username || user.email,
+    role: user.role,
+    name: user.name,
+    jurisdictionName: user.jurisdictionName,
+    jurisdictionId: user.jurisdictionId,
+    avatarUrl: user.avatarUrl,
+    memberId: user.memberId,
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+  return token;
+}
+
+function getSessionUser(req: express.Request): ActiveSession | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.split(' ')[1]?.trim();
+  if (!token) return null;
+
+  const session = activeSessions.get(token);
+  if (!session) return null;
+
+  if (Date.now() > session.expiresAt) {
+    activeSessions.delete(token);
+    return null;
+  }
+  return session;
+}
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'saka-database.json');
@@ -100,6 +183,42 @@ function loadDatabase() {
   }
 }
 
+// Ensure users and Super Admin account are securely initialized with password hashes
+function initializeUsersAndSuperAdmin() {
+  if (!Array.isArray(db.users)) {
+    db.users = [];
+  }
+
+  // Scrub any legacy plain text passwords or insecure demo users
+  db.users = db.users.filter(u => u.username !== 'rohadiwijaya' && u.password !== 'rohadiwijaya');
+
+  const adminUsername = process.env.ADMIN_USERNAME || 'admin_saka';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'SakaPariwisata#2026!';
+
+  let superAdmin = db.users.find(u => u.role === 'SUPER_ADMIN');
+  if (!superAdmin) {
+    superAdmin = {
+      id: 'user-superadmin-nasional',
+      username: adminUsername,
+      passwordHash: hashPassword(adminPassword),
+      email: 'admin@sakapariwisata.id',
+      name: 'Super Admin Kwartir Nasional',
+      role: 'SUPER_ADMIN',
+      jurisdictionName: 'Kwartir Nasional (Pusat)',
+      jurisdictionId: '00',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      createdAt: new Date().toISOString()
+    };
+    db.users.push(superAdmin);
+    saveDatabase();
+    console.log(`[Security] Super Admin account initialized with secure hashed password (Username: ${adminUsername}).`);
+  } else if (!superAdmin.passwordHash) {
+    superAdmin.passwordHash = hashPassword(adminPassword);
+    delete (superAdmin as any).password;
+    saveDatabase();
+  }
+}
+
 // Save database to file
 function saveDatabase() {
   try {
@@ -112,6 +231,7 @@ function saveDatabase() {
 }
 
 loadDatabase();
+initializeUsersAndSuperAdmin();
 
 // GViz API fetcher helper
 async function fetchSheetGViz(sheetName: string): Promise<Record<string, any>[]> {
@@ -443,8 +563,232 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ------------------------------------------
+// AUTHENTICATION ROUTES
+// ------------------------------------------
+
+// POST /api/auth/login
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: 'Nama pengguna dan kata sandi wajib diisi.' });
+  }
+
+  const cleanUser = String(username).trim().toLowerCase();
+  const rawPass = String(password).trim();
+
+  // Find user in db.users
+  let matchedUser = db.users.find(u => 
+    (u.username && u.username.toLowerCase() === cleanUser) ||
+    (u.email && u.email.toLowerCase() === cleanUser)
+  );
+
+  // Check if member with operator credentials in db.members
+  if (!matchedUser) {
+    const member = db.members.find(m => 
+      (m.email && m.email.toLowerCase() === cleanUser) ||
+      (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === cleanUser)
+    );
+    if (member && member.passwordHash) {
+      matchedUser = {
+        id: member.userId || `user-${member.id}`,
+        username: member.email.split('@')[0],
+        email: member.email,
+        name: member.fullName,
+        role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
+        jurisdictionName: `${member.branchName || ''}, ${member.regencyName || ''}`,
+        jurisdictionId: member.regencyId,
+        avatarUrl: member.avatarUrl,
+        memberId: member.id,
+        passwordHash: member.passwordHash
+      };
+    }
+  }
+
+  if (!matchedUser || !matchedUser.passwordHash || !verifyPassword(rawPass, matchedUser.passwordHash)) {
+    console.warn(`[Auth] Failed login attempt for user: ${cleanUser}`);
+    return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid.' });
+  }
+
+  const token = createSession(matchedUser);
+
+  // Audit log entry
+  db.auditLogs.unshift({
+    id: `log-${Date.now()}`,
+    userId: matchedUser.id,
+    userName: matchedUser.name,
+    userRole: matchedUser.role,
+    action: 'LOGIN',
+    targetType: 'AUTH',
+    targetId: matchedUser.id,
+    description: `Login berhasil sebagai ${matchedUser.role} (${matchedUser.jurisdictionName || 'Nasional'})`,
+    timestamp: new Date().toISOString()
+  });
+  if (db.auditLogs.length > 500) db.auditLogs.pop();
+  saveDatabase();
+
+  const sanitizedUser = {
+    id: matchedUser.id,
+    username: matchedUser.username,
+    name: matchedUser.name,
+    email: matchedUser.email,
+    role: matchedUser.role,
+    jurisdictionName: matchedUser.jurisdictionName,
+    jurisdictionId: matchedUser.jurisdictionId,
+    avatarUrl: matchedUser.avatarUrl,
+    memberId: matchedUser.memberId
+  };
+
+  res.json({
+    success: true,
+    token,
+    user: sanitizedUser
+  });
+});
+
+// GET /api/auth/me - Verify current session token
+app.get('/api/auth/me', (req, res) => {
+  const session = getSessionUser(req);
+  if (!session) {
+    return res.status(401).json({ success: false, message: 'Sesi tidak valid atau telah kedaluwarsa.' });
+  }
+  res.json({
+    success: true,
+    user: {
+      id: session.userId,
+      username: session.username,
+      name: session.name,
+      role: session.role,
+      jurisdictionName: session.jurisdictionName,
+      jurisdictionId: session.jurisdictionId,
+      avatarUrl: session.avatarUrl,
+      memberId: session.memberId
+    }
+  });
+});
+
+// POST /api/auth/logout - Invalidate session
+app.post('/api/auth/logout', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1]?.trim();
+    if (token) activeSessions.delete(token);
+  }
+  res.json({ success: true, message: 'Berhasil keluar.' });
+});
+
+// POST /api/auth/change-password
+app.post('/api/auth/change-password', (req, res) => {
+  const session = getSessionUser(req);
+  if (!session) {
+    return res.status(401).json({ success: false, message: 'Harap masuk terlebih dahulu.' });
+  }
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword || newPassword.length < 6) {
+    return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
+  }
+
+  const user = db.users.find(u => u.id === session.userId);
+  if (!user || !verifyPassword(currentPassword, user.passwordHash)) {
+    return res.status(400).json({ success: false, message: 'Kata sandi saat ini tidak sesuai.' });
+  }
+
+  user.passwordHash = hashPassword(newPassword);
+  saveDatabase();
+
+  res.json({ success: true, message: 'Kata sandi berhasil diperbarui.' });
+});
+
+// POST /api/auth/register - Public new member registration
+app.post('/api/auth/register', (req, res) => {
+  const { memberData, password } = req.body || {};
+  if (!memberData || !memberData.fullName) {
+    return res.status(400).json({ success: false, message: 'Data anggota wajib dilengkapi.' });
+  }
+
+  const memberId = `member-${Date.now()}`;
+  const userId = `user-${memberId}`;
+  const passHash = password && password.length >= 6 ? hashPassword(password) : undefined;
+
+  const newMember = {
+    ...memberData,
+    id: memberId,
+    userId,
+    status: 'PENDING',
+    registeredAt: new Date().toISOString(),
+    passwordHash: passHash
+  };
+
+  db.members.unshift(newMember);
+
+  // Record audit log
+  db.auditLogs.unshift({
+    id: `log-${Date.now()}`,
+    userId: 'public-register',
+    userName: newMember.fullName,
+    userRole: 'PUBLIC',
+    action: 'REGISTER',
+    targetType: 'MEMBER',
+    targetId: memberId,
+    description: `Pendaftaran mandiri calon anggota baru: ${newMember.fullName}`,
+    timestamp: new Date().toISOString()
+  });
+  if (db.auditLogs.length > 500) db.auditLogs.pop();
+  saveDatabase();
+
+  forwardToGoogleAppsScript({
+    action: 'UPSERT_MEMBER',
+    sheet: 'Anggota',
+    memberId: newMember.id,
+    rowData: [
+      newMember.id,
+      '',
+      newMember.fullName,
+      newMember.email || '',
+      newMember.phone || '',
+      newMember.provinceName || '',
+      newMember.regencyName || '',
+      newMember.branchName || '',
+      newMember.gugusDepan || '',
+      newMember.krida || '',
+      'PENDING',
+      newMember.avatarUrl || '',
+      newMember.registeredAt,
+      `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.id}`
+    ]
+  });
+
+  res.json({
+    success: true,
+    message: 'Pendaftaran keanggotaan berhasil diajukan dan sedang menunggu verifikasi.',
+    memberId
+  });
+});
+
+// ------------------------------------------
+// DATA & CONFIGURATION ROUTES (ROLE-ENFORCED)
+// ------------------------------------------
+
 // Config GET & POST
 app.get('/api/config', (req, res) => {
+  const session = getSessionUser(req);
+  const isSuperAdmin = session?.role === 'SUPER_ADMIN';
+
+  if (!isSuperAdmin) {
+    // Only return safe public operational status
+    return res.json({
+      config: {
+        status: db.config.status || 'CONNECTED',
+        autoSync: db.config.autoSync,
+        autoRefreshIntervalSeconds: db.config.autoRefreshIntervalSeconds || 6,
+        lastSyncedAt: db.config.lastSyncedAt
+      },
+      lastUpdated: db.lastUpdated,
+      version: db.version
+    });
+  }
+
+  // Full config for Super Admin
   res.json({
     config: db.config,
     lastUpdated: db.lastUpdated,
@@ -453,27 +797,95 @@ app.get('/api/config', (req, res) => {
 });
 
 app.post('/api/config', (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Wewenang Super Admin diperlukan untuk memperbarui konfigurasi pusat.' });
+  }
+
   const updates = req.body || {};
   db.config = {
     ...db.config,
     ...updates
   };
   saveDatabase();
-  console.log('[Config] Updated shared configuration:', db.config);
+  console.log('[Config] Updated shared configuration by Super Admin:', session.name);
   res.json({ success: true, config: db.config });
 });
 
-// Central Data GET
+// Central Data GET with strict Privacy and Role Enforcement
 app.get('/api/data', (req, res) => {
+  const session = getSessionUser(req);
+  const isSuperAdmin = session?.role === 'SUPER_ADMIN';
+  const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+
+  // Mask member data for public viewers to prevent data leaks
+  const sanitizedMembers = db.members.map(m => {
+    if (isSuperAdmin || isOperator) {
+      return m; // Full data for authorized administration
+    }
+    // Public directory data only:
+    return {
+      id: m.id,
+      nationalMemberNumber: m.nationalMemberNumber,
+      fullName: m.fullName,
+      nikMasked: m.nikMasked || '3201********0001',
+      avatarUrl: m.avatarUrl,
+      gender: m.gender,
+      provinceName: m.provinceName,
+      regencyName: m.regencyName,
+      branchName: m.branchName,
+      gugusDepan: m.gugusDepan,
+      krida: m.krida,
+      currentPosition: m.currentPosition,
+      joinYear: m.joinYear,
+      status: m.status,
+      registeredAt: m.registeredAt,
+      verificationToken: m.verificationToken,
+      skills: m.skills,
+      certifications: m.certifications
+    };
+  });
+
+  // Only return users list if Super Admin
+  const sanitizedUsers = isSuperAdmin 
+    ? db.users.map(u => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        jurisdictionName: u.jurisdictionName,
+        jurisdictionId: u.jurisdictionId,
+        avatarUrl: u.avatarUrl
+      }))
+    : [];
+
+  // Only return audit logs if Super Admin or Operator
+  const sanitizedAuditLogs = isSuperAdmin 
+    ? db.auditLogs.slice(0, 100) 
+    : isOperator 
+      ? db.auditLogs.filter(l => l.userId === session.userId).slice(0, 50) 
+      : [];
+
+  // Sanitize spreadsheet config for public
+  const sanitizedConfig = isSuperAdmin
+    ? db.config
+    : {
+        status: db.config.status || 'CONNECTED',
+        autoSync: db.config.autoSync,
+        autoRefreshIntervalSeconds: db.config.autoRefreshIntervalSeconds || 6,
+        lastSyncedAt: db.config.lastSyncedAt
+      };
+
   res.json({
-    members: db.members,
-    tours: db.tours,
-    culinaryItems: db.culinaryItems,
+    members: sanitizedMembers,
+    tours: db.tours.filter(t => isSuperAdmin || isOperator || t.status === 'APPROVED_PUBLISHED'),
+    culinaryItems: db.culinaryItems.filter(c => isSuperAdmin || isOperator || c.status === 'APPROVED'),
     activities: db.activities,
-    kridaModules: db.kridaModules,
-    users: db.users,
-    auditLogs: db.auditLogs,
-    config: db.config,
+    kridaModules: db.kridaModules || [],
+    users: sanitizedUsers,
+    auditLogs: sanitizedAuditLogs,
+    config: sanitizedConfig,
     lastUpdated: db.lastUpdated,
     version: db.version
   });
@@ -481,6 +893,11 @@ app.get('/api/data', (req, res) => {
 
 // Manual Sync Trigger
 app.post('/api/sync-spreadsheet', async (req, res) => {
+  const session = getSessionUser(req);
+  if (!session || (session.role !== 'SUPER_ADMIN' && !['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role))) {
+    return res.status(403).json({ success: false, message: 'Autentikasi administrator diperlukan untuk sinkronisasi database.' });
+  }
+
   const result = await syncFromGoogleSpreadsheet();
   res.json({
     ...result,
@@ -492,14 +909,45 @@ app.post('/api/sync-spreadsheet', async (req, res) => {
   });
 });
 
-// Central Mutation API - Receives any create/update/delete from ANY device
+// Central Mutation API - Receives any create/update/delete with Server Role Enforcement
 app.post('/api/mutate', async (req, res) => {
+  const session = getSessionUser(req);
+  const isSuperAdmin = session?.role === 'SUPER_ADMIN';
+  const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+
   const { type, action, payload } = req.body || {};
   if (!type || !action) {
-    return res.status(400).json({ success: false, message: 'Missing type or action' });
+    return res.status(400).json({ success: false, message: 'Parameter type atau action tidak lengkap.' });
   }
 
-  console.log(`[Mutation] Received ${type}:${action} from client.`);
+  // Role Validation for sensitive actions
+  if (type === 'MEMBER') {
+    if (action === 'DELETE') {
+      if (!isSuperAdmin) {
+        return res.status(403).json({ success: false, message: 'Hanya Super Admin Nasional yang berhak menghapus data anggota.' });
+      }
+    } else if (action === 'UPDATE' || action === 'STATUS' || action === 'BATCH_DELETE_DUMMY') {
+      if (!isSuperAdmin && !isOperator) {
+        return res.status(403).json({ success: false, message: 'Wewenang administrator diperlukan untuk memperbarui data anggota.' });
+      }
+    }
+  }
+
+  // Audit Logging
+  db.auditLogs.unshift({
+    id: `log-${Date.now()}`,
+    userId: session?.userId || 'guest-user',
+    userName: session?.name || 'Pengunjung / Publik',
+    userRole: session?.role || 'PUBLIC',
+    action: `${type}_${action}`,
+    targetType: type,
+    targetId: payload?.id || payload?.memberId || 'unknown',
+    description: `Operasi mutasi ${action} pada ${type} (${payload?.fullName || payload?.title || payload?.name || payload?.id || ''})`,
+    timestamp: new Date().toISOString()
+  });
+  if (db.auditLogs.length > 500) db.auditLogs.pop();
+
+  console.log(`[Mutation] [${session?.role || 'PUBLIC'}] Received ${type}:${action} from client.`);
 
   try {
     if (type === 'MEMBER') {
@@ -709,8 +1157,13 @@ app.post('/api/mutate', async (req, res) => {
   }
 });
 
-// Bulk sync endpoint from client to server
+// Bulk sync endpoint from client to server (Super Admin only)
 app.post('/api/sync-bulk', (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Hanya Super Admin yang berhak melakukan sinkronisasi massal.' });
+  }
+
   const { members, tours, culinaryItems, activities, config } = req.body || {};
 
   if (config) {
@@ -750,7 +1203,7 @@ app.post('/api/sync-bulk', (req, res) => {
 });
 
 // ==========================================
-// VITE OR STATIC SERVING
+// VITE OR STATIC SERVING (WITH SPA FALLBACK)
 // ==========================================
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
@@ -767,9 +1220,13 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Server] Saka Pariwisata Central Full-Stack Server running on port ${PORT}`);
-  });
+  if (process.env.VERCEL !== '1') {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`[Server] Saka Pariwisata Central Full-Stack Server running on port ${PORT}`);
+    });
+  }
 }
 
 startServer();
+
+export { app };

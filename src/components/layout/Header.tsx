@@ -20,10 +20,12 @@ import {
   Lock,
   CloudCheck,
   RefreshCw,
-  Check
+  Check,
+  LogOut,
+  User
 } from 'lucide-react';
 import { CurrentUser, NotificationItem } from '../../types';
-import { DEMO_USERS } from '../../data/initialData';
+import { DEFAULT_PUBLIC_USER } from '../../data/initialData';
 import { storage } from '../../services/storage';
 import { spreadsheetService } from '../../services/spreadsheetService';
 import { SakaLogo } from '../common/SakaLogo';
@@ -267,80 +269,98 @@ export const Header: React.FC<HeaderProps> = ({
           {showMobileSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
         </button>
 
-        {/* Role Persona Switcher (RBAC) */}
-        <div className="relative" ref={roleMenuRef}>
+        {/* User Authentication & Profile (Secure Session) */}
+        {currentUser.role === 'PUBLIC' ? (
           <button
-            onClick={() => setShowRoleMenu(!showRoleMenu)}
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100/80 text-purple-900 border border-purple-200/70 text-xs font-semibold transition-all cursor-pointer shadow-xs min-h-[40px]"
-            title="Ganti Peran Akun untuk Menguji Multi-Role"
+            onClick={onOpenLoginModal}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs min-h-[40px]"
+            title="Masuk ke Akun Admin atau Anggota"
           >
-            <Shield className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" />
-            <span className="hidden md:inline text-purple-600">Peran:</span>
-            <span className="font-bold text-purple-950 truncate max-w-[85px] sm:max-w-[120px]">
-              {currentUser.role === 'SUPER_ADMIN' ? 'Super Admin' :
-               currentUser.role === 'ADMIN_PROVINCE' ? 'Kwarda' :
-               currentUser.role === 'ADMIN_REGENCY' ? 'Kwarcab' :
-               currentUser.role === 'ADMIN_BRANCH' ? 'Kwarran' :
-               currentUser.role === 'MEMBER' ? 'Anggota' : 'Publik'}
-            </span>
-            <ChevronDown className="w-3 h-3 text-purple-600 flex-shrink-0" />
+            <Lock className="w-3.5 h-3.5" />
+            <span>Masuk</span>
           </button>
-
-          {showRoleMenu && (
-            <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-              <div className="px-3 py-2 border-b border-slate-100">
-                <p className="text-xs font-bold text-slate-900">Ubah Peran Pengguna (Demo RBAC)</p>
-                <p className="text-[11px] text-slate-500">Pilih salah satu tingkat wewenang untuk simulasi:</p>
+        ) : (
+          <div className="relative" ref={roleMenuRef}>
+            <button
+              onClick={() => setShowRoleMenu(!showRoleMenu)}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-950 border border-purple-200 text-xs font-semibold transition-all cursor-pointer shadow-xs min-h-[40px]"
+              title="Menu Akun Pengguna"
+            >
+              <img 
+                src={currentUser.avatarUrl} 
+                alt={currentUser.name} 
+                className="w-7 h-7 rounded-lg object-cover border border-purple-300 flex-shrink-0"
+              />
+              <div className="text-left hidden sm:block">
+                <p className="font-bold text-xs text-purple-950 leading-none truncate max-w-[110px]">{currentUser.name}</p>
+                <span className="text-[10px] text-purple-700 font-bold">
+                  {currentUser.role === 'SUPER_ADMIN' ? 'Super Admin' :
+                   currentUser.role === 'ADMIN_PROVINCE' ? 'Kwarda' :
+                   currentUser.role === 'ADMIN_REGENCY' ? 'Kwarcab' :
+                   currentUser.role === 'ADMIN_BRANCH' ? 'Kwarran' : 'Anggota'}
+                </span>
               </div>
-              <div className="py-1 space-y-1 max-h-80 overflow-y-auto custom-scrollbar">
-                {(availableUsers.length > 0 ? availableUsers : DEMO_USERS).map((user) => {
-                  const isSelected = user.id === currentUser.id;
-                  return (
+              <ChevronDown className="w-3 h-3 text-purple-600 flex-shrink-0" />
+            </button>
+
+            {showRoleMenu && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="p-3 border-b border-slate-100">
+                  <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{currentUser.email}</p>
+                  <div className="mt-1.5 inline-block px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">
+                    {currentUser.role === 'SUPER_ADMIN' ? 'Super Admin Nasional' : currentUser.role}
+                  </div>
+                </div>
+                <div className="py-1 space-y-0.5">
+                  <button
+                    onClick={() => {
+                      onSelectTab('my-card');
+                      setShowRoleMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <User className="w-4 h-4 text-purple-600" />
+                    <span>Profil Saya</span>
+                  </button>
+                  {isAdmin && (
                     <button
-                      key={user.id}
                       onClick={() => {
-                        onSwitchUser(user);
+                        onSelectTab('dashboard');
                         setShowRoleMenu(false);
                       }}
-                      className={`w-full text-left p-2.5 rounded-xl flex items-center gap-3 transition-colors cursor-pointer ${
-                        isSelected 
-                          ? 'bg-purple-50 text-purple-950 border border-purple-200' 
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
                     >
-                      <img 
-                        src={user.avatarUrl} 
-                        alt={user.name} 
-                        className="w-8 h-8 rounded-lg object-cover border border-slate-200 flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold truncate">{user.name}</p>
-                        <p className="text-[10px] text-slate-500 font-medium truncate">
-                          {user.jurisdictionName}
-                        </p>
-                      </div>
-                      {isSelected && <CheckCircle2 className="w-4 h-4 text-purple-600 flex-shrink-0" />}
+                      <Shield className="w-4 h-4 text-purple-600" />
+                      <span>Dashboard Administrator</span>
                     </button>
-                  );
-                })}
-              </div>
-              <div className="pt-2 border-t border-slate-100 px-2 pb-1">
-                <button
-                  onClick={() => {
-                    if (confirm('Kembalikan semua data simulasi ke awal?')) {
-                      storage.resetToDefault();
+                  )}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const token = storage.getAuthToken();
+                        if (token) {
+                          await fetch('/api/auth/logout', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                          });
+                        }
+                      } catch {}
+                      storage.setAuthToken(null);
+                      storage.setCurrentUser(DEFAULT_PUBLIC_USER);
+                      onSwitchUser(DEFAULT_PUBLIC_USER);
                       setShowRoleMenu(false);
-                    }
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-red-600 py-1.5 transition-colors cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Reset Data Demo ke Default</span>
-                </button>
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer transition-colors border-t border-slate-100 mt-1"
+                  >
+                    <LogOut className="w-4 h-4 text-red-600" />
+                    <span>Keluar / Logout</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Notification Bell */}
         <div className="relative" ref={notifMenuRef}>
