@@ -58,13 +58,18 @@ class SpreadsheetService {
     pollingIntervalSeconds: 6
   };
 
+
+  // Persistent queue: Google Spreadsheet/Drive adalah source of truth.
+  private readonly syncQueueKey = 'saka_cloud_sync_queue_v2';
+  private isDrainingQueue = false;
+  private lastMutationFingerprint = new Map<string, number>();
   constructor() {
     this.config = this.loadConfig();
     this.syncState.pollingIntervalSeconds = this.config.autoRefreshIntervalSeconds || 6;
     this.initBroadcastChannel();
     this.initAutoSync();
     this.startLiveSyncEngine((this.config.autoRefreshIntervalSeconds || 6) * 1000); // Poll every 6 seconds for real-time cloud data
-    this.fetchServerConfig().catch(() => {});
+    this.fetchServerConfig().then(() => this.drainSyncQueue()).catch(() => {});
   }
 
   public async fetchServerConfig() {
@@ -127,28 +132,26 @@ class SpreadsheetService {
     this.isLiveSyncActive = true;
     this.syncState.pollingIntervalSeconds = Math.round(intervalMs / 1000);
 
-    // 1. Silent initial sync
+    // Sinkronisasi cloud = reconciliation + retry queue, bukan blind overwrite.
     setTimeout(() => {
+      this.drainSyncQueue().catch(() => {});
       this.syncFromSpreadsheet(true).catch(() => {});
     }, 1200);
 
-    // 2. Interval polling every intervalMs (default: 6s)
     this.liveSyncTimer = setInterval(() => {
-      if (this.config.autoSync !== false) {
-        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-          this.syncFromSpreadsheet(true).catch(() => {});
-        }
+      if (this.config.autoSync !== false && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
+        this.drainSyncQueue().catch(() => {});
+        this.syncFromSpreadsheet(true).catch(() => {});
       }
     }, intervalMs);
 
-    // 3. Listen for window focus, visibility change, and online status for instant sync
     if (typeof window !== 'undefined') {
       const handleFocusOrVisible = () => {
         if (this.config.autoSync !== false && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
+          this.drainSyncQueue().catch(() => {});
           this.syncFromSpreadsheet(true).catch(() => {});
         }
       };
-
       window.addEventListener('focus', handleFocusOrVisible);
       window.addEventListener('online', handleFocusOrVisible);
       document.addEventListener('visibilitychange', handleFocusOrVisible);
@@ -246,137 +249,144 @@ class SpreadsheetService {
   }
 
   private async handleAutoSyncMutation(event: any) {
-    const scriptUrl = this.config.scriptUrl;
-    if (!scriptUrl) return;
+    if (this.config.autoSync === false || event?.type === 'SYSTEM' || event?.type === 'KRIDA_MODULE') return;
+    const id = event?.id || event?.payload?.id || event?.payload?.memberId || event?.payload?.tourId || event?.payload?.activityId;
+    const fingerprint = `${event.type}:${event.action}:${id || ''}`;
+    const now = Date.now();
+    if (this.lastMutationFingerprint.has(fingerprint) && now - (this.lastMutationFingerprint.get(fingerprint) || 0) < 500) return;
+    this.lastMutationFingerprint.set(fingerprint, now);
 
-    this.syncState.isSaving = true;
-    this.syncState.error = null;
-    this.syncState.lastSavedAction = `Menyimpan otomatis data ${event.type?.toLowerCase() || 'item'} ke Spreadsheet & Google Drive...`;
-    this.notifySyncState();
+    this.enqueueMutation({ ...event, queuedAt: now, attempts: 0 });
+    await this.drainSyncQueue();
+  }
 
+  private hasPendingEntity(type: string, id?: string): boolean {
+    if (!id) return false;
+    return this.readSyncQueue().some(q => q.type === type && q.id === id && q.status !== 'SYNCED');
+  }
+
+  private readSyncQueue(): any[] {
     try {
-      if (event.type === 'MEMBER') {
-        if (event.action === 'CREATE' || event.action === 'UPDATE' || event.action === 'PHOTO_UPDATE') {
-          const member: Member = event.payload;
-          if (member) {
-            if (member.avatarUrl && member.avatarUrl.startsWith('data:image')) {
-              try {
-                const fname = `KTA_${member.nationalMemberNumber || member.id}_${(member.fullName || 'Anggota').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-                const uploadRes = await this.uploadImageToDrive(member.avatarUrl, fname, 'MEMBER_AVATAR');
-                if (uploadRes.directUrl) {
-                  member.avatarUrl = uploadRes.directUrl;
-                }
-              } catch (imgErr) {
-                console.warn('Auto drive upload error:', imgErr);
-              }
-            }
-            await this.appendMemberToSpreadsheet(member);
+      const raw = localStorage.getItem(this.syncQueueKey);
+      const queue = raw ? JSON.parse(raw) : [];
+      return Array.isArray(queue) ? queue : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private writeSyncQueue(queue: any[]) {
+    localStorage.setItem(this.syncQueueKey, JSON.stringify(queue.slice(-500)));
+  }
+
+  private enqueueMutation(event: any) {
+    const queue = this.readSyncQueue();
+    const id = event?.id || event?.payload?.id || event?.payload?.memberId || event?.payload?.tourId || event?.payload?.activityId || '';
+    const key = `${event.type}:${id}`;
+    const item = {
+      ...event,
+      id,
+      queueId: event.queueId || `${key}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
+      queuedAt: event.queuedAt || Date.now(),
+      attempts: event.attempts || 0,
+      status: 'PENDING'
+    };
+    // Coalesce repeated CREATE/UPDATE/POTO_UPDATE mutations for the same entity.
+    const replaceable = ['CREATE', 'UPDATE', 'PHOTO_UPDATE'].includes(item.action);
+    const existingIndex = queue.findIndex(q => `${q.type}:${q.id || ''}` === key && replaceable && ['CREATE','UPDATE','PHOTO_UPDATE'].includes(q.action));
+    if (existingIndex >= 0) queue[existingIndex] = item;
+    else queue.push(item);
+    this.writeSyncQueue(queue);
+  }
+
+  private async drainSyncQueue() {
+    if (this.isDrainingQueue || this.config.autoSync === false) return;
+    const scriptUrl = this.config.scriptUrl?.trim();
+    if (!scriptUrl || typeof window === 'undefined' || !navigator.onLine) return;
+
+    this.isDrainingQueue = true;
+    try {
+      let queue = this.readSyncQueue();
+      for (const item of [...queue]) {
+        const current = queue.find(q => q.queueId === item.queueId);
+        if (!current) continue;
+        current.status = 'SYNCING';
+        current.attempts = (current.attempts || 0) + 1;
+        current.lastAttemptAt = new Date().toISOString();
+        this.writeSyncQueue(queue);
+        this.syncState.isSaving = true;
+        this.syncState.error = null;
+        this.syncState.lastSavedAction = `Menyinkronkan ${current.type.toLowerCase()} ${current.id || ''} ke Google...`;
+        this.notifySyncState();
+
+        try {
+          const result = await this.processQueuedMutation(current);
+          if (!result.success) throw new Error(result.message || 'Sinkronisasi gagal');
+          queue = queue.filter(q => q.queueId !== current.queueId);
+          this.writeSyncQueue(queue);
+          this.syncState.lastSavedTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+          this.syncState.lastSavedAction = `Tersinkron ke Google: ${current.type.toLowerCase()} ${current.id || ''}`;
+          this.notifySyncState();
+        } catch (err: any) {
+          const updated = queue.find(q => q.queueId === current.queueId);
+          if (updated) {
+            updated.status = 'FAILED';
+            updated.lastError = err?.message || String(err);
+            updated.nextRetryAt = Date.now() + Math.min(60000, 2000 * Math.pow(2, Math.min(updated.attempts || 1, 5)));
           }
-        } else if (event.action === 'DELETE') {
-          const delPayload = event.payload || {};
-          await this.deleteRowFromSpreadsheet('Anggota', delPayload.id || delPayload.memberId || event.id, delPayload.member?.nationalMemberNumber || delPayload.kta);
-        }
-      } else if (event.type === 'TOUR') {
-        if (event.action === 'CREATE' || event.action === 'UPDATE') {
-          const tour: TourPackage = event.payload;
-          if (tour) {
-            if (tour.coverImage && tour.coverImage.startsWith('data:image')) {
-              try {
-                const fname = `TOUR_${tour.id}_${(tour.title || 'Wisata').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-                const uploadRes = await this.uploadImageToDrive(tour.coverImage, fname, 'TOUR_PACKAGES');
-                if (uploadRes.directUrl) {
-                  tour.coverImage = uploadRes.directUrl;
-                }
-              } catch (e) {}
-            }
-            await this.appendTourToSpreadsheet(tour);
-          }
-        } else if (event.action === 'DELETE') {
-          const delPayload = event.payload || {};
-          await this.deleteRowFromSpreadsheet('Paket_Wisata', delPayload.tourId || delPayload.id || event.id);
-        }
-      } else if (event.type === 'CULINARY') {
-        if (event.action === 'CREATE' || event.action === 'UPDATE') {
-          const item: CulinarySouvenirItem = event.payload;
-          if (item) {
-            if (item.imageUrl && item.imageUrl.startsWith('data:image')) {
-              try {
-                const fname = `PROD_${item.id}_${(item.name || 'Produk').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-                const uploadRes = await this.uploadImageToDrive(item.imageUrl, fname, 'CULINARY_SOUVENIRS');
-                if (uploadRes.directUrl) {
-                  item.imageUrl = uploadRes.directUrl;
-                }
-              } catch (e) {}
-            }
-            await this.appendCulinaryToSpreadsheet(item);
-          }
-        } else if (event.action === 'DELETE') {
-          const delPayload = event.payload || {};
-          await this.deleteRowFromSpreadsheet('Kuliner_Cinderamata', delPayload.id || event.id);
-        }
-      } else if (event.type === 'ACTIVITY') {
-        if (event.action === 'CREATE' || event.action === 'UPDATE') {
-          const act: Activity = event.payload;
-          if (act) {
-            if (act.bannerUrl && act.bannerUrl.startsWith('data:image')) {
-              try {
-                const fname = `ACT_${act.id}_${(act.title || 'Kegiatan').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-                const uploadRes = await this.uploadImageToDrive(act.bannerUrl, fname, 'ACTIVITIES');
-                if (uploadRes.directUrl) {
-                  act.bannerUrl = uploadRes.directUrl;
-                }
-              } catch (e) {}
-            }
-            await this.appendActivityToSpreadsheet(act);
-          }
-        } else if (event.action === 'DELETE') {
-          const delPayload = event.payload || {};
-          await this.deleteRowFromSpreadsheet('Agenda_Kegiatan', delPayload.activityId || delPayload.id || event.id);
+          this.writeSyncQueue(queue);
+          this.syncState.error = err?.message || String(err);
+          this.syncState.isSaving = false;
+          this.notifySyncState();
+          // Jangan menghapus queue. Retry berikutnya akan melanjutkan transaksi ini.
+          break;
         }
       }
-
+    } finally {
+      this.isDrainingQueue = false;
       this.syncState.isSaving = false;
-      this.syncState.lastSavedTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
-      this.syncState.lastSavedAction = `Perubahan data berhasil disimpan otomatis ke Google Spreadsheet & Google Drive`;
-      this.notifySyncState();
-
-      // Siarkan ke seluruh tab browser lain agar langsung sinkron
-      this.broadcastRemoteEvent(event.type, event.payload);
-    } catch (err: any) {
-      console.error('Auto sync error:', err);
-      this.syncState.isSaving = false;
-      this.syncState.error = err.message;
       this.notifySyncState();
     }
+  }
+
+  private async processQueuedMutation(item: any): Promise<{success: boolean; message: string}> {
+    if (item.action === 'DELETE') {
+      const p = item.payload || {};
+      const sheet = item.type === 'MEMBER' ? 'Anggota' : item.type === 'TOUR' ? 'Paket_Wisata' : item.type === 'CULINARY' ? 'Kuliner_Cinderamata' : 'Agenda_Kegiatan';
+      return this.deleteRowFromSpreadsheet(sheet, p.id || p.memberId || p.tourId || p.activityId || item.id, p.nationalMemberNumber || p.kta || p.secondaryId);
+    }
+
+    if (item.type === 'MEMBER') {
+      const member: Member = { ...(item.payload || {}) };
+      if (!member.id) throw new Error('ID anggota kosong.');
+      if (member.avatarUrl?.startsWith('data:image')) {
+        const fname = `KTA_${member.nationalMemberNumber || member.id}_${(member.fullName || 'Anggota').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+        const upload = await this.uploadImageToDrive(member.avatarUrl, fname, 'MEMBER_AVATAR');
+        if (!upload.success || !upload.directUrl) throw new Error(upload.message || 'Upload foto anggota gagal.');
+        member.avatarUrl = upload.directUrl;
+      }
+      return this.appendMemberToSpreadsheet(member);
+    }
+    if (item.type === 'TOUR') return this.appendTourToSpreadsheet(item.payload as TourPackage);
+    if (item.type === 'CULINARY') return this.appendCulinaryToSpreadsheet(item.payload as CulinarySouvenirItem);
+    if (item.type === 'ACTIVITY') return this.appendActivityToSpreadsheet(item.payload as Activity);
+    return { success: true, message: 'Tidak ada operasi cloud.' };
   }
 
   /**
    * Hapus baris dari Google Spreadsheet berdasarkan ID atau Nomor KTA
    */
   public async deleteRowFromSpreadsheet(sheet: string, id: string, secondaryId?: string): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.config.scriptUrl;
-    if (!scriptUrl) return { success: true, message: 'Tersimpan lokal.' };
+    const scriptUrl = this.config.scriptUrl?.trim();
+    if (!scriptUrl) return { success: false, message: 'Google Apps Script Web App URL belum dipasang.' };
+    if (!id && !secondaryId) return { success: false, message: 'ID atau secondaryId wajib diisi.' };
 
-    try {
-      const payload = {
-        action: 'DELETE_ROW',
-        sheet,
-        id,
-        secondaryId
-      };
-
-      await fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      return { success: true, message: `Baris ${id} dihapus dari sheet ${sheet}.` };
-    } catch (e: any) {
-      console.error('Delete row from sheet failed', e);
-      return { success: false, message: e.message };
-    }
+    const requestId = crypto.randomUUID();
+    const payload = { action: 'DELETE_ROW', requestId, sheet, id, secondaryId };
+    await fetch(scriptUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+    const verify = await this.checkRecord(sheet, id, secondaryId);
+    if (verify.success && !verify.found) return { success: true, message: `Data ${id || secondaryId} terhapus dan terverifikasi.` };
+    throw new Error(`DELETE belum terverifikasi untuk ${id || secondaryId}.`);
   }
 
   /**
@@ -911,7 +921,8 @@ class SpreadsheetService {
             }
 
             if (existingIdx !== -1) {
-              // Update in place
+              // Jangan biarkan polling server menimpa transaksi lokal yang masih PENDING/FAILED.
+              if (this.hasPendingEntity('MEMBER', newM.id)) continue;
               merged[existingIdx] = {
                 ...merged[existingIdx],
                 ...newM,
@@ -1030,6 +1041,7 @@ class SpreadsheetService {
 
             const existingIdx = mergedTours.findIndex(t => t.id === tourId || t.title.toLowerCase() === title.toLowerCase());
             if (existingIdx !== -1) {
+              if (this.hasPendingEntity('TOUR', tourObj.id)) continue;
               mergedTours[existingIdx] = { ...mergedTours[existingIdx], ...tourObj };
             } else {
               mergedTours.push(tourObj);
@@ -1092,6 +1104,7 @@ class SpreadsheetService {
 
             const existingIdx = mergedCulinary.findIndex(c => c.id === itemId || c.name.toLowerCase() === name.toLowerCase());
             if (existingIdx !== -1) {
+              if (this.hasPendingEntity('CULINARY', culObj.id)) continue;
               mergedCulinary[existingIdx] = { ...mergedCulinary[existingIdx], ...culObj };
             } else {
               mergedCulinary.push(culObj);
@@ -1166,6 +1179,7 @@ class SpreadsheetService {
 
             const existingIdx = mergedActivities.findIndex(a => a.id === actId || a.title.toLowerCase() === title.toLowerCase());
             if (existingIdx !== -1) {
+              if (this.hasPendingEntity('ACTIVITY', actObj.id)) continue;
               mergedActivities[existingIdx] = { ...mergedActivities[existingIdx], ...actObj };
             } else {
               mergedActivities.push(actObj);
@@ -1226,56 +1240,37 @@ class SpreadsheetService {
   /**
    * Kirim data anggota baru ke Google Spreadsheet melalui Google Apps Script Web App
    */
+  private async checkRecord(sheet: string, id?: string, secondaryId?: string): Promise<{success: boolean; found: boolean; row?: number; record?: any; message?: string}> {
+    const scriptUrl = this.config.scriptUrl?.trim();
+    if (!scriptUrl) return { success: false, found: false, message: 'Web App URL belum dipasang.' };
+    const params = new URLSearchParams({ action: 'CHECK_RECORD', sheet, id: id || '', secondaryId: secondaryId || '', _t: String(Date.now()) });
+    const res = await fetch(`${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params.toString()}`, { method: 'GET', cache: 'no-store' });
+    if (!res.ok) throw new Error(`CHECK_RECORD HTTP ${res.status}`);
+    const data = await res.json();
+    return { success: data?.status === 'success', found: Boolean(data?.found), row: data?.row || undefined, record: data?.record, message: data?.message };
+  }
+
+  private async postAndVerify(payload: any, sheet: string, id: string, secondaryId?: string): Promise<any> {
+    const scriptUrl = this.config.scriptUrl?.trim();
+    if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dipasang.');
+    const requestId = payload.requestId || crypto.randomUUID();
+    const finalPayload = { ...payload, requestId };
+    // no-cors dipakai agar browser tidak terkena preflight. Karena response POST opaque,
+    // keberhasilan WAJIB diverifikasi melalui GET CHECK_RECORD.
+    await fetch(scriptUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(finalPayload) });
+    const verify = await this.checkRecord(sheet, id, secondaryId);
+    if (!verify.success || !verify.found) throw new Error(`Data ${id} belum terverifikasi di Google Spreadsheet.`);
+    return { requestId, verify };
+  }
+
   public async appendMemberToSpreadsheet(member: Member): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.config.scriptUrl;
-
-    if (!scriptUrl) {
-      return {
-        success: true,
-        message: 'Data tersimpan di database lokal. Untuk sinkronisasi otomatis ke Google Spreadsheet, masukkan Web App URL di Pengaturan Database.'
-      };
-    }
-
+    if (!this.config.scriptUrl?.trim()) return { success: false, message: 'Web App URL belum dipasang; transaksi tetap berada di Sync Queue.' };
     try {
-      const payload = {
-        action: 'UPSERT_MEMBER',
-        sheet: 'Anggota',
-        memberId: member.id,
-        rowData: [
-          member.id,
-          member.nationalMemberNumber || '',
-          member.fullName,
-          member.email,
-          member.phone,
-          member.provinceName,
-          member.regencyName,
-          member.branchName,
-          member.gugusDepan,
-          member.krida || '',
-          member.status,
-          member.avatarUrl,
-          member.registeredAt,
-          window.location.origin + '/?verifyId=' + (member.nationalMemberNumber || member.id)
-        ]
-      };
-
-      await fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      return {
-        success: true,
-        message: 'Data anggota berhasil dikirimkan ke Google Spreadsheet.'
-      };
+      const rowData = [member.id, member.nationalMemberNumber || '', member.fullName, member.email, member.phone, member.provinceName, member.regencyName, member.branchName, member.gugusDepan, member.krida || '', member.status, member.avatarUrl || '', member.registeredAt, window.location.origin + '/?verifyId=' + (member.nationalMemberNumber || member.id)];
+      await this.postAndVerify({ action: 'UPSERT_MEMBER', sheet: 'Anggota', memberId: member.id, secondaryId: member.nationalMemberNumber || '', rowData }, 'Anggota', member.id, member.nationalMemberNumber || '');
+      return { success: true, message: 'Anggota tersimpan dan terverifikasi di Google Spreadsheet.' };
     } catch (err: any) {
-      console.error('Failed to append row to spreadsheet', err);
-      return {
-        success: false,
-        message: 'Gagal mengirim ke spreadsheet: ' + err.message
-      };
+      return { success: false, message: `Gagal sinkronisasi anggota: ${err?.message || String(err)}` };
     }
   }
 
@@ -1283,40 +1278,13 @@ class SpreadsheetService {
    * Kirim data paket wisata ke Google Spreadsheet
    */
   public async appendTourToSpreadsheet(tour: TourPackage): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.config.scriptUrl;
-    if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
-
+    if (!this.config.scriptUrl?.trim()) return { success: false, message: 'Web App URL belum dipasang; transaksi tetap berada di Sync Queue.' };
     try {
-      const payload = {
-        action: 'UPSERT_TOUR',
-        sheet: 'Paket_Wisata',
-        itemId: tour.id,
-        rowData: [
-          tour.id,
-          tour.title,
-          tour.category,
-          tour.pricePerPerson,
-          tour.durationDays,
-          tour.locationAddress,
-          tour.provinceName,
-          tour.regencyName,
-          tour.ownerName,
-          tour.contactPhone,
-          tour.coverImage || '',
-          new Date().toISOString()
-        ]
-      };
-
-      await fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      return { success: true, message: 'Paket wisata terkirim ke spreadsheet.' };
-    } catch (e: any) {
-      return { success: false, message: e.message };
+      const id = tour.id;
+      await this.postAndVerify({ action: 'UPSERT_TOUR', sheet: 'Paket_Wisata', itemId: id, rowData: [tour.id, tour.title, tour.category, tour.pricePerPerson, tour.durationDays, tour.locationAddress, tour.provinceName, tour.regencyName, tour.ownerName, tour.contactPhone, tour.coverImage || '', new Date().toISOString()] }, 'Paket_Wisata', id);
+      return { success: true, message: 'Data tersimpan dan terverifikasi di Google Spreadsheet.' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || String(err) };
     }
   }
 
@@ -1324,83 +1292,27 @@ class SpreadsheetService {
    * Kirim data produk kuliner & cinderamata ke Google Spreadsheet
    */
   public async appendCulinaryToSpreadsheet(item: CulinarySouvenirItem): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.config.scriptUrl;
-    if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
-
+    if (!this.config.scriptUrl?.trim()) return { success: false, message: 'Web App URL belum dipasang; transaksi tetap berada di Sync Queue.' };
     try {
-      const payload = {
-        action: 'UPSERT_CULINARY',
-        sheet: 'Kuliner_Cinderamata',
-        itemId: item.id,
-        rowData: [
-          item.id,
-          item.name,
-          item.kind,
-          item.krida,
-          item.priceEstimate,
-          item.authorName,
-          item.contactPhone,
-          item.provinceName,
-          item.regencyName,
-          item.imageUrl || '',
-          item.categoryLabel || '',
-          new Date().toISOString()
-        ]
-      };
-
-      await fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      return { success: true, message: 'Produk kuliner/cinderamata terkirim ke spreadsheet.' };
-    } catch (e: any) {
-      return { success: false, message: e.message };
+      const id = item.id;
+      await this.postAndVerify({ action: 'UPSERT_CULINARY', sheet: 'Kuliner_Cinderamata', itemId: id, rowData: [item.id, item.name, item.kind, item.krida, item.priceEstimate, item.authorName, item.contactPhone, item.provinceName, item.regencyName, item.imageUrl || '', item.categoryLabel || '', new Date().toISOString()] }, 'Kuliner_Cinderamata', id);
+      return { success: true, message: 'Data tersimpan dan terverifikasi di Google Spreadsheet.' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || String(err) };
     }
   }
 
   /**
    * Kirim agenda kegiatan / event ke Google Spreadsheet
    */
-  public async appendActivityToSpreadsheet(activity: any): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.config.scriptUrl;
-    if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
-
+  public async appendActivityToSpreadsheet(activity: Activity): Promise<{ success: boolean; message: string }> {
+    if (!this.config.scriptUrl?.trim()) return { success: false, message: 'Web App URL belum dipasang; transaksi tetap berada di Sync Queue.' };
     try {
-      const payload = {
-        action: 'UPSERT_ACTIVITY',
-        sheet: 'Agenda_Kegiatan',
-        itemId: activity.id,
-        rowData: [
-          activity.id,
-          activity.title,
-          activity.category,
-          activity.organizerLevel,
-          activity.organizerName,
-          activity.locationName,
-          activity.provinceName,
-          activity.startDate,
-          activity.endDate,
-          activity.feeType,
-          activity.feeAmount || 0,
-          activity.contactPhone || '',
-          activity.uploadedByName || '',
-          new Date().toISOString()
-        ]
-      };
-
-      await fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      return { success: true, message: 'Agenda kegiatan terkirim ke spreadsheet.' };
-    } catch (e: any) {
-      return { success: false, message: e.message };
+      const id = activity.id;
+      await this.postAndVerify({ action: 'UPSERT_ACTIVITY', sheet: 'Agenda_Kegiatan', itemId: id, rowData: [activity.id, activity.title, activity.category, activity.organizerLevel, activity.organizerName, activity.locationName, activity.provinceName, activity.startDate, activity.endDate, activity.feeType, activity.feeAmount || 0, activity.contactPhone || '', activity.uploadedByName || '', new Date().toISOString()] }, 'Agenda_Kegiatan', id);
+      return { success: true, message: 'Data tersimpan dan terverifikasi di Google Spreadsheet.' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || String(err) };
     }
   }
 
@@ -1538,45 +1450,24 @@ class SpreadsheetService {
    * Upload gambar base64 langsung ke Google Drive melalui Apps Script Web App
    */
   public async uploadImageToDrive(
-    base64Data: string, 
-    filename: string, 
+    base64Data: string,
+    filename: string,
     category: 'MEMBER_AVATAR' | 'TOUR_PACKAGES' | 'CULINARY_SOUVENIRS' | 'DOCUMENTS' | 'KTA_CARD' | 'ACTIVITIES' = 'MEMBER_AVATAR'
   ): Promise<{ success: boolean; directUrl?: string; fileId?: string; viewUrl?: string; message: string }> {
-    const scriptUrl = this.config.scriptUrl;
-    if (!scriptUrl) {
-      return {
-        success: false,
-        message: 'Google Apps Script Web App URL belum dipasang. Harap pasang Web App URL di Pengaturan Database agar dapat mengunggah file langsung ke Google Drive.'
-      };
-    }
-
+    const scriptUrl = this.config.scriptUrl?.trim();
+    if (!scriptUrl) return { success: false, message: 'Google Apps Script Web App URL belum dipasang.' };
     try {
-      const payload = {
-        action: 'UPLOAD_DRIVE_IMAGE',
-        folderId: '16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh',
-        category,
-        filename,
-        base64: base64Data,
-        mimeType: base64Data.includes('data:image/png') ? 'image/png' : 'image/jpeg'
-      };
-
-      await fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
-      });
-
-      return {
-        success: true,
-        message: `Foto ${filename} berhasil dikirim untuk diunggah ke Google Drive folder.`
-      };
+      const payload = { action: 'UPLOAD_DRIVE_IMAGE', requestId: crypto.randomUUID(), folderId: '16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh', category, filename, base64: base64Data, mimeType: base64Data.includes('data:image/png') ? 'image/png' : 'image/jpeg' };
+      // POST tetap no-cors untuk kompatibilitas browser, lalu ambil metadata file via CHECK_DRIVE_FILE.
+      await fetch(scriptUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+      const params = new URLSearchParams({ action: 'CHECK_DRIVE_FILE', filename, category, _t: String(Date.now()) });
+      const verifyRes = await fetch(`${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params.toString()}`, { cache: 'no-store' });
+      if (!verifyRes.ok) throw new Error(`CHECK_DRIVE_FILE HTTP ${verifyRes.status}`);
+      const verified = await verifyRes.json();
+      if (verified?.status !== 'success' || !verified?.found || !verified?.fileId || !verified?.directUrl) throw new Error('File Drive belum terverifikasi.');
+      return { success: true, fileId: verified.fileId, directUrl: verified.directUrl, viewUrl: verified.viewUrl, message: `Foto ${filename} berhasil diunggah dan terverifikasi di Google Drive.` };
     } catch (err: any) {
-      console.error('Failed to upload image to Drive:', err);
-      return {
-        success: false,
-        message: `Gagal mengunggah foto ke Google Drive: ${err.message}`
-      };
+      return { success: false, message: `Gagal mengunggah foto ke Google Drive: ${err?.message || String(err)}` };
     }
   }
 
