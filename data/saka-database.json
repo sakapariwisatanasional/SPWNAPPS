@@ -5,7 +5,7 @@
     "scriptUrl": "",
     "autoSync": true,
     "autoRefreshIntervalSeconds": 6,
-    "lastSyncedAt": "2026-09-03T15:25:25.977Z",
+    "lastSyncedAt": "2026-09-03T16:11:05.399Z",
     "status": "CONNECTED"
   },
   "members": [
@@ -88,7 +88,7 @@
         }
       ],
       "status": "APPROVED_PUBLISHED",
-      "submittedAt": "2026-09-03T15:25:25.375Z",
+      "submittedAt": "2026-09-03T16:11:04.766Z",
       "viewsCount": 20,
       "featured": true
     },
@@ -132,7 +132,7 @@
         }
       ],
       "status": "APPROVED_PUBLISHED",
-      "submittedAt": "2026-09-03T15:25:25.375Z",
+      "submittedAt": "2026-09-03T16:11:04.767Z",
       "viewsCount": 20,
       "featured": true
     },
@@ -176,7 +176,7 @@
         }
       ],
       "status": "APPROVED_PUBLISHED",
-      "submittedAt": "2026-09-03T15:25:25.375Z",
+      "submittedAt": "2026-09-03T16:11:04.767Z",
       "viewsCount": 20,
       "featured": true
     },
@@ -220,7 +220,7 @@
         }
       ],
       "status": "APPROVED_PUBLISHED",
-      "submittedAt": "2026-09-03T15:25:25.375Z",
+      "submittedAt": "2026-09-03T16:11:04.767Z",
       "viewsCount": 20,
       "featured": true
     },
@@ -264,7 +264,7 @@
         }
       ],
       "status": "APPROVED_PUBLISHED",
-      "submittedAt": "2026-09-03T15:25:25.375Z",
+      "submittedAt": "2026-09-03T16:11:04.767Z",
       "viewsCount": 20,
       "featured": true
     },
@@ -308,7 +308,7 @@
         }
       ],
       "status": "APPROVED_PUBLISHED",
-      "submittedAt": "2026-09-03T15:25:25.375Z",
+      "submittedAt": "2026-09-03T16:11:04.767Z",
       "viewsCount": 20,
       "featured": true
     }
@@ -340,7 +340,7 @@
         "Lokal"
       ],
       "status": "APPROVED",
-      "createdAt": "2026-09-03T15:25:25.684Z",
+      "createdAt": "2026-09-03T16:11:05.083Z",
       "likesCount": 20,
       "featured": true
     },
@@ -370,7 +370,7 @@
         "Lokal"
       ],
       "status": "APPROVED",
-      "createdAt": "2026-09-03T15:25:25.684Z",
+      "createdAt": "2026-09-03T16:11:05.083Z",
       "likesCount": 20,
       "featured": true
     },
@@ -400,7 +400,7 @@
         "Lokal"
       ],
       "status": "APPROVED",
-      "createdAt": "2026-09-03T15:25:25.684Z",
+      "createdAt": "2026-09-03T16:11:05.083Z",
       "likesCount": 20,
       "featured": true
     },
@@ -430,7 +430,7 @@
         "Lokal"
       ],
       "status": "APPROVED",
-      "createdAt": "2026-09-03T15:25:25.684Z",
+      "createdAt": "2026-09-03T16:11:05.083Z",
       "likesCount": 20,
       "featured": true
     },
@@ -460,7 +460,7 @@
         "Lokal"
       ],
       "status": "APPROVED",
-      "createdAt": "2026-09-03T15:25:25.684Z",
+      "createdAt": "2026-09-03T16:11:05.083Z",
       "likesCount": 20,
       "featured": true
     }
@@ -678,8 +678,33 @@
     }
   ],
   "kridaModules": [],
-  "users": [],
-  "auditLogs": [],
-  "lastUpdated": "2026-09-03T15:25:28.155Z",
-  "version": 974
+  "users": [
+    {
+      "id": "user-superadmin-nasional",
+      "username": "admin_saka",
+      "passwordHash": "9bc9ca729127e21f3349399ac8aa9763:be586c5ec137468117e412d66417c7c25dc304f2d26c1fd4d9c865748ad24cd8120ce76867fb4e6480feea47882088a8f5ec8320635ab0b243036010888484bf",
+      "email": "admin@sakapariwisata.id",
+      "name": "Super Admin Kwartir Nasional",
+      "role": "SUPER_ADMIN",
+      "jurisdictionName": "Kwartir Nasional (Pusat)",
+      "jurisdictionId": "00",
+      "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      "createdAt": "2026-09-03T15:56:17.152Z"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "log-1788451888332",
+      "userId": "user-superadmin-nasional",
+      "userName": "Super Admin Kwartir Nasional",
+      "userRole": "SUPER_ADMIN",
+      "action": "LOGIN",
+      "targetType": "AUTH",
+      "targetId": "user-superadmin-nasional",
+      "description": "Login berhasil sebagai SUPER_ADMIN (Kwartir Nasional (Pusat))",
+      "timestamp": "2026-09-03T16:11:28.332Z"
+    }
+  ],
+  "lastUpdated": "2026-09-03T16:11:28.332Z",
+  "version": 1112
 }
