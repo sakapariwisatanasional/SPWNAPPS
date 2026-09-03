@@ -64,7 +64,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [photoInputUrl, setPhotoInputUrl] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState('');
   const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
   const [photoUploadSource, setPhotoUploadSource] = useState<'FILE' | 'URL'>('FILE');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -254,20 +253,17 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       return;
     }
 
-    // Strict validation for Operator Cabang
-    if (
-      isRegencyOperator &&
-      currentUser?.jurisdictionId &&
-      selectedRegencyId !== currentUser.jurisdictionId
-    ) {
-      alert(
-        `Peringatan Akses: Anda hanya diizinkan mendaftarkan anggota pada Kwartir Cabang Anda (${currentUser.jurisdictionName}).`
-      );
+    if (isRegencyOperator && currentUser?.jurisdictionId && selectedRegencyId !== currentUser.jurisdictionId) {
+      alert(`Peringatan Akses: Anda hanya diizinkan mendaftarkan anggota pada Kwartir Cabang Anda (${currentUser.jurisdictionName}).`);
+      return;
+    }
+
+    if (isUploadingPhoto) {
+      alert('Foto masih diproses. Tunggu sampai proses foto selesai.');
       return;
     }
 
     setIsSubmitting(true);
-    setSubmitStatus('Menyiapkan data pendaftaran...');
 
     try {
       const currentProvince = provinces.find(p => p.id === selectedProvinceId);
@@ -275,13 +271,10 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       const currentDistrict = districts.find(d => d.id === selectedDistrictId);
       const currentBranch = branches.find(b => b.id === selectedBranchId);
 
-      // Mask NIK for security
-      const maskedNik =
-        nik.length >= 10
-          ? nik.substring(0, 6) + '******' + nik.substring(nik.length - 4)
-          : nik;
+      const maskedNik = nik.length >= 10
+        ? nik.substring(0, 6) + '******' + nik.substring(nik.length - 4)
+        : nik;
 
-      // Build skills array
       const memberSkills: MemberSkill[] = selectedSkillIds.map((sId, idx) => {
         const sObj = skillsList.find(s => s.id === sId);
         return {
@@ -295,62 +288,18 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         };
       });
 
-      /*
-       * REAL-TIME TRANSACTION
-       * ---------------------
-       * Foto diunggah lebih dahulu agar Google Spreadsheet menerima URL Drive,
-       * bukan base64. Setelah itu member dibuat di local cache, dikirim ke
-       * Apps Script, lalu diverifikasi kembali dari Google Spreadsheet.
-       */
-      let finalAvatarUrl =
-        avatarUrl ||
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80';
-
-      const spreadsheetConfig = spreadsheetService.getConfig();
-
-      if (!spreadsheetConfig.scriptUrl?.trim()) {
-        throw new Error(
-          'Google Apps Script Web App URL belum dikonfigurasi. Pendaftaran real-time tidak dapat dilanjutkan sebelum koneksi Spreadsheet aktif.'
-        );
-      }
-
-      // Upload foto sebelum registrasi agar URL final ikut tersimpan ke record anggota.
-      if (finalAvatarUrl.startsWith('data:image')) {
-        setSubmitStatus('Mengunggah foto anggota ke Google Drive...');
-
-        const filename =
-          `KTA_${Date.now()}_${fullName.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-
-        const uploadResult = await spreadsheetService.uploadImageToDrive(
-          finalAvatarUrl,
-          filename,
-          'MEMBER_AVATAR'
-        );
-
-        if (!uploadResult.success || !uploadResult.directUrl) {
-          throw new Error(
-            uploadResult.message ||
-            'Foto gagal diunggah ke Google Drive. Pendaftaran dibatalkan agar data tidak tersimpan tanpa foto yang valid.'
-          );
-        }
-
-        finalAvatarUrl = uploadResult.directUrl;
-      }
-
-      setSubmitStatus('Membuat data anggota...');
-
+      // 1. Buat record lokal agar seluruh ID/data anggota terbentuk konsisten.
       const member = storage.registerMember({
         userId: `user-${Date.now()}`,
         fullName,
         nikMasked: maskedNik,
-        avatarUrl: finalAvatarUrl,
+        avatarUrl: avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80',
         gender,
         birthPlace: birthPlace || 'Tasikmalaya',
         birthDate,
         phone,
         email,
         address: address || 'Jl. Pramuka Raya',
-
         provinceId: selectedProvinceId,
         provinceName: currentProvince?.name || 'Jawa Barat',
         regencyId: selectedRegencyId,
@@ -358,143 +307,44 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         districtId: selectedDistrictId,
         districtName: currentDistrict?.name || 'Kecamatan',
         branchId: selectedBranchId || 'branch-default',
-        branchName:
-          currentBranch?.name ||
-          `Kwarran ${currentDistrict?.name || 'Pariwisata'}`,
-
+        branchName: currentBranch?.name || `Kwarran ${currentDistrict?.name || 'Pariwisata'}`,
         gugusDepan,
         joinYear,
         currentPosition: `Calon Anggota ${krida}`,
         krida,
         educationLevel,
         occupation,
-        bio:
-          bio ||
-          'Calon anggota Saka Pariwisata yang siap berkontribusi untuk pariwisata nusantara.',
+        bio: bio || 'Calon anggota Saka Pariwisata yang siap berkontribusi untuk pariwisata nusantara.',
         skills: memberSkills,
         certifications: []
       });
 
-      /*
-       * Kirim secara langsung dan tunggu hasil request.
-       * StorageService juga memiliki auto-sync listener, tetapi alur registrasi
-       * tidak boleh bergantung pada listener asynchronous tersebut.
-       */
-      setSubmitStatus('Mengirim data ke Google Spreadsheet...');
+      // 2. Tunggu sampai Google Spreadsheet benar-benar memiliki record.
+      const syncResult = await spreadsheetService.saveMemberAndWaitForSync(member);
 
-      const writeResult =
-        await spreadsheetService.appendMemberToSpreadsheet(member);
-
-      if (!writeResult.success) {
-        throw new Error(writeResult.message);
-      }
-
-      /*
-       * Karena POST Apps Script menggunakan no-cors, response POST tidak dapat
-       * dipercaya sebagai bukti bahwa baris sudah tertulis.
-       *
-       * Maka kita baca kembali sheet dan mencari ID/KTA/email yang baru dibuat.
-       */
-      setSubmitStatus('Memverifikasi data di Google Spreadsheet...');
-
-      const verifyMemberInSpreadsheet = async (): Promise<boolean> => {
-        const targetId = String(member.id || '').trim();
-        const targetKta = String(member.nationalMemberNumber || '').trim();
-        const targetEmail = String(member.email || '').trim().toLowerCase();
-
-        const maxAttempts = 12;
-        const delayMs = 500;
-
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          try {
-            const rows = await spreadsheetService.fetchSheetRows('Anggota');
-
-            const found = rows.some((row: Record<string, any>) => {
-              const values = Object.entries(row).reduce(
-                (acc, [key, value]) => {
-                  acc[key.toLowerCase().replace(/[^a-z0-9]/g, '')] =
-                    String(value ?? '').trim();
-                  return acc;
-                },
-                {} as Record<string, string>
-              );
-
-              const rowId =
-                values['id'] ||
-                values['memberid'] ||
-                values['member_id'] ||
-                values['col0'] ||
-                '';
-
-              const rowKta =
-                values['nomorkta'] ||
-                values['nomoranggota'] ||
-                values['nomornta'] ||
-                values['kta'] ||
-                values['nta'] ||
-                values['col2'] ||
-                '';
-
-              const rowEmail =
-                values['email'] ||
-                values['alamatemail'] ||
-                values['col10'] ||
-                '';
-
-              return (
-                (targetId && rowId === targetId) ||
-                (targetKta && rowKta === targetKta) ||
-                (targetEmail && rowEmail.toLowerCase() === targetEmail)
-              );
-            });
-
-            if (found) return true;
-          } catch (verifyError) {
-            console.warn(
-              `[MemberFormModal] Verifikasi Spreadsheet percobaan ${attempt} gagal:`,
-              verifyError
-            );
-          }
-
-          if (attempt < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-        }
-
-        return false;
-      };
-
-      const verified = await verifyMemberInSpreadsheet();
-
-      if (!verified) {
-        throw new Error(
-          'Data sudah dikirim, tetapi belum dapat diverifikasi kembali dari Google Spreadsheet setelah beberapa kali percobaan. Pendaftaran belum dianggap selesai.'
+      if (!syncResult.success || !syncResult.synced) {
+        setIsSubmitting(false);
+        alert(
+          'Pendaftaran BELUM berhasil diselesaikan.\n\n' +
+          syncResult.message + '\n\n' +
+          'User belum boleh melanjutkan ke proses login.'
         );
+        return;
       }
-
-      setSubmitStatus('Data berhasil diverifikasi di Google Spreadsheet.');
-
-      alert(
-        'Pendaftaran berhasil dan telah terverifikasi di Google Spreadsheet.\n\n' +
-        `Nomor KTA: ${member.nationalMemberNumber || '-'}\n\n` +
-        'Data anggota sekarang siap digunakan untuk proses login/verifikasi.'
-      );
 
       setIsSubmitting(false);
-      setSubmitStatus('');
+      alert(
+        'Pendaftaran berhasil dan telah terverifikasi di Google Spreadsheet.\n\n' +
+        `Nomor KTA: ${member.nationalMemberNumber || '-'}\n` +
+        `Baris Spreadsheet: ${syncResult.row || '-'}\n\n` +
+        'Akun sekarang dapat digunakan untuk login.'
+      );
       onSuccess();
       onClose();
     } catch (err: any) {
       console.error('[MemberFormModal] Registration error:', err);
-
       setIsSubmitting(false);
-      setSubmitStatus('');
-
-      alert(
-        'Pendaftaran belum selesai.\n\n' +
-        (err?.message || 'Terjadi kesalahan saat menyimpan data.') +
-        '\n\nSilakan periksa koneksi dan coba kembali.'
-      );
+      alert('Gagal mendaftarkan anggota: ' + (err?.message || 'Terjadi kesalahan.'));
     }
   };
 
@@ -999,14 +849,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             </div>
           </div>
 
-          {/* Submit Status */}
-          {isSubmitting && submitStatus && (
-            <div className="pt-2 flex items-center justify-end gap-2 text-[11px] text-emerald-700 font-semibold">
-              <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-              <span>{submitStatus}</span>
-            </div>
-          )}
-
           {/* Submit Actions */}
           <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
             <button
@@ -1022,7 +864,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-950/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4" />
-              <span>{isSubmitting ? 'Memverifikasi ke Spreadsheet...' : 'Kirim Pendaftaran'}</span>
+              <span>{isSubmitting ? 'Memverifikasi Spreadsheet...' : 'Kirim Pendaftaran'}</span>
             </button>
           </div>
         </form>
