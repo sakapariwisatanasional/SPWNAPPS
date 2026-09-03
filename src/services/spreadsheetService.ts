@@ -75,11 +75,21 @@ class SpreadsheetService {
       if (res.ok) {
         const data = await res.json();
         if (data && data.config) {
+          // Jangan biarkan konfigurasi server lama menimpa konfigurasi lokal
+          // (terutama Web App deployment URL yang baru saja dipasang pengguna).
+          // Local config adalah konfigurasi aktif perangkat; server hanya fallback
+          // untuk nilai yang memang belum tersedia secara lokal.
+          const localScriptUrl = String(this.config.scriptUrl || '').trim();
+          const localSpreadsheetId = String(this.config.spreadsheetId || '').trim();
+          const serverScriptUrl = String(data.config.scriptUrl || '').trim();
+          const serverSpreadsheetId = String(data.config.spreadsheetId || '').trim();
+
           this.config = {
             ...this.config,
             ...data.config,
-            spreadsheetId: data.config.spreadsheetId || DEFAULT_SPREADSHEET_ID,
-            spreadsheetUrl: data.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL
+            spreadsheetId: localSpreadsheetId || serverSpreadsheetId || DEFAULT_SPREADSHEET_ID,
+            spreadsheetUrl: this.config.spreadsheetUrl || data.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
+            scriptUrl: localScriptUrl || serverScriptUrl
           };
           localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
           this.notifySyncState();
@@ -128,12 +138,13 @@ class SpreadsheetService {
     this.isLiveSyncActive = true;
     this.syncState.pollingIntervalSeconds = Math.round(intervalMs / 1000);
 
-    // 1. Silent initial sync
-    setTimeout(() => {
-      this.syncFromSpreadsheet(true).catch(() => {});
-    }, 1200);
+    // Live polling hanya untuk membaca perubahan dari cloud. Jangan langsung
+    // melakukan reconciliation 1,2 detik setelah login karena pada beberapa
+    // browser itu beradu dengan proses inisialisasi sesi aplikasi.
+    // Penulisan anggota TIDAK bergantung pada polling ini; CREATE memakai
+    // POST UPSERT_MEMBER -> CHECK_RECORD secara langsung.
 
-    // 2. Interval polling every intervalMs (default: 6s)
+    // Interval polling tetap aktif untuk perubahan dari perangkat lain.
     this.liveSyncTimer = setInterval(() => {
       if (this.config.autoSync !== false) {
         if (typeof document === 'undefined' || document.visibilityState === 'visible') {
@@ -967,7 +978,14 @@ class SpreadsheetService {
           this.lastKnownMemberCount = importedMembers.length;
 
           storage.setMembers(merged);
-          storage.setUsers(mergedUsers);
+          // Jangan mengubah registry USERS pada silent/live polling.
+          // Registry user berkaitan langsung dengan sesi login; menulis ulang
+          // daftar user setiap beberapa detik dapat memicu re-render/auth guard
+          // pada aplikasi utama. Sinkronisasi user hanya dilakukan saat sync
+          // manual (silent=false).
+          if (!silent) {
+            storage.setUsers(mergedUsers);
+          }
           memberCount = importedMembers.length;
         }
       }
@@ -1230,9 +1248,16 @@ class SpreadsheetService {
    * Hanya endpoint /exec yang dipakai untuk transaksi produksi.
    */
   private normalizeAppsScriptUrl(raw?: string): string {
-    const value = String(raw || '').trim();
+    const value = String(raw || '').trim().replace(/\s+/g, '');
     if (!value) return '';
-    return value.replace(/\s+/g, '');
+
+    // Hanya izinkan Web App production endpoint. Deployment /dev atau ID mentah
+    // bukan endpoint transaksi yang valid.
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(value)) {
+      console.warn('[SpreadsheetService] Apps Script URL tidak valid / bukan endpoint /exec:', value);
+      return '';
+    }
+    return value;
   }
 
   /**
