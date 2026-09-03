@@ -128,7 +128,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar -mx-2 px-2 lg:mx-0 lg:px-0">
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <button
               onClick={() => setCategoryFilter('ALL')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${

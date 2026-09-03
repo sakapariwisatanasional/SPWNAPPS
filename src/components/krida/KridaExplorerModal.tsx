@@ -227,7 +227,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
         </div>
 
         {/* 4 KRIDA CATEGORY PILLS */}
-        <div className="px-5 py-3 border-b border-slate-800/80 bg-slate-900/40 flex items-center gap-2 overflow-x-auto custom-scrollbar shrink-0">
+        <div className="px-5 py-3 border-b border-slate-800/80 bg-slate-900/40 flex flex-wrap items-center gap-2 shrink-0">
           {KRIDA_CATEGORIES.map((cat, idx) => {
             const isSelected = !searchQuery && selectedKridaId === cat.id;
             return (
@@ -237,7 +237,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                   setSearchQuery('');
                   handleSelectCategory(cat.id);
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                   isSelected
                     ? `bg-gradient-to-r ${cat.color} text-white shadow-md shadow-purple-950/50 ring-1 ring-white/30`
                     : 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
@@ -404,7 +404,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                   </div>
 
                   {/* 4 TAB SWITCHERS */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-slate-800/80 custom-scrollbar">
+                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800/80">
                     <button
                       onClick={() => setActiveTab('CONTENT')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -501,27 +501,51 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                             <TableIcon className="w-4 h-4 text-purple-400" />
                             <span>Matriks Standar Kompetensi & Evaluasi</span>
                           </h3>
-                          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
-                            <table className="w-full text-left text-xs text-slate-300">
-                              <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
-                                <tr>
-                                  <th className="p-3">Kode Unit</th>
-                                  <th className="p-3">Elemen Kompetensi</th>
-                                  <th className="p-3">Indikator Kinerja</th>
-                                  <th className="p-3">Metode Uji</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-800/80">
-                                {currentModule.competencyTable.map((row, rIdx) => (
-                                  <tr key={rIdx} className="hover:bg-slate-900/50">
-                                    <td className="p-3 font-mono text-purple-300 font-semibold">{row.code}</td>
-                                    <td className="p-3 font-bold text-white">{row.element}</td>
-                                    <td className="p-3 text-slate-300">{row.indicator}</td>
-                                    <td className="p-3 text-emerald-400 font-medium">{row.assessment}</td>
+                          <div className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden">
+                            {/* Desktop Table */}
+                            <div className="hidden md:block overflow-x-auto">
+                              <table className="w-full text-left text-xs text-slate-300">
+                                <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                                  <tr>
+                                    <th className="p-3">Kode Unit</th>
+                                    <th className="p-3">Elemen Kompetensi</th>
+                                    <th className="p-3">Indikator Kinerja</th>
+                                    <th className="p-3">Metode Uji</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/80">
+                                  {currentModule.competencyTable.map((row, rIdx) => (
+                                    <tr key={rIdx} className="hover:bg-slate-900/50">
+                                      <td className="p-3 font-mono text-purple-300 font-semibold">{row.code}</td>
+                                      <td className="p-3 font-bold text-white">{row.element}</td>
+                                      <td className="p-3 text-slate-300">{row.indicator}</td>
+                                      <td className="p-3 text-emerald-400 font-medium">{row.assessment}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Mobile Cards (Zero Horizontal Scrolling) */}
+                            <div className="md:hidden divide-y divide-slate-800/80">
+                              {currentModule.competencyTable.map((row, rIdx) => (
+                                <div key={rIdx} className="p-3.5 space-y-2 text-xs">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-mono text-xs font-bold text-purple-300 bg-purple-950/70 px-2 py-0.5 rounded border border-purple-800/60">
+                                      {row.code}
+                                    </span>
+                                    <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/50">
+                                      {row.assessment}
+                                    </span>
+                                  </div>
+                                  <p className="font-bold text-white text-[13px]">{row.element}</p>
+                                  <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                                    <span className="text-[10px] text-slate-400 block font-semibold">Indikator Kinerja:</span>
+                                    <p className="leading-relaxed">{row.indicator}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       )}

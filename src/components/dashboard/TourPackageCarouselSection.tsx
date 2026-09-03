@@ -11,7 +11,9 @@ import {
   ArrowRight,
   Eye,
   Calendar,
-  Users
+  Users,
+  LayoutGrid,
+  SlidersHorizontal
 } from 'lucide-react';
 import { TourPackage, CurrentUser } from '../../types';
 
@@ -31,8 +33,9 @@ export const TourPackageCarouselSection: React.FC<TourPackageCarouselSectionProp
   const displayTours = publishedTours.length > 0 ? publishedTours : tours;
 
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'grid' | 'carousel'>('grid');
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAutoPlay, setIsAutoPlay] = useState(true);
+  const [isAutoPlay, setIsAutoPlay] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Extract unique categories
@@ -111,8 +114,61 @@ export const TourPackageCarouselSection: React.FC<TourPackageCarouselSectionProp
           </p>
         </div>
 
-        {/* Carousel Navigation Arrows & View All Link */}
+        {/* View Switcher & Actions */}
         <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-shrink-0 pt-1 sm:pt-0">
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'grid'
+                  ? 'bg-teal-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tampilan Grid Terbuka (Tanpa Scroll Samping)"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Grid Terbuka</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('carousel')}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'carousel'
+                  ? 'bg-teal-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tampilan Geser (Carousel)"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Geser</span>
+            </button>
+          </div>
+
+          {/* Carousel Arrows (only in carousel view) */}
+          {viewMode === 'carousel' && (
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+              <button
+                onClick={handlePrev}
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 flex items-center justify-center shadow-xs transition-all active:scale-95 cursor-pointer"
+                title="Paket Sebelumnya"
+                aria-label="Previous tour slide"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <button
+                onClick={handleNext}
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 flex items-center justify-center shadow-xs transition-all active:scale-95 cursor-pointer"
+                title="Paket Selanjutnya"
+                aria-label="Next tour slide"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
           {onSelectTab && (
             <button
               onClick={() => onSelectTab('tours')}
@@ -122,38 +178,17 @@ export const TourPackageCarouselSection: React.FC<TourPackageCarouselSectionProp
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
-
-          {/* Carousel Arrows */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
-            <button
-              onClick={handlePrev}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 flex items-center justify-center shadow-xs transition-all active:scale-95 cursor-pointer"
-              title="Paket Sebelumnya"
-              aria-label="Previous tour slide"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={handleNext}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 flex items-center justify-center shadow-xs transition-all active:scale-95 cursor-pointer"
-              title="Paket Selanjutnya"
-              aria-label="Next tour slide"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Category Filter Pills (Edge-to-edge scrollable on phones) */}
-      <div className="relative z-10 -mx-4 px-4 sm:mx-0 sm:px-0 flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+      {/* Category Filter Pills (Naturally Wrapped - Zero Horizontal Scroll) */}
+      <div className="relative z-10 flex flex-wrap items-center gap-2 pt-1">
         <button
           onClick={() => {
             setSelectedCategory('ALL');
             setCurrentIndex(0);
           }}
-          className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
+          className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
             selectedCategory === 'ALL'
               ? 'bg-teal-700 text-white shadow-xs'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -174,7 +209,7 @@ export const TourPackageCarouselSection: React.FC<TourPackageCarouselSectionProp
                 setSelectedCategory(cat);
                 setCurrentIndex(0);
               }}
-              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 selectedCategory === cat
                   ? 'bg-teal-700 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -189,18 +224,26 @@ export const TourPackageCarouselSection: React.FC<TourPackageCarouselSectionProp
         })}
       </div>
 
-      {/* Carousel Container */}
-      <div className="relative z-10 -mx-4 px-4 sm:mx-0 sm:px-0">
+      {/* Tours Container: Grid Mode (default, zero horizontal scroll) vs Carousel Mode */}
+      <div className={viewMode === 'grid' ? 'relative z-10' : 'relative z-10 -mx-4 px-4 sm:mx-0 sm:px-0'}>
         <div 
           ref={scrollContainerRef}
-          className="flex gap-4 sm:gap-5 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-3 sm:pb-4 custom-scrollbar"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          className={
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5'
+              : 'flex gap-4 sm:gap-5 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-3 sm:pb-4 custom-scrollbar'
+          }
+          style={viewMode === 'carousel' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : undefined}
         >
           {filteredTours.map((tour, idx) => (
             <div
               key={tour.id}
               onClick={() => onViewTourDetail(tour)}
-              className="flex-none w-[82vw] max-w-[310px] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] snap-start group bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs hover:shadow-xl hover:border-teal-300 transition-all duration-300 flex flex-col overflow-hidden cursor-pointer justify-between transform hover:-translate-y-1"
+              className={
+                viewMode === 'grid'
+                  ? 'group bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs hover:shadow-xl hover:border-teal-300 transition-all duration-300 flex flex-col overflow-hidden cursor-pointer justify-between transform hover:-translate-y-1'
+                  : 'flex-none w-[82vw] max-w-[310px] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] snap-start group bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs hover:shadow-xl hover:border-teal-300 transition-all duration-300 flex flex-col overflow-hidden cursor-pointer justify-between transform hover:-translate-y-1'
+              }
             >
               <div>
                 {/* Cover Image & Overlays */}
@@ -291,8 +334,8 @@ export const TourPackageCarouselSection: React.FC<TourPackageCarouselSectionProp
           ))}
         </div>
 
-        {/* Carousel Indicators / Step Dots */}
-        {filteredTours.length > 1 && (
+        {/* Carousel Indicators / Step Dots (Only when in carousel mode) */}
+        {viewMode === 'carousel' && filteredTours.length > 1 && (
           <div className="flex items-center justify-center gap-1.5 pt-2">
             {filteredTours.map((_, i) => (
               <button

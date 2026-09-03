@@ -121,7 +121,7 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
       {/* Category Pills & Filters */}
       <div className="space-y-3">
         {/* Category Carousel Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar no-scrollbar">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <button
             onClick={() => setSelectedCategory('ALL')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${

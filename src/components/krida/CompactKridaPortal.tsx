@@ -790,27 +790,53 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                           <TableIcon className="w-3.5 h-3.5" />
                           <span>Matriks Indikator Kecakapan Krida:</span>
                         </div>
-                        <div className={`overflow-x-auto rounded-xl border ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-                          <table className="w-full text-left text-xs">
-                            <thead className={isDark ? 'bg-slate-950 text-slate-300 font-bold' : 'bg-slate-100 text-slate-700 font-bold'}>
-                              <tr>
-                                <th className="p-2.5 border-b border-slate-800">Aspek / Unsur</th>
-                                <th className="p-2.5 border-b border-slate-800">Tingkat Purwa</th>
-                                <th className="p-2.5 border-b border-slate-800">Tingkat Madya</th>
-                                <th className="p-2.5 border-b border-slate-800">Tingkat Utama</th>
-                              </tr>
-                            </thead>
-                            <tbody className={`divide-y ${isDark ? 'divide-slate-800/60' : 'divide-slate-100'}`}>
-                              {currentModule.materials.tables.map((row, rIdx) => (
-                                <tr key={rIdx} className={isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}>
-                                  <td className="p-2.5 font-semibold text-purple-400">{row.aspect}</td>
-                                  <td className="p-2.5">{row.purwa}</td>
-                                  <td className="p-2.5">{row.madya}</td>
-                                  <td className="p-2.5">{row.utama}</td>
+                        <div className={`rounded-xl border ${isDark ? 'border-slate-800' : 'border-slate-200'} overflow-hidden`}>
+                          {/* Desktop Table */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className={isDark ? 'bg-slate-950 text-slate-300 font-bold' : 'bg-slate-100 text-slate-700 font-bold'}>
+                                <tr>
+                                  <th className="p-2.5 border-b border-slate-800">Aspek / Unsur</th>
+                                  <th className="p-2.5 border-b border-slate-800">Tingkat Purwa</th>
+                                  <th className="p-2.5 border-b border-slate-800">Tingkat Madya</th>
+                                  <th className="p-2.5 border-b border-slate-800">Tingkat Utama</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody className={`divide-y ${isDark ? 'divide-slate-800/60' : 'divide-slate-100'}`}>
+                                {currentModule.materials.tables.map((row, rIdx) => (
+                                  <tr key={rIdx} className={isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}>
+                                    <td className="p-2.5 font-semibold text-purple-400">{row.aspect}</td>
+                                    <td className="p-2.5">{row.purwa}</td>
+                                    <td className="p-2.5">{row.madya}</td>
+                                    <td className="p-2.5">{row.utama}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile Cards View (Zero Horizontal Scrolling) */}
+                          <div className={`md:hidden divide-y ${isDark ? 'divide-slate-800/60 bg-slate-950/70' : 'divide-slate-100 bg-white'}`}>
+                            {currentModule.materials.tables.map((row, rIdx) => (
+                              <div key={rIdx} className="p-3 space-y-2 text-xs">
+                                <p className="font-bold text-purple-400 text-[13px]">{row.aspect}</p>
+                                <div className="space-y-1.5">
+                                  <div className={`p-2 rounded-lg text-[11px] ${isDark ? 'bg-slate-900/90' : 'bg-slate-50'}`}>
+                                    <span className="font-bold text-amber-500 block text-[10px]">Tingkat Purwa:</span>
+                                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.purwa}</span>
+                                  </div>
+                                  <div className={`p-2 rounded-lg text-[11px] ${isDark ? 'bg-slate-900/90' : 'bg-slate-50'}`}>
+                                    <span className="font-bold text-teal-400 block text-[10px]">Tingkat Madya:</span>
+                                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.madya}</span>
+                                  </div>
+                                  <div className={`p-2 rounded-lg text-[11px] ${isDark ? 'bg-slate-900/90' : 'bg-slate-50'}`}>
+                                    <span className="font-bold text-indigo-400 block text-[10px]">Tingkat Utama:</span>
+                                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.utama}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}

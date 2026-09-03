@@ -300,7 +300,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
         </div>
 
         {/* SUB-TABS NAVIGATION */}
-        <div className="px-6 py-2.5 border-b border-slate-800/80 bg-slate-900/50 flex items-center gap-2 overflow-x-auto custom-scrollbar shrink-0">
+        <div className="px-6 py-2.5 border-b border-slate-800/80 bg-slate-900/50 flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={() => setActiveSubTab('TEXT')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${

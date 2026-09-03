@@ -572,7 +572,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
                 </button>
               </div>
 
-              <pre className="p-3 bg-slate-900 text-slate-200 rounded-xl text-[10px] font-mono overflow-x-auto max-h-48 custom-scrollbar">
+              <pre className="p-3 bg-slate-900 text-slate-200 rounded-xl text-[10px] font-mono whitespace-pre-wrap break-all max-h-48 overflow-y-auto custom-scrollbar">
                 {spreadsheetService.getGoogleAppsScriptTemplate()}
               </pre>
             </div>

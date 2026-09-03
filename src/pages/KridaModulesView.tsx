@@ -170,7 +170,7 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser 
       {/* Filter & Search Bar */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
         {/* View Mode Toggle & Category Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 custom-scrollbar">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto pt-1 md:pt-0">
           {/* Mode Switcher */}
           <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0 mr-2 border border-slate-200">
             <button

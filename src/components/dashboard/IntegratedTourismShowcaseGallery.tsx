@@ -358,7 +358,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
           </div>
 
           {/* Quick Clickable Destination Preset Buttons */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             {POPULAR_DESTINATIONS.map((preset) => {
               const isActive = userLocation.regionName === preset.provinceName && !selectedTourForMatching;
               return (
@@ -538,7 +538,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
             </div>
 
             {/* Category Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 onClick={() => setTourCategoryFilter('ALL')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 ${
@@ -966,7 +966,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               {/* Category Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 <button
                   onClick={() => setActivityCategoryFilter('ALL')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${

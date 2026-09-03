@@ -1420,82 +1420,141 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
 
             {/* SUB-VIEW D: RANKED TABLE LEADERBOARD */}
             {provinceChartType === 'RANKED_TABLE' && (
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="py-3 px-3.5 text-center w-12">No</th>
-                      <th className="py-3 px-3.5">Kwartir Daerah (Provinsi)</th>
-                      <th className="py-3 px-3.5">Wilayah Pulau</th>
-                      <th className="py-3 px-3.5 text-right">Total Anggota</th>
-                      <th className="py-3 px-3.5 text-right">Aktif</th>
-                      <th className="py-3 px-3.5 text-right">Pending</th>
-                      <th className="py-3 px-3.5">Pangsa Nasional</th>
-                      <th className="py-3 px-3.5">Krida Terbanyak</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredProvincesData.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                       <tr>
-                        <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">
-                          Tidak ada data provinsi yang sesuai dengan filter pencarian.
-                        </td>
+                        <th className="py-3 px-3.5 text-center w-12">No</th>
+                        <th className="py-3 px-3.5">Kwartir Daerah (Provinsi)</th>
+                        <th className="py-3 px-3.5">Wilayah Pulau</th>
+                        <th className="py-3 px-3.5 text-right">Total Anggota</th>
+                        <th className="py-3 px-3.5 text-right">Aktif</th>
+                        <th className="py-3 px-3.5 text-right">Pending</th>
+                        <th className="py-3 px-3.5">Pangsa Nasional</th>
+                        <th className="py-3 px-3.5">Krida Terbanyak</th>
                       </tr>
-                    ) : (
-                      filteredProvincesData.map((item, idx) => (
-                        <tr key={item.provinceId} className="hover:bg-emerald-50/40 transition-colors">
-                          <td className="py-2.5 px-3.5 text-center font-bold font-mono text-slate-600">
-                            {idx + 1}
-                          </td>
-                          <td className="py-2.5 px-3.5 font-bold text-slate-900">
-                            <div className="flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                              <span>{item.provinceName}</span>
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3.5 text-slate-600">
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-medium">
-                              {item.island}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3.5 text-right font-mono font-extrabold text-slate-900">
-                            {item.total.toLocaleString('id-ID')}
-                          </td>
-                          <td className="py-2.5 px-3.5 text-right font-mono font-bold text-emerald-600">
-                            {item.active}
-                          </td>
-                          <td className="py-2.5 px-3.5 text-right font-mono font-bold text-amber-600">
-                            {item.pending}
-                          </td>
-                          <td className="py-2.5 px-3.5">
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-emerald-600 rounded-full" 
-                                  style={{ width: `${Math.min(100, item.sharePct * 2)}%` }} 
-                                />
-                              </div>
-                              <span className="font-mono text-[11px] font-bold text-slate-700">
-                                {item.sharePct}%
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3.5">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              item.topKrida === 'Pemandu' ? 'bg-teal-100 text-teal-800' :
-                              item.topKrida === 'Penyuluh' ? 'bg-indigo-100 text-indigo-800' :
-                              item.topKrida === 'Mice & Event' ? 'bg-purple-100 text-purple-800' :
-                              item.topKrida === 'Kuliner & Cinderamata' ? 'bg-amber-100 text-amber-800' :
-                              'bg-slate-100 text-slate-500'
-                            }`}>
-                              {item.topKrida} {item.topKridaCount > 0 && `(${item.topKridaCount})`}
-                            </span>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredProvincesData.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">
+                            Tidak ada data provinsi yang sesuai dengan filter pencarian.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        filteredProvincesData.map((item, idx) => (
+                          <tr key={item.provinceId} className="hover:bg-emerald-50/40 transition-colors">
+                            <td className="py-2.5 px-3.5 text-center font-bold font-mono text-slate-600">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2.5 px-3.5 font-bold text-slate-900">
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                                <span>{item.provinceName}</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3.5 text-slate-600">
+                              <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-medium">
+                                {item.island}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3.5 text-right font-mono font-extrabold text-slate-900">
+                              {item.total.toLocaleString('id-ID')}
+                            </td>
+                            <td className="py-2.5 px-3.5 text-right font-mono font-bold text-emerald-600">
+                              {item.active}
+                            </td>
+                            <td className="py-2.5 px-3.5 text-right font-mono font-bold text-amber-600">
+                              {item.pending}
+                            </td>
+                            <td className="py-2.5 px-3.5">
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-emerald-600 rounded-full" 
+                                    style={{ width: `${Math.min(100, item.sharePct * 2)}%` }} 
+                                  />
+                                </div>
+                                <span className="font-mono text-[11px] font-bold text-slate-700">
+                                  {item.sharePct}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3.5">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                item.topKrida === 'Pemandu' ? 'bg-teal-100 text-teal-800' :
+                                item.topKrida === 'Penyuluh' ? 'bg-indigo-100 text-indigo-800' :
+                                item.topKrida === 'Mice & Event' ? 'bg-purple-100 text-purple-800' :
+                                item.topKrida === 'Kuliner & Cinderamata' ? 'bg-amber-100 text-amber-800' :
+                                'bg-slate-100 text-slate-500'
+                              }`}>
+                                {item.topKrida} {item.topKridaCount > 0 && `(${item.topKridaCount})`}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Responsive Cards (Zero Horizontal Scrolling) */}
+                <div className="md:hidden divide-y divide-slate-100 bg-white">
+                  {filteredProvincesData.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs">
+                      Tidak ada data provinsi yang sesuai dengan filter pencarian.
+                    </div>
+                  ) : (
+                    filteredProvincesData.map((item, idx) => (
+                      <div key={item.provinceId} className="p-3.5 space-y-2 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-mono font-bold text-[11px] flex items-center justify-center">
+                              #{idx + 1}
+                            </span>
+                            <div>
+                              <p className="font-bold text-slate-900">{item.provinceName}</p>
+                              <span className="text-[10px] text-slate-500">{item.island}</span>
+                            </div>
+                          </div>
+                          <span className="text-sm font-mono font-extrabold text-slate-900">
+                            {item.total.toLocaleString('id-ID')} <span className="text-[10px] text-slate-400 font-normal">Kader</span>
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2 rounded-xl text-[11px]">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block">Aktif</span>
+                            <span className="font-mono font-bold text-emerald-700">{item.active}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block">Pending</span>
+                            <span className="font-mono font-bold text-amber-700">{item.pending}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block">Pangsa</span>
+                            <span className="font-mono font-bold text-slate-800">{item.sharePct}%</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] pt-0.5">
+                          <span className="text-slate-500">Krida Terbanyak:</span>
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                            item.topKrida === 'Pemandu' ? 'bg-teal-100 text-teal-800' :
+                            item.topKrida === 'Penyuluh' ? 'bg-indigo-100 text-indigo-800' :
+                            item.topKrida === 'Mice & Event' ? 'bg-purple-100 text-purple-800' :
+                            item.topKrida === 'Kuliner & Cinderamata' ? 'bg-amber-100 text-amber-800' :
+                            'bg-slate-100 text-slate-500'
+                          }`}>
+                            {item.topKrida} {item.topKridaCount > 0 && `(${item.topKridaCount})`}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>

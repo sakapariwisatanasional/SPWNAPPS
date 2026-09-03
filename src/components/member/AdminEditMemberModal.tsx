@@ -542,7 +542,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-50/70 px-6 pt-2 gap-2 overflow-x-auto">
+        <div className="flex flex-wrap border-b border-slate-200 bg-slate-50/70 px-6 pt-2 gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('IDENTITY')}

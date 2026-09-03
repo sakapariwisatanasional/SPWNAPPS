@@ -388,7 +388,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
         </div>
 
         {/* Tour Categories Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <button
             onClick={() => setTourCategoryFilter('ALL')}
             className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${

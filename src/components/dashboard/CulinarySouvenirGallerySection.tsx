@@ -199,12 +199,12 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
 
       {/* Main Workflow View Selector: Etalase Publik vs Menunggu Persetujuan Operator vs Karya Saya */}
       <div className="relative z-10 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80 overflow-x-auto custom-scrollbar">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80">
           
           {/* Tab 1: Etalase Publik */}
           <button
             onClick={() => setActiveTab('PUBLISHED')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 flex-shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'PUBLISHED'
                 ? 'bg-white text-slate-950 shadow-sm border border-slate-200/80'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
@@ -223,7 +223,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
           {isOperator && (
             <button
               onClick={() => setActiveTab('PENDING')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 flex-shrink-0 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === 'PENDING'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-extrabold'
                   : 'text-amber-900 hover:bg-amber-100/60'
@@ -244,7 +244,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
           {/* Tab 3: Karya Saya */}
           <button
             onClick={() => setActiveTab('MY_ITEMS')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 flex-shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'MY_ITEMS'
                 ? 'bg-purple-700 text-white shadow-sm font-bold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
@@ -286,11 +286,11 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
       {/* Krida Categories & Search Filters */}
       <div className="relative z-10 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         
-        {/* Krida Filter Pills */}
-        <div className="-mx-4 px-4 sm:mx-0 sm:px-0 flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
+        {/* Krida Filter Pills (Naturally Wrapped - Zero Horizontal Scroll) */}
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setSelectedKrida('ALL')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               selectedKrida === 'ALL'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -311,7 +311,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
               <button
                 key={k.id}
                 onClick={() => setSelectedKrida(k.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   isSel ? `${k.activeClass} shadow-xs` : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >

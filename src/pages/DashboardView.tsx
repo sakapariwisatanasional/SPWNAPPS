@@ -805,8 +805,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           </div>
 
-          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-            <table className="w-full text-left text-xs min-w-[340px]">
+          {/* Desktop/Tablet Table View */}
+          <div className="hidden sm:block">
+            <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                   <th className="pb-3">Anggota</th>
@@ -881,6 +882,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Fluid Cards (Zero Horizontal Scroll!) */}
+          <div className="sm:hidden divide-y divide-slate-100">
+            {recentRegistrations.length === 0 ? (
+              <p className="py-6 text-center text-slate-400 text-xs">
+                Belum ada pendaftaran anggota di wilayah ini.
+              </p>
+            ) : (
+              recentRegistrations.map((m) => (
+                <div key={m.id} className="py-3 flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img
+                      src={m.avatarUrl}
+                      alt={m.fullName}
+                      className="w-9 h-9 rounded-xl object-cover border border-slate-200 flex-shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 text-xs truncate">{m.fullName}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{m.regencyName}</p>
+                      <span className={`inline-block text-[9px] px-1.5 py-0.2 rounded-md font-semibold mt-0.5 ${
+                        m.status === 'ACTIVE' 
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {m.status === 'ACTIVE' ? 'Aktif' : 'Menunggu'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {m.status === 'PENDING' && (
+                      <button
+                        onClick={() => onApproveMemberQuick(m.id)}
+                        className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold"
+                      >
+                        Setujui
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onVerifyMember(m)}
+                      className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
+                      title="Cek Verifikasi"
+                      aria-label="Cek Verifikasi Anggota"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

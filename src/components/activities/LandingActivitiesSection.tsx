@@ -180,7 +180,7 @@ export const LandingActivitiesSection: React.FC<LandingActivitiesSectionProps> =
       </div>
 
       {/* Scope Filtering Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
           onClick={() => setSelectedScope('ALL')}
           className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
@@ -242,7 +242,7 @@ export const LandingActivitiesSection: React.FC<LandingActivitiesSectionProps> =
       <div className="bg-slate-950/90 border border-slate-800/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Category Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar -mx-2 px-2 lg:mx-0 lg:px-0">
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <button
               onClick={() => setSelectedCategory('ALL')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${

@@ -67,9 +67,10 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
         </select>
       </div>
 
-      {/* Table */}
+      {/* Table & Mobile Card View */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
@@ -120,6 +121,44 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Responsive Cards View */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {filteredLogs.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">
+              Tidak ada catatan audit yang cocok.
+            </div>
+          ) : (
+            filteredLogs.map((log) => (
+              <div key={log.id} className="p-4 space-y-2.5 bg-white text-xs">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-slate-900">{log.userName || (log as any).actorName || 'Sistem'}</p>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {new Date(log.timestamp || (log as any).createdAt || Date.now()).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md font-bold text-[10px] font-mono flex-shrink-0">
+                    {log.action}
+                  </span>
+                </div>
+
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1 text-[11px]">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span>Target:</span>
+                    <span className="font-semibold text-slate-800">{log.entityId || (log as any).targetName || (log as any).targetId || '-'} ({log.entityType || '-'})</span>
+                  </div>
+                  <div className="text-slate-600 pt-1 border-t border-slate-200/60">
+                    {log.description || (log as any).details || '-'}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono text-right pt-0.5">
+                    IP: {log.ipAddress || '127.0.0.1'}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
