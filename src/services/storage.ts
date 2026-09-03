@@ -329,23 +329,8 @@ class StorageService {
       }
     }
 
-    // Forward to central full-stack server for cross-device synchronization
-    if (typeof window !== 'undefined' && type !== 'SYSTEM') {
-      try {
-        const token = this.getAuthToken();
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        fetch('/api/mutate', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ type, action, payload })
-        }).catch(err => console.warn('[Storage] Server mutation notice:', err));
-      } catch (err) {
-        console.warn('[Storage] Send server mutation error:', err);
-      }
-    }
+    // Persistence cloud ditangani tunggal oleh SpreadsheetService -> Google Apps Script.
+    // Jangan kirim mutasi kedua ke /api/mutate karena dapat menimbulkan dual-write/conflict.
   }
 
   public getAuthToken(): string | null {
@@ -369,46 +354,11 @@ class StorageService {
   }
 
   public async syncWithServer(): Promise<boolean> {
-    if (typeof window === 'undefined' || this.isSyncing) return false;
-    this.isSyncing = true;
-    try {
-      const token = this.getAuthToken();
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      const res = await fetch('/api/data', { headers, cache: 'no-store' });
-      if (!res.ok) return false;
-      const data = await res.json();
-
-      let hasChanges = false;
-
-      const syncCollection = (key: string, incoming: any[] | undefined) => {
-        if (!Array.isArray(incoming)) return false;
-        const currentStr = localStorage.getItem(key);
-        const incomingStr = JSON.stringify(incoming);
-        if (currentStr !== incomingStr) {
-          localStorage.setItem(key, incomingStr);
-          return true;
-        }
-        return false;
-      };
-
-      if (syncCollection(STORAGE_KEYS.MEMBERS, data.members)) hasChanges = true;
-      if (syncCollection(STORAGE_KEYS.TOURS, data.tours)) hasChanges = true;
-      if (syncCollection(STORAGE_KEYS.ACTIVITIES, data.activities)) hasChanges = true;
-      if (syncCollection(STORAGE_KEYS.CULINARY_SOUVENIRS, data.culinaryItems)) hasChanges = true;
-      if (syncCollection(STORAGE_KEYS.KRIDA_MODULES, data.kridaModules)) hasChanges = true;
-
-      if (hasChanges) {
-        this.listeners.forEach(cb => cb());
-      }
-      return true;
-    } catch (e) {
-      return false;
-    } finally {
-      this.isSyncing = false;
-    }
+    // Deprecated: Google Spreadsheet adalah source of truth untuk data aplikasi.
+    // SpreadsheetService menangani pull/reconciliation dari Apps Script.
+    // Method dipertahankan agar pemanggil lama tidak error, tetapi tidak lagi
+    // menimpa cache cloud dari backend /api/data.
+    return false;
   }
 
   private notify(mutationType?: string, payload?: any) {
