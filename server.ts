@@ -67,41 +67,75 @@ interface ActiveSession {
   expiresAt: number;
 }
 
-const activeSessions = new Map<string, ActiveSession>();
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// IMPORTANT: set SESSION_SECRET in production (especially Vercel) so every
+// serverless instance can verify the same bearer token.
+const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-this-session-secret';
+
+function base64UrlEncode(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64url');
+}
+
+function base64UrlDecode(value: string): string {
+  return Buffer.from(value, 'base64url').toString('utf8');
+}
+
+function signSessionPayload(payload: string): string {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+}
 
 function createSession(user: any): string {
-  const token = crypto.randomBytes(32).toString('hex');
-  activeSessions.set(token, {
-    token,
-    userId: user.id,
-    username: user.username || user.email,
-    role: user.role,
-    name: user.name,
+  const payload = {
+    userId: String(user.id),
+    username: String(user.username || user.email || ''),
+    role: String(user.role || 'MEMBER'),
+    name: String(user.name || user.fullName || ''),
     jurisdictionName: user.jurisdictionName,
     jurisdictionId: user.jurisdictionId,
     avatarUrl: user.avatarUrl,
     memberId: user.memberId,
-    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
-  });
-  return token;
+    exp: Date.now() + SESSION_TTL_MS
+  };
+  const encoded = base64UrlEncode(JSON.stringify(payload));
+  return `${encoded}.${signSessionPayload(encoded)}`;
 }
 
 function getSessionUser(req: express.Request): ActiveSession | null {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-  const token = authHeader.split(' ')[1]?.trim();
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+
+  const token = authHeader.slice('Bearer '.length).trim();
   if (!token) return null;
 
-  const session = activeSessions.get(token);
-  if (!session) return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
 
-  if (Date.now() > session.expiresAt) {
-    activeSessions.delete(token);
+  const [encodedPayload, providedSignature] = parts;
+  const expectedSignature = signSessionPayload(encodedPayload);
+
+  try {
+    const a = Buffer.from(providedSignature);
+    const b = Buffer.from(expectedSignature);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+    const payload = JSON.parse(base64UrlDecode(encodedPayload));
+    if (!payload || typeof payload.exp !== 'number' || Date.now() > payload.exp) return null;
+
+    return {
+      token,
+      userId: payload.userId,
+      username: payload.username,
+      role: payload.role,
+      name: payload.name,
+      jurisdictionName: payload.jurisdictionName,
+      jurisdictionId: payload.jurisdictionId,
+      avatarUrl: payload.avatarUrl,
+      memberId: payload.memberId,
+      expiresAt: payload.exp
+    };
+  } catch {
     return null;
   }
-  return session;
 }
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -575,7 +609,7 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const cleanUser = String(username).trim().toLowerCase();
-  const rawPass = String(password).trim();
+  const rawPass = String(password);
 
   // Find user in db.users
   let matchedUser = db.users.find(u => 
@@ -672,7 +706,8 @@ app.post('/api/auth/logout', (req, res) => {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1]?.trim();
-    if (token) activeSessions.delete(token);
+    // Sessions are stateless. Clearing the bearer token on the client is the
+    // logout action; persistent revocation would require a shared session store.
   }
   res.json({ success: true, message: 'Berhasil keluar.' });
 });
@@ -702,26 +737,78 @@ app.post('/api/auth/change-password', (req, res) => {
 // POST /api/auth/register - Public new member registration
 app.post('/api/auth/register', (req, res) => {
   const { memberData, password } = req.body || {};
+
   if (!memberData || !memberData.fullName) {
     return res.status(400).json({ success: false, message: 'Data anggota wajib dilengkapi.' });
   }
 
-  const memberId = `member-${Date.now()}`;
-  const userId = `user-${memberId}`;
-  const passHash = password && password.length >= 6 ? hashPassword(password) : undefined;
+  const rawPassword = typeof password === 'string' ? password : '';
+  if (rawPassword.length < 6) {
+    return res.status(400).json({ success: false, message: 'Kata sandi minimal 6 karakter.' });
+  }
+
+  const email = String(memberData.email || '').trim().toLowerCase();
+  const requestedUsername = String(memberData.username || '').trim().toLowerCase();
+  const username = requestedUsername || (email ? email.split('@')[0] : '');
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email wajib diisi untuk membuat akun.' });
+  }
+  if (!username) {
+    return res.status(400).json({ success: false, message: 'Nama pengguna tidak dapat ditentukan dari data pendaftaran.' });
+  }
+
+  const duplicateUser = db.users.find(u =>
+    (u.username && String(u.username).toLowerCase() === username) ||
+    (u.email && String(u.email).toLowerCase() === email)
+  );
+  if (duplicateUser) {
+    return res.status(409).json({ success: false, message: 'Username atau email sudah terdaftar. Silakan gunakan akun yang sudah ada.' });
+  }
+
+  const duplicateMember = db.members.find(m =>
+    (m.email && String(m.email).toLowerCase() === email) ||
+    (memberData.nationalMemberNumber && m.nationalMemberNumber &&
+      String(m.nationalMemberNumber).toLowerCase() === String(memberData.nationalMemberNumber).toLowerCase())
+  );
+  if (duplicateMember) {
+    return res.status(409).json({ success: false, message: 'Email atau Nomor KTA sudah terdaftar.' });
+  }
+
+  // Preserve a client-generated ID when supplied so the frontend/local cache,
+  // server DB and Spreadsheet row refer to the same member.
+  const memberId = String(memberData.id || `member-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`);
+  const userId = String(memberData.userId || `user-${memberId}`);
+  const registeredAt = new Date().toISOString();
+  const passHash = hashPassword(rawPassword);
 
   const newMember = {
     ...memberData,
     id: memberId,
     userId,
+    email,
     status: 'PENDING',
-    registeredAt: new Date().toISOString(),
+    registeredAt,
     passwordHash: passHash
   };
 
-  db.members.unshift(newMember);
+  const newUser = {
+    id: userId,
+    username,
+    email,
+    passwordHash: passHash,
+    name: newMember.fullName,
+    role: 'MEMBER',
+    jurisdictionName: `${newMember.branchName || ''}${newMember.regencyName ? `, ${newMember.regencyName}` : ''}`.replace(/^,\s*|\s*,\s*$/g, ''),
+    jurisdictionId: newMember.regencyId,
+    avatarUrl: newMember.avatarUrl,
+    memberId,
+    createdAt: registeredAt
+  };
 
-  // Record audit log
+  db.members.unshift(newMember);
+  db.users.push(newUser);
+
   db.auditLogs.unshift({
     id: `log-${Date.now()}`,
     userId: 'public-register',
@@ -731,18 +818,19 @@ app.post('/api/auth/register', (req, res) => {
     targetType: 'MEMBER',
     targetId: memberId,
     description: `Pendaftaran mandiri calon anggota baru: ${newMember.fullName}`,
-    timestamp: new Date().toISOString()
+    timestamp: registeredAt
   });
   if (db.auditLogs.length > 500) db.auditLogs.pop();
   saveDatabase();
 
-  forwardToGoogleAppsScript({
+  // Do not block account creation on Google Apps Script availability.
+  void forwardToGoogleAppsScript({
     action: 'UPSERT_MEMBER',
     sheet: 'Anggota',
     memberId: newMember.id,
     rowData: [
       newMember.id,
-      '',
+      newMember.nationalMemberNumber || '',
       newMember.fullName,
       newMember.email || '',
       newMember.phone || '',
@@ -754,14 +842,32 @@ app.post('/api/auth/register', (req, res) => {
       'PENDING',
       newMember.avatarUrl || '',
       newMember.registeredAt,
-      `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.id}`
+      `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.nationalMemberNumber || newMember.id}`
     ]
   });
 
-  res.json({
+  // Registration creates a real server account and immediately establishes
+  // a stateless session, so the newly registered user is already logged in.
+  const token = createSession(newUser);
+  const sanitizedUser = {
+    id: newUser.id,
+    username: newUser.username,
+    name: newUser.name,
+    email: newUser.email,
+    role: newUser.role,
+    jurisdictionName: newUser.jurisdictionName,
+    jurisdictionId: newUser.jurisdictionId,
+    avatarUrl: newUser.avatarUrl,
+    memberId: newUser.memberId
+  };
+
+  res.status(201).json({
     success: true,
     message: 'Pendaftaran keanggotaan berhasil diajukan dan sedang menunggu verifikasi.',
-    memberId
+    memberId,
+    member: newMember,
+    user: sanitizedUser,
+    token
   });
 });
 
