@@ -293,28 +293,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       let result: any = null;
 
-      // Jalur utama tetap melalui backend. Jika deployment Vercel lama/gagal,
-      // gunakan fallback langsung ke Apps Script agar pendaftaran dari ponsel
-      // tetap tersimpan ke Spreadsheet sebagai source of truth.
+      // PRIMARY REGISTRATION PATH: write directly from the browser to the
+      // Google Apps Script Web App, then verify BOTH central records.
+      // This avoids the Vercel/Undici -> Google socket failure observed on
+      // mobile/serverless requests (UND_ERR_SOCKET: other side closed).
       try {
-        const response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            memberData,
-            password: regPassword
-          })
-        });
-        result = await response.json().catch(() => null);
-        if (!response.ok || !result?.success) {
-          throw new Error(result?.message || `Server registrasi HTTP ${response.status}`);
-        }
-      } catch (serverErr: any) {
-        console.warn('[Auth] Backend registration gagal, mencoba Apps Script langsung:', serverErr?.message || serverErr);
-
         const scriptUrl = spreadsheetService.getConfig().scriptUrl ||
           'https://script.google.com/macros/s/AKfycbz0ZFGBmN3Hwt26lnUmpgXtwhs6f1PyWkezNsaU9OzSpKnIqxCaDnVcmJbl2sTaKJw4FQ/exec';
+
+        if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
 
         const bytes = new Uint8Array(16);
         crypto.getRandomValues(bytes);
@@ -341,21 +328,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           createdAt: memberData.registeredAt
         };
 
-        const authPayload = {
-          action: 'AUTH_REGISTER',
-          user: fallbackUser,
-          passwordHash: gasPasswordHash
-        };
-
-        // POST no-cors tidak dapat membaca response browser; keberhasilan
-        // diverifikasi dengan GET CHECK_RECORD setelahnya.
-        await fetch(scriptUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(authPayload)
-        });
-
         const memberPayload = {
           action: 'UPSERT_MEMBER',
           requestId: `member-${memberData.id}-${Date.now()}`,
@@ -372,6 +344,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           ]
         };
 
+        // UPSERT_MEMBER also auto-provisions the Users row while preserving
+        // the password hash created below. AUTH_REGISTER is sent first so the
+        // password/account record is authoritative when Users already exists.
+        await fetch(scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'AUTH_REGISTER',
+            user: fallbackUser,
+            passwordHash: gasPasswordHash
+          })
+        });
+
         await fetch(scriptUrl, {
           method: 'POST',
           mode: 'no-cors',
@@ -379,8 +365,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           body: JSON.stringify(memberPayload)
         });
 
-        const check = async (sheet: string) => {
-          const u = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}action=CHECK_RECORD&sheet=${encodeURIComponent(sheet)}&id=${encodeURIComponent(memberData.id)}&_t=${Date.now()}&_r=${Math.floor(Math.random()*1000000)}`;
+        const check = async (sheet: string, id: string) => {
+          const u = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}action=CHECK_RECORD&sheet=${encodeURIComponent(sheet)}&id=${encodeURIComponent(id)}&_t=${Date.now()}&_r=${Math.floor(Math.random()*1000000)}`;
           const r = await fetch(u, { method: 'GET', cache: 'no-store' });
           if (!r.ok) throw new Error(`CHECK_RECORD ${sheet} HTTP ${r.status}`);
           return r.json();
@@ -388,33 +374,86 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         let memberCheck: any = null;
         let userCheck: any = null;
-        for (let attempt = 0; attempt < 8; attempt++) {
+        const userRecordId = fallbackUser.id;
+        for (let attempt = 0; attempt < 10; attempt++) {
           try {
-            memberCheck = await check('Anggota');
-            userCheck = await check('Users');
+            memberCheck = await check('Anggota', memberData.id);
+            userCheck = await check('Users', userRecordId);
+            // If the Users row is provisioned by UPSERT_MEMBER under a
+            // user-<memberId> ID, this is the exact ID we expect.
             if (memberCheck?.found && userCheck?.found) break;
           } catch (checkErr) {
-            console.warn('[Auth] Fallback CHECK_RECORD:', checkErr);
+            console.warn('[Auth] Direct GAS CHECK_RECORD attempt:', checkErr);
           }
           await new Promise(resolve => setTimeout(resolve, 700));
         }
 
         if (!memberCheck?.found) {
-          throw new Error('Data Anggota belum terverifikasi di Spreadsheet melalui Apps Script.');
+          throw new Error('Data Anggota belum terverifikasi di Spreadsheet.');
         }
         if (!userCheck?.found) {
-          throw new Error('Data Users belum terverifikasi di Spreadsheet melalui Apps Script.');
+          throw new Error('Data Users belum terverifikasi di Spreadsheet.');
         }
 
-        result = {
-          success: true,
-          fallbackDirectAppsScript: true,
-          memberId: memberData.id,
-          member: memberData,
-          user: fallbackUser,
-          username: fallbackUser.username,
-          message: 'Pendaftaran berhasil disimpan langsung ke Google Spreadsheet.'
-        };
+        // Central data is verified. Ask Vercel only to create the local
+        // session/cache record; it must NOT forward to GAS again.
+        try {
+          const sessionResponse = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            credentials: 'include',
+            cache: 'no-store',
+            body: JSON.stringify({
+              memberData,
+              password: regPassword,
+              centralAlreadyPersisted: true
+            })
+          });
+          const sessionResult = await sessionResponse.json().catch(() => null);
+          if (sessionResponse.ok && sessionResult?.success) {
+            result = sessionResult;
+          } else {
+            console.warn('[Auth] Session creation after central verification failed:', sessionResult || sessionResponse.status);
+          }
+        } catch (sessionErr) {
+          console.warn('[Auth] Session endpoint unavailable after central verification:', sessionErr);
+        }
+
+        if (!result?.success) {
+          result = {
+            success: true,
+            fallbackDirectAppsScript: true,
+            centralAlreadyPersisted: true,
+            memberId: memberData.id,
+            member: memberData,
+            user: fallbackUser,
+            username: fallbackUser.username,
+            message: 'Pendaftaran berhasil disimpan dan diverifikasi di Google Spreadsheet.'
+          };
+        }
+      } catch (directGasErr: any) {
+        console.error('[Auth] Direct Apps Script registration failed:', directGasErr);
+
+        // Last-resort compatibility path: call Vercel. The server may still
+        // succeed on networks where its outbound Google connection is healthy.
+        try {
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            credentials: 'include',
+            cache: 'no-store',
+            body: JSON.stringify({ memberData, password: regPassword })
+          });
+          const serverResult = await response.json().catch(() => null);
+          if (!response.ok || !serverResult?.success) {
+            throw new Error(serverResult?.message || `Server registrasi HTTP ${response.status}`);
+          }
+          result = serverResult;
+        } catch (serverErr: any) {
+          throw new Error(
+            `Pendaftaran gagal disimpan ke Google Spreadsheet. ${directGasErr?.message || ''} ${serverErr?.message || ''}`.trim()
+          );
+        }
       }
 
       // Prefer the authoritative member returned by the backend.
