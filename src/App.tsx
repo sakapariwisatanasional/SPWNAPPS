@@ -151,34 +151,65 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [liveSyncToast, setLiveSyncToast] = useState<{ message: string; visible: boolean } | null>(null);
 
-  // Backend session verification
+  // Backend session verification.
+  // IMPORTANT: background/network failures must never log the user out.
+  // Only an explicit 401/403 from /api/auth/me invalidates the session.
   useEffect(() => {
-    const token = storage.getAuthToken();
-    if (token) {
-      fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.user) {
-            setCurrentUser(data.user);
-            storage.setCurrentUser(data.user);
-          } else {
+    let cancelled = false;
+
+    const verifySession = async () => {
+      const token = storage.getAuthToken();
+      const storedUser = storage.getCurrentUser();
+
+      // No token: keep the locally persisted public/auth state. Do not
+      // manufacture a logout merely because the backend is unreachable.
+      if (!token) {
+        if (!cancelled) setCurrentUser(storedUser || DEFAULT_PUBLIC_USER);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/me', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-store'
+        });
+
+        // A real authentication failure is the ONLY automatic logout case.
+        if (res.status === 401 || res.status === 403) {
+          if (!cancelled) {
             storage.setAuthToken(null);
             storage.setCurrentUser(DEFAULT_PUBLIC_USER);
             setCurrentUser(DEFAULT_PUBLIC_USER);
           }
-        })
-        .catch(() => {
-          // Keep offline state
-        });
-    } else {
-      const cur = storage.getCurrentUser();
-      if (cur.role !== 'PUBLIC') {
-        storage.setCurrentUser(DEFAULT_PUBLIC_USER);
-        setCurrentUser(DEFAULT_PUBLIC_USER);
+          return;
+        }
+
+        // 5xx, redirects, proxy errors, etc. are transient. Keep session.
+        if (!res.ok) {
+          if (!cancelled) setCurrentUser(storedUser || DEFAULT_PUBLIC_USER);
+          return;
+        }
+
+        const data = await res.json().catch(() => null);
+        if (!cancelled && data?.success && data.user) {
+          setCurrentUser(data.user);
+          storage.setCurrentUser(data.user);
+        } else if (!cancelled) {
+          setCurrentUser(storedUser || DEFAULT_PUBLIC_USER);
+        }
+      } catch (error) {
+        // Offline/cold-start/network error: preserve the current session.
+        console.warn('[Auth] Session verification unavailable; keeping local session.', error);
+        if (!cancelled) setCurrentUser(storedUser || DEFAULT_PUBLIC_USER);
       }
-    }
+    };
+
+    verifySession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Synchronize state with reactive storage & auto-fetch live spreadsheet data on initial load
