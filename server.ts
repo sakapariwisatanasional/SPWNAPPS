@@ -768,7 +768,7 @@ app.post('/api/auth/change-password', (req, res) => {
 });
 
 // POST /api/auth/register - Public new member registration
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   const { memberData, password } = req.body || {};
 
   if (!memberData || !memberData.fullName) {
