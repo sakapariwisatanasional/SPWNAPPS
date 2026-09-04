@@ -259,10 +259,7 @@ class SpreadsheetService {
   }
 
   private async handleAutoSyncMutation(event: any) {
-    // Always use the production Apps Script fallback when local configuration
-    // has not yet been populated. This is critical for approval/status updates
-    // made by an administrator on a fresh device.
-    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL);
+    const scriptUrl = this.config.scriptUrl;
     if (!scriptUrl) return;
 
     this.syncState.isSaving = true;
