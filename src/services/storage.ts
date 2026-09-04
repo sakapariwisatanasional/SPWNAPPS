@@ -69,9 +69,6 @@ export type StorageMutationEvent = {
 
 export type MutationListener = (event: StorageMutationEvent) => void;
 
-const AUTH_TOKEN_KEY = 'saka_auth_token';
-const SESSION_CURRENT_USER_KEY = 'saka_current_user_session_v2';
-
 const STORAGE_KEYS = {
   IS_INITIALIZED: 'saka_initialized_v2',
   MEMBERS: 'saka_members_v2',
@@ -216,16 +213,22 @@ class StorageService {
 
     localStorage.setItem(STORAGE_KEYS.IS_INITIALIZED, 'true');
 
-    // Jangan menghapus session aktif hanya karena token API tidak tersedia.
-    // Token bisa hilang/expired tanpa berarti user memilih logout.
-    try {
-      const hasLocalUser = !!localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      const hasSessionUser = !!sessionStorage.getItem(SESSION_CURRENT_USER_KEY);
-      if (!hasLocalUser && !hasSessionUser) {
+    if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_PUBLIC_USER));
+    } else {
+      try {
+        const rawUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        const authToken = localStorage.getItem('saka_auth_token');
+        if (rawUser) {
+          const u: CurrentUser = JSON.parse(rawUser);
+          // If the stored user is an admin or operator but no verified backend session token exists, reset to public
+          if (u.role !== 'PUBLIC' && !authToken) {
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_PUBLIC_USER));
+          }
+        }
+      } catch (e) {
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_PUBLIC_USER));
       }
-    } catch (e) {
-      console.warn('Auth session initialization warning:', e);
     }
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([DEFAULT_PUBLIC_USER]));
@@ -347,47 +350,21 @@ class StorageService {
 
   public getAuthToken(): string | null {
     try {
-      return localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY);
+      return localStorage.getItem('saka_auth_token');
     } catch {
       return null;
     }
   }
 
-  public setAuthToken(token: string | null, rememberMe: boolean = true) {
+  public setAuthToken(token: string | null) {
     try {
-      localStorage.removeItem(AUTH_TOKEN_KEY);
-      sessionStorage.removeItem(AUTH_TOKEN_KEY);
       if (token) {
-        (rememberMe ? localStorage : sessionStorage).setItem(AUTH_TOKEN_KEY, token);
+        localStorage.setItem('saka_auth_token', token);
+      } else {
+        localStorage.removeItem('saka_auth_token');
       }
     } catch (e) {
       console.warn('Set auth token error:', e);
-    }
-  }
-
-  public setCurrentUser(user: CurrentUser, rememberMe: boolean = true) {
-    try {
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-      sessionStorage.removeItem(SESSION_CURRENT_USER_KEY);
-      const target = rememberMe ? localStorage : sessionStorage;
-      target.setItem(rememberMe ? STORAGE_KEYS.CURRENT_USER : SESSION_CURRENT_USER_KEY, JSON.stringify(user));
-      this.addAuditLog({ action: 'AUTH_SESSION_SET', userId: user.id, details: { role: user.role, rememberMe } });
-      this.notify();
-    } catch (e) {
-      console.warn('Set current user error:', e);
-    }
-  }
-
-  public logout() {
-    try {
-      localStorage.removeItem(AUTH_TOKEN_KEY);
-      sessionStorage.removeItem(AUTH_TOKEN_KEY);
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-      sessionStorage.removeItem(SESSION_CURRENT_USER_KEY);
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_PUBLIC_USER));
-      this.notify();
-    } catch (e) {
-      console.warn('Logout error:', e);
     }
   }
 
@@ -417,16 +394,11 @@ class StorageService {
         return false;
       };
 
-      // Google Spreadsheet/Apps Script is the authoritative cross-device source
-      // for member records. Never replace the browser member cache from the
-      // serverless filesystem snapshot because a different Vercel instance may
-      // legitimately have an empty/stale in-memory database. SpreadsheetService
-      // performs the authoritative member pull separately.
-
-      if (Array.isArray(data.tours) && data.tours.length > 0) { if (syncCollection(STORAGE_KEYS.TOURS, data.tours)) hasChanges = true; }
-      if (Array.isArray(data.activities) && data.activities.length > 0) { if (syncCollection(STORAGE_KEYS.ACTIVITIES, data.activities)) hasChanges = true; }
-      if (Array.isArray(data.culinaryItems) && data.culinaryItems.length > 0) { if (syncCollection(STORAGE_KEYS.CULINARY_SOUVENIRS, data.culinaryItems)) hasChanges = true; }
-      if (Array.isArray(data.kridaModules) && data.kridaModules.length > 0) { if (syncCollection(STORAGE_KEYS.KRIDA_MODULES, data.kridaModules)) hasChanges = true; }
+      if (syncCollection(STORAGE_KEYS.MEMBERS, data.members)) hasChanges = true;
+      if (syncCollection(STORAGE_KEYS.TOURS, data.tours)) hasChanges = true;
+      if (syncCollection(STORAGE_KEYS.ACTIVITIES, data.activities)) hasChanges = true;
+      if (syncCollection(STORAGE_KEYS.CULINARY_SOUVENIRS, data.culinaryItems)) hasChanges = true;
+      if (syncCollection(STORAGE_KEYS.KRIDA_MODULES, data.kridaModules)) hasChanges = true;
 
       if (hasChanges) {
         this.listeners.forEach(cb => cb());
@@ -449,16 +421,34 @@ class StorageService {
   // --- Current User & Roles ---
   public getCurrentUser(): CurrentUser {
     try {
-      // Session tab-only diprioritaskan jika ada.
-      const rawSession = sessionStorage.getItem(SESSION_CURRENT_USER_KEY);
-      const rawLocal = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      const data = rawSession || rawLocal;
+      const token = this.getAuthToken();
+      const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
       if (!data) return DEFAULT_PUBLIC_USER;
       const user: CurrentUser = JSON.parse(data);
-      if (!user || !user.id || !user.role) return DEFAULT_PUBLIC_USER;
+      // If user is set to an elevated role but lacks an active backend session token, reset to public
+      if (user.role !== 'PUBLIC' && !token) {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_PUBLIC_USER));
+        return DEFAULT_PUBLIC_USER;
+      }
       return user;
     } catch {
       return DEFAULT_PUBLIC_USER;
+    }
+  }
+
+  public setCurrentUser(user: CurrentUser) {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    this.addAuditLog(user.id, user.name, user.role, 'SWITCH_ROLE', 'AUTH', user.id, `Status pengguna: ${user.role} (${user.jurisdictionName || 'Nasional'})`);
+    this.notify();
+  }
+
+  public getUsers(): CurrentUser[] {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.USERS);
+      const storedUsers: CurrentUser[] = data ? JSON.parse(data) : [];
+      return storedUsers.length > 0 ? storedUsers : [DEFAULT_PUBLIC_USER];
+    } catch {
+      return [DEFAULT_PUBLIC_USER];
     }
   }
 
