@@ -317,6 +317,11 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       // STEP 2: POST UPSERT_MEMBER -> STEP 3: CHECK_RECORD.
       // Jangan navigasi / menutup modal sebelum Google Spreadsheet benar-benar
       // mengembalikan found=true.
+      console.info('[MemberForm] Memulai sinkronisasi anggota:', {
+        memberId: member.id,
+        email: member.email,
+        webAppConfigured: spreadsheetService.getSyncState().hasScriptUrl
+      });
       const syncResult = await spreadsheetService.saveMemberAndWaitForSync(member);
 
       if (!syncResult.synced) {
