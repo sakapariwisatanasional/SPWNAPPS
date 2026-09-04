@@ -23,9 +23,84 @@ import {
 } from 'lucide-react';
 import { CurrentUser, Member, KridaType } from '../../types';
 import { storage } from '../../services/storage';
-import { spreadsheetService } from '../../services/spreadsheetService';
 import { formatGoogleDriveUrl } from '../../services/driveRepository';
 import { SakaLogo } from '../common/SakaLogo';
+
+const DEFAULT_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbz0ZFGBmN3Hwt26lnUmpgXtwhs6f1PyWkezNsaU9OzSpKnIqxCaDnVcmJbl2sTaKJw4FQ/exec';
+
+async function createGasPasswordHash(password: string): Promise<string> {
+  const saltBytes = new Uint8Array(16);
+  crypto.getRandomValues(saltBytes);
+  const salt = Array.from(saltBytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  const input = new TextEncoder().encode(`${salt}|${password}`);
+  const digest = await crypto.subtle.digest('SHA-256', input);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return `GAS2:${salt}:${hex}`;
+}
+
+async function sendRegistrationDirectToGas(memberData: any, password: string) {
+  const gasUrl = DEFAULT_APPS_SCRIPT_URL;
+  const passwordHash = await createGasPasswordHash(password);
+
+  const rowData = [
+    memberData.id,
+    '',
+    memberData.fullName,
+    memberData.email || '',
+    memberData.phone || '',
+    memberData.provinceName || '',
+    memberData.regencyName || '',
+    memberData.branchName || '',
+    memberData.gugusDepan || '',
+    memberData.krida || '',
+    'PENDING',
+    memberData.avatarUrl || '',
+    memberData.registeredAt,
+    `https://spwnapps.vercel.app/?verifyId=${memberData.id}`
+  ];
+
+  // Satu POST saja. no-cors memang tidak bisa membaca response,
+  // tetapi promise selesai setelah browser selesai mengirim request.
+  await fetch(gasUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'UPSERT_MEMBER',
+      sheet: 'Anggota',
+      memberId: memberData.id,
+      rowData,
+      passwordHash
+    })
+  });
+
+  // Hanya satu verifikasi ringan; tidak ada retry 10x yang membuat HP terasa macet.
+  const checkUrl =
+    `${gasUrl}?action=CHECK_RECORD&sheet=Anggota&id=${encodeURIComponent(memberData.id)}&_t=${Date.now()}`;
+
+  const checkResponse = await fetch(checkUrl, {
+    method: 'GET',
+    cache: 'no-store'
+  });
+
+  if (!checkResponse.ok) {
+    throw new Error('Data belum dapat diverifikasi di Google Spreadsheet.');
+  }
+
+  const check = await checkResponse.json().catch(() => null);
+  if (!check?.found) {
+    throw new Error('Data anggota belum ditemukan di Google Spreadsheet.');
+  }
+
+  return { passwordHash, memberId: memberData.id };
+}
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -291,184 +366,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         registeredAt: new Date().toISOString()
       };
 
-      let result: any = null;
+      // PRIMARY REGISTRATION PATH:
+      // Browser -> Google Apps Script -> Anggota + Users.
+      // Tidak lagi menunggu backend Vercel yang dapat mengalami cold start/network timeout.
+      const gasResult = await sendRegistrationDirectToGas(memberData, regPassword);
 
-      // PRIMARY REGISTRATION PATH: write directly from the browser to the
-      // Google Apps Script Web App, then verify BOTH central records.
-      // This avoids the Vercel/Undici -> Google socket failure observed on
-      // mobile/serverless requests (UND_ERR_SOCKET: other side closed).
-      try {
-        const scriptUrl = spreadsheetService.getConfig().scriptUrl ||
-          'https://script.google.com/macros/s/AKfycbz0ZFGBmN3Hwt26lnUmpgXtwhs6f1PyWkezNsaU9OzSpKnIqxCaDnVcmJbl2sTaKJw4FQ/exec';
-
-        if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
-
-        const bytes = new Uint8Array(16);
-        crypto.getRandomValues(bytes);
-        const salt = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-        const digestBuffer = await crypto.subtle.digest(
-          'SHA-256',
-          new TextEncoder().encode(`${salt}|${regPassword}`)
-        );
-        const digest = Array.from(new Uint8Array(digestBuffer))
-          .map(b => b.toString(16).padStart(2, '0')).join('');
-        const gasPasswordHash = `GAS2:${salt}:${digest}`;
-
-        const fallbackUser = {
-          id: memberData.userId,
-          username: memberData.email.split('@')[0].toLowerCase(),
-          email: memberData.email,
-          name: memberData.fullName,
-          role: 'MEMBER',
-          jurisdictionName: `${memberData.branchName || ''}${memberData.regencyName ? `, ${memberData.regencyName}` : ''}`.replace(/^,\s*|\s*,\s*$/g, ''),
-          jurisdictionId: memberData.regencyId,
-          avatarUrl: memberData.avatarUrl,
-          memberId: memberData.id,
-          status: 'PENDING',
-          createdAt: memberData.registeredAt
-        };
-
-        const memberPayload = {
-          action: 'UPSERT_MEMBER',
-          requestId: `member-${memberData.id}-${Date.now()}`,
-          transactionId: `member-${memberData.id}-${Date.now()}`,
-          sheet: 'Anggota',
-          memberId: memberData.id,
-          secondaryId: memberData.nationalMemberNumber || '',
-          rowData: [
-            memberData.id, memberData.nationalMemberNumber || '', memberData.fullName,
-            memberData.email || '', memberData.phone || '', memberData.provinceName || '',
-            memberData.regencyName || '', memberData.branchName || '', memberData.gugusDepan || '',
-            memberData.krida || '', 'PENDING', memberData.avatarUrl || '', memberData.registeredAt || new Date().toISOString(),
-            `${window.location.origin}/?verifyId=${encodeURIComponent(memberData.nationalMemberNumber || memberData.id)}`
-          ]
-        };
-
-        // UPSERT_MEMBER also auto-provisions the Users row while preserving
-        // the password hash created below. AUTH_REGISTER is sent first so the
-        // password/account record is authoritative when Users already exists.
-        await fetch(scriptUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'AUTH_REGISTER',
-            user: fallbackUser,
-            passwordHash: gasPasswordHash
-          })
-        });
-
-        await fetch(scriptUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(memberPayload)
-        });
-
-        const check = async (sheet: string, id: string) => {
-          const u = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}action=CHECK_RECORD&sheet=${encodeURIComponent(sheet)}&id=${encodeURIComponent(id)}&_t=${Date.now()}&_r=${Math.floor(Math.random()*1000000)}`;
-          const r = await fetch(u, { method: 'GET', cache: 'no-store' });
-          if (!r.ok) throw new Error(`CHECK_RECORD ${sheet} HTTP ${r.status}`);
-          return r.json();
-        };
-
-        let memberCheck: any = null;
-        let userCheck: any = null;
-        const userRecordId = fallbackUser.id;
-        for (let attempt = 0; attempt < 10; attempt++) {
-          try {
-            memberCheck = await check('Anggota', memberData.id);
-            userCheck = await check('Users', userRecordId);
-            // If the Users row is provisioned by UPSERT_MEMBER under a
-            // user-<memberId> ID, this is the exact ID we expect.
-            if (memberCheck?.found && userCheck?.found) break;
-          } catch (checkErr) {
-            console.warn('[Auth] Direct GAS CHECK_RECORD attempt:', checkErr);
-          }
-          await new Promise(resolve => setTimeout(resolve, 700));
-        }
-
-        if (!memberCheck?.found) {
-          throw new Error('Data Anggota belum terverifikasi di Spreadsheet.');
-        }
-        if (!userCheck?.found) {
-          throw new Error('Data Users belum terverifikasi di Spreadsheet.');
-        }
-
-        // Central data is verified. Ask Vercel only to create the local
-        // session/cache record; it must NOT forward to GAS again.
-        try {
-          const sessionResponse = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            credentials: 'include',
-            cache: 'no-store',
-            body: JSON.stringify({
-              memberData,
-              password: regPassword,
-              centralAlreadyPersisted: true
-            })
-          });
-          const sessionResult = await sessionResponse.json().catch(() => null);
-          if (sessionResponse.ok && sessionResult?.success) {
-            result = sessionResult;
-          } else {
-            console.warn('[Auth] Session creation after central verification failed:', sessionResult || sessionResponse.status);
-          }
-        } catch (sessionErr) {
-          console.warn('[Auth] Session endpoint unavailable after central verification:', sessionErr);
-        }
-
-        if (!result?.success) {
-          result = {
-            success: true,
-            fallbackDirectAppsScript: true,
-            centralAlreadyPersisted: true,
-            memberId: memberData.id,
-            member: memberData,
-            user: fallbackUser,
-            username: fallbackUser.username,
-            message: 'Pendaftaran berhasil disimpan dan diverifikasi di Google Spreadsheet.'
-          };
-        }
-      } catch (directGasErr: any) {
-        console.error('[Auth] Direct Apps Script registration failed:', directGasErr);
-
-        // Last-resort compatibility path: call Vercel. The server may still
-        // succeed on networks where its outbound Google connection is healthy.
-        try {
-          const response = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            credentials: 'include',
-            cache: 'no-store',
-            body: JSON.stringify({ memberData, password: regPassword })
-          });
-          const serverResult = await response.json().catch(() => null);
-          if (!response.ok || !serverResult?.success) {
-            throw new Error(serverResult?.message || `Server registrasi HTTP ${response.status}`);
-          }
-          result = serverResult;
-        } catch (serverErr: any) {
-          throw new Error(
-            `Pendaftaran gagal disimpan ke Google Spreadsheet. ${directGasErr?.message || ''} ${serverErr?.message || ''}`.trim()
-          );
-        }
-      }
-
-      // Prefer the authoritative member returned by the backend.
       const created: Member = {
-        ...(result.member || memberData),
-        id: result.member?.id || result.memberId || clientMemberId,
-        userId: result.member?.userId || memberData.userId,
-        status: result.member?.status || 'PENDING',
-        registeredAt: result.member?.registeredAt || memberData.registeredAt
+        ...memberData,
+        id: gasResult.memberId,
+        userId: memberData.userId,
+        status: 'PENDING',
+        registeredAt: memberData.registeredAt
       } as Member;
 
-      // Backend session/token is authoritative. Save it before any UI redirect.
-      if (result.token) {
-        storage.setAuthToken(result.token);
-      }
+      // Sesi lokal segera aktif setelah Google Spreadsheet mengonfirmasi Anggota.
+      storage.setAuthToken('member-session-' + Date.now());
 
       // Keep the browser cache aligned with the exact backend member ID.
       const existingMembers = storage.getMembers();
@@ -482,30 +394,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
       storage.setMembers(mergedMembers);
 
-      if (result.user) {
-        storage.setCurrentUser(result.user);
-        onLoginSuccess(result.user);
-      } else {
-        const newUser: CurrentUser = {
-          id: created.userId || `user-${created.id}`,
-          username: result.username || created.email,
-          email: created.email,
-          name: created.fullName,
-          role: 'MEMBER',
-          jurisdictionName: `${created.branchName || 'Kwarran'}, ${created.regencyName || ''}`,
-          avatarUrl: created.avatarUrl,
-          memberId: created.id
-        };
-        storage.setCurrentUser(newUser);
-        onLoginSuccess(newUser);
-      }
+      const newUser: CurrentUser = {
+        id: created.userId || `user-${created.id}`,
+        username: created.email || created.id,
+        email: created.email,
+        name: created.fullName,
+        role: 'MEMBER',
+        jurisdictionName: `${created.branchName || 'Kwarran'}, ${created.regencyName || ''}`,
+        avatarUrl: created.avatarUrl,
+        memberId: created.id
+      };
+      storage.setCurrentUser(newUser);
+      onLoginSuccess(newUser);
 
       // Do not make registration success depend on a background sync call.
       // The backend response above is already the authoritative auth result.
       storage.syncWithServer().catch(() => {});
 
       setRegSuccessMsg(
-        `Pendaftaran berhasil. Akun Anda sudah dibuat dan sesi login telah aktif. ID: ${created.id}`
+        `Pendaftaran berhasil. Data telah tersimpan di Google Spreadsheet dan akun Anda siap menunggu verifikasi. ID: ${created.id}`
       );
       setIsLoading(false);
 
