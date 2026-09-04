@@ -371,7 +371,15 @@ class StorageService {
       sessionStorage.removeItem(SESSION_CURRENT_USER_KEY);
       const target = rememberMe ? localStorage : sessionStorage;
       target.setItem(rememberMe ? STORAGE_KEYS.CURRENT_USER : SESSION_CURRENT_USER_KEY, JSON.stringify(user));
-      this.addAuditLog({ action: 'AUTH_SESSION_SET', userId: user.id, details: { role: user.role, rememberMe } });
+      this.addAuditLog(
+        user.id,
+        user.name,
+        user.role,
+        'AUTH_SESSION_SET',
+        'SYSTEM',
+        user.id,
+        `Sesi autentikasi ditetapkan (rememberMe=${rememberMe}).`
+      );
       this.notify();
     } catch (e) {
       console.warn('Set current user error:', e);
@@ -454,6 +462,18 @@ class StorageService {
       return user;
     } catch {
       return DEFAULT_PUBLIC_USER;
+    }
+  }
+
+  public getUsers(): CurrentUser[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.USERS);
+      if (!raw) return Array.isArray(DEMO_USERS) ? [...DEMO_USERS] : [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : (Array.isArray(DEMO_USERS) ? [...DEMO_USERS] : []);
+    } catch (error) {
+      console.warn('[Storage] getUsers error:', error);
+      return Array.isArray(DEMO_USERS) ? [...DEMO_USERS] : [];
     }
   }
 
