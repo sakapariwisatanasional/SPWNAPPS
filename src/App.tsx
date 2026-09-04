@@ -89,6 +89,53 @@ import { DriveMediaRepositoryModal } from './components/common/DriveMediaReposit
 import { ActivityDetailModal } from './components/activities/ActivityDetailModal';
 import { ActivityFormModal } from './components/activities/ActivityFormModal';
 
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; message: string }
+> {
+  state = { hasError: false, message: '' };
+
+  static getDerivedStateFromError(error: unknown) {
+    return {
+      hasError: true,
+      message: error instanceof Error ? error.message : 'Terjadi kesalahan saat menampilkan halaman.'
+    };
+  }
+
+  componentDidCatch(error: unknown, info: React.ErrorInfo) {
+    console.error('[App] Render error:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+          <div className="max-w-lg w-full bg-white rounded-3xl border border-red-200 shadow-xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold">!</div>
+              <div>
+                <h1 className="text-lg font-extrabold text-slate-900">Dashboard mengalami kendala</h1>
+                <p className="text-xs text-slate-500">Data login tetap dipertahankan.</p>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-xs text-red-700 break-words">
+              {this.state.message}
+            </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 w-full py-2.5 rounded-xl bg-purple-700 text-white text-sm font-bold"
+            >
+              Muat Ulang Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   // Current logged in user
   const [currentUser, setCurrentUser] = useState<CurrentUser>(storage.getCurrentUser() || DEFAULT_PUBLIC_USER);
@@ -222,7 +269,11 @@ export default function App() {
       setSkills(storage.getSkills());
       setAuditLogs(storage.getAuditLogs());
       setCulinaryItems(storage.getCulinarySouvenirs());
-      setCurrentUser(storage.getCurrentUser());
+      const nextStoredUser = storage.getCurrentUser();
+      const authToken = storage.getAuthToken();
+      if (nextStoredUser && (nextStoredUser.role === 'PUBLIC' ? !authToken : true)) {
+        setCurrentUser(nextStoredUser);
+      }
     };
 
     syncState();
@@ -507,29 +558,31 @@ export default function App() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
           <div className="max-w-7xl mx-auto">
             {currentTab === 'dashboard' && (
-              <DashboardView
-                currentUser={currentUser}
-                members={members}
-                tours={tours}
-                provinces={provinces}
-                culinaryItems={culinaryItems}
-                onSelectTab={handleNavigateTab}
-                onOpenRegisterModal={() => handleOpenAuth('register')}
-                onVerifyMember={(m) => setVerifyingMember(m)}
-                onApproveMemberQuick={handleApproveMember}
-                onViewTourDetail={(t) => setSelectedTourDetail(t)}
-                onOpenEditCardModal={() => setIsEditKtaModalOpen(true)}
-                onOpenEditPhotoModal={(m) => setEditingPhotoMember(m)}
-                onOpenEditMemberModal={(m) => setEditingMember(m)}
-                onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
-                onOpenCulinaryFormModal={(item) => {
-                  setEditingCulinaryItem(item || null);
-                  setIsCulinaryFormOpen(true);
-                }}
-                onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
-                onOpenSpreadsheetModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
-                onOpenDriveModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
-              />
+              <AppErrorBoundary>
+                <DashboardView
+                  currentUser={currentUser}
+                  members={members}
+                  tours={tours}
+                  provinces={provinces}
+                  culinaryItems={culinaryItems}
+                  onSelectTab={handleNavigateTab}
+                  onOpenRegisterModal={() => handleOpenAuth('register')}
+                  onVerifyMember={(m) => setVerifyingMember(m)}
+                  onApproveMemberQuick={handleApproveMember}
+                  onViewTourDetail={(t) => setSelectedTourDetail(t)}
+                  onOpenEditCardModal={() => setIsEditKtaModalOpen(true)}
+                  onOpenEditPhotoModal={(m) => setEditingPhotoMember(m)}
+                  onOpenEditMemberModal={(m) => setEditingMember(m)}
+                  onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
+                  onOpenCulinaryFormModal={(item) => {
+                    setEditingCulinaryItem(item || null);
+                    setIsCulinaryFormOpen(true);
+                  }}
+                  onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
+                  onOpenSpreadsheetModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
+                  onOpenDriveModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
+                />
+              </AppErrorBoundary>
             )}
 
             {currentTab === 'culinary-souvenirs' && (
