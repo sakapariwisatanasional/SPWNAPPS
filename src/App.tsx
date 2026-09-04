@@ -136,7 +136,7 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
-function AppContent() {
+export default function App() {
   // Current logged in user
   const [currentUser, setCurrentUser] = useState<CurrentUser>(storage.getCurrentUser() || DEFAULT_PUBLIC_USER);
   
@@ -927,15 +927,3 @@ function AppContent() {
   );
 }
 
-
-
-// Global render boundary: catches errors from Sidebar/Header/page views as well,
-// not only DashboardView. This prevents a single component crash from producing
-// a completely blank screen.
-export default function App() {
-  return (
-    <AppErrorBoundary>
-      <AppContent />
-    </AppErrorBoundary>
-  );
-}
