@@ -183,6 +183,7 @@ class SpreadsheetService {
         const parsed = JSON.parse(raw);
         return {
           ...parsed,
+          scriptUrl: parsed.scriptUrl || DEFAULT_APPS_SCRIPT_URL,
           autoSync: parsed.autoSync !== undefined ? parsed.autoSync : true,
           autoRefreshIntervalSeconds: parsed.autoRefreshIntervalSeconds || 6
         };
@@ -194,7 +195,7 @@ class SpreadsheetService {
     return {
       spreadsheetId: DEFAULT_SPREADSHEET_ID,
       spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
-      scriptUrl: '',
+      scriptUrl: DEFAULT_APPS_SCRIPT_URL,
       autoSync: true,
       autoRefreshIntervalSeconds: 6,
       status: 'CONNECTED'
@@ -205,19 +206,6 @@ class SpreadsheetService {
     this.config = { ...this.config, ...updates };
     localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
     this.notifySyncState();
-
-    // Persist to central server so ALL devices and browsers share this configuration
-    if (typeof window !== 'undefined') {
-      try {
-        fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.config)
-        }).catch(err => console.warn('[SpreadsheetService] Save config to server notice:', err));
-      } catch (err) {
-        console.warn('[SpreadsheetService] Save config to server error:', err);
-      }
-    }
 
     return this.config;
   }
@@ -230,7 +218,7 @@ class SpreadsheetService {
     return {
       ...this.syncState,
       autoSync: this.config.autoSync !== false,
-      hasScriptUrl: Boolean(this.config.scriptUrl && this.config.scriptUrl.trim().length > 0)
+      hasScriptUrl: Boolean((this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL).trim().length > 0)
     };
   }
 
@@ -259,7 +247,7 @@ class SpreadsheetService {
   }
 
   private async handleAutoSyncMutation(event: any) {
-    const scriptUrl = this.config.scriptUrl;
+    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL);
     if (!scriptUrl) return;
 
     this.syncState.isSaving = true;
@@ -476,144 +464,28 @@ class SpreadsheetService {
    * Mengambil data mentah baris dari Google Spreadsheet menggunakan Google Visualization API
    */
   public async fetchSheetRows(sheetName: string = 'Anggota'): Promise<Record<string, any>[]> {
-    const spreadsheetId = this.config.spreadsheetId || DEFAULT_SPREADSHEET_ID;
-    const scriptUrl = this.config.scriptUrl;
+    const scriptUrl = this.normalizeAppsScriptUrl(
+      this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL
+    );
+    if (!scriptUrl) return [];
 
-    // 1. Prioritaskan pengambilan data melalui Google Apps Script Web App jika sudah terpasang
-    if (scriptUrl && scriptUrl.trim().length > 0) {
-      try {
-        const gasUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}`;
-        const gasResponse = await fetch(gasUrl, {
-          method: 'GET',
-          cache: 'no-store'
-        });
-        if (gasResponse.ok) {
-          const gasData = await gasResponse.json();
-          if (Array.isArray(gasData) && gasData.length > 0) {
-            return gasData;
-          }
-        }
-      } catch (gasErr) {
-        // Fallback ke GViz API jika GAS web app ada kendala network
-      }
-    }
-
-    // 2. Daftar variasi nama sheet yang mungkin digunakan melalui Google Visualization API
-    const sheetCandidates: string[] = [sheetName];
-    if (sheetName.toLowerCase().includes('anggota')) {
-      sheetCandidates.push(
-        'Data Anggota',
-        'Data_Anggota',
-        'Members',
-        'Anggota Saka',
-        'Pendaftaran',
-        'Form Responses 1',
-        'Respon Formulir 1',
-        'Form Responses',
-        'Respon Formulir',
-        'Sheet1',
-        'Sheet 1',
-        'Lembar1',
-        'Lembar 1',
-        'Data Member',
-        'Member',
-        ''
-      );
-    } else if (sheetName.toLowerCase().includes('paket') || sheetName.toLowerCase().includes('wisata')) {
-      sheetCandidates.push('Paket_Wisata', 'Paket Wisata', 'Tours', 'Tour_Packages', 'Paket', 'Wisata');
-    } else if (sheetName.toLowerCase().includes('kuliner') || sheetName.toLowerCase().includes('cinderamata')) {
-      sheetCandidates.push('Kuliner_Cinderamata', 'Kuliner & Cinderamata', 'Produk', 'Products', 'Souvenirs', 'Kuliner', 'Cinderamata');
-    } else if (sheetName.toLowerCase().includes('agenda') || sheetName.toLowerCase().includes('kegiatan')) {
-      sheetCandidates.push('Agenda_Kegiatan', 'Agenda & Kegiatan', 'Events', 'Activities', 'Agenda', 'Kegiatan');
-    }
-
-    for (const targetSheet of sheetCandidates) {
-      try {
-        const sheetParam = targetSheet ? `&sheet=${encodeURIComponent(targetSheet)}` : '';
-        const cacheBuster = `&_t=${Date.now()}&_rnd=${Math.floor(Math.random() * 1000000)}`;
-        const gvizUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json${sheetParam}${cacheBuster}`;
-        
-        const response = await fetch(gvizUrl, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          }
-        });
-        if (!response.ok) continue;
-
-        const text = await response.text();
-        const jsonStart = text.indexOf('{');
-        const jsonEnd = text.lastIndexOf('}');
-        
-        if (jsonStart !== -1 && jsonEnd !== -1) {
-          const jsonStr = text.substring(jsonStart, jsonEnd + 1);
-          const data = JSON.parse(jsonStr);
-          
-          if (data.table && data.table.rows && data.table.rows.length > 0) {
-            let cols: string[] = (data.table.cols || []).map((col: any, idx: number) => {
-              return (col && col.label && col.label.trim()) || `col_${idx}`;
-            });
-
-            let dataRows = data.table.rows;
-
-            // Jika label cols generic (seperti col_0, col_1) dan baris pertama berisi header teks
-            const firstRowHasHeaders = cols.every(c => c.startsWith('col_') || !c) && 
-              dataRows.length > 0 && 
-              dataRows[0].c && 
-              dataRows[0].c.some((cell: any) => cell && typeof cell.v === 'string' && (cell.v.toLowerCase().includes('nama') || cell.v.toLowerCase().includes('kta') || cell.v.toLowerCase().includes('id') || cell.v.toLowerCase().includes('email')));
-
-            if (firstRowHasHeaders) {
-              cols = dataRows[0].c.map((cell: any, idx: number) => {
-                return (cell && (cell.v || cell.f) && String(cell.v || cell.f).trim()) || `col_${idx}`;
-              });
-              dataRows = dataRows.slice(1);
-            }
-
-            const results = dataRows.map((row: any) => {
-              const item: Record<string, any> = {};
-              if (row.c) {
-                row.c.forEach((cell: any, idx: number) => {
-                  const key = cols[idx] || `col_${idx}`;
-                  item[key] = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : cell.f || '') : '';
-                });
-              }
-              return item;
-            }).filter((r: any) => Object.values(r).some(v => v !== '' && v !== null && v !== undefined));
-
-            if (results.length > 0) {
-              return results;
-            }
-          }
-        }
-      } catch (err: any) {
-        // Abaikan kandidat yang tidak cocok secara silent
-      }
-    }
-
-    // 3. Fallback: Coba CSV Export URL secara aman tanpa uncaught error
     try {
-      const csvCacheBuster = `&_t=${Date.now()}&_rnd=${Math.floor(Math.random() * 1000000)}`;
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}${csvCacheBuster}`;
-      const response = await fetch(csvUrl, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      if (response && response.ok) {
-        const csvText = await response.text();
-        const parsed = this.parseCSV(csvText);
-        if (parsed.length > 0) return parsed;
+      const url = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}`;
+      const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+      if (!response.ok) {
+        console.warn(`[SpreadsheetService] Apps Script GET ${sheetName} gagal: HTTP ${response.status}`);
+        return [];
       }
-    } catch (csvErr: any) {
-      // Penanganan fallback secara graceful tanpa mengotori log error sistem
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        console.warn(`[SpreadsheetService] Apps Script mengembalikan format tidak valid untuk ${sheetName}:`, data);
+        return [];
+      }
+      return data;
+    } catch (err: any) {
+      console.warn(`[SpreadsheetService] Gagal membaca ${sheetName} melalui Apps Script:`, err?.message || err);
+      return [];
     }
-
-    return [];
   }
 
   /**
