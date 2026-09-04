@@ -769,7 +769,7 @@ app.post('/api/auth/change-password', (req, res) => {
 
 // POST /api/auth/register - Public new member registration
 app.post('/api/auth/register', async (req, res) => {
-  const { memberData, password } = req.body || {};
+  const { memberData, password, centralAlreadyPersisted } = req.body || {};
 
   if (!memberData || !memberData.fullName) {
     return res.status(400).json({ success: false, message: 'Data anggota wajib dilengkapi.' });
@@ -856,9 +856,35 @@ app.post('/api/auth/register', async (req, res) => {
   if (db.auditLogs.length > 500) db.auditLogs.pop();
   saveDatabase();
 
-  // Persist BOTH authentication and member data to Google Spreadsheet.
-  // Vercel's local filesystem is not a durable source of truth, so registration
-  // must succeed at the central Apps Script endpoint before returning success.
+  // The browser can reach the Apps Script Web App more reliably than a
+  // serverless Vercel -> Google fetch in some mobile/network environments.
+  // When the client has already written + verified the central records,
+  // do not forward them again from Vercel.
+  if (centralAlreadyPersisted === true) {
+    const token = createSession(newUser);
+    return res.json({
+      success: true,
+      token,
+      memberId,
+      member: newMember,
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role,
+        jurisdictionName: newUser.jurisdictionName,
+        jurisdictionId: newUser.jurisdictionId,
+        avatarUrl: newUser.avatarUrl,
+        memberId: newUser.memberId
+      },
+      message: 'Pendaftaran berhasil disimpan dan diverifikasi di Google Spreadsheet.'
+    });
+  }
+
+  // Legacy/server-side persistence path. Kept for existing admin/internal
+  // callers, but public mobile registration now uses the verified direct-GAS
+  // path from AuthModal.
   try {
     const gasPasswordHash = hashPasswordForGoogleAppsScript(rawPassword);
 
