@@ -147,7 +147,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     const ident = loginIdentifier.trim();
-    const pass = loginPassword.trim();
+    const pass = loginPassword;
 
     if (!ident || !pass) {
       setIsLoading(false);
@@ -159,6 +159,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username: ident, password: pass })
       });
 
@@ -219,6 +220,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // Handle Registration
+  // Registration is authoritative on the backend first. The backend creates:
+  // 1) the member record, 2) the password hash, and 3) an authenticated session.
+  // Only after that succeeds do we update the browser cache.
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
@@ -226,6 +230,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     if (!regFullName.trim()) {
       setRegError('Nama lengkap wajib diisi.');
+      return;
+    }
+    if (!regEmail.trim()) {
+      setRegError('Email aktif wajib diisi.');
       return;
     }
     if (regPassword.length < 6) {
@@ -239,65 +247,130 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setIsLoading(true);
 
-    const selProv = provinces.find(p => p.id === regProvinceId);
-    const selReg = regencies.find(r => r.id === regRegencyId);
-    const selDist = districts.find(d => d.id === regDistrictId);
+    try {
+      const selProv = provinces.find(p => p.id === regProvinceId);
+      const selReg = regencies.find(r => r.id === regRegencyId);
+      const selDist = districts.find(d => d.id === regDistrictId);
 
-    const newMemberPayload: Omit<Member, 'id' | 'status' | 'registeredAt' | 'verificationToken' | 'locationHistory'> = {
-      userId: `user-reg-${Date.now()}`,
-      fullName: regFullName.trim(),
-      nikMasked: regNik ? `${regNik.substring(0, 4)}********${regNik.slice(-4)}` : '3201********0001',
-      avatarUrl: regAvatarUrl || (regGender === 'LAKI_LAKI' 
-        ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80' 
-        : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&fit=crop&q=80'),
-      gender: regGender,
-      birthPlace: regBirthPlace,
-      birthDate: regBirthDate,
-      email: regEmail || `${regFullName.toLowerCase().replace(/[^a-z0-9]/g, '')}@pramuka.id`,
-      phone: regPhone || '081234567890',
-      address: `${selDist?.name || 'Kecamatan'}, ${selReg?.name || 'Kabupaten'}, ${selProv?.name || 'Provinsi'}`,
-      provinceId: regProvinceId,
-      provinceName: selProv?.name || 'DKI Jakarta',
-      regencyId: regRegencyId,
-      regencyName: selReg?.name || 'Jakarta Selatan',
-      districtId: regDistrictId,
-      districtName: selDist?.name || 'Kebayoran Baru',
-      branchId: `branch-${regDistrictId}`,
-      branchName: `Kwarran ${selDist?.name || 'Kebayoran Baru'}`,
-      gugusDepan: regGudep || 'Gugus Depan Saka Pariwisata',
-      currentPosition: `Anggota ${regKrida}`,
-      krida: regKrida,
-      joinYear: new Date().getFullYear(),
-      educationLevel: 'SMA/SMK',
-      occupation: 'Pelajar / Mahasiswa',
-      bio: `Anggota aktif Saka Pariwisata ${selProv?.name || ''}, peminatan ${regKrida}.`,
-      skills: [],
-      certifications: []
-    };
+      // One client-side ID is generated and sent to the backend so the
+      // local cache, backend database and Google Spreadsheet use the same ID.
+      const clientMemberId = `member-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    const created = storage.registerMember(newMemberPayload);
-
-    // Kirim ke spreadsheet service jika dikonfigurasi
-    await spreadsheetService.appendMemberToSpreadsheet(created);
-
-    setIsLoading(false);
-    setRegSuccessMsg(`Pendaftaran berhasil! Akun Anda telah terdaftar di database Saka Pariwisata. ID Anda: ${created.id}`);
-
-    // Auto login as new member
-    setTimeout(() => {
-      const newUser: CurrentUser = {
-        id: created.userId,
-        email: created.email,
-        name: created.fullName,
-        role: 'MEMBER',
-        jurisdictionName: `${created.branchName}, ${created.regencyName}`,
-        avatarUrl: created.avatarUrl,
-        memberId: created.id
+      const memberData: any = {
+        id: clientMemberId,
+        userId: `user-${clientMemberId}`,
+        fullName: regFullName.trim(),
+        nikMasked: regNik ? `${regNik.substring(0, 4)}********${regNik.slice(-4)}` : '3201********0001',
+        avatarUrl: regAvatarUrl || (regGender === 'LAKI_LAKI'
+          ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&fit=crop&q=80'),
+        gender: regGender,
+        birthPlace: regBirthPlace,
+        birthDate: regBirthDate,
+        email: regEmail.trim().toLowerCase(),
+        phone: regPhone.trim(),
+        address: `${selDist?.name || 'Kecamatan'}, ${selReg?.name || 'Kabupaten'}, ${selProv?.name || 'Provinsi'}`,
+        provinceId: regProvinceId,
+        provinceName: selProv?.name || 'DKI Jakarta',
+        regencyId: regRegencyId,
+        regencyName: selReg?.name || 'Jakarta Selatan',
+        districtId: regDistrictId,
+        districtName: selDist?.name || 'Kebayoran Baru',
+        branchId: `branch-${regDistrictId}`,
+        branchName: `Kwarran ${selDist?.name || 'Kebayoran Baru'}`,
+        gugusDepan: regGudep || 'Gugus Depan Saka Pariwisata',
+        currentPosition: `Anggota ${regKrida}`,
+        krida: regKrida,
+        joinYear: new Date().getFullYear(),
+        educationLevel: 'SMA/SMK',
+        occupation: 'Pelajar / Mahasiswa',
+        bio: `Anggota aktif Saka Pariwisata ${selProv?.name || ''}, peminatan ${regKrida}.`,
+        skills: [],
+        certifications: [],
+        status: 'PENDING',
+        registeredAt: new Date().toISOString()
       };
-      storage.setCurrentUser(newUser);
-      onLoginSuccess(newUser);
-      onClose();
-    }, 1200);
+
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          memberData,
+          password: regPassword
+        })
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || 'Pendaftaran akun gagal diproses oleh server.');
+      }
+
+      // Prefer the authoritative member returned by the backend.
+      const created: Member = {
+        ...(result.member || memberData),
+        id: result.member?.id || result.memberId || clientMemberId,
+        userId: result.member?.userId || memberData.userId,
+        status: result.member?.status || 'PENDING',
+        registeredAt: result.member?.registeredAt || memberData.registeredAt
+      } as Member;
+
+      // Backend session/token is authoritative. Save it before any UI redirect.
+      if (result.token) {
+        storage.setAuthToken(result.token);
+      }
+
+      // Keep the browser cache aligned with the exact backend member ID.
+      const existingMembers = storage.getMembers();
+      const existingIndex = existingMembers.findIndex(m => m.id === created.id);
+      const mergedMembers = [...existingMembers];
+
+      if (existingIndex >= 0) {
+        mergedMembers[existingIndex] = { ...mergedMembers[existingIndex], ...created };
+      } else {
+        mergedMembers.unshift(created);
+      }
+      storage.setMembers(mergedMembers);
+
+      if (result.user) {
+        storage.setCurrentUser(result.user);
+        onLoginSuccess(result.user);
+      } else {
+        const newUser: CurrentUser = {
+          id: created.userId || `user-${created.id}`,
+          username: result.username || created.email,
+          email: created.email,
+          name: created.fullName,
+          role: 'MEMBER',
+          jurisdictionName: `${created.branchName || 'Kwarran'}, ${created.regencyName || ''}`,
+          avatarUrl: created.avatarUrl,
+          memberId: created.id
+        };
+        storage.setCurrentUser(newUser);
+        onLoginSuccess(newUser);
+      }
+
+      // Do not make registration success depend on a background sync call.
+      // The backend response above is already the authoritative auth result.
+      storage.syncWithServer().catch(() => {});
+
+      setRegSuccessMsg(
+        `Pendaftaran berhasil. Akun Anda sudah dibuat dan sesi login telah aktif. ID: ${created.id}`
+      );
+      setIsLoading(false);
+
+      setTimeout(() => {
+        onClose();
+      }, 700);
+    } catch (err: any) {
+      console.error('[Auth] Registration failed:', err);
+      setIsLoading(false);
+      setRegError(
+        err?.message ||
+        'Pendaftaran gagal. Periksa koneksi server dan coba kembali.'
+      );
+    }
   };
 
   // Handle Forgot Password
