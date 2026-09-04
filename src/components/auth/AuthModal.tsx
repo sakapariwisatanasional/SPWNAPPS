@@ -291,20 +291,130 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         registeredAt: new Date().toISOString()
       };
 
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          memberData,
-          password: regPassword
-        })
-      });
+      let result: any = null;
 
-      const result = await response.json().catch(() => null);
+      // Jalur utama tetap melalui backend. Jika deployment Vercel lama/gagal,
+      // gunakan fallback langsung ke Apps Script agar pendaftaran dari ponsel
+      // tetap tersimpan ke Spreadsheet sebagai source of truth.
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            memberData,
+            password: regPassword
+          })
+        });
+        result = await response.json().catch(() => null);
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.message || `Server registrasi HTTP ${response.status}`);
+        }
+      } catch (serverErr: any) {
+        console.warn('[Auth] Backend registration gagal, mencoba Apps Script langsung:', serverErr?.message || serverErr);
 
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || 'Pendaftaran akun gagal diproses oleh server.');
+        const scriptUrl = spreadsheetService.getConfig().scriptUrl ||
+          'https://script.google.com/macros/s/AKfycbz0ZFGBmN3Hwt26lnUmpgXtwhs6f1PyWkezNsaU9OzSpKnIqxCaDnVcmJbl2sTaKJw4FQ/exec';
+
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        const salt = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        const digestBuffer = await crypto.subtle.digest(
+          'SHA-256',
+          new TextEncoder().encode(`${salt}|${regPassword}`)
+        );
+        const digest = Array.from(new Uint8Array(digestBuffer))
+          .map(b => b.toString(16).padStart(2, '0')).join('');
+        const gasPasswordHash = `GAS2:${salt}:${digest}`;
+
+        const fallbackUser = {
+          id: memberData.userId,
+          username: memberData.email.split('@')[0].toLowerCase(),
+          email: memberData.email,
+          name: memberData.fullName,
+          role: 'MEMBER',
+          jurisdictionName: `${memberData.branchName || ''}${memberData.regencyName ? `, ${memberData.regencyName}` : ''}`.replace(/^,\s*|\s*,\s*$/g, ''),
+          jurisdictionId: memberData.regencyId,
+          avatarUrl: memberData.avatarUrl,
+          memberId: memberData.id,
+          status: 'PENDING',
+          createdAt: memberData.registeredAt
+        };
+
+        const authPayload = {
+          action: 'AUTH_REGISTER',
+          user: fallbackUser,
+          passwordHash: gasPasswordHash
+        };
+
+        // POST no-cors tidak dapat membaca response browser; keberhasilan
+        // diverifikasi dengan GET CHECK_RECORD setelahnya.
+        await fetch(scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(authPayload)
+        });
+
+        const memberPayload = {
+          action: 'UPSERT_MEMBER',
+          requestId: `member-${memberData.id}-${Date.now()}`,
+          transactionId: `member-${memberData.id}-${Date.now()}`,
+          sheet: 'Anggota',
+          memberId: memberData.id,
+          secondaryId: memberData.nationalMemberNumber || '',
+          rowData: [
+            memberData.id, memberData.nationalMemberNumber || '', memberData.fullName,
+            memberData.email || '', memberData.phone || '', memberData.provinceName || '',
+            memberData.regencyName || '', memberData.branchName || '', memberData.gugusDepan || '',
+            memberData.krida || '', 'PENDING', memberData.avatarUrl || '', memberData.registeredAt || new Date().toISOString(),
+            `${window.location.origin}/?verifyId=${encodeURIComponent(memberData.nationalMemberNumber || memberData.id)}`
+          ]
+        };
+
+        await fetch(scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(memberPayload)
+        });
+
+        const check = async (sheet: string) => {
+          const u = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}action=CHECK_RECORD&sheet=${encodeURIComponent(sheet)}&id=${encodeURIComponent(memberData.id)}&_t=${Date.now()}&_r=${Math.floor(Math.random()*1000000)}`;
+          const r = await fetch(u, { method: 'GET', cache: 'no-store' });
+          if (!r.ok) throw new Error(`CHECK_RECORD ${sheet} HTTP ${r.status}`);
+          return r.json();
+        };
+
+        let memberCheck: any = null;
+        let userCheck: any = null;
+        for (let attempt = 0; attempt < 8; attempt++) {
+          try {
+            memberCheck = await check('Anggota');
+            userCheck = await check('Users');
+            if (memberCheck?.found && userCheck?.found) break;
+          } catch (checkErr) {
+            console.warn('[Auth] Fallback CHECK_RECORD:', checkErr);
+          }
+          await new Promise(resolve => setTimeout(resolve, 700));
+        }
+
+        if (!memberCheck?.found) {
+          throw new Error('Data Anggota belum terverifikasi di Spreadsheet melalui Apps Script.');
+        }
+        if (!userCheck?.found) {
+          throw new Error('Data Users belum terverifikasi di Spreadsheet melalui Apps Script.');
+        }
+
+        result = {
+          success: true,
+          fallbackDirectAppsScript: true,
+          memberId: memberData.id,
+          member: memberData,
+          user: fallbackUser,
+          username: fallbackUser.username,
+          message: 'Pendaftaran berhasil disimpan langsung ke Google Spreadsheet.'
+        };
       }
 
       // Prefer the authoritative member returned by the backend.
