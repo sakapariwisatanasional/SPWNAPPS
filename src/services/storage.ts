@@ -462,6 +462,16 @@ class StorageService {
     }
   }
 
+  public getUsers(): CurrentUser[] {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.USERS);
+      const storedUsers: CurrentUser[] = data ? JSON.parse(data) : [];
+      return storedUsers.length > 0 ? storedUsers : [DEFAULT_PUBLIC_USER];
+    } catch {
+      return [DEFAULT_PUBLIC_USER];
+    }
+  }
+
   public setUsers(users: CurrentUser[]) {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
     this.notify();
