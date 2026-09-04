@@ -2,7 +2,6 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { createServer as createViteServer } from 'vite';
 
 const app = express();
 const PORT = 3000;
@@ -71,6 +70,12 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // IMPORTANT: set SESSION_SECRET in production (especially Vercel) so every
 // serverless instance can verify the same bearer token.
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-this-session-secret';
+const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
+
+// The Google Apps Script endpoint is the authoritative external write target.
+// Keep a production fallback so a fresh Vercel instance does not depend on the
+// writable local JSON file for its script configuration.
+const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0ZFGBmN3Hwt26lnUmpgXtwhs6f1PyWkezNsaU9OzSpKnIqxCaDnVcmJbl2sTaKJw4FQ/exec';
 
 function base64UrlEncode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url');
@@ -258,7 +263,12 @@ function saveDatabase() {
   try {
     db.lastUpdated = new Date().toISOString();
     db.version = (db.version || 0) + 1;
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    // Vercel serverless filesystems are not persistent. Keep the in-memory
+    // cache for the lifetime of the instance, but never let a read-only FS
+    // operation break an API request.
+    if (!IS_VERCEL) {
+      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    }
   } catch (err) {
     console.error('[DB] Error saving database file:', err);
   }
@@ -564,17 +574,18 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
   }
 }
 
-// Initial background sync
-syncFromGoogleSpreadsheet().catch(err => console.warn('[Sync] Initial sync notice:', err));
-
-// Periodic sync every 25 seconds
-setInterval(() => {
-  syncFromGoogleSpreadsheet().catch(() => {});
-}, 25000);
+// Background spreadsheet sync. In Vercel serverless, avoid a permanent
+// interval and avoid doing a large outbound sync during cold-start import.
+if (!IS_VERCEL) {
+  syncFromGoogleSpreadsheet().catch(err => console.warn('[Sync] Initial sync notice:', err));
+  setInterval(() => {
+    syncFromGoogleSpreadsheet().catch(() => {});
+  }, 25000);
+}
 
 // Proxy mutation to Google Apps Script Web App
 async function forwardToGoogleAppsScript(payload: any) {
-  const scriptUrl = db.config.scriptUrl;
+  const scriptUrl = (db.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL).trim();
   if (!scriptUrl || scriptUrl.trim().length === 0) return;
   try {
     const res = await fetch(scriptUrl, {
@@ -1308,11 +1319,28 @@ app.post('/api/sync-bulk', (req, res) => {
   res.json({ success: true, lastUpdated: db.lastUpdated, version: db.version });
 });
 
+// Final API error handler. This ensures unexpected route errors return JSON
+// instead of terminating the serverless invocation.
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[API Error]', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({
+    success: false,
+    message: err?.message || 'Terjadi kesalahan pada server.',
+    error: IS_VERCEL ? 'SERVERLESS_API_ERROR' : 'API_ERROR'
+  });
+});
+
 // ==========================================
 // VITE OR STATIC SERVING (WITH SPA FALLBACK)
 // ==========================================
 async function startServer() {
+  // Vercel uses api/index.ts as the serverless entrypoint. Do not attach
+  // Vite middleware or start a listening socket there.
+  if (IS_VERCEL) return;
+
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -1326,13 +1354,14 @@ async function startServer() {
     });
   }
 
-  if (process.env.VERCEL !== '1') {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`[Server] Saka Pariwisata Central Full-Stack Server running on port ${PORT}`);
-    });
-  }
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[Server] Saka Pariwisata Central Full-Stack Server running on port ${PORT}`);
+  });
 }
 
-startServer();
+void startServer().catch(err => {
+  console.error('[Server] Startup error:', err);
+});
 
+// Always expose the Express app for Vercel's serverless function adapter.
 export { app };
