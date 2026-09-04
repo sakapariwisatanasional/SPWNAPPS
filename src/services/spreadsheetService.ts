@@ -1180,14 +1180,13 @@ class SpreadsheetService {
     const separator = scriptUrl.includes('?') ? '&' : '?';
     const verifyUrl = `${scriptUrl}${separator}${params.toString()}`;
 
+    // Jangan kirim custom headers pada GET Apps Script. Header seperti
+    // Cache-Control/Pragma/Expires dapat memicu CORS preflight dan membuat
+    // Web App Google gagal di browser ponsel. Cache-busting sudah dilakukan
+    // melalui query parameter _t/_r.
     const response = await fetch(verifyUrl, {
       method: 'GET',
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
+      cache: 'no-store'
     });
 
     if (!response.ok) {
