@@ -409,13 +409,14 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
 
       {isFormOpen && (
         <ActivityFormModal
+          isOpen={isFormOpen}
           currentUser={currentUser}
           initialActivity={editingActivity || undefined}
           onClose={() => {
             setIsFormOpen(false);
             setEditingActivity(null);
           }}
-          onSaveSuccess={() => {
+          onSuccess={() => {
             refreshActivities();
             setIsFormOpen(false);
             setEditingActivity(null);
