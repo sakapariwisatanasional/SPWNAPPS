@@ -371,15 +371,7 @@ class StorageService {
       sessionStorage.removeItem(SESSION_CURRENT_USER_KEY);
       const target = rememberMe ? localStorage : sessionStorage;
       target.setItem(rememberMe ? STORAGE_KEYS.CURRENT_USER : SESSION_CURRENT_USER_KEY, JSON.stringify(user));
-      this.addAuditLog(
-        user.id,
-        user.name,
-        user.role,
-        'AUTH_SESSION_SET',
-        'SYSTEM',
-        user.id,
-        `Sesi autentikasi ditetapkan (rememberMe=${rememberMe}).`
-      );
+      this.addAuditLog({ action: 'AUTH_SESSION_SET', userId: user.id, details: { role: user.role, rememberMe } });
       this.notify();
     } catch (e) {
       console.warn('Set current user error:', e);
@@ -425,11 +417,16 @@ class StorageService {
         return false;
       };
 
-      if (syncCollection(STORAGE_KEYS.MEMBERS, data.members)) hasChanges = true;
-      if (syncCollection(STORAGE_KEYS.TOURS, data.tours)) hasChanges = true;
-      if (syncCollection(STORAGE_KEYS.ACTIVITIES, data.activities)) hasChanges = true;
-      if (syncCollection(STORAGE_KEYS.CULINARY_SOUVENIRS, data.culinaryItems)) hasChanges = true;
-      if (syncCollection(STORAGE_KEYS.KRIDA_MODULES, data.kridaModules)) hasChanges = true;
+      // Google Spreadsheet/Apps Script is the authoritative cross-device source
+      // for member records. Never replace the browser member cache from the
+      // serverless filesystem snapshot because a different Vercel instance may
+      // legitimately have an empty/stale in-memory database. SpreadsheetService
+      // performs the authoritative member pull separately.
+
+      if (Array.isArray(data.tours) && data.tours.length > 0) { if (syncCollection(STORAGE_KEYS.TOURS, data.tours)) hasChanges = true; }
+      if (Array.isArray(data.activities) && data.activities.length > 0) { if (syncCollection(STORAGE_KEYS.ACTIVITIES, data.activities)) hasChanges = true; }
+      if (Array.isArray(data.culinaryItems) && data.culinaryItems.length > 0) { if (syncCollection(STORAGE_KEYS.CULINARY_SOUVENIRS, data.culinaryItems)) hasChanges = true; }
+      if (Array.isArray(data.kridaModules) && data.kridaModules.length > 0) { if (syncCollection(STORAGE_KEYS.KRIDA_MODULES, data.kridaModules)) hasChanges = true; }
 
       if (hasChanges) {
         this.listeners.forEach(cb => cb());
@@ -462,18 +459,6 @@ class StorageService {
       return user;
     } catch {
       return DEFAULT_PUBLIC_USER;
-    }
-  }
-
-  public getUsers(): CurrentUser[] {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.USERS);
-      if (!raw) return Array.isArray(DEMO_USERS) ? [...DEMO_USERS] : [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : (Array.isArray(DEMO_USERS) ? [...DEMO_USERS] : []);
-    } catch (error) {
-      console.warn('[Storage] getUsers error:', error);
-      return Array.isArray(DEMO_USERS) ? [...DEMO_USERS] : [];
     }
   }
 
