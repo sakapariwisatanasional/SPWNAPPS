@@ -291,20 +291,80 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         registeredAt: new Date().toISOString()
       };
 
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          memberData,
-          password: regPassword
-        })
-      });
+      // Mobile-safe registration request:
+      // - uses an AbortController timeout so a stalled mobile connection does not
+      //   leave the form spinning forever;
+      // - reads the response as text first, because some mobile/proxy failures
+      //   return HTML or plain text instead of JSON;
+      // - reports the actual HTTP status/body instead of hiding it behind a
+      //   generic registration error.
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 30000);
 
-      const result = await response.json().catch(() => null);
+      let response: Response;
+      let rawResponse = '';
+
+      try {
+        response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include',
+          cache: 'no-store',
+          signal: controller.signal,
+          body: JSON.stringify({
+            memberData,
+            password: regPassword
+          })
+        });
+
+        rawResponse = await response.text();
+      } catch (fetchError: any) {
+        if (fetchError?.name === 'AbortError') {
+          throw new Error(
+            'Server terlalu lama merespons. Periksa koneksi internet ponsel dan coba kembali.'
+          );
+        }
+
+        throw new Error(
+          'Tidak dapat terhubung ke server pendaftaran. Pastikan koneksi internet ponsel aktif lalu coba kembali.'
+        );
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+
+      let result: any = null;
+      if (rawResponse) {
+        try {
+          result = JSON.parse(rawResponse);
+        } catch {
+          // Keep rawResponse for diagnostics below.
+        }
+      }
 
       if (!response.ok || !result?.success) {
-        throw new Error(result?.message || 'Pendaftaran akun gagal diproses oleh server.');
+        const serverMessage =
+          result?.message ||
+          (rawResponse && rawResponse.length < 500
+            ? rawResponse.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim()
+            : '');
+
+        const statusMessage = `Pendaftaran gagal (HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}).`;
+
+        console.error('[Auth] Registration server response:', {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type'),
+          body: rawResponse
+        });
+
+        throw new Error(
+          serverMessage
+            ? `${statusMessage} ${serverMessage}`
+            : statusMessage
+        );
       }
 
       // Prefer the authoritative member returned by the backend.
@@ -850,7 +910,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || isUploadingRegPhoto}
                   className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-950/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isLoading ? (
