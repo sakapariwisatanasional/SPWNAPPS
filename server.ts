@@ -145,6 +145,12 @@ const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
 const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0ZFGBmN3Hwt26lnUmpgXtwhs6f1PyWkezNsaU9OzSpKnIqxCaDnVcmJbl2sTaKJw4FQ/exec';
 
+function hashPasswordForGoogleAppsScript(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const digest = crypto.createHash('sha256').update(`${salt}|${password}`, 'utf8').digest('hex');
+  return `GAS2:${salt}:${digest}`;
+}
+
 interface DatabaseSchema {
   config: {
     spreadsheetId: string;
@@ -574,9 +580,10 @@ setInterval(() => {
 }, 25000);
 
 // Proxy mutation to Google Apps Script Web App
-async function callGoogleAppsScript(payload: any): Promise<any> {
+async function forwardToGoogleAppsScript(payload: any): Promise<any> {
   const scriptUrl = String(db.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL).trim();
   if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
+
   const res = await fetch(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -585,28 +592,14 @@ async function callGoogleAppsScript(payload: any): Promise<any> {
   const text = await res.text();
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-  if (!res.ok) throw new Error(`Google Apps Script HTTP ${res.status}`);
-  if (data && data.status === 'error') throw new Error(data.message || 'Google Apps Script menolak operasi.');
-  return data;
-}
 
-async function forwardToGoogleAppsScript(payload: any) {
-  try {
-    await callGoogleAppsScript(payload);
-  } catch (err) {
-    console.warn('[GAS Forward] Failed forwarding to GAS:', err);
+  if (!res.ok) {
+    throw new Error(`Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`);
   }
-}
-
-async function authenticateAgainstGoogleAppsScript(username: string, password: string): Promise<any | null> {
-  try {
-    const result = await callGoogleAppsScript({ action: 'AUTH_LOGIN', username, password });
-    if (result?.status === 'success' && result.user) return result.user;
-    return null;
-  } catch (err) {
-    console.warn('[GAS Auth] Login lookup failed:', err);
-    return null;
+  if (data?.status === 'error') {
+    throw new Error(data.message || 'Google Apps Script menolak permintaan.');
   }
+  return data || { status: 'success' };
 }
 
 // ==========================================
@@ -632,46 +625,92 @@ app.post('/api/auth/login', async (req, res) => {
   const cleanUser = String(username).trim().toLowerCase();
   const rawPass = String(password);
 
-  // 1) Fast local lookup (useful for Super Admin / warm instance).
+  // 1) Try the central Users sheet first for persistent member accounts.
+  try {
+    const gasResult = await forwardToGoogleAppsScript({
+      action: 'AUTH_LOGIN',
+      username: cleanUser,
+      password: rawPass
+    });
+    if (gasResult?.status === 'success' && gasResult.user) {
+      const gu = gasResult.user;
+      const persistentUser = {
+        id: gu.id || `user-${gu.memberId || Date.now()}`,
+        username: gu.username || cleanUser,
+        email: gu.email || '',
+        name: gu.name || gu.username || cleanUser,
+        role: gu.role || 'MEMBER',
+        jurisdictionName: gu.jurisdictionName || '',
+        jurisdictionId: gu.jurisdictionId || '',
+        avatarUrl: gu.avatarUrl || '',
+        memberId: gu.memberId || undefined,
+        passwordHash: ''
+      };
+
+      const token = createSession(persistentUser);
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: persistentUser.id,
+          username: persistentUser.username,
+          name: persistentUser.name,
+          email: persistentUser.email,
+          role: persistentUser.role,
+          jurisdictionName: persistentUser.jurisdictionName,
+          jurisdictionId: persistentUser.jurisdictionId,
+          avatarUrl: persistentUser.avatarUrl,
+          memberId: persistentUser.memberId
+        }
+      });
+    }
+  } catch (gasErr: any) {
+    console.warn('[Auth] Persistent Users login unavailable:', gasErr?.message || gasErr);
+  }
+
+  // 2) Fallback for existing Super Admin / legacy local accounts.
   let matchedUser = db.users.find(u =>
-    (u.username && String(u.username).toLowerCase() === cleanUser) ||
-    (u.email && String(u.email).toLowerCase() === cleanUser)
+    (u.username && u.username.toLowerCase() === cleanUser) ||
+    (u.email && u.email.toLowerCase() === cleanUser)
   );
 
-  if (matchedUser && matchedUser.passwordHash && verifyPassword(rawPass, matchedUser.passwordHash)) {
-    // Member accounts must be ACTIVE before login. Super Admin/operator accounts
-    // without memberId remain immediately available.
-    if (matchedUser.memberId && String(matchedUser.status || '').toUpperCase() !== 'ACTIVE') {
-      return res.status(403).json({ success: false, message: 'Akun ditemukan, tetapi belum disetujui administrator.' });
+  if (!matchedUser) {
+    const member = db.members.find(m =>
+      (m.email && m.email.toLowerCase() === cleanUser) ||
+      (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === cleanUser)
+    );
+    if (member && member.passwordHash) {
+      matchedUser = {
+        id: member.userId || `user-${member.id}`,
+        username: member.email.split('@')[0],
+        email: member.email,
+        name: member.fullName,
+        role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
+        jurisdictionName: `${member.branchName || ''}, ${member.regencyName || ''}`,
+        jurisdictionId: member.regencyId,
+        avatarUrl: member.avatarUrl,
+        memberId: member.id,
+        passwordHash: member.passwordHash
+      };
     }
-    const token = createSession(matchedUser);
-    return res.json({ success: true, token, user: {
+  }
+
+  if (!matchedUser || !matchedUser.passwordHash || !verifyPassword(rawPass, matchedUser.passwordHash)) {
+    console.warn(`[Auth] Failed login attempt for user: ${cleanUser}`);
+    return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid.' });
+  }
+
+  const token = createSession(matchedUser);
+  res.json({
+    success: true,
+    token,
+    user: {
       id: matchedUser.id, username: matchedUser.username, name: matchedUser.name,
       email: matchedUser.email, role: matchedUser.role,
       jurisdictionName: matchedUser.jurisdictionName, jurisdictionId: matchedUser.jurisdictionId,
       avatarUrl: matchedUser.avatarUrl, memberId: matchedUser.memberId
-    }});
-  }
-
-  // 2) Authoritative cross-device lookup in Google Sheets via Apps Script.
-  const gasUser = await authenticateAgainstGoogleAppsScript(cleanUser, rawPass);
-  if (!gasUser) {
-    return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid, atau akun belum disetujui.' });
-  }
-
-  const token = createSession(gasUser);
-  const sanitizedUser = {
-    id: gasUser.id,
-    username: gasUser.username,
-    name: gasUser.name,
-    email: gasUser.email,
-    role: gasUser.role || 'MEMBER',
-    jurisdictionName: gasUser.jurisdictionName,
-    jurisdictionId: gasUser.jurisdictionId,
-    avatarUrl: gasUser.avatarUrl,
-    memberId: gasUser.memberId
-  };
-  res.json({ success: true, token, user: sanitizedUser });
+    }
+  });
 });
 
 // GET /api/auth/me - Verify current session token
@@ -729,72 +768,175 @@ app.post('/api/auth/change-password', (req, res) => {
 });
 
 // POST /api/auth/register - Public new member registration
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', (req, res) => {
   const { memberData, password } = req.body || {};
+
   if (!memberData || !memberData.fullName) {
     return res.status(400).json({ success: false, message: 'Data anggota wajib dilengkapi.' });
   }
+
   const rawPassword = typeof password === 'string' ? password : '';
-  if (rawPassword.length < 6) return res.status(400).json({ success: false, message: 'Kata sandi minimal 6 karakter.' });
+  if (rawPassword.length < 6) {
+    return res.status(400).json({ success: false, message: 'Kata sandi minimal 6 karakter.' });
+  }
 
   const email = String(memberData.email || '').trim().toLowerCase();
   const requestedUsername = String(memberData.username || '').trim().toLowerCase();
   const username = requestedUsername || (email ? email.split('@')[0] : '');
-  if (!email || !username) return res.status(400).json({ success: false, message: 'Email dan nama pengguna wajib diisi.' });
 
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email wajib diisi untuk membuat akun.' });
+  }
+  if (!username) {
+    return res.status(400).json({ success: false, message: 'Nama pengguna tidak dapat ditentukan dari data pendaftaran.' });
+  }
+
+  const duplicateUser = db.users.find(u =>
+    (u.username && String(u.username).toLowerCase() === username) ||
+    (u.email && String(u.email).toLowerCase() === email)
+  );
+  if (duplicateUser) {
+    return res.status(409).json({ success: false, message: 'Username atau email sudah terdaftar. Silakan gunakan akun yang sudah ada.' });
+  }
+
+  const duplicateMember = db.members.find(m =>
+    (m.email && String(m.email).toLowerCase() === email) ||
+    (memberData.nationalMemberNumber && m.nationalMemberNumber &&
+      String(m.nationalMemberNumber).toLowerCase() === String(memberData.nationalMemberNumber).toLowerCase())
+  );
+  if (duplicateMember) {
+    return res.status(409).json({ success: false, message: 'Email atau Nomor KTA sudah terdaftar.' });
+  }
+
+  // Preserve a client-generated ID when supplied so the frontend/local cache,
+  // server DB and Spreadsheet row refer to the same member.
   const memberId = String(memberData.id || `member-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`);
   const userId = String(memberData.userId || `user-${memberId}`);
   const registeredAt = new Date().toISOString();
   const passHash = hashPassword(rawPassword);
-  const newMember = { ...memberData, id: memberId, userId, email, status: 'PENDING', registeredAt, passwordHash: passHash };
-  const newUser = {
-    id: userId, username, email, passwordHash: passHash, name: newMember.fullName,
-    role: 'MEMBER', jurisdictionName: `${newMember.branchName || ''}${newMember.regencyName ? `, ${newMember.regencyName}` : ''}`.replace(/^,\s*|\s*,\s*$/g, ''),
-    jurisdictionId: newMember.regencyId, avatarUrl: newMember.avatarUrl, memberId, status: 'PENDING', createdAt: registeredAt
+
+  const newMember = {
+    ...memberData,
+    id: memberId,
+    userId,
+    email,
+    status: 'PENDING',
+    registeredAt,
+    passwordHash: passHash
   };
 
-  // Persist credentials FIRST in the authoritative Users sheet. This prevents
-  // a Vercel serverless instance restart from losing the account.
-  try {
-    await callGoogleAppsScript({
-      action: 'AUTH_REGISTER',
-      user: {
-        id: userId, username, email, name: newMember.fullName, role: 'MEMBER',
-        jurisdictionName: newUser.jurisdictionName, jurisdictionId: newUser.jurisdictionId,
-        avatarUrl: newUser.avatarUrl, memberId, status: 'PENDING', createdAt: registeredAt
-      },
-      passwordHash: (() => {
-        const gasSalt = crypto.randomBytes(16).toString('hex');
-        const gasHash = crypto.createHash('sha256').update(`${gasSalt}|${rawPassword}`, 'utf8').digest('hex');
-        return `GAS2:${gasSalt}:${gasHash}`;
-      })()
-    });
-  } catch (err: any) {
-    return res.status(502).json({ success: false, message: `Akun belum dapat disimpan ke database pusat: ${err?.message || String(err)}` });
-  }
+  const newUser = {
+    id: userId,
+    username,
+    email,
+    passwordHash: passHash,
+    name: newMember.fullName,
+    role: 'MEMBER',
+    jurisdictionName: `${newMember.branchName || ''}${newMember.regencyName ? `, ${newMember.regencyName}` : ''}`.replace(/^,\s*|\s*,\s*$/g, ''),
+    jurisdictionId: newMember.regencyId,
+    avatarUrl: newMember.avatarUrl,
+    memberId,
+    createdAt: registeredAt
+  };
 
   db.members.unshift(newMember);
-  db.users = db.users.filter(u => u.id !== userId && u.email !== email && u.username !== username);
   db.users.push(newUser);
-  db.auditLogs.unshift({ id: `log-${Date.now()}`, userId: 'public-register', userName: newMember.fullName, userRole: 'PUBLIC', action: 'REGISTER', targetType: 'MEMBER', targetId: memberId, description: `Pendaftaran mandiri calon anggota baru: ${newMember.fullName}`, timestamp: registeredAt });
+
+  db.auditLogs.unshift({
+    id: `log-${Date.now()}`,
+    userId: 'public-register',
+    userName: newMember.fullName,
+    userRole: 'PUBLIC',
+    action: 'REGISTER',
+    targetType: 'MEMBER',
+    targetId: memberId,
+    description: `Pendaftaran mandiri calon anggota baru: ${newMember.fullName}`,
+    timestamp: registeredAt
+  });
   if (db.auditLogs.length > 500) db.auditLogs.pop();
   saveDatabase();
 
+  // Persist BOTH authentication and member data to Google Spreadsheet.
+  // Vercel's local filesystem is not a durable source of truth, so registration
+  // must succeed at the central Apps Script endpoint before returning success.
   try {
-    await callGoogleAppsScript({
-      action: 'UPSERT_MEMBER', sheet: 'Anggota', memberId: newMember.id,
-      rowData: [newMember.id, '', newMember.fullName, newMember.email || '', newMember.phone || '', newMember.provinceName || '', newMember.regencyName || '', newMember.branchName || '', newMember.gugusDepan || '', newMember.krida || '', 'PENDING', newMember.avatarUrl || '', newMember.registeredAt, `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.id}`]
+    const gasPasswordHash = hashPasswordForGoogleAppsScript(rawPassword);
+
+    await forwardToGoogleAppsScript({
+      action: 'AUTH_REGISTER',
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role,
+        jurisdictionName: newUser.jurisdictionName,
+        jurisdictionId: newUser.jurisdictionId,
+        avatarUrl: newUser.avatarUrl,
+        memberId: newUser.memberId,
+        status: 'PENDING',
+        createdAt: registeredAt
+      },
+      passwordHash: gasPasswordHash
     });
-  } catch (err) {
-    console.warn('[Register] Member sheet write failed after auth was persisted:', err);
+
+    await forwardToGoogleAppsScript({
+      action: 'UPSERT_MEMBER',
+      sheet: 'Anggota',
+      memberId: newMember.id,
+      secondaryId: newMember.nationalMemberNumber || '',
+      rowData: [
+        newMember.id,
+        newMember.nationalMemberNumber || '',
+        newMember.fullName,
+        newMember.email || '',
+        newMember.phone || '',
+        newMember.provinceName || '',
+        newMember.regencyName || '',
+        newMember.branchName || '',
+        newMember.gugusDepan || '',
+        newMember.krida || '',
+        'PENDING',
+        newMember.avatarUrl || '',
+        newMember.registeredAt,
+        `https://spwnapps.vercel.app/?verifyId=${newMember.nationalMemberNumber || newMember.id}`
+      ]
+    });
+  } catch (gasErr: any) {
+    // Roll back the transient Vercel records if the central write failed.
+    db.members = db.members.filter(m => m.id !== memberId);
+    db.users = db.users.filter(u => u.id !== userId);
+    db.auditLogs = db.auditLogs.filter(l => l.targetId !== memberId);
+    saveDatabase();
+    console.error('[Auth Register] Central persistence failed:', gasErr);
+    return res.status(502).json({
+      success: false,
+      message: `Pendaftaran belum disimpan ke Google Spreadsheet: ${gasErr?.message || 'koneksi Apps Script gagal.'}`
+    });
   }
 
-  // Do not auto-login a PENDING account. The account becomes loginable only after approval.
+  // Registration creates a real server account and immediately establishes
+  // a stateless session, so the newly registered user is already logged in.
+  const token = createSession(newUser);
+  const sanitizedUser = {
+    id: newUser.id,
+    username: newUser.username,
+    name: newUser.name,
+    email: newUser.email,
+    role: newUser.role,
+    jurisdictionName: newUser.jurisdictionName,
+    jurisdictionId: newUser.jurisdictionId,
+    avatarUrl: newUser.avatarUrl,
+    memberId: newUser.memberId
+  };
+
   res.status(201).json({
     success: true,
-    message: 'Pendaftaran berhasil. Akun tersimpan dan menunggu persetujuan administrator.',
-    memberId, member: newMember,
-    user: { id: userId, username, name: newMember.fullName, email, role: 'MEMBER', jurisdictionName: newUser.jurisdictionName, jurisdictionId: newUser.jurisdictionId, avatarUrl: newMember.avatarUrl, memberId }
+    message: 'Pendaftaran keanggotaan berhasil diajukan dan sedang menunggu verifikasi.',
+    memberId,
+    member: newMember,
+    user: sanitizedUser,
+    token
   });
 });
 
@@ -992,7 +1134,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        forwardToGoogleAppsScript({
+        await forwardToGoogleAppsScript({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1007,10 +1149,10 @@ app.post('/api/mutate', async (req, res) => {
             member.branchName,
             member.gugusDepan,
             member.krida || '',
-            member.status,
+            member.status || 'PENDING',
             member.avatarUrl,
             member.registeredAt,
-            `https://sakapariwisata-nasional.vercel.app/?verifyId=${member.nationalMemberNumber || member.id}`
+            `https://spwnapps.vercel.app/?verifyId=${member.nationalMemberNumber || member.id}`
           ]
         });
       } else if (action === 'UPDATE' || action === 'STATUS' || action === 'PHOTO_UPDATE') {
@@ -1020,14 +1162,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        if (member && member.status) {
-          const userIdx = db.users.findIndex(u => u.memberId === member.id || u.id === member.userId || (u.email && member.email && String(u.email).toLowerCase() === String(member.email).toLowerCase()));
-          if (userIdx !== -1) {
-            db.users[userIdx] = { ...db.users[userIdx], status: member.status, name: member.fullName || db.users[userIdx].name, memberId: member.id };
-          }
-        }
-        saveDatabase();
-        forwardToGoogleAppsScript({
+        await forwardToGoogleAppsScript({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1045,11 +1180,15 @@ app.post('/api/mutate', async (req, res) => {
             member.status,
             member.avatarUrl,
             member.registeredAt,
-            `https://sakapariwisata-nasional.vercel.app/?verifyId=${member.nationalMemberNumber || member.id}`
+            `https://spwnapps.vercel.app/?verifyId=${member.nationalMemberNumber || member.id}`
           ]
         });
-        if (member && member.status) {
-          void callGoogleAppsScript({ action: 'UPDATE_AUTH_STATUS', memberId: member.id, status: member.status, member: { fullName: member.fullName, email: member.email, nationalMemberNumber: member.nationalMemberNumber } }).catch(err => console.warn('[Auth] status sync failed:', err));
+        if ((action === 'STATUS' || action === 'UPDATE') && member.id && member.status) {
+          await forwardToGoogleAppsScript({
+            action: 'UPDATE_AUTH_STATUS',
+            memberId: member.id,
+            status: member.status
+          });
         }
       } else if (action === 'DELETE') {
         const memberId = payload.id || payload.memberId;
