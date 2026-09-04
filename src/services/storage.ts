@@ -97,8 +97,6 @@ class StorageService {
   constructor() {
     this.init();
     this.initCrossTabListener();
-    this.syncWithServer().catch(() => {});
-    this.startAutoSyncInterval();
   }
 
   private initCrossTabListener() {
@@ -126,13 +124,13 @@ class StorageService {
 
       // 3. Auto-sync on window focus (when user switches back to browser/tab)
       window.addEventListener('focus', () => {
-        this.syncWithServer().catch(() => {});
+
       });
 
       // 4. Auto-sync on visibility change (mobile browsers, tab switching)
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-          this.syncWithServer().catch(() => {});
+  
         }
       });
     }
@@ -141,10 +139,9 @@ class StorageService {
   private startAutoSyncInterval() {
     if (typeof window === 'undefined') return;
     if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
-    // Poll central server every 5 seconds for cross-device consistency
-    this.autoSyncInterval = setInterval(() => {
-      this.syncWithServer().catch(() => {});
-    }, 5000);
+    // Cross-device reads are handled by SpreadsheetService via Apps Script.
+    // Do not poll the Vercel filesystem as if it were the source of truth.
+    return;
   }
 
   private init() {
