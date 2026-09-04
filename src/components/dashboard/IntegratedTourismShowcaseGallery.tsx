@@ -1471,13 +1471,14 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
 
       {isActivityFormOpen && (
         <ActivityFormModal
+          isOpen={isActivityFormOpen}
           currentUser={currentUser}
           initialActivity={editingActivity || undefined}
           onClose={() => {
             setIsActivityFormOpen(false);
             setEditingActivity(null);
           }}
-          onSaveSuccess={() => {
+          onSuccess={() => {
             refreshActivities();
             setIsActivityFormOpen(false);
             setEditingActivity(null);
