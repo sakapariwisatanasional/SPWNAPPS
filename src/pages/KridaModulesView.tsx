@@ -1,14 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  BookOpen,
-  Download,
-  Edit3,
-  ExternalLink,
-  Image as ImageIcon,
-  Link as LinkIcon,
-  Search,
-  X,
-} from 'lucide-react';
+import { Download, ExternalLink, Image as ImageIcon, Link as LinkIcon, Save, Sparkles } from 'lucide-react';
 import { CurrentUser, KridaId, KridaModuleItem } from '../types';
 import { KRIDA_CATEGORIES } from '../data/kridaData';
 import { storage } from '../services/storage';
@@ -17,370 +8,209 @@ interface KridaModulesViewProps {
   currentUser: CurrentUser;
 }
 
-type EditableKridaModule = KridaModuleItem & {
-  coverImageUrl?: string;
-  downloadUrl?: string;
+type KridaVisualConfig = {
+  imageUrl: string;
+  downloadUrl: string;
 };
 
-const getCoverImageUrl = (module: KridaModuleItem) =>
-  String((module as EditableKridaModule).coverImageUrl || module.images?.[0]?.url || '').trim();
+const CONFIG_KEY = 'spwn_krida_visual_config_v1';
 
-const getDownloadUrl = (module: KridaModuleItem) =>
-  String((module as EditableKridaModule).downloadUrl || module.downloads?.[0]?.fileUrl || '').trim();
+const DEFAULT_CONFIG: Record<string, KridaVisualConfig> = {};
 
-const getCategory = (kridaId: KridaId) => KRIDA_CATEGORIES.find((category) => category.id === kridaId);
+const readConfig = (): Record<string, KridaVisualConfig> => {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
 
-const makePlaceholder = (module: KridaModuleItem) => {
-  const category = getCategory(module.kridaId);
-  const label = encodeURIComponent(category?.shortTitle || module.kridaName || 'Saka Pariwisata');
-  return `https://placehold.co/1200x675/e9d5ff/581c87?text=${label}`;
+const writeConfig = (config: Record<string, KridaVisualConfig>) => {
+  try {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  } catch {
+    // Keep the page usable even if browser storage is unavailable.
+  }
 };
 
 export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser }) => {
   const [modules, setModules] = useState<KridaModuleItem[]>(() => storage.getKridaModules());
-  const [selectedKrida, setSelectedKrida] = useState<'ALL' | KridaId>('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [editingModule, setEditingModule] = useState<KridaModuleItem | null>(null);
-  const [imageUrl, setImageUrl] = useState('');
-  const [downloadUrl, setDownloadUrl] = useState('');
-  const [saveMessage, setSaveMessage] = useState('');
+  const [config, setConfig] = useState<Record<string, KridaVisualConfig>>(readConfig);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<KridaVisualConfig>({ imageUrl: '', downloadUrl: '' });
 
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
 
   useEffect(() => {
-    const unsubscribe = storage.subscribe(() => {
-      setModules(storage.getKridaModules());
-    });
+    const unsubscribe = storage.subscribe(() => setModules(storage.getKridaModules()));
     return () => unsubscribe();
   }, []);
 
-  const filteredModules = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    return modules.filter((module) => {
-      const categoryMatch = selectedKrida === 'ALL' || module.kridaId === selectedKrida;
-      if (!categoryMatch) return false;
-      if (!query) return true;
+  const cards = useMemo(() => {
+    return KRIDA_CATEGORIES.map((category) => {
+      const categoryModules = modules.filter(m => m.kridaId === category.id);
+      const first = categoryModules[0];
+      const configured = config[category.id];
 
-      return [
-        module.title,
-        module.code,
-        module.kridaName,
-        module.description,
-      ].some((value) => String(value || '').toLowerCase().includes(query));
+      const fallbackImage = first?.images?.find(i => i.url)?.url || '';
+      const fallbackDownload = first?.downloads?.find(d => d.fileUrl)?.fileUrl || '';
+
+      return {
+        category,
+        imageUrl: configured?.imageUrl?.trim() || fallbackImage,
+        downloadUrl: configured?.downloadUrl?.trim() || fallbackDownload,
+        moduleCount: categoryModules.length,
+      };
     });
-  }, [modules, searchQuery, selectedKrida]);
+  }, [modules, config]);
 
-  const openEditor = (module: KridaModuleItem) => {
-    setEditingModule(module);
-    setImageUrl(getCoverImageUrl(module));
-    setDownloadUrl(getDownloadUrl(module));
-    setSaveMessage('');
-  };
-
-  const closeEditor = () => {
-    setEditingModule(null);
-    setImageUrl('');
-    setDownloadUrl('');
-    setSaveMessage('');
-  };
-
-  const saveLinks = () => {
-    if (!editingModule) return;
-
-    const nextImages = [...(editingModule.images || [])];
-    if (imageUrl.trim()) {
-      const existing = nextImages[0];
-      nextImages[0] = existing
-        ? { ...existing, url: imageUrl.trim(), caption: existing.caption || editingModule.title }
-        : { id: `img-${editingModule.id}`, url: imageUrl.trim(), caption: editingModule.title };
-    } else {
-      nextImages.shift();
-    }
-
-    const nextDownloads = [...(editingModule.downloads || [])];
-    if (downloadUrl.trim()) {
-      const existing = nextDownloads[0];
-      nextDownloads[0] = existing
-        ? { ...existing, fileUrl: downloadUrl.trim(), title: existing.title || `${editingModule.title} - Modul` }
-        : {
-            id: `download-${editingModule.id}`,
-            title: `${editingModule.title} - Modul`,
-            fileUrl: downloadUrl.trim(),
-            fileType: 'PDF',
-            fileSize: '',
-          };
-    } else {
-      nextDownloads.shift();
-    }
-
-    const updated: KridaModuleItem = {
-      ...editingModule,
-      images: nextImages,
-      downloads: nextDownloads,
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentUser.name || 'Super Admin',
+  const startEdit = (id: string) => {
+    const card = cards.find(c => c.category.id === id);
+    const current = config[id] || {
+      imageUrl: card?.imageUrl || '',
+      downloadUrl: card?.downloadUrl || '',
     };
+    setEditingId(id);
+    setDraft({ imageUrl: current.imageUrl, downloadUrl: current.downloadUrl });
+  };
 
-    // Backward-compatible aliases are stored only in the module object.
-    // Existing Krida data and all other application storage remain untouched.
-    const updatedWithAliases = updated as EditableKridaModule;
-    updatedWithAliases.coverImageUrl = imageUrl.trim();
-    updatedWithAliases.downloadUrl = downloadUrl.trim();
-
-    storage.updateKridaModule(updatedWithAliases, currentUser.name);
-    setModules(storage.getKridaModules());
-    setSaveMessage('Tautan berhasil disimpan.');
+  const saveEdit = (id: string) => {
+    const next = {
+      ...config,
+      [id]: {
+        imageUrl: draft.imageUrl.trim(),
+        downloadUrl: draft.downloadUrl.trim(),
+      },
+    };
+    setConfig(next);
+    writeConfig(next);
+    setEditingId(null);
   };
 
   return (
     <div className="space-y-6 pb-12">
-      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
-        <div className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full bg-purple-100/60 blur-3xl" />
-        <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">
-              <BookOpen className="h-3.5 w-3.5" />
-              Katalog Modul Krida Saka Pariwisata
+      <section className="relative overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-sm">
+        <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-purple-100/60 blur-3xl pointer-events-none" />
+        <div className="relative p-6 sm:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full bg-purple-50 border border-purple-200 px-3 py-1 text-xs font-bold text-purple-700">
+                <Sparkles className="h-3.5 w-3.5" />
+                PUSAT MODUL SAKA PARIWISATA
+              </div>
+              <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                4 Krida Saka Pariwisata
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Pilih krida untuk melihat sampul materi dan mengunduh modul pembelajaran. Tampilan ini menggantikan tampilan naskah/draft lama.
+              </p>
             </div>
-            <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-              Modul Krida & Materi Pembelajaran
-            </h1>
-            <p className="text-sm leading-relaxed text-slate-600">
-              Akses materi melalui gambar sampul dan tautan unduhan resmi. Tampilan ini menggantikan tampilan draft/naskah lama tanpa mengubah sistem anggota, autentikasi, atau sinkronisasi aplikasi.
-            </p>
-          </div>
-
-          <div className="relative w-full lg:w-80">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Cari modul atau krida..."
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-4 text-sm text-slate-800 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-500/10"
-            />
+            <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-600">
+              <b className="text-slate-900">{cards.length}</b> Krida tersedia
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {KRIDA_CATEGORIES.map((category) => {
-          const count = modules.filter((module) => module.kridaId === category.id).length;
-          const active = selectedKrida === category.id;
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        {cards.map(({ category, imageUrl, downloadUrl, moduleCount }) => {
+          const isEditing = editingId === category.id;
           return (
-            <button
-              key={category.id}
-              type="button"
-              onClick={() => setSelectedKrida(active ? 'ALL' : category.id)}
-              className={`rounded-2xl border p-4 text-left transition-all ${
-                active
-                  ? 'border-purple-300 bg-purple-50 ring-2 ring-purple-400/20'
-                  : 'border-slate-200 bg-white hover:border-purple-200 hover:bg-slate-50'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-xs font-bold text-slate-800">{category.shortTitle}</span>
-                <span className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold text-purple-700 shadow-2xs">
-                  {count}
-                </span>
+            <article key={category.id} className="group overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all">
+              <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={`Sampul ${category.name}`}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextElementSibling?.removeAttribute('hidden');
+                    }}
+                  />
+                ) : null}
+                <div hidden={!!imageUrl} className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                  <ImageIcon className="h-10 w-10 mb-2" />
+                  <span className="text-xs font-semibold">Image URL belum diisi</span>
+                </div>
+                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/55 to-transparent pointer-events-none" />
+                <div className="absolute left-4 bottom-4 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[10px] font-extrabold text-purple-700">
+                  {moduleCount} MATERI
+                </div>
               </div>
-              <p className="mt-1 truncate text-[11px] text-slate-500">{category.subtitle}</p>
-            </button>
+
+              <div className="p-5">
+                <h2 className="text-lg font-extrabold text-slate-900 leading-tight">{category.name}</h2>
+                <p className="mt-1 text-xs font-semibold text-purple-600">{category.subtitle}</p>
+                <p className="mt-3 text-xs leading-5 text-slate-600 line-clamp-4">{category.description}</p>
+
+                <div className="mt-5 grid grid-cols-1 gap-2">
+                  {downloadUrl ? (
+                    <a
+                      href={downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 hover:bg-purple-700 px-4 py-2.5 text-xs font-extrabold text-white transition-colors"
+                    >
+                      <Download className="h-4 w-4" />
+                      DOWNLOAD MODUL
+                    </a>
+                  ) : (
+                    <button disabled className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-400 cursor-not-allowed">
+                      <Download className="h-4 w-4" />
+                      LINK DOWNLOAD BELUM TERSEDIA
+                    </button>
+                  )}
+
+                  {downloadUrl && (
+                    <a
+                      href={downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      BUKA LINK
+                    </a>
+                  )}
+                </div>
+
+                {isSuperAdmin && (
+                  <div className="mt-5 border-t border-slate-100 pt-4">
+                    {!isEditing ? (
+                      <button onClick={() => startEdit(category.id)} className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-2.5 text-xs font-extrabold text-amber-800">
+                        <LinkIcon className="h-4 w-4" />
+                        ATUR IMAGE & DOWNLOAD URL
+                      </button>
+                    ) : (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Image URL</label>
+                          <input value={draft.imageUrl} onChange={e => setDraft(v => ({ ...v, imageUrl: e.target.value }))} placeholder="https://.../cover.jpg" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-purple-300" />
+                        </div>
+                        <div>
+                          <label className="block mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Download URL</label>
+                          <input value={draft.downloadUrl} onChange={e => setDraft(v => ({ ...v, downloadUrl: e.target.value }))} placeholder="https://.../modul.pdf" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-purple-300" />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => saveEdit(category.id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-extrabold text-white"><Save className="h-3.5 w-3.5" /> SIMPAN</button>
+                          <button onClick={() => setEditingId(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">BATAL</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </article>
           );
         })}
       </section>
 
-      <section className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-extrabold text-slate-900">Katalog Modul</h2>
-          <p className="text-xs text-slate-500">{filteredModules.length} modul ditampilkan</p>
-        </div>
-        {isSuperAdmin && (
-          <span className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800">
-            Super Admin · Kelola Image URL & Download URL
-          </span>
-        )}
-      </section>
-
-      {filteredModules.length === 0 ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center">
-          <BookOpen className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-          <p className="text-sm font-semibold text-slate-700">Modul tidak ditemukan.</p>
-          <p className="mt-1 text-xs text-slate-400">Coba ubah pencarian atau pilih krida lainnya.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {filteredModules.map((module) => {
-            const category = getCategory(module.kridaId);
-            const coverUrl = getCoverImageUrl(module) || makePlaceholder(module);
-            const moduleDownloadUrl = getDownloadUrl(module);
-
-            return (
-              <article
-                key={module.id}
-                className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs transition-all hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-lg"
-              >
-                <div className="relative aspect-[16/9] overflow-hidden bg-slate-100">
-                  <img
-                    src={coverUrl}
-                    alt={`Sampul ${module.title}`}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]"
-                    loading="lazy"
-                    onError={(event) => {
-                      const image = event.currentTarget;
-                      if (image.src !== makePlaceholder(module)) image.src = makePlaceholder(module);
-                    }}
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-12">
-                    <span className="inline-flex rounded-lg bg-white/90 px-2.5 py-1 text-[10px] font-extrabold text-purple-800 backdrop-blur-sm">
-                      {category?.shortTitle || module.kridaName}
-                    </span>
-                  </div>
-                  <span className="absolute right-3 top-3 rounded-lg bg-slate-950/75 px-2 py-1 font-mono text-[10px] font-bold text-white backdrop-blur-sm">
-                    {module.code}
-                  </span>
-                </div>
-
-                <div className="flex min-h-[250px] flex-col p-5">
-                  <div className="flex-1">
-                    <h3 className="text-base font-extrabold leading-snug text-slate-900 transition-colors group-hover:text-purple-700">
-                      {module.title}
-                    </h3>
-                    <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-slate-500">
-                      {module.description}
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[10px] font-bold text-slate-600">
-                        <ImageIcon className="h-3.5 w-3.5" />
-                        Sampul Modul
-                      </span>
-                      {moduleDownloadUrl && (
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700">
-                          <Download className="h-3.5 w-3.5" />
-                          Tersedia untuk diunduh
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex gap-2 border-t border-slate-100 pt-4">
-                    {moduleDownloadUrl ? (
-                      <a
-                        href={moduleDownloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 py-2.5 text-xs font-extrabold text-white shadow-sm transition hover:bg-purple-700"
-                      >
-                        <Download className="h-4 w-4" />
-                        Download Modul
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="flex flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-bold text-slate-400"
-                      >
-                        <LinkIcon className="h-4 w-4" />
-                        Link Belum Tersedia
-                      </button>
-                    )}
-
-                    {moduleDownloadUrl && (
-                      <a
-                        href={moduleDownloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="Buka modul"
-                        title="Buka modul"
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-600 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    )}
-
-                    {isSuperAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => openEditor(module)}
-                        title="Kelola Image URL & Download URL"
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-600 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      {editingModule && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600">Super Admin · Katalog Krida</p>
-                <h3 className="mt-1 text-lg font-extrabold text-slate-900">{editingModule.title}</h3>
-              </div>
-              <button type="button" onClick={closeEditor} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-5 p-5">
-              <div>
-                <label className="mb-2 block text-xs font-bold text-slate-700">Image URL / URL Sampul</label>
-                <div className="flex gap-2">
-                  <div className="flex flex-1 items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
-                    <ImageIcon className="mr-2 h-4 w-4 shrink-0 text-slate-400" />
-                    <input
-                      value={imageUrl}
-                      onChange={(event) => setImageUrl(event.target.value)}
-                      placeholder="https://.../cover.jpg"
-                      className="w-full bg-transparent py-3 text-xs text-slate-800 outline-none"
-                    />
-                  </div>
-                  {imageUrl && (
-                    <img src={imageUrl} alt="Preview" className="h-12 w-20 rounded-xl border border-slate-200 object-cover" />
-                  )}
-                </div>
-                <p className="mt-1.5 text-[10px] text-slate-400">Masukkan URL gambar publik. Tidak ada file gambar yang diunggah ke server aplikasi.</p>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-xs font-bold text-slate-700">Download URL / Link Modul</label>
-                <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
-                  <Download className="mr-2 h-4 w-4 shrink-0 text-slate-400" />
-                  <input
-                    value={downloadUrl}
-                    onChange={(event) => setDownloadUrl(event.target.value)}
-                    placeholder="https://.../modul.pdf"
-                    className="w-full bg-transparent py-3 text-xs text-slate-800 outline-none"
-                  />
-                </div>
-                <p className="mt-1.5 text-[10px] text-slate-400">Link dibuka di tab baru. Bisa berupa URL PDF, Google Drive, atau sumber dokumen resmi lainnya.</p>
-              </div>
-
-              {saveMessage && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
-                  {saveMessage}
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
-              <button type="button" onClick={closeEditor} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100">
-                Tutup
-              </button>
-              <button type="button" onClick={saveLinks} className="rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-purple-700">
-                Simpan URL
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-800">
+        <b>Catatan:</b> Image URL dan Download URL disimpan pada konfigurasi katalog Krida tersendiri di browser, sehingga perubahan ini tidak mengubah data anggota, login, sinkronisasi, atau modul sistem lainnya.
+      </div>
     </div>
   );
 };
