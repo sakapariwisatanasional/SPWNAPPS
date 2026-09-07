@@ -8,8 +8,6 @@ import {
   Download, 
   ShieldCheck, 
   X, 
-  Maximize2,
-  CheckCircle2,
   UserCheck
 } from 'lucide-react';
 import { Member } from '../../types';
@@ -27,13 +25,13 @@ export interface KtaQrCodeProps {
 }
 
 /**
- * Membangun URL Verifikasi Resmi Anggota yang langsung memicu profil verifikasi
+ * Membangun URL profil resmi anggota pemilik KTA.
+ * Saat discan oleh kamera smartphone manapun, langsung membuka halaman profil KTA anggota ini.
  */
 export function getMemberVerificationUrl(member: Member): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://spwnapps.vercel.app';
-  const identifier = member.nationalMemberNumber || member.id;
-  // Parameter langsung agar saat dipindai kamera HP manapun, sistem langsung mengenali ID anggota
-  return `${origin}/?verifyId=${encodeURIComponent(identifier)}&id=${encodeURIComponent(member.id)}&tab=verify-portal`;
+  const nta = member.nationalMemberNumber || member.id;
+  return `${origin}/profile?memberId=${encodeURIComponent(member.id)}&nta=${encodeURIComponent(nta)}`;
 }
 
 export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
@@ -52,15 +50,15 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-  const verificationUrl = getMemberVerificationUrl(member);
+  const profileUrl = getMemberVerificationUrl(member);
   const nta = member.nationalMemberNumber || member.id;
 
-  // Generate QR Code saat komponen dimuat
+  // Generate QR Code
   useEffect(() => {
     let isMounted = true;
 
-    // QR Kecil untuk Kartu KTA
-    QRCode.toDataURL(verificationUrl, {
+    // QR Kecil Kartu
+    QRCode.toDataURL(profileUrl, {
       width: size * 3,
       margin: 1,
       color: {
@@ -72,10 +70,10 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
       .then((url) => {
         if (isMounted) setQrDataUrl(url);
       })
-      .catch((err) => console.error('Error generating card QR:', err));
+      .catch((err) => console.error('Error QR:', err));
 
-    // QR Resolusi Tinggi untuk Pop-up & Unduhan
-    QRCode.toDataURL(verificationUrl, {
+    // QR Resolusi Tinggi
+    QRCode.toDataURL(profileUrl, {
       width: 512,
       margin: 2,
       color: {
@@ -87,20 +85,20 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
       .then((url) => {
         if (isMounted) setHighResQrUrl(url);
       })
-      .catch((err) => console.error('Error generating high-res QR:', err));
+      .catch((err) => console.error('Error High-Res QR:', err));
 
     return () => {
       isMounted = false;
     };
-  }, [verificationUrl, size, darkColor, lightColor]);
+  }, [profileUrl, size, darkColor, lightColor]);
 
   const handleCopyLink = async () => {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(verificationUrl);
+        await navigator.clipboard.writeText(profileUrl);
       } else {
         const textarea = document.createElement('textarea');
-        textarea.value = verificationUrl;
+        textarea.value = profileUrl;
         document.body.appendChild(textarea);
         textarea.select();
         document.execCommand('copy');
@@ -109,7 +107,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch (err) {
-      console.error('Gagal menyalin tautan:', err);
+      console.error('Gagal menyalin:', err);
     }
   };
 
@@ -120,7 +118,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
     try {
       const cleanNta = (member.nationalMemberNumber || member.id).replace(/[^a-zA-Z0-9]/g, '-');
       const cleanName = (member.fullName || 'Anggota').replace(/[^a-zA-Z0-9]/g, '-');
-      const filename = `QR-Verifikasi-${cleanNta}-${cleanName}.png`;
+      const filename = `QR-Profil-KTA-${cleanNta}-${cleanName}.png`;
 
       const downloadUrl = highResQrUrl || qrDataUrl;
       const link = document.createElement('a');
@@ -130,25 +128,25 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      console.error('Download QR PNG error:', err);
+      console.error('Download QR error:', err);
     } finally {
       setTimeout(() => setDownloading(false), 600);
     }
   };
 
-  const handleOpenVerification = (e: React.MouseEvent) => {
+  const handleOpenProfile = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsModalOpen(false);
     if (onVerifyClick) {
       onVerifyClick(member);
     } else {
-      window.location.href = verificationUrl;
+      window.location.href = profileUrl;
     }
   };
 
   return (
     <>
-      {/* Container QR Code di Kartu KTA */}
+      {/* Container QR Code Kartu */}
       <div 
         className={`flex flex-col items-center flex-shrink-0 bg-white p-1 rounded-xl shadow-md border border-purple-200/50 transition-all ${
           interactive ? 'hover:scale-105 hover:shadow-lg cursor-pointer group/qr relative' : ''
@@ -158,7 +156,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
           e.stopPropagation();
           setIsModalOpen(true);
         }}
-        title="Klik untuk memperbesar QR Verifikasi Profil Anggota"
+        title="Klik untuk membuka QR Profil Anggota"
       >
         <div className="relative flex items-center justify-center">
           {qrDataUrl ? (
@@ -177,7 +175,6 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
             </div>
           )}
 
-          {/* Logo Saka di tengah QR kecil */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-3.5 h-3.5 bg-white rounded-full p-0.5 shadow-xs flex items-center justify-center">
               <SakaLogo size={10} />
@@ -187,12 +184,12 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
 
         {showLabel && (
           <span className="text-[7px] font-bold text-purple-900 tracking-wider font-mono mt-0.5 uppercase">
-            Pindai KTA
+            Profil KTA
           </span>
         )}
       </div>
 
-      {/* MODAL POP-UP QR CODE RESOLUSI TINGGI */}
+      {/* POP-UP MODAL QR CODE */}
       {isModalOpen && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fadeIn"
@@ -202,7 +199,6 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
             className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4 text-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Tombol Tutup */}
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
@@ -230,21 +226,20 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
               </div>
             </div>
 
-            {/* Tampilan Gambar QR Code */}
+            {/* Gambar QR Code */}
             <div className="flex flex-col items-center justify-center space-y-2 py-1">
               <div className="relative p-2 bg-white rounded-2xl shadow-md border border-slate-200">
                 {highResQrUrl ? (
                   <img 
                     src={highResQrUrl} 
-                    alt="QR Code Verifikasi" 
+                    alt="QR Code Profil KTA" 
                     className="w-52 h-52 object-contain rounded-xl"
                   />
                 ) : (
                   <div className="w-52 h-52 bg-slate-100 rounded-xl animate-pulse flex items-center justify-center text-xs text-slate-400">
-                    Menyiapkan QR Code...
+                    Memuat QR Code...
                   </div>
                 )}
-                {/* Logo Saka di tengah QR Besar */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="w-11 h-11 bg-white rounded-full p-1 shadow-md border border-purple-200 flex items-center justify-center">
                     <SakaLogo size={28} />
@@ -257,21 +252,21 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
                   {nta}
                 </span>
                 <p className="text-[11px] text-slate-500">
-                  Pindai dengan kamera smartphone untuk membuka verifikasi profil resmi
+                  Pindai dengan kamera smartphone untuk membuka langsung profil digital KTA anggota ini
                 </p>
               </div>
             </div>
 
-            {/* Kolom Tautan Verifikasi */}
+            {/* Tautan Langsung Profil */}
             <div className="space-y-1">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                Tautan Verifikasi Publik:
+                Tautan Profil Digital KTA:
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   readOnly
-                  value={verificationUrl}
+                  value={profileUrl}
                   className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-700 outline-none select-all"
                 />
                 <button
@@ -289,7 +284,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
               </div>
             </div>
 
-            {/* Tombol Aksi Bawah */}
+            {/* Tombol Aksi */}
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
@@ -303,11 +298,11 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
 
               <button
                 type="button"
-                onClick={handleOpenVerification}
-                className="px-3.5 py-2.5 bg-gradient-to-r from-purple-900 to-indigo-900 hover:from-purple-950 hover:to-indigo-950 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-950/20 cursor-pointer"
+                onClick={handleOpenProfile}
+                className="px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
               >
-                <UserCheck className="w-3.5 h-3.5 text-purple-300" />
-                <span>Buka Profil Verifikasi</span>
+                <UserCheck className="w-3.5 h-3.5 text-emerald-200" />
+                <span>Buka Profil Anggota</span>
               </button>
             </div>
           </div>
