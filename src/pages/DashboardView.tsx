@@ -32,6 +32,7 @@ import { IntegratedTourismShowcaseGallery } from '../components/dashboard/Integr
 import { DashboardWidget } from '../components/dashboard/DashboardWidget';
 import { SakaLogo } from '../components/common/SakaLogo';
 import { storage } from '../services/storage';
+import { DEFAULT_PUBLIC_USER } from '../data/initialData';
 
 interface DashboardViewProps {
   currentUser: CurrentUser;
@@ -74,10 +75,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSpreadsheetModal,
   onOpenDriveModal
 }) => {
-  const isPublic = currentUser?.role === 'PUBLIC';
-  const isMember = currentUser?.role === 'MEMBER';
-  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
-  const isOperator = currentUser?.role === 'ADMIN_PROVINCE' || currentUser?.role === 'ADMIN_REGENCY' || currentUser?.role === 'ADMIN_BRANCH';
+  // Pastikan objek user selalu valid dan memiliki properti role
+  const safeCurrentUser: CurrentUser = (currentUser && currentUser.role) 
+    ? currentUser 
+    : DEFAULT_PUBLIC_USER;
+
+  const isPublic = safeCurrentUser.role === 'PUBLIC';
+  const isMember = safeCurrentUser.role === 'MEMBER';
+  const isSuperAdmin = safeCurrentUser.role === 'SUPER_ADMIN';
+  const isOperator = safeCurrentUser.role === 'ADMIN_PROVINCE' || safeCurrentUser.role === 'ADMIN_REGENCY' || safeCurrentUser.role === 'ADMIN_BRANCH';
   const isAdmin = isSuperAdmin || isOperator;
 
   const ktaSettings = storage.getKtaSettings();
@@ -87,20 +93,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const scopedMembers = isSuperAdmin 
     ? (members || [])
-    : currentUser?.role === 'ADMIN_PROVINCE' 
-      ? (members || []).filter(m => m.provinceId === currentUser.jurisdictionId)
-      : currentUser?.role === 'ADMIN_REGENCY'
-        ? (members || []).filter(m => m.regencyId === currentUser.jurisdictionId)
-        : currentUser?.role === 'ADMIN_BRANCH'
-          ? (members || []).filter(m => m.branchId === currentUser.jurisdictionId)
+    : safeCurrentUser.role === 'ADMIN_PROVINCE' 
+      ? (members || []).filter(m => m.provinceId === safeCurrentUser.jurisdictionId)
+      : safeCurrentUser.role === 'ADMIN_REGENCY' 
+        ? (members || []).filter(m => m.regencyId === safeCurrentUser.jurisdictionId)
+        : safeCurrentUser.role === 'ADMIN_BRANCH' 
+          ? (members || []).filter(m => m.branchId === safeCurrentUser.jurisdictionId)
           : [];
 
   const scopedTours = isSuperAdmin
     ? (tours || [])
-    : currentUser?.role === 'ADMIN_PROVINCE'
-      ? (tours || []).filter(t => t.provinceId === currentUser.jurisdictionId)
-      : currentUser?.role === 'ADMIN_REGENCY'
-        ? (tours || []).filter(t => t.regencyId === currentUser.jurisdictionId)
+    : safeCurrentUser.role === 'ADMIN_PROVINCE'
+      ? (tours || []).filter(t => t.provinceId === safeCurrentUser.jurisdictionId)
+      : safeCurrentUser.role === 'ADMIN_REGENCY'
+        ? (tours || []).filter(t => t.regencyId === safeCurrentUser.jurisdictionId)
         : (tours || []);
 
   const activeMembersCount = isSuperAdmin 
@@ -120,7 +126,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const tourCategories = Array.from(new Set(publishedTours.map(t => t?.category).filter(Boolean)));
 
-  // Filter aman tanpa memicu crash undefined toLowerCase
   const filteredPublicTours = publishedTours.filter(t => {
     if (!t) return false;
     const matchCat = selectedTourCategory === 'ALL' || t.category === selectedTourCategory;
@@ -136,7 +141,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return matchCat && matchQuery;
   });
 
-  // TAMPILAN PUBLIK
+  // 1. TAMPILAN PUBLIK
   if (isPublic) {
     return (
       <div className="space-y-6 sm:space-y-8 pb-16">
@@ -184,6 +189,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           tours={tours}
           products={liveCulinaryItems}
           members={members}
+          currentUser={safeCurrentUser}
           onViewTourDetail={onViewTourDetail}
           onSelectCulinaryDetail={onSelectCulinaryDetail}
           onSelectTab={onSelectTab}
@@ -198,17 +204,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     );
   }
 
-  // TAMPILAN MEMBER & ADMIN
+  // 2. TAMPILAN ADMIN & ANGGOTA RESMI
   return (
     <div className="space-y-6 sm:space-y-8 pb-16">
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative overflow-hidden">
         <div className="space-y-2 z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-400/30 rounded-full text-emerald-300 text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{isSuperAdmin ? 'Kwartir Nasional Super Admin' : isOperator ? currentUser?.jurisdictionName : 'Dashboard Anggota'}</span>
+            <span>{isSuperAdmin ? 'Kwartir Nasional Super Admin' : isOperator ? safeCurrentUser.jurisdictionName : 'Dashboard Anggota'}</span>
           </div>
           <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight">
-            Selamat Datang, {currentUser?.fullName || currentUser?.name || 'Kader Saka'}
+            Selamat Datang, {safeCurrentUser.fullName || safeCurrentUser.name || 'Kader Saka'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-300">
             Sistem Informasi Registrasi & Manajemen Saka Pariwisata Nasional
@@ -304,10 +310,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
+      {/* Teruskan safeCurrentUser agar galeri pintar tidak mengalami crash */}
       <IntegratedTourismShowcaseGallery
         tours={tours}
         products={liveCulinaryItems}
         members={members}
+        currentUser={safeCurrentUser}
         onViewTourDetail={onViewTourDetail}
         onSelectCulinaryDetail={onSelectCulinaryDetail}
         onSelectTab={onSelectTab}
