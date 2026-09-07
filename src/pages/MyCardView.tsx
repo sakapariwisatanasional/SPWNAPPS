@@ -1,31 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   CreditCard, 
-  Download, 
-  Printer, 
-  FileDown,
-  Eye, 
-  MapPin, 
-  Award, 
-  Sparkles, 
-  CheckCircle2, 
-  ShieldCheck, 
-  History, 
-  Calendar, 
+  FileDown, 
   Sliders, 
   Camera, 
-  Edit3,
-  Share2,
-  QrCode,
-  Copy,
-  Check,
+  Edit3, 
+  Share2, 
+  QrCode, 
+  Copy, 
+  Check, 
   Send,
-  ExternalLink,
-  Layers
+  UserCheck
 } from 'lucide-react';
 import { Member, CurrentUser } from '../types';
 import { DigitalMemberCard } from '../components/member/DigitalMemberCard';
-import { QuickShareBadgeModal } from '../components/member/QuickShareBadgeModal';
 import { getMemberVerificationUrl } from '../components/member/KtaQrCode';
 import QRCode from 'qrcode';
 
@@ -42,7 +30,7 @@ interface MyCardViewProps {
 
 export const MyCardView: React.FC<MyCardViewProps> = ({
   currentUser,
-  members,
+  members = [],
   onOpenVerifyModal,
   onOpenEditCardModal,
   onOpenEditPhotoModal,
@@ -50,39 +38,82 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
   onOpenPrintPdfModal,
   onOpenQuickShareModal
 }) => {
-  const member = members.find(m => m.id === currentUser.memberId) || members[0];
-  const isAdmin = currentUser.role !== 'MEMBER' && currentUser.role !== 'PUBLIC';
-  
-  const [isQuickShareOpen, setIsQuickShareOpen] = useState(false);
+  // 1. Deteksi identitas anggota dari query parameter hasil scan Google Lens / kamera HP
+  const targetMember = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const scannedId = (
+        params.get('memberId') || 
+        params.get('verifyId') || 
+        params.get('nta') || 
+        params.get('id') || 
+        params.get('kta') || 
+        ''
+      ).trim().toLowerCase();
+
+      if (scannedId && members.length > 0) {
+        // Cari anggota yang cocok dengan ID atau Nomor NTA/KTA
+        const matched = members.find(m => {
+          const mId = String(m.id || '').trim().toLowerCase();
+          const mNta = String(m.nationalMemberNumber || '').trim().toLowerCase();
+          const mToken = String(m.verificationToken || '').trim().toLowerCase();
+          return mId === scannedId || mNta === scannedId || mToken === scannedId;
+        });
+
+        if (matched) return matched;
+      }
+    }
+
+    // 2. Jika tidak ada parameter scan, tampilkan profil user yang sedang login
+    if (currentUser?.memberId) {
+      const userMember = members.find(m => m.id === currentUser.memberId);
+      if (userMember) return userMember;
+    }
+
+    // 3. Fallback jika user login memiliki nama yang sama
+    if (currentUser?.fullName || currentUser?.name) {
+      const curName = String(currentUser.fullName || currentUser.name).trim().toLowerCase();
+      const userByName = members.find(m => String(m.fullName || '').trim().toLowerCase() === curName);
+      if (userByName) return userByName;
+    }
+
+    // 4. Fallback terakhir: anggota pertama yang berstatus ACTIVE
+    return members.find(m => m.status === 'ACTIVE') || members[0] || null;
+  }, [members, currentUser]);
+
+  const member = targetMember;
+  const isOwner = Boolean(
+    member && currentUser && (
+      member.id === currentUser.memberId || 
+      member.userId === currentUser.id ||
+      (member.fullName && currentUser.name && member.fullName.toLowerCase() === currentUser.name.toLowerCase())
+    )
+  );
+  const isAdmin = currentUser?.role !== 'MEMBER' && currentUser?.role !== 'PUBLIC';
+
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedNta, setCopiedNta] = useState(false);
 
   if (!member) {
     return (
-      <div className="p-12 text-center text-slate-400">
-        Data KTA anggota tidak ditemukan.
+      <div className="p-12 text-center text-slate-400 space-y-2">
+        <CreditCard className="w-10 h-10 mx-auto text-slate-300" />
+        <p className="text-sm font-semibold">Data KTA Anggota Tidak Ditemukan</p>
+        <p className="text-xs text-slate-500">Pastikan anggota sudah terdaftar dan tersinkronisasi di Google Spreadsheet.</p>
       </div>
     );
   }
 
-  const nta = member.nationalMemberNumber || member.verificationToken || member.id;
-  const verificationUrl = getMemberVerificationUrl(member);
-
-  const handleOpenBadge = () => {
-    if (onOpenQuickShareModal) {
-      onOpenQuickShareModal(member);
-    } else {
-      setIsQuickShareOpen(true);
-    }
-  };
+  const nta = member.nationalMemberNumber || member.id;
+  const profileUrl = getMemberVerificationUrl(member);
 
   const handleCopyLink = async () => {
     try {
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(verificationUrl);
+        await navigator.clipboard.writeText(profileUrl);
       } else {
         const textarea = document.createElement('textarea');
-        textarea.value = verificationUrl;
+        textarea.value = profileUrl;
         textarea.style.position = 'fixed';
         textarea.style.left = '-999999px';
         document.body.appendChild(textarea);
@@ -120,32 +151,29 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
 
   const handleWhatsAppShare = () => {
     const waText = encodeURIComponent(
-      `Halo! Ini tanda pengenal & profil digital Saka Pariwisata saya:\n\n*${member.fullName}*\nNTA: ${nta}\nJabatan: ${member.currentPosition || 'Anggota'}\nWilayah: ${member.regencyName ? `Kwarcab ${member.regencyName}, ` : ''}${member.provinceName}\n\nLihat profil & verifikasi resmi di sini:\n${verificationUrl}`
+      `Profil KTA Resmi Saka Pariwisata:\n\n*${member.fullName}*\nNTA: ${nta}\nKrida: ${member.krida}\nWilayah: Kwarcab ${member.regencyName}, Kwarda ${member.provinceName}\n\nLihat KTA Digital lengkap:\n${profileUrl}`
     );
     window.open(`https://api.whatsapp.com/send?text=${waText}`, '_blank');
   };
 
   const handleDownloadQuickQr = async () => {
     try {
-      const qrUrl = await QRCode.toDataURL(verificationUrl, {
+      const qrUrl = await QRCode.toDataURL(profileUrl, {
         width: 800,
         margin: 2,
         errorCorrectionLevel: 'H',
-        color: {
-          dark: '#1e0842',
-          light: '#ffffff'
-        }
+        color: { dark: '#1e0842', light: '#ffffff' }
       });
 
-      const cleanNta = (member.nationalMemberNumber || member.id).replace(/[^a-zA-Z0-9]/g, '-');
+      const cleanNta = String(nta).replace(/[^a-zA-Z0-9]/g, '-');
       const link = document.createElement('a');
-      link.download = `QR-NTA-SakaPariwisata-${cleanNta}.png`;
+      link.download = `QR-Profil-KTA-${cleanNta}.png`;
       link.href = qrUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      console.error('Quick QR download error:', err);
+      console.error('Download QR error:', err);
     }
   };
 
@@ -156,81 +184,81 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2">
             <span className="px-3 py-1 bg-purple-100 text-purple-900 text-[11px] font-extrabold uppercase tracking-widest rounded-full">
-              Kartu Tanda Anggota Elektronik
+              Profil Anggota & KTA Elektronik
             </span>
+            {isOwner && (
+              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1">
+                <UserCheck className="w-3 h-3" /> Akun Anda
+              </span>
+            )}
             {isAdmin && (
               <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-md">
-                Admin Mode
+                Admin View
               </span>
             )}
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold font-heading text-slate-900">
-            KTA Digital Saka Pariwisata
+            {member.fullName}
           </h2>
           <p className="text-xs text-slate-500">
-            Tanda pengenal resmi tingkat nasional dengan konversi PDF standar cetak global ISO/IEC 7810 ID-1
+            {member.krida} • Kwartir Cabang {member.regencyName}, Kwarda {member.provinceName}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap justify-center">
-          {/* Quick Share / Event Badge Button (Prominent) */}
-          <button
-            onClick={handleOpenBadge}
-            className="flex-shrink-0 px-4 py-2.5 bg-gradient-to-r from-amber-500 via-purple-700 to-indigo-900 hover:from-amber-600 hover:to-indigo-950 text-white rounded-2xl text-xs font-bold shadow-lg shadow-purple-950/20 transition-all inline-flex items-center gap-2 cursor-pointer group hover:scale-[1.02]"
-            title="Buka badge event & QR Code jejaring instan"
-          >
-            <Share2 className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform" />
-            <span>Quick Share & Badge Event</span>
-            <span className="px-1.5 py-0.5 bg-amber-400 text-slate-950 text-[9px] font-black rounded-full">
-              BARU
-            </span>
-          </button>
+          {onOpenQuickShareModal && (
+            <button
+              onClick={() => onOpenQuickShareModal(member)}
+              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-purple-700 to-indigo-900 hover:from-amber-600 hover:to-indigo-950 text-white rounded-2xl text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer"
+            >
+              <Share2 className="w-4 h-4 text-amber-300" />
+              <span>Bagikan Profil</span>
+            </button>
+          )}
 
           {onOpenPrintPdfModal && (
             <button
               onClick={() => onOpenPrintPdfModal(member)}
-              className="flex-shrink-0 px-4 py-2.5 bg-purple-900 hover:bg-purple-950 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-950/20 transition-all inline-flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-purple-900 hover:bg-purple-950 text-white rounded-2xl text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer"
             >
               <FileDown className="w-4 h-4 text-purple-300" />
-              <span>Cetak / Unduh PDF KTA</span>
+              <span>Cetak / Unduh PDF</span>
             </button>
           )}
 
           {isAdmin && onOpenEditMemberModal && (
             <button
               onClick={() => onOpenEditMemberModal(member)}
-              className="flex-shrink-0 px-4 py-2.5 bg-indigo-900 hover:bg-indigo-950 text-white rounded-2xl text-xs font-bold shadow-xs transition-all inline-flex items-center gap-2 cursor-pointer"
-              title="Koreksi nama, gelar, data profil atau domisili kwartir"
+              className="px-4 py-2.5 bg-indigo-900 hover:bg-indigo-950 text-white rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
               <Edit3 className="w-4 h-4 text-indigo-300" />
-              <span>Koreksi Profil & Domisili</span>
+              <span>Koreksi Data</span>
             </button>
           )}
 
-          {onOpenEditPhotoModal && (
+          {(isOwner || isAdmin) && onOpenEditPhotoModal && (
             <button
               onClick={() => onOpenEditPhotoModal(member)}
-              className="flex-shrink-0 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold shadow-xs transition-all inline-flex items-center gap-2 cursor-pointer"
-              title="Unggah berkas atau ganti link pas foto resmi KTA Anda"
+              className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
               <Camera className="w-4 h-4 text-purple-600" />
-              <span>Ubah Foto KTA</span>
+              <span>Ubah Foto</span>
             </button>
           )}
 
           {isAdmin && onOpenEditCardModal && (
             <button
               onClick={onOpenEditCardModal}
-              className="flex-shrink-0 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-2xl text-xs font-bold shadow-xs transition-all inline-flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
               <Sliders className="w-4 h-4" />
-              <span>Edit Tampilan KTA</span>
+              <span>Desain KTA</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Main 3D Card Display */}
+      {/* Kartu 3D KTA Interaktif */}
       <div className="bg-gradient-to-b from-slate-900 to-slate-950 p-8 rounded-3xl border border-slate-800 shadow-2xl flex flex-col items-center justify-center space-y-6">
         <DigitalMemberCard
           member={member}
@@ -244,175 +272,92 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
         />
 
         <div className="text-center text-xs text-slate-400 max-w-md">
-          <p>Klik kartu di atas untuk membalik dan melihat ketentuan, barcode, serta pengesahan Kwartir Nasional.</p>
+          <p>Klik kartu di atas untuk membalik dan melihat barcode, data pangkalan, serta pengesahan Kwartir Nasional.</p>
         </div>
       </div>
 
-      {/* NEW FEATURE: Quick Share & Networking Event Badge Card */}
-      <div className="bg-gradient-to-br from-purple-950 via-slate-900 to-indigo-950 text-white p-6 rounded-3xl border border-purple-800/40 shadow-xl relative overflow-hidden">
-        {/* Background decorative elements */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-60 h-60 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+      {/* Detail Data Profil Anggota */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+        <h3 className="font-bold text-sm text-slate-900 pb-2 border-b border-slate-100 flex items-center justify-between">
+          <span>Informasi Keanggotaan Terdaftar</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+            member.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+          }`}>
+            {member.status === 'ACTIVE' ? '✓ Aktif Terdaftar' : 'Menunggu Validasi'}
+          </span>
+        </h3>
 
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-xl">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-3 py-0.5 bg-amber-400/20 border border-amber-300/30 text-amber-300 text-[10px] font-extrabold tracking-wider uppercase rounded-full">
-                Fitur Jejaring & Acara
-              </span>
-              <span className="text-purple-300 text-xs font-mono">
-                NTA: {nta}
-              </span>
-            </div>
-
-            <h3 className="text-lg sm:text-xl font-black font-heading text-white">
-              Quick Share: Badge Pengenal & QR Portofolio Instan
-            </h3>
-
-            <p className="text-xs text-purple-200/80 leading-relaxed">
-              Buat tanda pengenal berformat vertikal ID-Card (A6) atau kartu nama networking (A5) lengkap dengan NTA dan QR Code beresolusi tinggi. Sangat cocok untuk kegiatan <strong>Kemah Wisata, Jambore, Munas, Rakernas,</strong> atau pertukaran kontak antar pramuka se-Indonesia.
-            </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+            <span className="text-slate-400 text-[10px] font-bold uppercase">Nomor Tanda Anggota (NTA)</span>
+            <p className="font-mono font-bold text-slate-800 text-sm">{nta}</p>
           </div>
+          <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+            <span className="text-slate-400 text-[10px] font-bold uppercase">Pilihan Krida Utama</span>
+            <p className="font-bold text-emerald-800 text-sm">{member.krida}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+            <span className="text-slate-400 text-[10px] font-bold uppercase">Gugus Depan / Pangkalan</span>
+            <p className="font-semibold text-slate-800">{member.gugusDepan || '-'}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+            <span className="text-slate-400 text-[10px] font-bold uppercase">Wilayah Kwartir</span>
+            <p className="font-semibold text-slate-800">Kwarcab {member.regencyName}, Kwarda {member.provinceName}</p>
+          </div>
+        </div>
 
-          {/* Action Hub */}
-          <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row items-stretch gap-2.5 w-full md:w-auto flex-shrink-0">
+        {member.bio && (
+          <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-xs">
+            <span className="text-slate-400 text-[10px] font-bold uppercase">Bio / Catatan Pengabdian</span>
+            <p className="text-slate-700 italic">"{member.bio}"</p>
+          </div>
+        )}
+      </div>
+
+      {/* Bagikan Profil & Akses Cepat */}
+      <div className="bg-gradient-to-br from-purple-950 via-slate-900 to-indigo-950 text-white p-6 rounded-3xl border border-purple-800/40 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-base font-bold text-white">Bagikan Profil Anggota Ini</h3>
+            <p className="text-xs text-purple-200/80">Tautan langsung untuk verifikasi profil di lapangan</p>
+          </div>
+          <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={handleOpenBadge}
-              className="px-4 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer font-heading"
+              onClick={handleWhatsAppShare}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Share2 className="w-4 h-4 text-slate-950" />
-              <span>Buka Generator Badge</span>
+              <Send className="w-3.5 h-3.5" />
+              <span>Kirim WhatsApp</span>
             </button>
-
             <button
-              type="button"
               onClick={handleDownloadQuickQr}
-              className="px-4 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl text-xs border border-white/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/20 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <QrCode className="w-4 h-4 text-purple-300" />
-              <span>Unduh QR Cepat</span>
+              <QrCode className="w-3.5 h-3.5 text-purple-300" />
+              <span>Unduh QR</span>
             </button>
           </div>
         </div>
 
-        {/* Quick Copy & WhatsApp Bar */}
-        <div className="mt-5 pt-4 border-t border-purple-800/40 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           <button
             type="button"
             onClick={handleCopyLink}
             className="p-2.5 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/40 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-purple-200"
           >
             {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-300" />}
-            <span className="font-medium">{copiedLink ? 'Tautan Profil Tersalin!' : 'Salin Tautan Profil'}</span>
+            <span className="font-medium">{copiedLink ? 'Tautan Profil Tersalin!' : 'Salin Tautan Profil KTA'}</span>
           </button>
-
           <button
             type="button"
             onClick={handleCopyNta}
             className="p-2.5 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/40 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-purple-200"
           >
             {copiedNta ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-300" />}
-            <span className="font-medium">{copiedNta ? 'NTA Tersalin!' : 'Salin NTA Nomor'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleWhatsAppShare}
-            className="p-2.5 bg-emerald-900/40 hover:bg-emerald-900/70 border border-emerald-700/40 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-emerald-200"
-          >
-            <Send className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="font-medium">Bagikan ke WhatsApp</span>
+            <span className="font-medium">{copiedNta ? 'NTA Tersalin!' : 'Salin Nomor NTA'}</span>
           </button>
         </div>
       </div>
-
-      {/* Profile & Credentials Details */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Detail Kepramukaan */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
-          <h3 className="font-bold text-sm text-slate-900 font-heading flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Informasi Keanggotaan</span>
-          </h3>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">Nomor Anggota</span>
-              <span className="font-mono font-bold text-emerald-800">{member.nationalMemberNumber}</span>
-            </div>
-
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">Pangkalan Ranting</span>
-              <span className="font-semibold text-slate-800">{member.branchName}</span>
-            </div>
-
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">Kwartir Cabang</span>
-              <span className="font-semibold text-slate-800">{member.regencyName}</span>
-            </div>
-
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">Kwartir Daerah</span>
-              <span className="font-semibold text-slate-800">{member.provinceName}</span>
-            </div>
-
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">Gugus Depan</span>
-              <span className="font-semibold text-slate-800">{member.gugusDepan}</span>
-            </div>
-
-            <div className="flex justify-between py-2">
-              <span className="text-slate-500">Krida Utama</span>
-              <span className="font-bold text-emerald-700">{member.krida}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Keahlian & Riwayat */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
-          <h3 className="font-bold text-sm text-slate-900 font-heading flex items-center gap-2">
-            <Award className="w-4 h-4 text-emerald-600" />
-            <span>Keahlian & Sertifikasi Terdaftar</span>
-          </h3>
-
-          <div className="space-y-2">
-            {member.skills && member.skills.length > 0 ? (
-              member.skills.map((s) => (
-                <div key={s.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-slate-800">{s.skillName}</p>
-                    <p className="text-[10px] text-slate-400">{s.category}</p>
-                  </div>
-                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-bold">
-                    {s.proficiency}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-slate-400">Belum ada keahlian terverifikasi.</p>
-            )}
-          </div>
-
-          <div className="pt-2">
-            <button
-              onClick={() => onOpenVerifyModal(member)}
-              className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Buka Tampilan Verifikasi Publik (QR)</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Self-contained Quick Share Modal */}
-      <QuickShareBadgeModal
-        isOpen={isQuickShareOpen}
-        member={member}
-        onClose={() => setIsQuickShareOpen(false)}
-        onOpenVerifyModal={onOpenVerifyModal}
-      />
     </div>
   );
 };
