@@ -11,9 +11,9 @@ import {
   Sparkles,
   ShieldCheck,
   Lock,
-  AlertCircle,
   Upload,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Globe2
 } from 'lucide-react';
 import { storage } from '../../services/storage';
 import { spreadsheetService } from '../../services/spreadsheetService';
@@ -41,7 +41,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
   // Form State
   const [fullName, setFullName] = useState('');
-  const [nik, setNik] = useState('');
   const [gender, setGender] = useState<'LAKI_LAKI' | 'PEREMPUAN'>('LAKI_LAKI');
   const [birthPlace, setBirthPlace] = useState('');
   const [birthDate, setBirthDate] = useState('2002-05-15');
@@ -49,6 +48,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   
+  // Tingkatan Kwartir Organisasi
+  const [kwartirLevel, setKwartirLevel] = useState<'NASIONAL' | 'DAERAH'>('DAERAH');
   const [selectedProvinceId, setSelectedProvinceId] = useState('32');
   const [selectedRegencyId, setSelectedRegencyId] = useState('32.06');
   const [selectedDistrictId, setSelectedDistrictId] = useState('32.06.12');
@@ -138,7 +139,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>(['skill-tour-guide']);
   const [skillProficiency, setSkillProficiency] = useState<SkillProficiency>('INTERMEDIATE');
 
-  // Initialize territory data and default selections based on currentUser role
+  // Territory Initializer
   useEffect(() => {
     const allProvinces = storage.getProvinces();
     setProvinces(allProvinces);
@@ -146,12 +147,12 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
     if (currentUser) {
       if (currentUser.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId) {
-        // Operator Cabang: Find province that contains this regency
         const regencyId = currentUser.jurisdictionId;
         const allRegs = storage.getRegencies();
         const targetReg = allRegs.find(r => r.id === regencyId);
         const provId = targetReg ? targetReg.provinceId : regencyId.split('.')[0] || '32';
         
+        setKwartirLevel('DAERAH');
         setSelectedProvinceId(provId);
         setSelectedRegencyId(regencyId);
         
@@ -164,6 +165,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
           if (brs.length > 0) setSelectedBranchId(brs[0].id);
         }
       } else if (currentUser.role === 'ADMIN_PROVINCE' && currentUser.jurisdictionId) {
+        setKwartirLevel('DAERAH');
         setSelectedProvinceId(currentUser.jurisdictionId);
         const regs = storage.getRegencies(currentUser.jurisdictionId);
         setRegencies(regs);
@@ -179,6 +181,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
           }
         }
       } else if (currentUser.role === 'ADMIN_BRANCH' && currentUser.jurisdictionId) {
+        setKwartirLevel('DAERAH');
         const branchId = currentUser.jurisdictionId;
         const allDists = storage.getDistricts();
         const targetDist = allDists.find(d => d.id === branchId || branchId.startsWith(d.id));
@@ -199,7 +202,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
   useEffect(() => {
     if (selectedProvinceId) {
-      // If role is ADMIN_REGENCY, keep regencies filtered to their jurisdiction or loaded
       const regs = storage.getRegencies(selectedProvinceId);
       setRegencies(regs);
       if (currentUser?.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId) {
@@ -243,12 +245,11 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
     if (isSubmitting) return;
 
-    if (!fullName || !nik || !email || !phone || !gugusDepan) {
+    if (!fullName || !email || !phone || !gugusDepan) {
       alert('Harap lengkapi semua data wajib yang ditandai bintang (*)');
       return;
     }
 
-    // Strict validation for Operator Cabang
     if (isRegencyOperator && currentUser?.jurisdictionId && selectedRegencyId !== currentUser.jurisdictionId) {
       alert(`Peringatan Akses: Anda hanya diizinkan mendaftarkan anggota pada Kwartir Cabang Anda (${currentUser.jurisdictionName}).`);
       return;
@@ -256,15 +257,15 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
     setIsSubmitting(true);
 
-    const currentProvince = provinces.find(p => p.id === selectedProvinceId);
-    const currentRegency = regencies.find(r => r.id === selectedRegencyId);
-    const currentDistrict = districts.find(d => d.id === selectedDistrictId);
-    const currentBranch = branches.find(b => b.id === selectedBranchId);
+    const isNasional = kwartirLevel === 'NASIONAL';
+    const currentProvince = isNasional ? { id: '00', name: 'Kwartir Nasional' } : provinces.find(p => p.id === selectedProvinceId);
+    const currentRegency = isNasional ? { id: '00.00', name: 'Pusat Nasional' } : regencies.find(r => r.id === selectedRegencyId);
+    const currentDistrict = isNasional ? { id: '00.00.00', name: 'Nasional' } : districts.find(d => d.id === selectedDistrictId);
+    const currentBranch = isNasional ? { id: 'branch-nasional', name: 'Pimpinan Saka Tingkat Nasional' } : branches.find(b => b.id === selectedBranchId);
 
-    // Mask NIK for security
-    const maskedNik = nik.length >= 10 
-      ? nik.substring(0, 6) + '******' + nik.substring(nik.length - 4)
-      : nik;
+    // Otomatisasi NIK masked tanpa perlu meminta input dari pengguna
+    const cleanPhone = phone.replace(/\D/g, '');
+    const generatedNikMasked = '3200******' + (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
 
     // Build skills array
     const memberSkills: MemberSkill[] = selectedSkillIds.map((sId, idx) => {
@@ -281,26 +282,25 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     });
 
     try {
-      // STEP 1: buat record lokal dengan status PENDING.
       const member = storage.registerMember({
         userId: `user-${Date.now()}`,
         fullName,
-        nikMasked: maskedNik,
+        nikMasked: generatedNikMasked,
         avatarUrl: avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80',
         gender,
-        birthPlace: birthPlace || 'Tasikmalaya',
+        birthPlace: birthPlace || currentRegency?.name || 'Indonesia',
         birthDate,
         phone,
         email,
-        address: address || 'Jl. Pramuka Raya',
+        address: address || `Pangkalan ${gugusDepan}`,
         
-        provinceId: selectedProvinceId,
-        provinceName: currentProvince?.name || 'Jawa Barat',
-        regencyId: selectedRegencyId,
-        regencyName: currentRegency?.name || 'Kwartir Cabang',
-        districtId: selectedDistrictId,
-        districtName: currentDistrict?.name || 'Kecamatan',
-        branchId: selectedBranchId || 'branch-default',
+        provinceId: isNasional ? '00' : selectedProvinceId,
+        provinceName: currentProvince?.name || 'Kwartir Nasional',
+        regencyId: isNasional ? '00.00' : selectedRegencyId,
+        regencyName: currentRegency?.name || 'Nasional',
+        districtId: isNasional ? '00.00.00' : selectedDistrictId,
+        districtName: currentDistrict?.name || 'Nasional',
+        branchId: isNasional ? 'branch-nasional' : (selectedBranchId || 'branch-default'),
         branchName: currentBranch?.name || `Kwarran ${currentDistrict?.name || 'Pariwisata'}`,
         
         gugusDepan,
@@ -314,21 +314,19 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         certifications: []
       });
 
-      // STEP 2: POST UPSERT_MEMBER -> STEP 3: CHECK_RECORD.
-      // Jangan navigasi / menutup modal sebelum Google Spreadsheet benar-benar
-      // mengembalikan found=true.
       console.info('[MemberForm] Memulai sinkronisasi anggota:', {
         memberId: member.id,
         email: member.email,
         webAppConfigured: spreadsheetService.getSyncState().hasScriptUrl
       });
+
       const syncResult = await spreadsheetService.saveMemberAndWaitForSync(member);
 
       if (!syncResult.synced) {
         throw new Error(syncResult.message || 'Data belum terverifikasi di Google Spreadsheet.');
       }
 
-      alert(`Pendaftaran berhasil disimpan dan diverifikasi di Google Spreadsheet (baris ${syncResult.row || '-'}).`);
+      alert(`Pendaftaran anggota berhasil disimpan dan disinkronkan ke Google Spreadsheet.`);
       setIsSubmitting(false);
       onSuccess();
       onClose();
@@ -357,7 +355,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             <div>
               <h3 className="font-bold text-base font-heading">Formulir Registrasi Anggota Saka Pariwisata</h3>
               <p className="text-xs text-slate-300">
-                {isRegencyOperator ? `Operator Khusus: ${currentUser?.jurisdictionName}` : 'Pendataan Keanggotaan Berbasis Struktur Wilayah Nasional'}
+                {isRegencyOperator ? `Operator Khusus: ${currentUser?.jurisdictionName}` : 'Pendataan Keanggotaan Berjenjang Kwarnas, Kwarda, Kwarcab, dan Kwarran'}
               </p>
             </div>
           </div>
@@ -381,6 +379,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
         {/* Modal Form Content */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar text-xs">
+          
           {/* Section 1: Identitas Pribadi */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-1 border-b border-slate-200 text-slate-900 font-bold text-sm">
@@ -388,32 +387,16 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               <span>1. Identitas Anggota</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Nama Lengkap & Gelar *</label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Contoh: Muhammad Farhan, S.Par."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">NIK (16 Digit) *</label>
-                <input
-                  type="text"
-                  required
-                  maxLength={16}
-                  value={nik}
-                  onChange={(e) => setNik(e.target.value)}
-                  placeholder="Contoh: 3206121405020001"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-mono"
-                />
-                <span className="text-[10px] text-slate-400">Data NIK dienkripsi & dilindungi (UU PDP).</span>
-              </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Nama Lengkap & Gelar *</label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Contoh: Muhammad Farhan, S.Par."
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -430,13 +413,12 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Tempat Lahir *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Tempat Lahir</label>
                 <input
                   type="text"
-                  required
                   value={birthPlace}
                   onChange={(e) => setBirthPlace(e.target.value)}
-                  placeholder="Tasikmalaya"
+                  placeholder="Kota / Tempat Lahir"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
                 />
               </div>
@@ -479,39 +461,39 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               </div>
             </div>
 
-            {/* Avatar Picker with Upload, Drag&Drop, Camera, and URL Support */}
+            {/* Avatar Picker with Upload, Drag&Drop, and Copy-Paste URL Support */}
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <label className="block text-xs font-bold text-slate-900 font-heading">
-                    Pas Foto Resmi Anggota (KTA Digital & Fisik)
+                    Pas Foto Anggota (KTA Digital & Cetak)
                   </label>
                   <p className="text-[11px] text-slate-500">
-                    Gunakan foto setengah badan berpakaian seragam Pramuka / rapi
+                    Upload berkas foto atau salin/tempel tautan URL gambar
                   </p>
                 </div>
                 <div className="flex items-center bg-slate-200 p-0.5 rounded-lg text-[10px] font-bold">
                   <button
                     type="button"
                     onClick={() => setPhotoUploadSource('FILE')}
-                    className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                       photoUploadSource === 'FILE' 
                         ? 'bg-white text-emerald-900 shadow-xs font-extrabold' 
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    Upload File
+                    Upload Foto
                   </button>
                   <button
                     type="button"
                     onClick={() => setPhotoUploadSource('URL')}
-                    className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                       photoUploadSource === 'URL' 
                         ? 'bg-white text-emerald-900 shadow-xs font-extrabold' 
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    Link URL / Drive
+                    Paste Link URL
                   </button>
                 </div>
               </div>
@@ -541,7 +523,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                     </button>
                   </div>
                   <span className="absolute -bottom-2 inset-x-0 mx-auto w-max px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-extrabold rounded-full shadow-xs">
-                    Format KTA 3x4
+                    Pas Foto KTA
                   </span>
                 </div>
 
@@ -575,10 +557,10 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-xs font-bold text-slate-800">
-                          Klik untuk memilih foto dari perangkat atau seret foto ke sini
+                          Pilih foto dari galeri/ponsel atau seret berkas ke sini
                         </p>
                         <p className="text-[10px] text-slate-400">
-                          Mendukung JPG, PNG, WEBP (Kompresi otomatis hingga optimal)
+                          Mendukung JPG, PNG, WEBP (Otomatis dikompresi agar hemat kuota)
                         </p>
                       </div>
                       <div className="flex items-center gap-2 pt-0.5">
@@ -591,14 +573,14 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                           className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                         >
                           <Camera className="w-3.5 h-3.5" />
-                          <span>Pilih / Ambil Foto</span>
+                          <span>Ambil / Unggah Foto</span>
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       <label className="block text-[11px] font-bold text-slate-700">
-                        Tautan Foto Google Drive atau URL Web
+                        Paste / Salin Link URL Foto (Google Drive atau URL Gambar Publik)
                       </label>
                       <div className="relative">
                         <LinkIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -612,12 +594,12 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                               setAvatarUrl(formatGoogleDriveUrl(val.trim()));
                             }
                           }}
-                          placeholder="https://drive.google.com/file/d/... atau https://..."
+                          placeholder="Contoh: https://drive.google.com/file/d/... atau https://..."
                           className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                         />
                       </div>
                       <p className="text-[10px] text-slate-400">
-                        *Jika menggunakan Google Drive, pastikan izin akses tautan disetel ke "Siapa saja yang memiliki link".
+                        *Jika menggunakan Google Drive, pastikan link disetel ke "Siapa saja yang memiliki link".
                       </p>
                     </div>
                   )}
@@ -649,92 +631,138 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Struktur Wilayah Organisasi */}
+          {/* Section 2: Struktur Wilayah Organisasi (Kwarnas, Kwarda, Kwarcab, Kwarran) */}
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between pb-1 border-b border-slate-200">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
                 <MapPin className="w-4 h-4 text-emerald-600" />
-                <span>2. Wilayah Kwartir & Ranting</span>
+                <span>2. Struktur Wilayah Kwartir Gerakan Pramuka</span>
               </div>
               {isRegencyOperator && (
                 <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-300">
                   <Lock className="w-3 h-3 text-amber-700" />
-                  Kwartir Cabang Terkunci
+                  Wilayah Cabang Terkunci
                 </span>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Provinsi (Kwarda) {isRegencyOperator && <span className="text-amber-700 text-[10px]">(Terkunci)</span>} *
-                </label>
-                <select
-                  disabled={isRegencyOperator || isProvinceAdmin || isBranchAdmin}
-                  value={selectedProvinceId}
-                  onChange={(e) => setSelectedProvinceId(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-xl outline-none text-slate-800 ${
-                    isRegencyOperator || isProvinceAdmin || isBranchAdmin
-                      ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
-                      : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+            {/* Pilihan Tingkat Kwartir: Nasional vs Daerah */}
+            {!isRegencyOperator && !isProvinceAdmin && !isBranchAdmin && (
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setKwartirLevel('DAERAH')}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    kwartirLevel === 'DAERAH'
+                      ? 'bg-white text-emerald-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  {provinces.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} (Kode {p.code})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Kabupaten/Kota (Kwarcab) {isRegencyOperator && <span className="text-amber-700 text-[10px] font-bold">(Khusus Wilayah Anda)</span>} *
-                </label>
-                <select
-                  disabled={isRegencyOperator || isBranchAdmin}
-                  value={selectedRegencyId}
-                  onChange={(e) => setSelectedRegencyId(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-xl outline-none font-semibold ${
-                    isRegencyOperator || isBranchAdmin
-                      ? 'bg-amber-50/80 border-amber-300 text-amber-950 cursor-not-allowed'
-                      : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800'
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Kwarda / Kwarcab / Kwarran</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKwartirLevel('NASIONAL')}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    kwartirLevel === 'NASIONAL'
+                      ? 'bg-emerald-800 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  {regencies.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name} (Kode {r.code})</option>
-                  ))}
-                </select>
+                  <Globe2 className="w-3.5 h-3.5" />
+                  <span>Kwartir Nasional (Kwarnas)</span>
+                </button>
               </div>
+            )}
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Kecamatan (Kwarran) *</label>
-                <select
-                  value={selectedDistrictId}
-                  onChange={(e) => setSelectedDistrictId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                >
-                  {districts.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name} (Kode {d.code})</option>
-                  ))}
-                </select>
+            {kwartirLevel === 'NASIONAL' ? (
+              <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
+                <div className="flex items-center gap-2 text-emerald-900 font-bold">
+                  <Globe2 className="w-4 h-4 text-emerald-700" />
+                  <span>Cakupan: Pimpinan Saka Pariwisata Tingkat Nasional</span>
+                </div>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Anggota akan didaftarkan di bawah naungan <strong>Kwartir Nasional Gerakan Pramuka</strong> dengan akses terkoordinasi secara nasional.
+                </p>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    1. Kwartir Daerah (Kwarda / Provinsi) *
+                  </label>
+                  <select
+                    disabled={isRegencyOperator || isProvinceAdmin || isBranchAdmin}
+                    value={selectedProvinceId}
+                    onChange={(e) => setSelectedProvinceId(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-xl outline-none text-slate-800 ${
+                      isRegencyOperator || isProvinceAdmin || isBranchAdmin
+                        ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                        : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+                    }`}
+                  >
+                    {provinces.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} (Kwarda)</option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Pangkalan Saka / Ranting *</label>
-                <select
-                  value={selectedBranchId}
-                  onChange={(e) => setSelectedBranchId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold text-emerald-900"
-                >
-                  {branches.length > 0 ? (
-                    branches.map((b) => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
-                    ))
-                  ) : (
-                    <option value="">Ranting Umum Kecamatan Terkait</option>
-                  )}
-                </select>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    2. Kwartir Cabang (Kwarcab / Kab-Kota) *
+                  </label>
+                  <select
+                    disabled={isRegencyOperator || isBranchAdmin}
+                    value={selectedRegencyId}
+                    onChange={(e) => setSelectedRegencyId(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-xl outline-none font-semibold ${
+                      isRegencyOperator || isBranchAdmin
+                        ? 'bg-amber-50/80 border-amber-300 text-amber-950 cursor-not-allowed'
+                        : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800'
+                    }`}
+                  >
+                    {regencies.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name} (Kwarcab)</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    3. Kwartir Ranting (Kwarran / Kecamatan) *
+                  </label>
+                  <select
+                    value={selectedDistrictId}
+                    onChange={(e) => setSelectedDistrictId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+                  >
+                    {districts.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name} (Kwarran)</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    4. Pangkalan Saka / Gugus Depan Terkait
+                  </label>
+                  <select
+                    value={selectedBranchId}
+                    onChange={(e) => setSelectedBranchId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold text-emerald-900"
+                  >
+                    {branches.length > 0 ? (
+                      branches.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))
+                    ) : (
+                      <option value="">Pangkalan Kwarran Kecamatan Terkait</option>
+                    )}
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Section 3: Kepramukaan & Krida */}
@@ -746,7 +774,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Nama Gugus Depan Asal *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Gugus Depan / Pangkalan Asal *</label>
                 <input
                   type="text"
                   required
@@ -862,4 +890,3 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     </div>
   );
 };
-
