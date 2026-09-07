@@ -207,6 +207,34 @@ class SpreadsheetService {
     }
   }
 
+  // Pembaca nilai kolom multi-alias fleksibel
+  private getRowVal(row: Record<string, any>, aliases: string[]): string {
+    if (!row) return '';
+    const keys = Object.keys(row);
+    
+    // 1. Exact match
+    for (const alias of aliases) {
+      if (row[alias] !== undefined && row[alias] !== null && String(row[alias]).trim() !== '') {
+        return String(row[alias]).trim();
+      }
+    }
+
+    // 2. Case-insensitive / partial match
+    for (const alias of aliases) {
+      const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
+      for (const k of keys) {
+        const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (cleanKey === cleanAlias || cleanKey.includes(cleanAlias)) {
+          if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+            return String(row[k]).trim();
+          }
+        }
+      }
+    }
+
+    return '';
+  }
+
   public async fetchSheetRows(sheetName: string = 'Anggota'): Promise<Record<string, any>[]> {
     const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL);
     if (!scriptUrl) return [];
@@ -222,7 +250,7 @@ class SpreadsheetService {
     }
   }
 
-  // Sinkronisasi data anggota riil dari Spreadsheet langsung ke UI Admin
+  // Sinkronisasi data anggota riil dari Spreadsheet ke sistem
   public async syncFromSpreadsheet(silent: boolean = false): Promise<{ success: boolean; count: number; message: string }> {
     if (this.isSyncing) return { success: false, count: 0, message: 'Sinkronisasi sedang berjalan.' };
     this.isSyncing = true;
@@ -235,10 +263,40 @@ class SpreadsheetService {
         const merged = [...existingMembers];
 
         rows.forEach((row, idx) => {
-          const fullName = row['Nama Lengkap'] || row['nama_lengkap'] || `Anggota ${idx + 1}`;
-          const kta = row['Nomor KTA'] || row['nomor_kta'] || '';
-          const explicitId = row['ID Anggota'] || row['ID'] || row['id'];
+          const fullName = this.getRowVal(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'Full Name', 'Nama Peserta']) || `Anggota ${idx + 1}`;
+          const kta = this.getRowVal(row, ['Nomor KTA', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA']);
+          const explicitId = this.getRowVal(row, ['ID Anggota', 'ID', 'id', 'Member ID']);
           const memberId = explicitId || (kta ? `mem-${kta.replace(/[^a-zA-Z0-9]/g, '')}` : `mem-sheet-${idx + 1}`);
+
+          // Baca wilayah riil dari input user
+          const rawProv = this.getRowVal(row, ['Kwarda / Provinsi', 'Provinsi', 'Kwarda', 'Province', 'provinsi']);
+          const rawKab = this.getRowVal(row, ['Kwarcab / Kabupaten', 'Kabupaten', 'Kwarcab', 'Kabupaten/Kota', 'Kota', 'kabupaten']);
+          const rawKec = this.getRowVal(row, ['Kwarran / Kecamatan', 'Kecamatan', 'Kwarran', 'Ranting', 'kecamatan_ranting']);
+          const rawGudep = this.getRowVal(row, ['Gugus Depan / Pangkalan', 'Gugus Depan', 'Gudep', 'Pangkalan', 'gudep']);
+          const rawPhone = this.getRowVal(row, ['Nomor WhatsApp', 'WhatsApp', 'No WA', 'No. WA', 'Telepon', 'Phone', 'nomor_wa', 'No HP']);
+          const rawEmail = this.getRowVal(row, ['Email', 'Alamat Email', 'Surel', 'email']);
+          const rawKrida = this.getRowVal(row, ['Krida', 'Pilihan Krida', 'Nama Krida', 'krida']) || 'Krida Pemandu';
+          const rawAvatar = this.getRowVal(row, ['Foto URL', 'Foto', 'Pas Foto', 'Link Foto', 'Avatar', 'foto_url']);
+          const rawDate = this.getRowVal(row, ['Tanggal Daftar', 'Tanggal Registrasi', 'Timestamp', 'tanggal_daftar']) || new Date().toISOString();
+
+          // Penanganan Status: DEFAULT HARUS PENDING!
+          // HANYA menjadi ACTIVE jika kolom status secara jelas tertulis ACTIVE / AKTIF / DISETUJUI
+          const rawStatus = this.getRowVal(row, ['Status Verifikasi', 'Status Anggota', 'Status', 'status', 'Validasi']).toUpperCase();
+          let finalStatus: 'ACTIVE' | 'PENDING' | 'SUSPENDED' = 'PENDING';
+          
+          if (rawStatus.includes('AKTIF') || rawStatus.includes('ACTIVE') || rawStatus.includes('DISETUJUI') || rawStatus.includes('APPROVED')) {
+            finalStatus = 'ACTIVE';
+          } else if (rawStatus.includes('SUSPEND') || rawStatus.includes('TOLAK') || rawStatus.includes('REJECT')) {
+            finalStatus = 'SUSPENDED';
+          } else {
+            finalStatus = 'PENDING';
+          }
+
+          // Cari data provinsi ID jika cocok
+          const matchedProv = PROVINCES_DATA.find(p => 
+            (rawProv && p.name.toLowerCase().includes(rawProv.toLowerCase())) ||
+            (rawProv && rawProv.toLowerCase().includes(p.name.toLowerCase()))
+          );
 
           const existingIdx = merged.findIndex(m => m.id === memberId || (kta && m.nationalMemberNumber === kta));
           
@@ -248,48 +306,57 @@ class SpreadsheetService {
             nationalMemberNumber: kta || undefined,
             fullName,
             nikMasked: '3200******0000',
-            avatarUrl: row['Foto URL'] || row['foto_url'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80',
+            avatarUrl: rawAvatar || (existingIdx >= 0 ? merged[existingIdx].avatarUrl : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80'),
             gender: 'LAKI_LAKI',
-            birthPlace: row['Kwarcab / Kabupaten'] || 'Indonesia',
+            birthPlace: rawKab || (existingIdx >= 0 ? merged[existingIdx].birthPlace : 'Indonesia'),
             birthDate: '2004-01-01',
-            phone: row['Nomor WhatsApp'] || row['nomor_wa'] || '081234567890',
-            email: row['Email'] || row['email'] || `anggota${idx + 1}@sakapariwisata.id`,
-            address: `Pangkalan ${row['Gugus Depan / Pangkalan'] || 'Pariwisata'}`,
-            provinceId: '32',
-            provinceName: row['Kwarda / Provinsi'] || 'Jawa Barat',
-            regencyId: '32.04',
-            regencyName: row['Kwarcab / Kabupaten'] || 'Kabupaten Bandung',
-            districtId: '32.04.01',
-            districtName: row['Kwarran / Kecamatan'] || 'Kecamatan',
-            branchId: 'branch-default',
-            branchName: `Kwarran ${row['Kwarran / Kecamatan'] || 'Pariwisata'}`,
-            gugusDepan: row['Gugus Depan / Pangkalan'] || 'Gudep Pariwisata',
+            phone: rawPhone || (existingIdx >= 0 ? merged[existingIdx].phone : '081234567890'),
+            email: rawEmail || (existingIdx >= 0 ? merged[existingIdx].email : `anggota${idx + 1}@sakapariwisata.id`),
+            address: rawGudep ? `Pangkalan ${rawGudep}` : (existingIdx >= 0 ? merged[existingIdx].address : 'Pangkalan Saka'),
+            provinceId: matchedProv ? matchedProv.id : (existingIdx >= 0 ? merged[existingIdx].provinceId : '32'),
+            provinceName: rawProv || (existingIdx >= 0 ? merged[existingIdx].provinceName : 'Jawa Barat'),
+            regencyId: existingIdx >= 0 ? merged[existingIdx].regencyId : '32.04',
+            regencyName: rawKab || (existingIdx >= 0 ? merged[existingIdx].regencyName : 'Kabupaten Bandung'),
+            districtId: existingIdx >= 0 ? merged[existingIdx].districtId : '32.04.01',
+            districtName: rawKec || (existingIdx >= 0 ? merged[existingIdx].districtName : 'Kecamatan'),
+            branchId: existingIdx >= 0 ? merged[existingIdx].branchId : 'branch-default',
+            branchName: rawKec ? `Kwarran ${rawKec}` : (existingIdx >= 0 ? merged[existingIdx].branchName : 'Kwarran'),
+            gugusDepan: rawGudep || (existingIdx >= 0 ? merged[existingIdx].gugusDepan : 'Gudep Pariwisata'),
             joinYear: 2024,
-            currentPosition: `Anggota ${row['Krida'] || 'Krida Pemandu'}`,
-            krida: (row['Krida'] || 'Krida Pemandu Wisata') as any,
-            status: ((row['Status Verifikasi'] || row['status'] || 'ACTIVE').toUpperCase().includes('PENDING') ? 'PENDING' : 'ACTIVE') as any,
+            currentPosition: `Anggota ${rawKrida}`,
+            krida: rawKrida as any,
+            status: finalStatus,
             educationLevel: 'SMA/SMK',
             occupation: 'Pramuka Penegak',
             bio: 'Anggota aktif Saka Pariwisata.',
-            skills: [],
-            certifications: [],
-            registeredAt: row['Tanggal Daftar'] || new Date().toISOString()
+            skills: existingIdx >= 0 ? merged[existingIdx].skills : [],
+            certifications: existingIdx >= 0 ? merged[existingIdx].certifications : [],
+            registeredAt: rawDate
           };
 
           if (existingIdx >= 0) {
-            merged[existingIdx] = { ...merged[existingIdx], ...memberObj };
+            merged[existingIdx] = { 
+              ...merged[existingIdx], 
+              ...memberObj,
+              // Pertahankan data lokal pendaftar jika kolom di spreadsheet masih belum diisi lengkap
+              phone: rawPhone || merged[existingIdx].phone,
+              email: rawEmail || merged[existingIdx].email,
+              regencyName: rawKab || merged[existingIdx].regencyName,
+              provinceName: rawProv || merged[existingIdx].provinceName,
+              gugusDepan: rawGudep || merged[existingIdx].gugusDepan,
+              status: finalStatus
+            };
           } else {
             merged.push(memberObj);
           }
         });
 
-        // Simpan menggunakan storage.setMembers agar memicu render ulang (reactive notify) ke UI Admin
         storage.setMembers(merged);
       }
 
       this.saveConfig({ status: 'CONNECTED', lastSyncedAt: new Date().toISOString() });
       this.isSyncing = false;
-      return { success: true, count: rows.length, message: 'Sinkronisasi berhasil.' };
+      return { success: true, count: rows.length, message: 'Sinkronisasi data riil berhasil.' };
     } catch (err: any) {
       this.isSyncing = false;
       this.saveConfig({ status: 'ERROR', lastError: err?.message });
@@ -348,7 +415,7 @@ class SpreadsheetService {
       const memberRows = members.map(m => [
         m.id, m.nationalMemberNumber || '', m.fullName || '', m.email || '',
         m.phone || '', m.provinceName || '', m.regencyName || '', m.branchName || '',
-        m.gugusDepan || '', m.krida || '', m.status || 'ACTIVE', m.avatarUrl || '',
+        m.gugusDepan || '', m.krida || '', m.status || 'PENDING', m.avatarUrl || '',
         m.registeredAt || new Date().toISOString(), ''
       ]);
 
