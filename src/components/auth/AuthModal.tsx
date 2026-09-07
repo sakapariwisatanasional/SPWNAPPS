@@ -1,13 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  X, LogIn, UserPlus, Lock, Mail, User, Shield, MapPin, 
-  CheckCircle, AlertCircle, Phone, ArrowRight, Compass,
-  KeyRound, HelpCircle, Eye, EyeOff, Camera, Upload, Link as LinkIcon,
+  X, LogIn, UserPlus, Lock, User, Shield, MapPin, 
+  CheckCircle, AlertCircle, ArrowRight, Compass,
+  Eye, EyeOff, Camera, Upload, Link as LinkIcon,
   Globe2, Building, Sparkles
 } from 'lucide-react';
-import { CurrentUser, KridaType } from '../../types';
+import { CurrentUser, KridaType, Regency, District } from '../../types';
 import { storage } from '../../services/storage';
-import { PROVINCES_DATA, REGENCIES_DATA } from '../../data/indonesiaTerritories';
+import { PROVINCES_DATA } from '../../data/indonesiaTerritories';
 import { formatGoogleDriveUrl } from '../../services/driveRepository';
 import { spreadsheetService } from '../../services/spreadsheetService';
 
@@ -34,7 +34,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Register form state (diselaraskan dengan MemberFormModal)
+  // Register form state
   const [regFullName, setRegFullName] = useState('');
   const [regGender, setRegGender] = useState<'LAKI_LAKI' | 'PEREMPUAN'>('LAKI_LAKI');
   const [regBirthPlace, setRegBirthPlace] = useState('');
@@ -49,6 +49,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [regProvinceId, setRegProvinceId] = useState('32');
   const [regRegencyId, setRegRegencyId] = useState('32.04');
   const [regDistrictId, setRegDistrictId] = useState('');
+  const [regenciesList, setRegenciesList] = useState<Regency[]>([]);
+  const [districtsList, setDistrictsList] = useState<District[]>([]);
+
   const [regGudep, setRegGudep] = useState('');
   const [regKrida, setRegKrida] = useState<KridaType>('Krida Pemandu');
   const [regEducationLevel, setRegEducationLevel] = useState('SMA / SMK / Sederajat');
@@ -74,11 +77,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [forgotError, setForgotError] = useState('');
   const [forgotUserFound, setForgotUserFound] = useState<CurrentUser | null>(null);
 
+  // Selaraskan tab saat modal dibuka dari tombol yang berbeda
+  useEffect(() => {
+    if (isOpen) {
+      setTab(initialTab);
+      setLoginError('');
+      setRegError('');
+      setRegSuccessMsg('');
+      setForgotError('');
+    }
+  }, [isOpen, initialTab]);
+
+  // Load daftar kabupaten berdasarkan provinsi yang dipilih menggunakan storage helper
+  useEffect(() => {
+    if (regProvinceId) {
+      const regs = storage.getRegencies(regProvinceId) || [];
+      setRegenciesList(regs);
+      if (regs.length > 0 && !regs.some(r => r.id === regRegencyId)) {
+        setRegRegencyId(regs[0].id);
+      }
+    }
+  }, [regProvinceId]);
+
+  // Load daftar kecamatan berdasarkan kabupaten yang dipilih
+  useEffect(() => {
+    if (regRegencyId) {
+      const dists = storage.getDistricts(regRegencyId) || [];
+      setDistrictsList(dists);
+      if (dists.length > 0 && !dists.some(d => d.id === regDistrictId)) {
+        setRegDistrictId(dists[0].id);
+      }
+    }
+  }, [regRegencyId]);
+
   if (!isOpen) return null;
 
   const provinces = PROVINCES_DATA;
-  const regencies = REGENCIES_DATA[regProvinceId] || [];
-  const districts = storage.getDistricts(regRegencyId);
 
   // Kompresi dan pemrosesan foto dari berkas
   const processAndCompressFile = (file: File) => {
@@ -183,7 +217,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
       }
     } catch (apiErr) {
-      console.warn('[Auth] Koneksi API offline/fallback:', apiErr);
+      console.warn('[Auth] Mode offline/fallback:', apiErr);
     }
 
     const lowerIdent = ident.toLowerCase();
@@ -262,7 +296,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoginError('Kombinasi nama pengguna/email/KTA atau kata sandi tidak sesuai.');
   };
 
-  // Handle Registrasi Anggota Baru (Sesuai MemberFormModal)
+  // Handle Registrasi Anggota Baru
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
@@ -286,14 +320,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     const isNasional = kwartirLevel === 'NASIONAL';
-    const provName = isNasional ? 'Kwartir Nasional' : provinces.find(p => p.id === regProvinceId)?.name || 'Jawa Barat';
-    const regName = isNasional ? 'Pusat Nasional' : regencies.find(r => r.id === regRegencyId)?.name || 'Kabupaten Bandung';
-    const distName = isNasional ? 'Nasional' : districts.find(d => d.id === regDistrictId)?.name || 'Kecamatan';
+    const provObj = provinces.find(p => p.id === regProvinceId);
+    const regObj = regenciesList.find(r => r.id === regRegencyId);
+    const distObj = districtsList.find(d => d.id === regDistrictId);
+
+    const provName = isNasional ? 'Kwartir Nasional' : (provObj?.name || 'Jawa Barat');
+    const regName = isNasional ? 'Pusat Nasional' : (regObj?.name || 'Kabupaten Bandung');
+    const distName = isNasional ? 'Nasional' : (distObj?.name || 'Kecamatan');
 
     const newMemberId = `mem-${Date.now()}`;
     const newUserId = `user-${Date.now()}`;
 
-    // Generate masked NIK otomatis tanpa meminta pengguna
+    // Otomatisasi masked NIK tanpa meminta user
     const cleanPhone = regPhone.replace(/\D/g, '');
     const generatedNikMasked = '3200******' + (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
 
@@ -578,7 +616,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           )}
 
-          {/* TAB 2: REGISTER (SESUAI DENGAN FORM MEMBERFORMMODAL) */}
+          {/* TAB 2: REGISTER (AMAN DARI ERROR MAP DATA KABUPATEN) */}
           {tab === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               {regError && (
@@ -598,7 +636,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="space-y-3">
                 <div className="flex items-center gap-2 pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
                   <Shield className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>1. Identitas Anggota (Tanpa Input NIK)</span>
+                  <span>1. Identitas Anggota</span>
                 </div>
 
                 <div>
@@ -863,7 +901,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         onChange={(e) => setRegRegencyId(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
                       >
-                        {regencies.map((r) => (
+                        {regenciesList.map((r) => (
                           <option key={r.id} value={r.id}>{r.name}</option>
                         ))}
                       </select>
@@ -875,7 +913,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         onChange={(e) => setRegDistrictId(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
                       >
-                        {districts.map((d) => (
+                        {districtsList.map((d) => (
                           <option key={d.id} value={d.id}>{d.name}</option>
                         ))}
                       </select>
