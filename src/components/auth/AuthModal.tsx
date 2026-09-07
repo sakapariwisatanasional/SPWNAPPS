@@ -77,7 +77,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [forgotError, setForgotError] = useState('');
   const [forgotUserFound, setForgotUserFound] = useState<CurrentUser | null>(null);
 
-  // Selaraskan tab saat modal dibuka dari tombol yang berbeda
+  // Helper penyimpanan list users yang aman
+  const persistUsersList = (users: CurrentUser[]) => {
+    if (typeof (storage as any).setUsers === 'function') {
+      (storage as any).setUsers(users);
+    } else if (typeof (storage as any).saveUsers === 'function') {
+      (storage as any).saveUsers(users);
+    } else {
+      try {
+        localStorage.setItem('saka_users', JSON.stringify(users));
+      } catch (err) {
+        console.warn('Gagal menyimpan pengguna ke local storage:', err);
+      }
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       setTab(initialTab);
@@ -88,7 +102,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   }, [isOpen, initialTab]);
 
-  // Load daftar kabupaten berdasarkan provinsi yang dipilih menggunakan storage helper
   useEffect(() => {
     if (regProvinceId) {
       const regs = storage.getRegencies(regProvinceId) || [];
@@ -99,7 +112,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   }, [regProvinceId]);
 
-  // Load daftar kecamatan berdasarkan kabupaten yang dipilih
   useEffect(() => {
     if (regRegencyId) {
       const dists = storage.getDistricts(regRegencyId) || [];
@@ -114,7 +126,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const provinces = PROVINCES_DATA;
 
-  // Kompresi dan pemrosesan foto dari berkas
   const processAndCompressFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('Mohon pilih berkas gambar yang valid (JPG, PNG, WEBP).');
@@ -181,7 +192,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // Handle Login dengan Fallback Otomatis
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -222,7 +232,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     const lowerIdent = ident.toLowerCase();
 
-    // Fallback Admin
     if ((lowerIdent === 'admin_saka' || lowerIdent === 'admin@sakapariwisata.id') && pass === 'SakaPariwisata#2026!') {
       const fallbackAdmin: CurrentUser = {
         id: 'user-superadmin-nasional',
@@ -243,7 +252,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    // Fallback Akun Pengguna Lokal
     const localUsers = storage.getUsers();
     const matchedUser = localUsers.find(u => 
       (u.username && u.username.toLowerCase() === lowerIdent) ||
@@ -262,7 +270,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     }
 
-    // Fallback Anggota
     const members = storage.getMembers();
     const matchedMember = members.find(m => 
       (m.nationalMemberNumber && m.nationalMemberNumber.trim() === ident) ||
@@ -296,7 +303,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoginError('Kombinasi nama pengguna/email/KTA atau kata sandi tidak sesuai.');
   };
 
-  // Handle Registrasi Anggota Baru
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
@@ -331,7 +337,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const newMemberId = `mem-${Date.now()}`;
     const newUserId = `user-${Date.now()}`;
 
-    // Otomatisasi masked NIK tanpa meminta user
     const cleanPhone = regPhone.replace(/\D/g, '');
     const generatedNikMasked = '3200******' + (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
 
@@ -379,11 +384,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         certifications: []
       });
 
-      // Simpan user dengan password ke basis data lokal
       const existingUsers = storage.getUsers();
-      storage.saveUsers([...existingUsers, { ...newUser, password: regPassword } as any]);
+      persistUsersList([...existingUsers, { ...newUser, password: regPassword } as any]);
 
-      // Sinkronisasi pendaftaran ke Spreadsheet di latar belakang
       spreadsheetService.saveMemberAndWaitForSync(registeredMember).catch((syncErr) => {
         console.warn('[AuthModal] Catatan sinkronisasi spreadsheet:', syncErr);
       });
@@ -403,7 +406,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // Handle Forgot Password
   const handleFindAccount = (e: React.FormEvent) => {
     e.preventDefault();
     setForgotError('');
@@ -465,7 +467,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
         return u;
       });
-      storage.saveUsers(updated as any);
+      persistUsersList(updated as any);
       setForgotStep('done');
       setTimeout(() => {
         setTab('login');
@@ -616,7 +618,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           )}
 
-          {/* TAB 2: REGISTER (AMAN DARI ERROR MAP DATA KABUPATEN) */}
+          {/* TAB 2: REGISTER */}
           {tab === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               {regError && (
@@ -710,7 +712,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
                 </div>
 
-                {/* Pas Foto (Upload / Drag&Drop / Link URL) */}
+                {/* Pas Foto */}
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div>
@@ -840,7 +842,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              {/* 2. Struktur Wilayah Organisasi (Kwarnas, Kwarda, Kwarcab, Kwarran) */}
+              {/* 2. Struktur Wilayah Organisasi */}
               <div className="space-y-3 pt-1">
                 <div className="flex items-center justify-between pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
                   <div className="flex items-center gap-2">
