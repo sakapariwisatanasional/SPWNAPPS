@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   X, LogIn, UserPlus, Lock, Mail, User, Shield, MapPin, 
   CheckCircle, AlertCircle, Phone, ArrowRight, Compass,
-  KeyRound, HelpCircle, Eye, EyeOff
+  KeyRound, HelpCircle, Eye, EyeOff, Camera, Upload, Link as LinkIcon,
+  Globe2, Building, Sparkles
 } from 'lucide-react';
-import { CurrentUser, UserRole } from '../../types';
+import { CurrentUser, KridaType } from '../../types';
 import { storage } from '../../services/storage';
 import { PROVINCES_DATA, REGENCIES_DATA } from '../../data/indonesiaTerritories';
-import { DEFAULT_APPS_SCRIPT_URL, DEFAULT_SPREADSHEET_ID } from '../../services/spreadsheetService';
+import { formatGoogleDriveUrl } from '../../services/driveRepository';
+import { spreadsheetService } from '../../services/spreadsheetService';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -27,27 +29,44 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Login form
+  // Login form state
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Register form
+  // Register form state (diselaraskan dengan MemberFormModal)
   const [regFullName, setRegFullName] = useState('');
-  const [regNik, setRegNik] = useState('');
+  const [regGender, setRegGender] = useState<'LAKI_LAKI' | 'PEREMPUAN'>('LAKI_LAKI');
+  const [regBirthPlace, setRegBirthPlace] = useState('');
+  const [regBirthDate, setRegBirthDate] = useState('2002-05-15');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
-  const [regGudep, setRegGudep] = useState('');
-  const [regKrida, setRegKrida] = useState('Krida Bina Wisata');
+  
+  // Wilayah & Struktur Organisasi
+  const [kwartirLevel, setKwartirLevel] = useState<'NASIONAL' | 'DAERAH'>('DAERAH');
   const [regProvinceId, setRegProvinceId] = useState('32');
   const [regRegencyId, setRegRegencyId] = useState('32.04');
   const [regDistrictId, setRegDistrictId] = useState('');
+  const [regGudep, setRegGudep] = useState('');
+  const [regKrida, setRegKrida] = useState<KridaType>('Krida Pemandu');
+  const [regEducationLevel, setRegEducationLevel] = useState('SMA / SMK / Sederajat');
+  const [regOccupation, setRegOccupation] = useState('Pelajar / Mahasiswa');
+  const [regBio, setRegBio] = useState('');
+
+  // Foto Profil / KTA
+  const [regAvatarUrl, setRegAvatarUrl] = useState('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80');
+  const [regPhotoInputUrl, setRegPhotoInputUrl] = useState('');
+  const [photoUploadSource, setPhotoUploadSource] = useState<'FILE' | 'URL'>('FILE');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [regError, setRegError] = useState('');
   const [regSuccessMsg, setRegSuccessMsg] = useState('');
 
-  // Forgot Password form
+  // Forgot Password form state
   const [forgotIdentifier, setForgotIdentifier] = useState('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
@@ -61,7 +80,74 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const regencies = REGENCIES_DATA[regProvinceId] || [];
   const districts = storage.getDistricts(regRegencyId);
 
-  // Handle Login via API dengan Fallback Otomatis untuk Perangkat Ponsel
+  // Kompresi dan pemrosesan foto dari berkas
+  const processAndCompressFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih berkas gambar yang valid (JPG, PNG, WEBP).');
+      return;
+    }
+    setIsUploadingPhoto(true);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 800;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          setRegAvatarUrl(canvas.toDataURL('image/jpeg', 0.85));
+        } else {
+          setRegAvatarUrl(event.target?.result as string);
+        }
+        setIsUploadingPhoto(false);
+      };
+      img.onerror = () => {
+        setRegAvatarUrl(event.target?.result as string);
+        setIsUploadingPhoto(false);
+      };
+    };
+    reader.onerror = () => {
+      alert('Gagal membaca berkas foto.');
+      setIsUploadingPhoto(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processAndCompressFile(file);
+    }
+  };
+
+  const handlePhotoDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingPhoto(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processAndCompressFile(file);
+    }
+  };
+
+  // Handle Login dengan Fallback Otomatis
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -76,8 +162,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    // 1. Coba login melalui backend API terlebih dahulu
-    let apiSuccess = false;
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -89,7 +173,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (response.ok) {
         const result = await response.json();
         if (result && result.success && result.user) {
-          apiSuccess = true;
           if (result.token) storage.setAuthToken(result.token);
           storage.setCurrentUser(result.user);
           onLoginSuccess(result.user);
@@ -100,13 +183,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
       }
     } catch (apiErr) {
-      console.warn('[Auth] Koneksi API gagal/unreachable, beralih ke verifikasi lokal:', apiErr);
+      console.warn('[Auth] Koneksi API offline/fallback:', apiErr);
     }
 
-    // 2. Fallback jika offline / backend API mengembalikan failed to fetch
     const lowerIdent = ident.toLowerCase();
 
-    // Akun Super Admin Standar
+    // Fallback Admin
     if ((lowerIdent === 'admin_saka' || lowerIdent === 'admin@sakapariwisata.id') && pass === 'SakaPariwisata#2026!') {
       const fallbackAdmin: CurrentUser = {
         id: 'user-superadmin-nasional',
@@ -127,7 +209,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    // Periksa ke penyimpanan user lokal (termasuk user yang disinkron dari Spreadsheet)
+    // Fallback Akun Pengguna Lokal
     const localUsers = storage.getUsers();
     const matchedUser = localUsers.find(u => 
       (u.username && u.username.toLowerCase() === lowerIdent) ||
@@ -135,7 +217,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     );
 
     if (matchedUser) {
-      // Verifikasi password jika tersimpan
       const expectedPassword = (matchedUser as any).password || 'password123';
       if (pass === expectedPassword || pass === 'password123') {
         storage.setAuthToken('local-session-' + Date.now());
@@ -147,7 +228,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     }
 
-    // Periksa apakah login menggunakan NIK atau KTA terdaftar
+    // Fallback Anggota
     const members = storage.getMembers();
     const matchedMember = members.find(m => 
       (m.nationalMemberNumber && m.nationalMemberNumber.trim() === ident) ||
@@ -181,13 +262,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoginError('Kombinasi nama pengguna/email/KTA atau kata sandi tidak sesuai.');
   };
 
-  // Handle Registration
+  // Handle Registrasi Anggota Baru (Sesuai MemberFormModal)
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
     setRegSuccessMsg('');
 
-    if (!regFullName || !regNik || !regEmail || !regPhone || !regPassword || !regGudep) {
+    if (!regFullName || !regEmail || !regPhone || !regPassword || !regGudep) {
       setRegError('Harap lengkapi semua kolom yang wajib diisi (*).');
       return;
     }
@@ -204,13 +285,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setIsLoading(true);
 
-    const provName = provinces.find(p => p.id === regProvinceId)?.name || 'Jawa Barat';
-    const regName = regencies.find(r => r.id === regRegencyId)?.name || 'Kabupaten Bandung';
-    const distName = districts.find(d => d.id === regDistrictId)?.name || 'Kecamatan';
+    const isNasional = kwartirLevel === 'NASIONAL';
+    const provName = isNasional ? 'Kwartir Nasional' : provinces.find(p => p.id === regProvinceId)?.name || 'Jawa Barat';
+    const regName = isNasional ? 'Pusat Nasional' : regencies.find(r => r.id === regRegencyId)?.name || 'Kabupaten Bandung';
+    const distName = isNasional ? 'Nasional' : districts.find(d => d.id === regDistrictId)?.name || 'Kecamatan';
 
     const newMemberId = `mem-${Date.now()}`;
     const newUserId = `user-${Date.now()}`;
-    const newKta = `${regProvinceId}.${regRegencyId.replace('.', '')}.${new Date().getFullYear()}.${Math.floor(1000 + Math.random() * 9000)}`;
+
+    // Generate masked NIK otomatis tanpa meminta pengguna
+    const cleanPhone = regPhone.replace(/\D/g, '');
+    const generatedNikMasked = '3200******' + (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
 
     const newUser: CurrentUser = {
       id: newUserId,
@@ -220,68 +305,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       email: regEmail,
       role: 'MEMBER',
       memberId: newMemberId,
-      jurisdictionId: regRegencyId,
-      jurisdictionName: regName,
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80'
+      jurisdictionId: isNasional ? '00.00' : regRegencyId,
+      jurisdictionName: isNasional ? 'Kwartir Nasional (Pusat)' : regName,
+      avatarUrl: regAvatarUrl
     };
 
     try {
-      // Simpan record pendaftaran ke database lokal
-      const registered = storage.registerMember({
+      const registeredMember = storage.registerMember({
         userId: newUserId,
         fullName: regFullName,
-        nikMasked: regNik.length >= 10 ? regNik.substring(0, 6) + '******' + regNik.substring(regNik.length - 4) : regNik,
-        avatarUrl: newUser.avatarUrl,
-        gender: 'LAKI_LAKI',
-        birthPlace: regName,
-        birthDate: '2004-01-01',
+        nikMasked: generatedNikMasked,
+        avatarUrl: regAvatarUrl,
+        gender: regGender,
+        birthPlace: regBirthPlace || regName,
+        birthDate: regBirthDate,
         phone: regPhone,
         email: regEmail,
         address: `Pangkalan ${regGudep}, ${distName}`,
-        provinceId: regProvinceId,
+        provinceId: isNasional ? '00' : regProvinceId,
         provinceName: provName,
-        regencyId: regRegencyId,
+        regencyId: isNasional ? '00.00' : regRegencyId,
         regencyName: regName,
-        districtId: regDistrictId || `${regRegencyId}.01`,
+        districtId: isNasional ? '00.00.00' : (regDistrictId || `${regRegencyId}.01`),
         districtName: distName,
-        branchId: `kwarran-${regRegencyId}`,
-        branchName: `Kwarran ${distName}`,
+        branchId: isNasional ? 'branch-nasional' : `kwarran-${regRegencyId}`,
+        branchName: isNasional ? 'Pimpinan Saka Tingkat Nasional' : `Kwarran ${distName}`,
         gugusDepan: regGudep,
         joinYear: new Date().getFullYear(),
         currentPosition: `Calon Anggota ${regKrida}`,
-        krida: regKrida as any,
-        educationLevel: 'SMA/SMK',
-        occupation: 'Pramuka Penegak',
-        bio: 'Calon anggota Saka Pariwisata yang siap memajukan pariwisata nusantara.',
+        krida: regKrida,
+        educationLevel: regEducationLevel,
+        occupation: regOccupation,
+        bio: regBio || 'Calon anggota Saka Pariwisata yang siap memajukan pariwisata nusantara.',
         skills: [],
         certifications: []
       });
 
-      // Simpan kredensial user lokal
+      // Simpan user dengan password ke basis data lokal
       const existingUsers = storage.getUsers();
       storage.saveUsers([...existingUsers, { ...newUser, password: regPassword } as any]);
 
-      // Kirim sinkronisasi ke backend jika tersedia
-      fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: regFullName,
-          nik: regNik,
-          email: regEmail,
-          phone: regPhone,
-          password: regPassword,
-          gugusDepan: regGudep,
-          krida: regKrida,
-          provinceId: regProvinceId,
-          regencyId: regRegencyId,
-          districtId: regDistrictId
-        })
-      }).catch(() => {});
+      // Sinkronisasi pendaftaran ke Spreadsheet di latar belakang
+      spreadsheetService.saveMemberAndWaitForSync(registeredMember).catch((syncErr) => {
+        console.warn('[AuthModal] Catatan sinkronisasi spreadsheet:', syncErr);
+      });
 
       storage.setCurrentUser(newUser);
       setIsLoading(false);
-      setRegSuccessMsg(`Registrasi berhasil! Selamat datang, ${regFullName}.`);
+      setRegSuccessMsg(`Pendaftaran berhasil! Selamat datang, ${regFullName}.`);
+      
       setTimeout(() => {
         onLoginSuccess(newUser);
         onClose();
@@ -365,9 +437,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const sampleAvatars = [
+    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80'
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 max-h-[92vh] flex flex-col">
+      <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 max-h-[92vh] flex flex-col">
         
         {/* Header */}
         <div className="relative bg-gradient-to-r from-emerald-800 to-teal-900 p-6 text-white shrink-0">
@@ -385,7 +464,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div>
               <h2 className="text-xl font-bold tracking-tight">
                 {tab === 'login' && 'Masuk ke Akun'}
-                {tab === 'register' && 'Daftar Akun Baru'}
+                {tab === 'register' && 'Pendaftaran Anggota Baru'}
                 {tab === 'forgot' && 'Reset Kata Sandi'}
               </h2>
               <p className="text-xs text-emerald-100/90">
@@ -416,13 +495,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   : 'text-white/80 hover:text-white hover:bg-white/5'
               }`}
             >
-              <UserPlus className="w-3.5 h-3.5" /> Daftar
+              <UserPlus className="w-3.5 h-3.5" /> Daftar Anggota Baru
             </button>
           </div>
         </div>
 
         {/* Form Body */}
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar text-xs">
 
           {/* TAB 1: LOGIN */}
           {tab === 'login' && (
@@ -499,9 +578,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           )}
 
-          {/* TAB 2: REGISTER */}
+          {/* TAB 2: REGISTER (SESUAI DENGAN FORM MEMBERFORMMODAL) */}
           {tab === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-3.5">
+            <form onSubmit={handleRegister} className="space-y-4">
               {regError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -515,118 +594,407 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Lengkap *</label>
-                <input
-                  type="text"
-                  required
-                  value={regFullName}
-                  onChange={(e) => setRegFullName(e.target.value)}
-                  placeholder="Nama Lengkap sesuai KTP/KTA"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
-                />
-              </div>
+              {/* 1. Identitas Anggota */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
+                  <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>1. Identitas Anggota (Tanpa Input NIK)</span>
+                </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">NIK (16 Digit) *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Nama Lengkap & Gelar *</label>
                   <input
                     type="text"
                     required
-                    maxLength={16}
-                    value={regNik}
-                    onChange={(e) => setRegNik(e.target.value.replace(/\D/g, ''))}
-                    placeholder="3204..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
+                    value={regFullName}
+                    onChange={(e) => setRegFullName(e.target.value)}
+                    placeholder="Contoh: Muhammad Farhan, S.Par."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">No. WhatsApp *</label>
-                  <input
-                    type="tel"
-                    required
-                    value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
-                    placeholder="08..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Jenis Kelamin *</label>
+                    <select
+                      value={regGender}
+                      onChange={(e: any) => setRegGender(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+                    >
+                      <option value="LAKI_LAKI">Laki-laki</option>
+                      <option value="PEREMPUAN">Perempuan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Tempat Lahir</label>
+                    <input
+                      type="text"
+                      value={regBirthPlace}
+                      onChange={(e) => setRegBirthPlace(e.target.value)}
+                      placeholder="Kota Lahir"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Tanggal Lahir *</label>
+                    <input
+                      type="date"
+                      required
+                      value={regBirthDate}
+                      onChange={(e) => setRegBirthDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Alamat Email *</label>
+                    <input
+                      type="email"
+                      required
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="nama@email.com"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Nomor WhatsApp / HP *</label>
+                    <input
+                      type="tel"
+                      required
+                      value={regPhone}
+                      onChange={(e) => setRegPhone(e.target.value)}
+                      placeholder="0812-3456-7890"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Pas Foto (Upload / Drag&Drop / Link URL) */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-900">
+                        Pas Foto Resmi Anggota
+                      </label>
+                      <p className="text-[10px] text-slate-500">
+                        Upload berkas atau paste link Google Drive / URL gambar
+                      </p>
+                    </div>
+                    <div className="flex items-center bg-slate-200 p-0.5 rounded-lg text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setPhotoUploadSource('FILE')}
+                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                          photoUploadSource === 'FILE' 
+                            ? 'bg-white text-emerald-900 shadow-xs font-extrabold' 
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Upload Foto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPhotoUploadSource('URL')}
+                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                          photoUploadSource === 'URL' 
+                            ? 'bg-white text-emerald-900 shadow-xs font-extrabold' 
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Link URL
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 pt-1">
+                    <div className="w-20 h-26 rounded-xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-900 relative flex-shrink-0">
+                      <img
+                        src={regAvatarUrl}
+                        alt="Preview Foto"
+                        className="w-full h-full object-cover"
+                      />
+                      {isUploadingPhoto && (
+                        <div className="absolute inset-0 bg-slate-950/70 flex flex-col items-center justify-center text-white text-[9px] font-bold gap-1">
+                          <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                          <span>Proses...</span>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="absolute inset-0 bg-slate-900/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[9px] font-bold"
+                      >
+                        <Camera className="w-4 h-4 mb-0.5 text-emerald-300" />
+                        <span>Ganti</span>
+                      </button>
+                    </div>
+
+                    <div className="flex-1 w-full space-y-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp"
+                        onChange={handlePhotoFileUpload}
+                        className="hidden"
+                      />
+
+                      {photoUploadSource === 'FILE' ? (
+                        <div
+                          onDragOver={(e) => { e.preventDefault(); setIsDraggingPhoto(true); }}
+                          onDragLeave={() => setIsDraggingPhoto(false)}
+                          onDrop={handlePhotoDrop}
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`border-2 border-dashed rounded-xl p-3 transition-all text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
+                            isDraggingPhoto 
+                              ? 'border-emerald-500 bg-emerald-50' 
+                              : 'border-slate-300 hover:border-emerald-500 bg-white'
+                          }`}
+                        >
+                          <Upload className="w-4 h-4 text-emerald-700" />
+                          <p className="text-[11px] font-bold text-slate-800">
+                            Pilih foto dari galeri / kamera
+                          </p>
+                          <p className="text-[9px] text-slate-400">
+                            Mendukung JPG, PNG, WEBP (Kompresi otomatis)
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="relative">
+                            <LinkIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="url"
+                              value={regPhotoInputUrl}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setRegPhotoInputUrl(val);
+                                if (val.trim()) {
+                                  setRegAvatarUrl(formatGoogleDriveUrl(val.trim()));
+                                }
+                              }}
+                              placeholder="https://drive.google.com/... atau URL foto"
+                              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <span className="text-[10px] text-slate-400">Contoh:</span>
+                        {sampleAvatars.map((url, i) => (
+                          <button
+                            type="button"
+                            key={i}
+                            onClick={() => { setRegAvatarUrl(url); setRegPhotoInputUrl(''); }}
+                            className={`w-6 h-6 rounded-md overflow-hidden border transition-all ${
+                              regAvatarUrl === url ? 'border-emerald-600 scale-105 shadow-xs' : 'border-transparent opacity-60'
+                            }`}
+                          >
+                            <img src={url} alt="Option" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Alamat Email *</label>
-                <input
-                  type="email"
-                  required
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  placeholder="email@domain.com"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
-                />
-              </div>
+              {/* 2. Struktur Wilayah Organisasi (Kwarnas, Kwarda, Kwarcab, Kwarran) */}
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>2. Struktur Wilayah Kwartir Gerakan Pramuka</span>
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Pilihan Krida *</label>
-                  <select
-                    value={regKrida}
-                    onChange={(e) => setRegKrida(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setKwartirLevel('DAERAH')}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      kwartirLevel === 'DAERAH'
+                        ? 'bg-white text-emerald-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
                   >
-                    <option value="Krida Bina Wisata">Krida Bina Wisata</option>
-                    <option value="Krida Pemandu Wisata">Krida Pemandu Wisata</option>
-                    <option value="Krida Kuliner & Cinderamata">Krida Kuliner & Cinderamata</option>
-                  </select>
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>Kwarda / Kwarcab / Kwarran</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setKwartirLevel('NASIONAL')}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      kwartirLevel === 'NASIONAL'
+                        ? 'bg-emerald-800 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Globe2 className="w-3.5 h-3.5" />
+                    <span>Kwartir Nasional (Kwarnas)</span>
+                  </button>
                 </div>
+
+                {kwartirLevel === 'NASIONAL' ? (
+                  <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[11px] text-emerald-800">
+                    Pendaftaran anggota terhubung langsung ke <strong>Kwartir Nasional (Pusat)</strong>.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">1. Kwarda (Provinsi) *</label>
+                      <select
+                        value={regProvinceId}
+                        onChange={(e) => setRegProvinceId(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
+                      >
+                        {provinces.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">2. Kwarcab (Kab/Kota) *</label>
+                      <select
+                        value={regRegencyId}
+                        onChange={(e) => setRegRegencyId(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
+                      >
+                        {regencies.map((r) => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">3. Kwarran (Kecamatan) *</label>
+                      <select
+                        value={regDistrictId}
+                        onChange={(e) => setRegDistrictId(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
+                      >
+                        {districts.map((d) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Data Kepramukaan & Krida */}
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center gap-2 pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
+                  <Building className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>3. Kepramukaan & Krida Saka Pariwisata</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Gugus Depan / Pangkalan Asal *</label>
+                    <input
+                      type="text"
+                      required
+                      value={regGudep}
+                      onChange={(e) => setRegGudep(e.target.value)}
+                      placeholder="Contoh: SMA Negeri 1..."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Pilihan Krida *</label>
+                    <select
+                      value={regKrida}
+                      onChange={(e: any) => setRegKrida(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold"
+                    >
+                      <option value="Krida Pemandu">Krida Pemandu</option>
+                      <option value="Krida Penyuluh">Krida Penyuluh</option>
+                      <option value="Krida Mice & Event">Krida Mice & Event</option>
+                      <option value="Krida Kuliner & Cinderamata">Krida Kuliner & Cinderamata</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Pendidikan Terakhir</label>
+                    <input
+                      type="text"
+                      value={regEducationLevel}
+                      onChange={(e) => setRegEducationLevel(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Pekerjaan / Aktivitas</label>
+                    <input
+                      type="text"
+                      value={regOccupation}
+                      onChange={(e) => setRegOccupation(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-slate-800"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Pangkalan Gudep *</label>
-                  <input
-                    type="text"
-                    required
-                    value={regGudep}
-                    onChange={(e) => setRegGudep(e.target.value)}
-                    placeholder="Contoh: SMA Negeri 1..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
+                  <label className="block font-semibold text-slate-700 mb-1">Bio & Motivasi Bergabung</label>
+                  <textarea
+                    rows={2}
+                    value={regBio}
+                    onChange={(e) => setRegBio(e.target.value)}
+                    placeholder="Ceritakan motivasi Anda memajukan pariwisata nusantara..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-slate-800"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Kata Sandi *</label>
-                  <input
-                    type="password"
-                    required
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Minimal 6 karakter"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
-                  />
+              {/* 4. Kata Sandi Akun */}
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center gap-2 pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
+                  <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>4. Keamanan & Kata Sandi Akun</span>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Ulangi Sandi *</label>
-                  <input
-                    type="password"
-                    required
-                    value={regConfirmPassword}
-                    onChange={(e) => setRegConfirmPassword(e.target.value)}
-                    placeholder="Konfirmasi sandi"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Kata Sandi *</label>
+                    <input
+                      type="password"
+                      required
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Minimal 6 karakter"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Konfirmasi Kata Sandi *</label>
+                    <input
+                      type="password"
+                      required
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      placeholder="Ketik ulang sandi"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
+                    />
+                  </div>
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-50 mt-2"
+                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/20 transition-all disabled:opacity-50 mt-4 cursor-pointer"
               >
                 {isLoading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Daftar Sekarang</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4" />
+                    <span>Daftarkan Anggota Baru Sekarang</span>
                   </>
                 )}
               </button>
