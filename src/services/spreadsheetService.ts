@@ -222,6 +222,7 @@ class SpreadsheetService {
     }
   }
 
+  // Sinkronisasi data anggota riil dari Spreadsheet langsung ke UI Admin
   public async syncFromSpreadsheet(silent: boolean = false): Promise<{ success: boolean; count: number; message: string }> {
     if (this.isSyncing) return { success: false, count: 0, message: 'Sinkronisasi sedang berjalan.' };
     this.isSyncing = true;
@@ -240,6 +241,7 @@ class SpreadsheetService {
           const memberId = explicitId || (kta ? `mem-${kta.replace(/[^a-zA-Z0-9]/g, '')}` : `mem-sheet-${idx + 1}`);
 
           const existingIdx = merged.findIndex(m => m.id === memberId || (kta && m.nationalMemberNumber === kta));
+          
           const memberObj: Member = {
             id: memberId,
             userId: `user-${memberId}`,
@@ -281,7 +283,8 @@ class SpreadsheetService {
           }
         });
 
-        storage.saveMembers(merged);
+        // Simpan menggunakan storage.setMembers agar memicu render ulang (reactive notify) ke UI Admin
+        storage.setMembers(merged);
       }
 
       this.saveConfig({ status: 'CONNECTED', lastSyncedAt: new Date().toISOString() });
@@ -320,7 +323,7 @@ class SpreadsheetService {
       member.status || 'PENDING',
       member.avatarUrl || '',
       member.registeredAt || new Date().toISOString(),
-      typeof window !== 'undefined' ? `${window.location.origin}/?verifyId=${encodeURIComponent(member.nationalMemberNumber || member.id)}` : ''
+      typeof window !== 'undefined' ? `${window.location.origin}/profile?memberId=${encodeURIComponent(member.id)}&nta=${encodeURIComponent(member.nationalMemberNumber || member.id)}` : ''
     ];
 
     try {
@@ -365,7 +368,6 @@ class SpreadsheetService {
     return { success: true, message: 'Perintah inisialisasi folder Drive selesai.' };
   }
 
-  // Alias kedua fungsi template agar tidak pernah throw undefined
   public getGoogleAppsScriptTemplate(): string {
     return this.getAppsScriptTemplateCode();
   }
