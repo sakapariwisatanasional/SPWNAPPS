@@ -580,8 +580,8 @@ setInterval(() => {
 }, 25000);
 
 // Proxy mutation to Google Apps Script Web App
-async function forwardToGoogleAppsScript(payload: any): Promise<any> {
-  const scriptUrl = String(process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL).trim();
+async function forwardToGoogleAppsScript(payload: any, overrideScriptUrl?: string): Promise<any> {
+  const scriptUrl = String(overrideScriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL).trim();
   if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
 
   const res = await fetch(scriptUrl, {
@@ -612,7 +612,7 @@ async function forwardToGoogleAppsScript(payload: any): Promise<any> {
 // require cross-origin handling. This route also keeps the GAS URL server-side.
 app.post('/api/upload-image', async (req, res) => {
   try {
-    const { base64, filename, category } = req.body || {};
+    const { base64, filename, category, scriptUrl } = req.body || {};
     const value = String(base64 || '').trim();
 
     if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
@@ -637,7 +637,7 @@ app.post('/api/upload-image', async (req, res) => {
       base64: value,
       filename: String(filename || `image_${Date.now()}.jpg`).trim(),
       category: String(category || 'MEMBER_AVATAR').trim().toUpperCase()
-    });
+    }, String(scriptUrl || '').trim() || undefined);
 
     if (!result || result.success === false || !result.url) {
       return res.status(502).json({
@@ -1181,7 +1181,9 @@ app.post('/api/mutate', async (req, res) => {
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
   const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
-  const { type, action, payload } = req.body || {};
+  const { type, action, payload, scriptUrl } = req.body || {};
+  const requestScriptUrl = String(scriptUrl || '').trim();
+  const forwardRequest = (gasPayload: any) => forwardToGoogleAppsScript(gasPayload, requestScriptUrl || undefined);
   if (!type || !action) {
     return res.status(400).json({ success: false, message: 'Parameter type atau action tidak lengkap.' });
   }
@@ -1225,7 +1227,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        await forwardToGoogleAppsScript({
+        await forwardRequest({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1253,7 +1255,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        await forwardToGoogleAppsScript({
+        await forwardRequest({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1275,7 +1277,7 @@ app.post('/api/mutate', async (req, res) => {
           ]
         });
         if ((action === 'STATUS' || action === 'UPDATE') && member.id && member.status) {
-          await forwardToGoogleAppsScript({
+          await forwardRequest({
             action: 'UPDATE_AUTH_STATUS',
             memberId: member.id,
             status: member.status
@@ -1284,7 +1286,7 @@ app.post('/api/mutate', async (req, res) => {
       } else if (action === 'DELETE') {
         const memberId = payload.id || payload.memberId;
         db.members = db.members.filter(m => m.id !== memberId);
-        forwardToGoogleAppsScript({
+        forwardRequest({
           action: 'DELETE_ROW',
           sheet: 'Anggota',
           id: memberId,
@@ -1300,7 +1302,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.tours.unshift(tour);
         }
-        forwardToGoogleAppsScript({
+        forwardRequest({
           action: 'UPSERT_ROW',
           sheet: 'Paket_Wisata',
           id: tour.id,
@@ -1321,7 +1323,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.tours = db.tours.filter(t => t.id !== payload.id);
-        forwardToGoogleAppsScript({
+        forwardRequest({
           action: 'DELETE_ROW',
           sheet: 'Paket_Wisata',
           id: payload.id
@@ -1336,7 +1338,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.culinaryItems.unshift(item);
         }
-        forwardToGoogleAppsScript({
+        forwardRequest({
           action: 'UPSERT_ROW',
           sheet: 'Kuliner_Cinderamata',
           id: item.id,
@@ -1357,7 +1359,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.culinaryItems = db.culinaryItems.filter(c => c.id !== payload.id);
-        forwardToGoogleAppsScript({
+        forwardRequest({
           action: 'DELETE_ROW',
           sheet: 'Kuliner_Cinderamata',
           id: payload.id
@@ -1372,7 +1374,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.activities.unshift(act);
         }
-        forwardToGoogleAppsScript({
+        forwardRequest({
           action: 'UPSERT_ROW',
           sheet: 'Agenda_Kegiatan',
           id: act.id,
@@ -1395,7 +1397,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.activities = db.activities.filter(a => a.id !== payload.id);
-        forwardToGoogleAppsScript({
+        forwardRequest({
           action: 'DELETE_ROW',
           sheet: 'Agenda_Kegiatan',
           id: payload.id
