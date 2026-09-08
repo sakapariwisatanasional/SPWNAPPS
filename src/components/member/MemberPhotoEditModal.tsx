@@ -115,9 +115,40 @@ export const MemberPhotoEditModal: React.FC<MemberPhotoEditModalProps> = ({
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      if (e.target?.result) {
-        setSelectedPhoto(e.target.result as string);
-      }
+      const source = e.target?.result as string | null;
+      if (!source) return;
+
+      // Kompresi di browser agar data URL aman disimpan di localStorage.
+      const img = new Image();
+      img.onload = () => {
+        const maxDimension = 1000;
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          const ratio = Math.min(maxDimension / width, maxDimension / height);
+          width = Math.max(1, Math.round(width * ratio));
+          height = Math.max(1, Math.round(height * ratio));
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          setSelectedPhoto(source);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        setSelectedPhoto(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => setSelectedPhoto(source);
+      img.src = source;
+    };
+    reader.onerror = () => {
+      alert('Gagal membaca berkas foto.');
     };
     reader.readAsDataURL(file);
   };
