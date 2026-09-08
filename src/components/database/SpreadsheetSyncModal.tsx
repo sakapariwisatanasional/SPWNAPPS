@@ -140,13 +140,45 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
     setConfig(spreadsheetService.getConfig());
   };
 
-  const handleSaveConfig = (e: React.FormEvent) => {
+  const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     const updated = spreadsheetService.saveConfig({
       spreadsheetId: spreadsheetIdInput.trim() || DEFAULT_SPREADSHEET_ID,
       spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetIdInput.trim() || DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`,
       scriptUrl: scriptUrlInput.trim()
     });
+
+    try {
+      const token = storage.getAuthToken();
+      if (!token) throw new Error('Sesi Super Admin tidak ditemukan.');
+
+      const response = await fetch('/api/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          spreadsheetId: updated.spreadsheetId,
+          spreadsheetUrl: updated.spreadsheetUrl,
+          scriptUrl: updated.scriptUrl || '',
+          autoSync: updated.autoSync,
+          autoRefreshIntervalSeconds: updated.autoRefreshIntervalSeconds || 6
+        })
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || `Server gagal menyimpan konfigurasi (HTTP ${response.status}).`);
+      }
+    } catch (error: any) {
+      console.error('[Config] Failed to save central configuration:', error);
+      alert(error?.message || 'Konfigurasi lokal tersimpan, tetapi konfigurasi pusat belum berhasil disimpan.');
+      setConfig(updated);
+      return;
+    }
+
     setConfig(updated);
     alert('Pengaturan database Google Spreadsheet & Web App URL berhasil disimpan.');
   };
