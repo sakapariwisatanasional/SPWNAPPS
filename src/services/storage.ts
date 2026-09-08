@@ -295,6 +295,120 @@ class StorageService {
    * Memperbarui foto anggota dan menyinkronkannya ke profil user.
    * Foto dapat berupa data URL hasil upload lokal atau URL/Google Drive.
    */
+  /**
+   * Memperbarui seluruh data profil anggota dari panel administrator.
+   * Perubahan disimpan ke LocalStorage terlebih dahulu agar UI langsung
+   * terbarui, kemudian dikirim ke API /api/mutate agar tersimpan di server
+   * dan diteruskan ke Google Apps Script.
+   */
+  public async adminUpdateMember(
+    memberId: string,
+    payload: Partial<Member>,
+    actor: CurrentUser,
+    reason: string
+  ): Promise<Member | null> {
+    if (!memberId) return null;
+
+    const members = this.getMembers();
+    const index = members.findIndex(member => member.id === memberId);
+    if (index === -1) return null;
+
+    const current = members[index];
+    const updatedMember: Member = {
+      ...current,
+      ...payload,
+      id: memberId,
+      // Field wajib jangan sampai hilang akibat payload parsial.
+      userId: payload.userId ?? current.userId,
+      registeredAt: current.registeredAt || new Date().toISOString(),
+      verificationToken: current.verificationToken || `VERIFY-${memberId}`,
+      locationHistory: current.locationHistory || [],
+      certifications: payload.certifications ?? current.certifications ?? [],
+      skills: payload.skills ?? current.skills ?? []
+    };
+
+    // Validasi isolasi wilayah di sisi client sebagai lapisan pertama.
+    const role = actor?.role;
+    const jurisdictionId = actor?.jurisdictionId;
+    if (role === 'ADMIN_PROVINCE' && jurisdictionId && updatedMember.provinceId !== jurisdictionId) {
+      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke provinsi lain.');
+    }
+    if (role === 'ADMIN_REGENCY' && jurisdictionId && updatedMember.regencyId !== jurisdictionId) {
+      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke Kwartir Cabang lain.');
+    }
+    if (role === 'ADMIN_BRANCH' && jurisdictionId && updatedMember.branchId !== jurisdictionId) {
+      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke wilayah cabang lain.');
+    }
+
+    // Simpan lokal terlebih dahulu.
+    members[index] = updatedMember;
+    this.setMembers(members);
+
+    // Sinkronkan avatar dengan akun user yang terkait.
+    if (updatedMember.userId) {
+      const users = this.getUsers();
+      const userIndex = users.findIndex(user => user.id === updatedMember.userId);
+      if (userIndex !== -1) {
+        users[userIndex] = {
+          ...users[userIndex],
+          name: updatedMember.fullName,
+          email: updatedMember.email,
+          avatarUrl: updatedMember.avatarUrl
+        };
+        this.setUsers(users);
+      }
+    }
+
+    // Audit lokal.
+    const audit: AuditLog = {
+      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      userId: actor?.id || 'unknown',
+      userName: actor?.name || 'Operator',
+      userRole: actor?.role || 'SUPER_ADMIN',
+      action: 'UPDATE_MEMBER_PROFILE',
+      entityType: 'MEMBER',
+      entityId: memberId,
+      description: reason || 'Pembaruan profil anggota',
+      timestamp: new Date().toISOString(),
+      ipAddress: 'client'
+    };
+    const logs = this.getAuditLogs();
+    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([audit, ...logs].slice(0, 500)));
+    this.notify();
+
+    // Jika aplikasi berjalan dengan sesi API, kirim perubahan ke server.
+    const token = this.getAuthToken();
+    if (token) {
+      const response = await fetch('/api/mutate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          type: 'MEMBER',
+          action: 'UPDATE',
+          payload: updatedMember,
+          reason: reason || 'Pembaruan profil anggota'
+        })
+      });
+
+      let result: any = null;
+      try {
+        result = await response.json();
+      } catch {
+        result = null;
+      }
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || `Server menolak perubahan profil (HTTP ${response.status}).`);
+      }
+    }
+
+    return updatedMember;
+  }
+
   public updateMemberPhoto(
     memberId: string,
     avatarUrl: string,
@@ -1063,7 +1177,44 @@ class StorageService {
   // =========================================================
 
   public async syncWithServer(): Promise<boolean> {
-    return true;
+    const token = this.getAuthToken();
+    if (!token) return false;
+
+    try {
+      const response = await fetch('/api/data', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      if (!data || !Array.isArray(data.members)) return false;
+
+      // Jangan menghapus data lokal hanya karena server sedang kosong.
+      if (data.members.length > 0) {
+        this.setMembers(data.members as Member[]);
+      }
+
+      if (Array.isArray(data.users) && data.users.length > 0) {
+        this.setUsers(data.users as CurrentUser[]);
+      }
+
+      if (Array.isArray(data.auditLogs)) {
+        try {
+          localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(data.auditLogs));
+        } catch {}
+      }
+
+      this.notify();
+      return true;
+    } catch (error) {
+      console.warn('[Storage] Sinkronisasi server gagal:', error);
+      return false;
+    }
   }
 }
 
