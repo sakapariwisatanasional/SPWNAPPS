@@ -584,14 +584,32 @@ if (!IS_VERCEL) {
 }
 
 // Proxy mutation to Google Apps Script Web App
-async function forwardToGoogleAppsScript(payload: any): Promise<any> {
-  const scriptUrl = String(process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL).trim();
-  if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
+function normalizeManualAppsScriptUrl(raw: any): string {
+  const value = String(raw || '').trim().replace(/\s+/g, '');
+  if (!value || !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(value)) {
+    return '';
+  }
+  return value;
+}
+
+async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: string): Promise<any> {
+  const scriptUrl =
+    normalizeManualAppsScriptUrl(requestedScriptUrl) ||
+    normalizeManualAppsScriptUrl(payload?.scriptUrl) ||
+    normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
+    '';
+
+  if (!scriptUrl) {
+    throw new Error('Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.');
+  }
+
+  const gasPayload = { ...payload };
+  delete gasPayload.scriptUrl;
 
   const res = await fetch(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(gasPayload)
   });
 
   const text = await res.text();
@@ -619,7 +637,7 @@ async function forwardToGoogleAppsScript(payload: any): Promise<any> {
 // require cross-origin handling. This route also keeps the GAS URL server-side.
 app.post('/api/upload-image', async (req, res) => {
   try {
-    const { base64, filename, category } = req.body || {};
+    const { base64, filename, category, scriptUrl: requestedScriptUrl } = req.body || {};
     const value = String(base64 || '').trim();
 
     if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
@@ -644,7 +662,7 @@ app.post('/api/upload-image', async (req, res) => {
       base64: value,
       filename: String(filename || `image_${Date.now()}.jpg`).trim(),
       category: String(category || 'MEMBER_AVATAR').trim().toUpperCase()
-    });
+    }, requestedScriptUrl);
 
     if (!result || result.success === false || !result.url) {
       return res.status(502).json({
