@@ -50,9 +50,9 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   
   // Tingkatan Kwartir Organisasi
   const [kwartirLevel, setKwartirLevel] = useState<'NASIONAL' | 'DAERAH'>('DAERAH');
-  const [selectedProvinceId, setSelectedProvinceId] = useState('32');
-  const [selectedRegencyId, setSelectedRegencyId] = useState('32.06');
-  const [selectedDistrictId, setSelectedDistrictId] = useState('32.06.12');
+  const [selectedProvinceId, setSelectedProvinceId] = useState('');
+  const [selectedRegencyId, setSelectedRegencyId] = useState('');
+  const [selectedDistrictId, setSelectedDistrictId] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState('');
   
   const [gugusDepan, setGugusDepan] = useState('');
@@ -200,38 +200,72 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     }
   }, [currentUser, isOpen]);
 
+  // Cascade wilayah: Provinsi -> Kabupaten/Kota -> Kecamatan -> Pangkalan.
+  // Setiap perubahan parent langsung mengosongkan child agar tidak pernah
+  // tersimpan kombinasi wilayah yang berasal dari provinsi berbeda.
   useEffect(() => {
-    if (selectedProvinceId) {
-      const regs = storage.getRegencies(selectedProvinceId);
-      setRegencies(regs);
-      if (currentUser?.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId) {
-        setSelectedRegencyId(currentUser.jurisdictionId);
-      } else if (regs.length > 0 && !regs.some(r => r.id === selectedRegencyId)) {
-        setSelectedRegencyId(regs[0].id);
-      }
+    if (!selectedProvinceId) {
+      setRegencies([]);
+      setSelectedRegencyId('');
+      setDistricts([]);
+      setSelectedDistrictId('');
+      setBranches([]);
+      setSelectedBranchId('');
+      return;
     }
-  }, [selectedProvinceId]);
+
+    const regs = storage.getRegencies(selectedProvinceId);
+    setRegencies(regs);
+
+    const allowedRegency = isRegencyOperator && currentUser?.jurisdictionId
+      ? regs.find(r => r.id === currentUser.jurisdictionId)
+      : undefined;
+
+    const nextRegencyId = allowedRegency?.id ||
+      (regs.some(r => r.id === selectedRegencyId) ? selectedRegencyId : regs[0]?.id || '');
+
+    setSelectedRegencyId(nextRegencyId);
+
+    if (!nextRegencyId) {
+      setDistricts([]);
+      setSelectedDistrictId('');
+      setBranches([]);
+      setSelectedBranchId('');
+    }
+  }, [selectedProvinceId, currentUser?.role, currentUser?.jurisdictionId]);
 
   useEffect(() => {
-    if (selectedRegencyId) {
-      const dists = storage.getDistricts(selectedRegencyId);
-      setDistricts(dists);
-      if (dists.length > 0 && !dists.some(d => d.id === selectedDistrictId)) {
-        setSelectedDistrictId(dists[0].id);
-      }
+    if (!selectedRegencyId) {
+      setDistricts([]);
+      setSelectedDistrictId('');
+      setBranches([]);
+      setSelectedBranchId('');
+      return;
+    }
+
+    const dists = storage.getDistricts(selectedRegencyId);
+    setDistricts(dists);
+    const nextDistrictId = dists.some(d => d.id === selectedDistrictId)
+      ? selectedDistrictId
+      : dists[0]?.id || '';
+    setSelectedDistrictId(nextDistrictId);
+
+    if (!nextDistrictId) {
+      setBranches([]);
+      setSelectedBranchId('');
     }
   }, [selectedRegencyId]);
 
   useEffect(() => {
-    if (selectedDistrictId) {
-      const brs = storage.getBranches(selectedDistrictId);
-      setBranches(brs);
-      if (brs.length > 0 && !brs.some(b => b.id === selectedBranchId)) {
-        setSelectedBranchId(brs[0].id);
-      } else if (brs.length === 0) {
-        setSelectedBranchId('');
-      }
+    if (!selectedDistrictId) {
+      setBranches([]);
+      setSelectedBranchId('');
+      return;
     }
+
+    const brs = storage.getBranches(selectedDistrictId);
+    setBranches(brs);
+    setSelectedBranchId(current => brs.some(b => b.id === current) ? current : brs[0]?.id || '');
   }, [selectedDistrictId]);
 
   if (!isOpen) return null;
@@ -248,6 +282,20 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     if (!fullName || !email || !phone || !gugusDepan) {
       alert('Harap lengkapi semua data wajib yang ditandai bintang (*)');
       return;
+    }
+
+    if (kwartirLevel === 'DAERAH' && (!selectedProvinceId || !selectedRegencyId || !selectedDistrictId)) {
+      alert('Silakan pilih Provinsi, Kabupaten/Kota, dan Kecamatan terlebih dahulu.');
+      return;
+    }
+
+    if (kwartirLevel === 'DAERAH') {
+      const validRegency = regencies.some(r => r.id === selectedRegencyId && r.provinceId === selectedProvinceId);
+      const validDistrict = districts.some(d => d.id === selectedDistrictId && d.regencyId === selectedRegencyId);
+      if (!validRegency || !validDistrict) {
+        alert('Kombinasi wilayah tidak valid. Pilih ulang Provinsi, Kabupaten/Kota, dan Kecamatan.');
+        return;
+      }
     }
 
     if (isRegencyOperator && currentUser?.jurisdictionId && selectedRegencyId !== currentUser.jurisdictionId) {
@@ -282,11 +330,24 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     });
 
     try {
+      // Upload foto terlebih dahulu. Payload anggota ke /api/mutate harus
+      // berisi URL Drive, bukan data:image Base64, agar request registrasi
+      // tetap ringan dan foto benar-benar tersimpan di repository Drive.
+      let persistedAvatarUrl = avatarUrl || '';
+      if (/^data:image\//i.test(persistedAvatarUrl)) {
+        const uploaded = await spreadsheetService.uploadImageToDrive(
+          persistedAvatarUrl,
+          `member_${Date.now()}.jpg`,
+          'MEMBER_AVATAR'
+        );
+        persistedAvatarUrl = uploaded.url;
+      }
+
       const member = storage.registerMember({
         userId: `user-${Date.now()}`,
         fullName,
         nikMasked: generatedNikMasked,
-        avatarUrl: avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80',
+        avatarUrl: persistedAvatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80',
         gender,
         birthPlace: birthPlace || currentRegency?.name || 'Indonesia',
         birthDate,
@@ -320,7 +381,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         webAppConfigured: spreadsheetService.getSyncState().hasScriptUrl
       });
 
-      const syncResult = await spreadsheetService.saveMemberAndWaitForSync(member);
+      const syncResult = await spreadsheetService.registerMemberAndWaitForSync(member);
 
       if (!syncResult.synced) {
         throw new Error(syncResult.message || 'Data belum terverifikasi di Google Spreadsheet.');
@@ -695,13 +756,23 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                   <select
                     disabled={isRegencyOperator || isProvinceAdmin || isBranchAdmin}
                     value={selectedProvinceId}
-                    onChange={(e) => setSelectedProvinceId(e.target.value)}
+                    onChange={(e) => {
+                      const provinceId = e.target.value;
+                      setSelectedProvinceId(provinceId);
+                      setSelectedRegencyId('');
+                      setSelectedDistrictId('');
+                      setRegencies([]);
+                      setDistricts([]);
+                      setBranches([]);
+                      setSelectedBranchId('');
+                    }}
                     className={`w-full px-3 py-2 border rounded-xl outline-none text-slate-800 ${
                       isRegencyOperator || isProvinceAdmin || isBranchAdmin
                         ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
                         : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
                     }`}
                   >
+                    <option value="">Pilih Provinsi / Kwarda...</option>
                     {provinces.map((p) => (
                       <option key={p.id} value={p.id}>{p.name} (Kwarda)</option>
                     ))}
@@ -715,13 +786,21 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                   <select
                     disabled={isRegencyOperator || isBranchAdmin}
                     value={selectedRegencyId}
-                    onChange={(e) => setSelectedRegencyId(e.target.value)}
+                    onChange={(e) => {
+                      const regencyId = e.target.value;
+                      setSelectedRegencyId(regencyId);
+                      setSelectedDistrictId('');
+                      setDistricts([]);
+                      setBranches([]);
+                      setSelectedBranchId('');
+                    }}
                     className={`w-full px-3 py-2 border rounded-xl outline-none font-semibold ${
                       isRegencyOperator || isBranchAdmin
                         ? 'bg-amber-50/80 border-amber-300 text-amber-950 cursor-not-allowed'
                         : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800'
                     }`}
                   >
+                    {regencies.length === 0 && <option value="">Pilih Kabupaten/Kota...</option>}
                     {regencies.map((r) => (
                       <option key={r.id} value={r.id}>{r.name} (Kwarcab)</option>
                     ))}
@@ -734,9 +813,15 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                   </label>
                   <select
                     value={selectedDistrictId}
-                    onChange={(e) => setSelectedDistrictId(e.target.value)}
+                    onChange={(e) => {
+                      const districtId = e.target.value;
+                      setSelectedDistrictId(districtId);
+                      setBranches([]);
+                      setSelectedBranchId('');
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
                   >
+                    {districts.length === 0 && <option value="">Pilih Kecamatan...</option>}
                     {districts.map((d) => (
                       <option key={d.id} value={d.id}>{d.name} (Kwarran)</option>
                     ))}
