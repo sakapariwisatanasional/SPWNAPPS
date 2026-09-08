@@ -607,6 +607,71 @@ async function forwardToGoogleAppsScript(payload: any): Promise<any> {
 // ==========================================
 
 // Health check
+// Upload image proxy: browser -> application server -> Google Apps Script -> Google Drive.
+// The browser must not call Apps Script directly because the JSON POST would
+// require cross-origin handling. This route also keeps the GAS URL server-side.
+app.post('/api/upload-image', async (req, res) => {
+  try {
+    const { base64, filename, category } = req.body || {};
+    const value = String(base64 || '').trim();
+
+    if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: 'Data gambar tidak valid.'
+      });
+    }
+
+    // Match the Apps Script limit and avoid oversized requests reaching GAS.
+    if (value.length > 12 * 1024 * 1024) {
+      return res.status(413).json({
+        success: false,
+        status: 'error',
+        message: 'Data gambar terlalu besar.'
+      });
+    }
+
+    const result = await forwardToGoogleAppsScript({
+      action: 'UPLOAD_IMAGE',
+      base64: value,
+      filename: String(filename || `image_${Date.now()}.jpg`).trim(),
+      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase()
+    });
+
+    if (!result || result.success === false || !result.url) {
+      return res.status(502).json({
+        success: false,
+        status: 'error',
+        message: result?.message || 'Google Apps Script tidak mengembalikan URL foto.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      status: 'success',
+      action: 'UPLOAD_IMAGE',
+      fileId: result.fileId || null,
+      url: result.url,
+      directUrl: result.directUrl || result.url,
+      viewUrl: result.viewUrl || null,
+      category: result.category || category || 'MEMBER_AVATAR',
+      filename: result.filename || filename || null,
+      message: result.message || 'Foto berhasil disimpan ke Google Drive'
+    });
+  } catch (error: any) {
+    console.error('[Upload Image] Error:', error);
+    const message = error?.message || 'Upload foto gagal.';
+    const statusMatch = message.match(/HTTP (\d{3})/i);
+    const upstreamStatus = statusMatch ? Number(statusMatch[1]) : 502;
+    return res.status(upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 502).json({
+      success: false,
+      status: 'error',
+      message
+    });
+  }
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
