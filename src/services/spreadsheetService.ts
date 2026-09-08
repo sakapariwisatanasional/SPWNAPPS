@@ -250,7 +250,13 @@ class SpreadsheetService {
     }
   }
 
-  // Sinkronisasi data anggota riil dari Spreadsheet ke sistem
+  // Sinkronisasi data anggota riil dari Spreadsheet ke sistem.
+  // Prinsip penting:
+  // 1. Spreadsheet adalah sumber persistensi, tetapi polling TIDAK boleh menghapus
+  //    data lokal hanya karena kolom Spreadsheet kosong.
+  // 2. Perubahan yang baru saja dikirim ke server dilindungi sampai Spreadsheet
+  //    benar-benar memantulkan nilai tersebut.
+  // 3. Jangan membuat data palsu/default untuk field yang kosong di Spreadsheet.
   public async syncFromSpreadsheet(silent: boolean = false): Promise<{ success: boolean; count: number; message: string }> {
     if (this.isSyncing) return { success: false, count: 0, message: 'Sinkronisasi sedang berjalan.' };
     this.isSyncing = true;
@@ -258,120 +264,162 @@ class SpreadsheetService {
 
     try {
       const rows = await this.fetchSheetRows('Anggota');
-      if (rows && rows.length > 0) {
-        const existingMembers = storage.getMembers();
-        const merged = [...existingMembers];
 
-        rows.forEach((row, idx) => {
-          const fullName = this.getRowVal(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'Full Name', 'Nama Peserta']) || `Anggota ${idx + 1}`;
-          const kta = this.getRowVal(row, ['Nomor KTA', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA']);
-          const explicitId = this.getRowVal(row, ['ID Anggota', 'ID', 'id', 'Member ID']);
-          const memberId = explicitId || (kta ? `mem-${kta.replace(/[^a-zA-Z0-9]/g, '')}` : `mem-sheet-${idx + 1}`);
-
-          // Baca wilayah riil dari input user
-          const rawProv = this.getRowVal(row, ['Kwarda / Provinsi', 'Provinsi', 'Kwarda', 'Province', 'provinsi']);
-          const rawKab = this.getRowVal(row, ['Kwarcab / Kabupaten', 'Kabupaten', 'Kwarcab', 'Kabupaten/Kota', 'Kota', 'kabupaten']);
-          const rawKec = this.getRowVal(row, ['Kwarran / Kecamatan', 'Kecamatan', 'Kwarran', 'Ranting', 'kecamatan_ranting']);
-          const rawGudep = this.getRowVal(row, ['Gugus Depan / Pangkalan', 'Gugus Depan', 'Gudep', 'Pangkalan', 'gudep']);
-          const rawPhone = this.getRowVal(row, ['Nomor WhatsApp', 'WhatsApp', 'No WA', 'No. WA', 'Telepon', 'Phone', 'nomor_wa', 'No HP']);
-          const rawEmail = this.getRowVal(row, ['Email', 'Alamat Email', 'Surel', 'email']);
-          const rawKrida = this.getRowVal(row, ['Krida', 'Pilihan Krida', 'Nama Krida', 'krida']) || 'Krida Pemandu';
-          const rawAvatar = this.getRowVal(row, ['Foto URL', 'Foto', 'Pas Foto', 'Link Foto', 'Avatar', 'foto_url']);
-          const rawDate = this.getRowVal(row, ['Tanggal Daftar', 'Tanggal Registrasi', 'Timestamp', 'tanggal_daftar']) || new Date().toISOString();
-
-          // Penanganan Status: DEFAULT HARUS PENDING!
-          // HANYA menjadi ACTIVE jika kolom status secara jelas tertulis ACTIVE / AKTIF / DISETUJUI
-          const rawStatus = this.getRowVal(row, ['Status Verifikasi', 'Status Anggota', 'Status', 'status', 'Validasi']).toUpperCase();
-          let finalStatus: 'ACTIVE' | 'PENDING' | 'SUSPENDED' = 'PENDING';
-
-          // Jika admin baru saja mengubah status, jangan izinkan polling
-          // Spreadsheet yang masih memakai nilai lama menimpa perubahan lokal.
-          // Penanda ini dibuat oleh StorageService saat /api/mutate sedang
-          // diproses. Setelah berhasil, penanda dihapus.
-          let pendingWrite: any = null;
-          try {
-            const pendingRaw = localStorage.getItem('saka_pending_member_writes_v1');
-            const pendingMap = pendingRaw ? JSON.parse(pendingRaw) : {};
-            pendingWrite = pendingMap?.[memberId];
-          } catch {}
-          
-          if (rawStatus.includes('AKTIF') || rawStatus.includes('ACTIVE') || rawStatus.includes('DISETUJUI') || rawStatus.includes('APPROVED')) {
-            finalStatus = 'ACTIVE';
-          } else if (rawStatus.includes('SUSPEND') || rawStatus.includes('TOLAK') || rawStatus.includes('REJECT')) {
-            finalStatus = 'SUSPENDED';
-          } else {
-            finalStatus = 'PENDING';
-          }
-
-          if (pendingWrite && Date.now() - Number(pendingWrite.timestamp || 0) < 30000) {
-            finalStatus = pendingWrite.status || finalStatus;
-          }
-
-          // Cari data provinsi ID jika cocok
-          const matchedProv = PROVINCES_DATA.find(p => 
-            (rawProv && p.name.toLowerCase().includes(rawProv.toLowerCase())) ||
-            (rawProv && rawProv.toLowerCase().includes(p.name.toLowerCase()))
-          );
-
-          const existingIdx = merged.findIndex(m => m.id === memberId || (kta && m.nationalMemberNumber === kta));
-          
-          const memberObj: Member = {
-            id: memberId,
-            userId: `user-${memberId}`,
-            nationalMemberNumber: kta || undefined,
-            fullName,
-            nikMasked: '3200******0000',
-            avatarUrl: rawAvatar || (existingIdx >= 0 ? merged[existingIdx].avatarUrl : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80'),
-            gender: 'LAKI_LAKI',
-            birthPlace: rawKab || (existingIdx >= 0 ? merged[existingIdx].birthPlace : 'Indonesia'),
-            birthDate: '2004-01-01',
-            phone: rawPhone || (existingIdx >= 0 ? merged[existingIdx].phone : '081234567890'),
-            email: rawEmail || (existingIdx >= 0 ? merged[existingIdx].email : `anggota${idx + 1}@sakapariwisata.id`),
-            address: rawGudep ? `Pangkalan ${rawGudep}` : (existingIdx >= 0 ? merged[existingIdx].address : 'Pangkalan Saka'),
-            provinceId: matchedProv ? matchedProv.id : (existingIdx >= 0 ? merged[existingIdx].provinceId : '32'),
-            provinceName: rawProv || (existingIdx >= 0 ? merged[existingIdx].provinceName : 'Jawa Barat'),
-            regencyId: existingIdx >= 0 ? merged[existingIdx].regencyId : '32.04',
-            regencyName: rawKab || (existingIdx >= 0 ? merged[existingIdx].regencyName : 'Kabupaten Bandung'),
-            districtId: existingIdx >= 0 ? merged[existingIdx].districtId : '32.04.01',
-            districtName: rawKec || (existingIdx >= 0 ? merged[existingIdx].districtName : 'Kecamatan'),
-            branchId: existingIdx >= 0 ? merged[existingIdx].branchId : 'branch-default',
-            branchName: rawKec ? `Kwarran ${rawKec}` : (existingIdx >= 0 ? merged[existingIdx].branchName : 'Kwarran'),
-            gugusDepan: rawGudep || (existingIdx >= 0 ? merged[existingIdx].gugusDepan : 'Gudep Pariwisata'),
-            joinYear: 2024,
-            currentPosition: `Anggota ${rawKrida}`,
-            krida: rawKrida as any,
-            status: finalStatus,
-            educationLevel: 'SMA/SMK',
-            occupation: 'Pramuka Penegak',
-            bio: 'Anggota aktif Saka Pariwisata.',
-            skills: existingIdx >= 0 ? merged[existingIdx].skills : [],
-            certifications: existingIdx >= 0 ? merged[existingIdx].certifications : [],
-            registeredAt: rawDate
-          };
-
-          if (existingIdx >= 0) {
-            merged[existingIdx] = { 
-              ...merged[existingIdx], 
-              ...memberObj,
-              // Pertahankan data lokal pendaftar jika kolom di spreadsheet masih belum diisi lengkap
-              phone: rawPhone || merged[existingIdx].phone,
-              email: rawEmail || merged[existingIdx].email,
-              regencyName: rawKab || merged[existingIdx].regencyName,
-              provinceName: rawProv || merged[existingIdx].provinceName,
-              gugusDepan: rawGudep || merged[existingIdx].gugusDepan,
-              status: finalStatus
-            };
-          } else {
-            merged.push(memberObj);
-          }
-        });
-
-        storage.setMembers(merged);
+      // Jangan pernah mengganti database lokal dengan array kosong.
+      if (!Array.isArray(rows) || rows.length === 0) {
+        this.isSyncing = false;
+        this.saveConfig({ status: 'CONNECTED', lastSyncedAt: new Date().toISOString() });
+        return { success: true, count: 0, message: 'Spreadsheet tidak mengembalikan data; data lokal dipertahankan.' };
       }
 
+      const existingMembers = storage.getMembers();
+      const merged = [...existingMembers];
+
+      let pendingMap: Record<string, any> = {};
+      try {
+        const raw = localStorage.getItem('saka_pending_member_writes_v1');
+        pendingMap = raw ? JSON.parse(raw) : {};
+      } catch {}
+
+      const clean = (value: any) => String(value ?? '').trim();
+      const nonEmpty = (value: any) => clean(value) !== '';
+
+      const clearPendingIfConfirmed = (memberId: string, sheetMember: Member) => {
+        const pending = pendingMap[memberId];
+        if (!pending) return;
+
+        const expected = pending.member || {};
+        const checks = ['fullName', 'email', 'phone', 'provinceName', 'regencyName', 'branchName', 'gugusDepan', 'krida', 'status'];
+        const confirmed = checks.every(key => {
+          const wanted = clean(expected[key]);
+          if (!wanted) return true;
+          return clean((sheetMember as any)[key]) === wanted;
+        });
+
+        if (confirmed || Date.now() - Number(pending.timestamp || 0) > 10 * 60 * 1000) {
+          delete pendingMap[memberId];
+        }
+      };
+
+      rows.forEach((row, idx) => {
+        const fullName = this.getRowVal(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'Full Name', 'Nama Peserta']);
+        const kta = this.getRowVal(row, ['Nomor KTA', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA']);
+        const explicitId = this.getRowVal(row, ['ID Anggota', 'ID', 'id', 'Member ID']);
+
+        // Baris tanpa identitas anggota tidak boleh dibuat menjadi anggota kosong.
+        if (!fullName && !kta && !explicitId) return;
+
+        const memberId = explicitId || (kta ? `mem-${kta.replace(/[^a-zA-Z0-9]/g, '')}` : `mem-sheet-${idx + 1}`);
+
+        const rawProv = this.getRowVal(row, ['Kwarda / Provinsi', 'Provinsi', 'Kwarda', 'Province', 'provinsi']);
+        const rawKab = this.getRowVal(row, ['Kwarcab / Kabupaten', 'Kabupaten', 'Kwarcab', 'Kabupaten/Kota', 'Kota', 'kabupaten']);
+        const rawKec = this.getRowVal(row, ['Kwarran / Kecamatan', 'Kecamatan', 'Kwarran', 'Ranting', 'kecamatan_ranting']);
+        const rawGudep = this.getRowVal(row, ['Gugus Depan / Pangkalan', 'Gugus Depan', 'Gudep', 'Pangkalan', 'gudep']);
+        const rawPhone = this.getRowVal(row, ['Nomor WhatsApp', 'WhatsApp', 'No WA', 'No. WA', 'Telepon', 'Phone', 'nomor_wa', 'No HP']);
+        const rawEmail = this.getRowVal(row, ['Email', 'Alamat Email', 'Surel', 'email']);
+        const rawKrida = this.getRowVal(row, ['Krida', 'Pilihan Krida', 'Nama Krida', 'krida']);
+        const rawAvatar = this.getRowVal(row, ['Foto URL', 'Foto', 'Pas Foto', 'Link Foto', 'Avatar', 'foto_url']);
+        const rawDate = this.getRowVal(row, ['Tanggal Daftar', 'Tanggal Registrasi', 'Timestamp', 'tanggal_daftar']);
+        const rawStatus = this.getRowVal(row, ['Status Verifikasi', 'Status Anggota', 'Status', 'status', 'Validasi']).toUpperCase();
+
+        const matchedProv = PROVINCES_DATA.find(p =>
+          (rawProv && p.name.toLowerCase().includes(rawProv.toLowerCase())) ||
+          (rawProv && rawProv.toLowerCase().includes(p.name.toLowerCase()))
+        );
+
+        const existingIdx = merged.findIndex(m =>
+          m.id === memberId || (kta && m.nationalMemberNumber === kta)
+        );
+        const existing = existingIdx >= 0 ? merged[existingIdx] : undefined;
+        const pending = pendingMap[memberId];
+
+        let finalStatus: 'ACTIVE' | 'PENDING' | 'SUSPENDED' = existing?.status || 'PENDING';
+        if (rawStatus.includes('AKTIF') || rawStatus.includes('ACTIVE') || rawStatus.includes('DISETUJUI') || rawStatus.includes('APPROVED')) {
+          finalStatus = 'ACTIVE';
+        } else if (rawStatus.includes('SUSPEND') || rawStatus.includes('TOLAK') || rawStatus.includes('REJECT')) {
+          finalStatus = 'SUSPENDED';
+        } else if (rawStatus.includes('PENDING') || rawStatus.includes('MENUNGGU') || rawStatus.includes('PROSES')) {
+          finalStatus = 'PENDING';
+        }
+
+        // Selama write belum dikonfirmasi Spreadsheet, jangan biarkan polling
+        // mengembalikan status/data ke versi lama.
+        if (pending?.member) {
+          const expected = pending.member as Member;
+          finalStatus = expected.status || finalStatus;
+        }
+
+        const memberObj: Member = {
+          ...(existing || {} as Member),
+          id: memberId,
+          userId: existing?.userId || `user-${memberId}`,
+          nationalMemberNumber: nonEmpty(kta) ? kta : existing?.nationalMemberNumber,
+          fullName: nonEmpty(fullName) ? fullName : existing?.fullName || '',
+          nikMasked: existing?.nikMasked || '**************',
+          avatarUrl: nonEmpty(rawAvatar) ? rawAvatar : existing?.avatarUrl || '',
+          gender: existing?.gender || 'LAKI_LAKI',
+          birthPlace: existing?.birthPlace || '',
+          birthDate: existing?.birthDate || '',
+          phone: nonEmpty(rawPhone) ? rawPhone : existing?.phone || '',
+          email: nonEmpty(rawEmail) ? rawEmail : existing?.email || '',
+          address: existing?.address || '',
+          provinceId: matchedProv?.id || existing?.provinceId || '',
+          provinceName: nonEmpty(rawProv) ? rawProv : existing?.provinceName || '',
+          regencyId: existing?.regencyId || '',
+          regencyName: nonEmpty(rawKab) ? rawKab : existing?.regencyName || '',
+          districtId: existing?.districtId || '',
+          districtName: nonEmpty(rawKec) ? rawKec : existing?.districtName || '',
+          branchId: existing?.branchId || '',
+          branchName: nonEmpty(rawKec) ? `Kwarran ${rawKec}` : existing?.branchName || '',
+          gugusDepan: nonEmpty(rawGudep) ? rawGudep : existing?.gugusDepan || '',
+          joinYear: existing?.joinYear || new Date().getFullYear(),
+          currentPosition: existing?.currentPosition || '',
+          krida: nonEmpty(rawKrida) ? rawKrida as any : existing?.krida as any,
+          status: finalStatus,
+          educationLevel: existing?.educationLevel || '',
+          occupation: existing?.occupation || '',
+          bio: existing?.bio || '',
+          skills: existing?.skills || [],
+          certifications: existing?.certifications || [],
+          registeredAt: nonEmpty(rawDate) ? rawDate : existing?.registeredAt || new Date().toISOString(),
+          locationHistory: existing?.locationHistory || []
+        };
+
+        // Jika pending menyimpan snapshot lengkap, pertahankan field lokal yang
+        // belum dipantulkan Spreadsheet agar polling tidak mengosongkannya.
+        if (pending?.member) {
+          const expected = pending.member as Member;
+          const protectedFields: (keyof Member)[] = [
+            'fullName', 'email', 'phone', 'address', 'provinceId', 'provinceName',
+            'regencyId', 'regencyName', 'districtId', 'districtName', 'branchId',
+            'branchName', 'gugusDepan', 'krida', 'currentPosition', 'educationLevel',
+            'occupation', 'bio', 'avatarUrl', 'nationalMemberNumber', 'status'
+          ];
+          protectedFields.forEach(field => {
+            const wanted = expected[field];
+            if (wanted !== undefined && wanted !== null && clean(wanted) !== '') {
+              (memberObj as any)[field] = wanted;
+            }
+          });
+        }
+
+        if (existingIdx >= 0) {
+          merged[existingIdx] = { ...merged[existingIdx], ...memberObj };
+        } else {
+          merged.push(memberObj);
+        }
+
+        clearPendingIfConfirmed(memberId, memberObj);
+      });
+
+      try {
+        localStorage.setItem('saka_pending_member_writes_v1', JSON.stringify(pendingMap));
+      } catch {}
+
+      storage.setMembers(merged);
       this.saveConfig({ status: 'CONNECTED', lastSyncedAt: new Date().toISOString() });
       this.isSyncing = false;
-      return { success: true, count: rows.length, message: 'Sinkronisasi data riil berhasil.' };
+      return { success: true, count: rows.length, message: 'Sinkronisasi data riil berhasil tanpa mengosongkan data lokal.' };
     } catch (err: any) {
       this.isSyncing = false;
       this.saveConfig({ status: 'ERROR', lastError: err?.message });
