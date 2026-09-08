@@ -36,6 +36,19 @@ import {
   getDistrictsForRegency
 } from '../data/indonesiaTerritories';
 
+const SPREADSHEET_CONFIG_KEY = 'saka_spreadsheet_config_v1';
+
+function getManualAppsScriptUrl(): string {
+  try {
+    const raw = localStorage.getItem(SPREADSHEET_CONFIG_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    const url = String(parsed?.scriptUrl || '').trim().replace(/\s+/g, '');
+    return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(url) ? url : '';
+  } catch {
+    return '';
+  }
+}
+
 const STORAGE_KEYS = {
   MEMBERS: 'saka_members',
   TOURS: 'saka_tours',
@@ -405,15 +418,9 @@ class StorageService {
     }
 
     try {
-      let scriptUrl = '';
-      try {
-        const rawConfig = localStorage.getItem('saka_spreadsheet_config_v1');
-        const parsedConfig = rawConfig ? JSON.parse(rawConfig) : null;
-        scriptUrl = String(parsedConfig?.scriptUrl || '').trim().replace(/\s+/g, '');
-      } catch {}
-
-      if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(scriptUrl)) {
-        throw new Error('URL Google Apps Script belum diatur. Silakan isi URL Web App pada Dashboard > Database Google Spreadsheet & Drive > Pengaturan API.');
+      const manualScriptUrl = getManualAppsScriptUrl();
+      if (!manualScriptUrl) {
+        throw new Error('URL Google Apps Script belum diisi melalui Dashboard > Pengaturan API.');
       }
 
       const response = await fetch('/api/mutate', {
@@ -428,7 +435,7 @@ class StorageService {
           action: 'UPDATE',
           payload: updatedMember,
           reason: reason || 'Pembaruan profil anggota',
-          scriptUrl
+          scriptUrl: getManualAppsScriptUrl()
         })
       });
 
@@ -1044,8 +1051,7 @@ class StorageService {
       return [];
     }
 
-    const regency = REGENCIES_DATA.find(r => r.id === regencyId);
-    return getDistrictsForRegency(regencyId, regency?.name);
+    return getDistrictsForRegency(regencyId);
   }
 
   public getBranches(
