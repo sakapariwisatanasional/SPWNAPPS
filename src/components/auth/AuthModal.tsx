@@ -341,68 +341,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const cleanPhone = regPhone.replace(/\D/g, '');
     const generatedNikMasked = '3200******' + (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
 
-    const newUser: CurrentUser = {
-      id: newUserId,
-      username: regEmail.split('@')[0],
-      name: regFullName,
-      fullName: regFullName,
-      email: regEmail,
-      role: 'MEMBER',
-      memberId: newMemberId,
-      jurisdictionId: isNasional ? '00.00' : regRegencyId,
-      jurisdictionName: isNasional ? 'Kwartir Nasional (Pusat)' : regName,
-      avatarUrl: regAvatarUrl
-    };
+    const newMemberId = `mem-${Date.now()}`;
+    const newUserId = `user-${Date.now()}`;
 
     try {
-      const registeredMember = storage.registerMember({
-        userId: newUserId,
-        fullName: regFullName,
-        nikMasked: generatedNikMasked,
-        avatarUrl: regAvatarUrl,
-        gender: regGender,
-        birthPlace: regBirthPlace || regName,
-        birthDate: regBirthDate,
-        phone: regPhone,
-        email: regEmail,
-        address: `Pangkalan ${regGudep}, ${distName}`,
-        provinceId: isNasional ? '00' : regProvinceId,
-        provinceName: provName,
-        regencyId: isNasional ? '00.00' : regRegencyId,
-        regencyName: regName,
-        districtId: isNasional ? '00.00.00' : (regDistrictId || `${regRegencyId}.01`),
-        districtName: distName,
-        branchId: isNasional ? 'branch-nasional' : `kwarran-${regRegencyId}`,
-        branchName: isNasional ? 'Pimpinan Saka Tingkat Nasional' : `Kwarran ${distName}`,
-        gugusDepan: regGudep,
-        joinYear: new Date().getFullYear(),
-        currentPosition: `Calon Anggota ${regKrida}`,
-        krida: regKrida,
-        educationLevel: regEducationLevel,
-        occupation: regOccupation,
-        bio: regBio || 'Calon anggota Saka Pariwisata yang siap memajukan pariwisata nusantara.',
-        skills: [],
-        certifications: []
+      let finalAvatarUrl = regAvatarUrl;
+      if (/^data:image\//i.test(finalAvatarUrl)) {
+        setIsUploadingPhoto(true);
+        const cleanName = regFullName.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 'Anggota';
+        const uploadResult = await spreadsheetService.uploadImageToDrive(finalAvatarUrl, `KTA_${newMemberId}_${cleanName}.jpg`, 'MEMBER_AVATAR');
+        setIsUploadingPhoto(false);
+        if (!uploadResult.success || !uploadResult.url) throw new Error(uploadResult.message || 'Foto gagal disimpan ke Google Drive.');
+        finalAvatarUrl = uploadResult.url;
+      }
+
+      const scriptUrl = spreadsheetService.getConfig().scriptUrl || '';
+      if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.');
+
+      const memberData = {
+        id: newMemberId, userId: newUserId, fullName: regFullName, nikMasked: generatedNikMasked, avatarUrl: finalAvatarUrl, gender: regGender,
+        birthPlace: regBirthPlace || regName, birthDate: regBirthDate, phone: regPhone, email: regEmail, address: `Pangkalan ${regGudep}, ${distName}`,
+        provinceId: isNasional ? '00' : regProvinceId, provinceName: provName, regencyId: isNasional ? '00.00' : regRegencyId, regencyName: regName,
+        districtId: isNasional ? '00.00.00' : (regDistrictId || `${regRegencyId}.01`), districtName: distName,
+        branchId: isNasional ? 'branch-nasional' : `kwarran-${regRegencyId}`, branchName: isNasional ? 'Pimpinan Saka Tingkat Nasional' : `Kwarran ${distName}`,
+        gugusDepan: regGudep, joinYear: new Date().getFullYear(), currentPosition: `Calon Anggota ${regKrida}`, krida: regKrida,
+        educationLevel: regEducationLevel, occupation: regOccupation, bio: regBio || 'Calon anggota Saka Pariwisata yang siap memajukan pariwisata nusantara.', skills: [], certifications: []
+      };
+
+      const response = await fetch('/api/auth/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ memberData, password: regPassword, scriptUrl })
       });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success || !result?.member || !result?.user) throw new Error(result?.message || `Pendaftaran gagal (HTTP ${response.status}).`);
 
-      const existingUsers = storage.getUsers();
-      persistUsersList([...existingUsers, { ...newUser, password: regPassword } as any]);
-
-      spreadsheetService.saveMemberAndWaitForSync(registeredMember).catch((syncErr) => {
-        console.warn('[AuthModal] Catatan sinkronisasi spreadsheet:', syncErr);
-      });
-
-      storage.setCurrentUser(newUser);
+      const registeredMember = result.member as any;
+      const registeredUser = result.user as CurrentUser;
+      storage.setMembers([registeredMember, ...storage.getMembers().filter(m => m.id !== registeredMember.id)]);
+      storage.setUsers([registeredUser, ...storage.getUsers().filter(u => u.id !== registeredUser.id)]);
+      if (result.token) storage.setAuthToken(result.token);
+      storage.setCurrentUser(registeredUser);
       setIsLoading(false);
       setRegSuccessMsg(`Pendaftaran berhasil! Selamat datang, ${regFullName}.`);
-      
-      setTimeout(() => {
-        onLoginSuccess(newUser);
-        onClose();
-      }, 1200);
-
+      setTimeout(() => { onLoginSuccess(registeredUser); onClose(); }, 1200);
     } catch (err: any) {
-      setIsLoading(false);
+      setIsUploadingPhoto(false); setIsLoading(false);
       setRegError(err?.message || 'Gagal mendaftar. Silakan coba kembali.');
     }
   };
