@@ -405,14 +405,16 @@ class StorageService {
     }
 
     try {
-      let configuredScriptUrl = '';
+      let scriptUrl = '';
       try {
         const rawConfig = localStorage.getItem('saka_spreadsheet_config_v1');
-        if (rawConfig) {
-          const parsedConfig = JSON.parse(rawConfig);
-          configuredScriptUrl = String(parsedConfig?.scriptUrl || '').trim();
-        }
+        const parsedConfig = rawConfig ? JSON.parse(rawConfig) : null;
+        scriptUrl = String(parsedConfig?.scriptUrl || '').trim().replace(/\s+/g, '');
       } catch {}
+
+      if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(scriptUrl)) {
+        throw new Error('URL Google Apps Script belum diatur. Silakan isi URL Web App pada Dashboard > Database Google Spreadsheet & Drive > Pengaturan API.');
+      }
 
       const response = await fetch('/api/mutate', {
         method: 'POST',
@@ -426,7 +428,7 @@ class StorageService {
           action: 'UPDATE',
           payload: updatedMember,
           reason: reason || 'Pembaruan profil anggota',
-          scriptUrl: configuredScriptUrl
+          scriptUrl
         })
       });
 
