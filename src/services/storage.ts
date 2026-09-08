@@ -350,6 +350,111 @@ class StorageService {
 
 
   /**
+   * Generate Nomor Tanda Anggota (NTA) berdasarkan kode wilayah.
+   * Format: PP.KK.KC.NNNNNN
+   * PP = kode provinsi, KK = kode kabupaten/kota, KC = kode kecamatan,
+   * NNNNNN = nomor urut 6 digit yang unik di dalam wilayah tersebut.
+   */
+  public generateNationalMemberNumber(
+    provinceCode: string,
+    regencyCode: string,
+    districtCode: string
+  ): string {
+    const pp = String(provinceCode || '00').replace(/\D/g, '').slice(-2).padStart(2, '0');
+    const kk = String(regencyCode || '00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
+    const kc = String(districtCode || '00.00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
+    const prefix = `${pp}.${kk}.${kc}.`;
+
+    const members = this.getMembers();
+    let maxSequence = 0;
+
+    members.forEach(member => {
+      const nta = String(member?.nationalMemberNumber || '').trim();
+      if (!nta.startsWith(prefix)) return;
+
+      const sequence = parseInt(nta.slice(prefix.length).replace(/\D/g, ''), 10);
+      if (Number.isFinite(sequence) && sequence > maxSequence) {
+        maxSequence = sequence;
+      }
+    });
+
+    return `${prefix}${String(maxSequence + 1).padStart(6, '0')}`;
+  }
+
+  /**
+   * Menerbitkan NTA untuk anggota yang belum memiliki nomor.
+   * Nomor selalu mengikuti wilayah anggota saat ini.
+   */
+  public assignNationalMemberNumber(memberId: string): Member | null {
+    const members = this.getMembers();
+    const index = members.findIndex(member => member.id === memberId);
+    if (index === -1) return null;
+
+    const member = members[index];
+    const nta = member.nationalMemberNumber || this.generateNationalMemberNumber(
+      member.provinceId || '00',
+      member.regencyId || '00.00',
+      member.districtId || '00.00.00'
+    );
+
+    members[index] = { ...member, nationalMemberNumber: nta };
+    this.setMembers(members);
+    return members[index];
+  }
+
+  /**
+   * Generate NTA massal berdasarkan wilayah yang dipilih.
+   * Hanya anggota tanpa NTA yang diberi nomor agar nomor lama tidak berubah.
+   */
+  public generateNationalMemberNumbersByRegion(
+    provinceId?: string,
+    regencyId?: string,
+    districtId?: string
+  ): { updated: number; skipped: number; total: number } {
+    const members = this.getMembers();
+    let sequenceByPrefix: Record<string, number> = {};
+    let updated = 0;
+    let skipped = 0;
+
+    const selected = members.filter(member => {
+      if (provinceId && member.provinceId !== provinceId) return false;
+      if (regencyId && member.regencyId !== regencyId) return false;
+      if (districtId && member.districtId !== districtId) return false;
+      return true;
+    });
+
+    // Seed sequence dari semua nomor yang sudah ada, bukan hanya hasil filter.
+    members.forEach(member => {
+      const nta = String(member.nationalMemberNumber || '');
+      const match = nta.match(/^(\d{2}\.\d{2}\.\d{2})\.(\d{6})$/);
+      if (match) {
+        const n = Number(match[2]);
+        sequenceByPrefix[match[1]] = Math.max(sequenceByPrefix[match[1]] || 0, n);
+      }
+    });
+
+    selected.forEach(member => {
+      if (member.nationalMemberNumber) {
+        skipped++;
+        return;
+      }
+
+      const pp = String(member.provinceId || '00').replace(/\D/g, '').slice(-2).padStart(2, '0');
+      const kk = String(member.regencyId || '00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
+      const kc = String(member.districtId || '00.00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
+      const prefix = `${pp}.${kk}.${kc}`;
+      const next = (sequenceByPrefix[prefix] || 0) + 1;
+      sequenceByPrefix[prefix] = next;
+
+      member.nationalMemberNumber = `${prefix}.${String(next).padStart(6, '0')}`;
+      updated++;
+    });
+
+    if (updated > 0) this.setMembers(members);
+    return { updated, skipped, total: selected.length };
+  }
+
+  /**
    * Registrasi anggota baru.
    *
    * ID otomatis:
@@ -407,6 +512,11 @@ class StorageService {
         .toString(36)
         .toUpperCase()}`,
       locationHistory: [],
+      nationalMemberNumber: payload.nationalMemberNumber || this.generateNationalMemberNumber(
+        payload.provinceId,
+        payload.regencyId,
+        payload.districtId
+      ),
       skills: payload.skills || [],
       certifications: payload.certifications || []
     };
