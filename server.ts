@@ -143,6 +143,7 @@ const DB_FILE = path.join(DATA_DIR, 'saka-database.json');
 
 const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
+const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekKQk_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
 
 function hashPasswordForGoogleAppsScript(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -579,18 +580,22 @@ setInterval(() => {
 }, 25000);
 
 // Proxy mutation to Google Apps Script Web App
-async function forwardToGoogleAppsScript(payload: any, scriptUrlOverride?: string): Promise<any> {
-  const scriptUrl = String(scriptUrlOverride || payload?.scriptUrl || '').trim().replace(/\s+/g, '');
-  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(scriptUrl)) {
-    throw new Error('URL Google Apps Script belum diatur melalui Dashboard. Silakan buka Dashboard > Database Google Spreadsheet & Drive > Pengaturan API.');
+function normalizeManualAppsScriptUrl(raw: any): string {
+  const value = String(raw || '').trim().replace(/\s+/g, '');
+  if (!value || !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(value)) {
+    return '';
   }
+  return value;
+}
 
-  const { scriptUrl: _ignoredScriptUrl, ...gasPayload } = payload || {};
+async function forwardToGoogleAppsScript(payload: any, scriptUrlOverride?: string): Promise<any> {
+  const scriptUrl = normalizeManualAppsScriptUrl(scriptUrlOverride) || String(process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL).trim();
+  if (!scriptUrl) throw new Error('URL Google Apps Script belum diisi melalui Dashboard > Pengaturan API.');
 
   const res = await fetch(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(gasPayload)
+    body: JSON.stringify(payload)
   });
   const text = await res.text();
   let data: any = null;
@@ -610,72 +615,6 @@ async function forwardToGoogleAppsScript(payload: any, scriptUrlOverride?: strin
 // ==========================================
 
 // Health check
-// Upload image proxy: browser -> application server -> Google Apps Script -> Google Drive.
-// The browser must not call Apps Script directly because the JSON POST would
-// require cross-origin handling. This route also keeps the GAS URL server-side.
-app.post('/api/upload-image', async (req, res) => {
-  try {
-    const { base64, filename, category, scriptUrl } = req.body || {};
-    const value = String(base64 || '').trim();
-
-    if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
-      return res.status(400).json({
-        success: false,
-        status: 'error',
-        message: 'Data gambar tidak valid.'
-      });
-    }
-
-    // Match the Apps Script limit and avoid oversized requests reaching GAS.
-    if (value.length > 12 * 1024 * 1024) {
-      return res.status(413).json({
-        success: false,
-        status: 'error',
-        message: 'Data gambar terlalu besar.'
-      });
-    }
-
-    const result = await forwardToGoogleAppsScript({
-      action: 'UPLOAD_IMAGE',
-      base64: value,
-      filename: String(filename || `image_${Date.now()}.jpg`).trim(),
-      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase(),
-      scriptUrl
-    });
-
-    if (!result || result.success === false || !result.url) {
-      return res.status(502).json({
-        success: false,
-        status: 'error',
-        message: result?.message || 'Google Apps Script tidak mengembalikan URL foto.'
-      });
-    }
-
-    return res.json({
-      success: true,
-      status: 'success',
-      action: 'UPLOAD_IMAGE',
-      fileId: result.fileId || null,
-      url: result.url,
-      directUrl: result.directUrl || result.url,
-      viewUrl: result.viewUrl || null,
-      category: result.category || category || 'MEMBER_AVATAR',
-      filename: result.filename || filename || null,
-      message: result.message || 'Foto berhasil disimpan ke Google Drive'
-    });
-  } catch (error: any) {
-    console.error('[Upload Image] Error:', error);
-    const message = error?.message || 'Upload foto gagal.';
-    const statusMatch = message.match(/HTTP (\d{3})/i);
-    const upstreamStatus = statusMatch ? Number(statusMatch[1]) : 502;
-    return res.status(upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 502).json({
-      success: false,
-      status: 'error',
-      message
-    });
-  }
-});
-
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -686,7 +625,7 @@ app.get('/api/health', (req, res) => {
 
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
-  const { username, password, scriptUrl } = req.body || {};
+  const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Nama pengguna dan kata sandi wajib diisi.' });
   }
@@ -699,8 +638,7 @@ app.post('/api/auth/login', async (req, res) => {
     const gasResult = await forwardToGoogleAppsScript({
       action: 'AUTH_LOGIN',
       username: cleanUser,
-      password: rawPass,
-      scriptUrl
+      password: rawPass
     });
     if (gasResult?.status === 'success' && gasResult.user) {
       const gu = gasResult.user;
@@ -839,7 +777,7 @@ app.post('/api/auth/change-password', (req, res) => {
 
 // POST /api/auth/register - Public new member registration
 app.post('/api/auth/register', async (req, res) => {
-  const { memberData, password, centralAlreadyPersisted, scriptUrl } = req.body || {};
+  const { memberData, password, centralAlreadyPersisted } = req.body || {};
 
   if (!memberData || !memberData.fullName) {
     return res.status(400).json({ success: false, message: 'Data anggota wajib dilengkapi.' });
@@ -973,8 +911,7 @@ app.post('/api/auth/register', async (req, res) => {
         status: 'PENDING',
         createdAt: registeredAt
       },
-      passwordHash: gasPasswordHash,
-      scriptUrl
+      passwordHash: gasPasswordHash
     });
 
     await forwardToGoogleAppsScript({
@@ -997,8 +934,7 @@ app.post('/api/auth/register', async (req, res) => {
         newMember.avatarUrl || '',
         newMember.registeredAt,
         `https://spwnapps.vercel.app/?verifyId=${newMember.nationalMemberNumber || newMember.id}`
-      ],
-      scriptUrl
+      ]
     });
   } catch (gasErr: any) {
     // Roll back the transient Vercel records if the central write failed.
@@ -1182,15 +1118,69 @@ app.post('/api/sync-spreadsheet', async (req, res) => {
   });
 });
 
+// Upload image: URL GAS harus berasal dari Dashboard client.
+app.post('/api/upload-image', async (req, res) => {
+  try {
+    const { base64, filename, category, scriptUrl } = req.body || {};
+    const value = String(base64 || '').trim();
+    const manualScriptUrl = normalizeManualAppsScriptUrl(scriptUrl);
+
+    if (!manualScriptUrl) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: 'URL Google Apps Script belum diisi atau tidak valid. Atur melalui Dashboard > Pengaturan API.'
+      });
+    }
+
+    if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
+      return res.status(400).json({ success: false, status: 'error', message: 'Data gambar tidak valid.' });
+    }
+
+    if (value.length > 12 * 1024 * 1024) {
+      return res.status(413).json({ success: false, status: 'error', message: 'Data gambar terlalu besar.' });
+    }
+
+    const result = await forwardToGoogleAppsScript({
+      action: 'UPLOAD_IMAGE',
+      base64: value,
+      filename: String(filename || `image_${Date.now()}.jpg`).trim(),
+      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase()
+    }, manualScriptUrl);
+
+    if (!result || result.success !== true || result.status !== 'success' || result.action !== 'UPLOAD_IMAGE' || !result.url) {
+      const detail = result?.message || 'Google Apps Script tidak mengembalikan URL foto.';
+      return res.status(502).json({ success: false, status: 'error', message: detail });
+    }
+
+    return res.json({
+      success: true,
+      status: 'success',
+      action: 'UPLOAD_IMAGE',
+      fileId: result.fileId || null,
+      url: result.url,
+      directUrl: result.directUrl || result.url,
+      viewUrl: result.viewUrl || null,
+      category: result.category || category || 'MEMBER_AVATAR',
+      filename: result.filename || filename || null,
+      message: result.message || 'Foto berhasil disimpan ke Google Drive'
+    });
+  } catch (error: any) {
+    console.error('[Upload Image] Error:', error);
+    return res.status(502).json({ success: false, status: 'error', message: error?.message || 'Upload foto gagal.' });
+  }
+});
+
 // Central Mutation API - Receives any create/update/delete with Server Role Enforcement
 app.post('/api/mutate', async (req, res) => {
   const session = getSessionUser(req);
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
   const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
-  const { type, action, payload, scriptUrl } = req.body || {};
+  const { type, action, payload } = req.body || {};
+  const requestScriptUrl = normalizeManualAppsScriptUrl(req.body?.scriptUrl);
   const forwardMutationToGoogleAppsScript = (gasPayload: any) =>
-    forwardToGoogleAppsScript(gasPayload, scriptUrl);
+    forwardToGoogleAppsScript(gasPayload, requestScriptUrl);
 
   if (!type || !action) {
     return res.status(400).json({ success: false, message: 'Parameter type atau action tidak lengkap.' });
@@ -1224,6 +1214,10 @@ app.post('/api/mutate', async (req, res) => {
   if (db.auditLogs.length > 500) db.auditLogs.pop();
 
   console.log(`[Mutation] [${session?.role || 'PUBLIC'}] Received ${type}:${action} from client.`);
+
+  if (type === 'MEMBER' && ['CREATE', 'REGISTER', 'UPDATE', 'STATUS', 'PHOTO_UPDATE', 'DELETE'].includes(action) && !requestScriptUrl) {
+    return res.status(400).json({ success: false, message: 'URL Google Apps Script belum diisi melalui Dashboard > Pengaturan API.' });
+  }
 
   try {
     if (type === 'MEMBER') {
