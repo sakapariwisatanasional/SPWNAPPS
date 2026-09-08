@@ -580,7 +580,8 @@ class SpreadsheetService {
       body: JSON.stringify({
         base64,
         filename: filename || `image_${Date.now()}.jpg`,
-        category
+        category,
+        scriptUrl: this.normalizeAppsScriptUrl(this.config.scriptUrl)
       })
     });
 
