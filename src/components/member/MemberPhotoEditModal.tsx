@@ -142,7 +142,19 @@ export const MemberPhotoEditModal: React.FC<MemberPhotoEditModalProps> = ({
         }
 
         ctx.drawImage(img, 0, 0, width, height);
-        setSelectedPhoto(canvas.toDataURL('image/jpeg', 0.82));
+
+        // Keep the transport payload safely below typical serverless request limits.
+        // The original upload may be up to 5MB, but the persisted image is a compact
+        // JPEG and is uploaded to Drive before the member record is updated.
+        let quality = 0.82;
+        let compressed = canvas.toDataURL('image/jpeg', quality);
+        const maxBase64Chars = 2.5 * 1024 * 1024;
+        while (compressed.length > maxBase64Chars && quality > 0.5) {
+          quality -= 0.08;
+          compressed = canvas.toDataURL('image/jpeg', quality);
+        }
+
+        setSelectedPhoto(compressed);
       };
       img.onerror = () => setSelectedPhoto(source);
       img.src = source;
@@ -169,23 +181,35 @@ export const MemberPhotoEditModal: React.FC<MemberPhotoEditModalProps> = ({
 
     setIsSaving(true);
 
-    // Jika berupa base64 dan Google Apps Script aktif, kirim juga ke Drive
-    if (selectedPhoto.startsWith('data:image')) {
-      const cleanName = member.fullName.replace(/[^a-zA-Z0-9]/g, '_');
-      const filename = `KTA_${member.nationalMemberNumber || member.id}_${cleanName}.jpg`;
-      spreadsheetService.uploadImageToDrive(selectedPhoto, filename, 'MEMBER_AVATAR').catch(console.error);
-    }
+    try {
+      let avatarUrl = selectedPhoto.trim();
 
-    const updated = storage.updateMemberPhoto(member.id, selectedPhoto, currentUser);
-    setIsSaving(false);
-    setSaveSuccess(true);
-
-    setTimeout(() => {
-      if (updated && onSuccess) {
-        onSuccess(updated);
+      // Base64 is temporary only. Upload to Drive first, then persist the URL.
+      if (avatarUrl.startsWith('data:image')) {
+        const cleanName = member.fullName.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `KTA_${member.nationalMemberNumber || member.id}_${cleanName}.jpg`;
+        const uploaded = await spreadsheetService.uploadImageToDrive(avatarUrl, filename, 'MEMBER_AVATAR');
+        avatarUrl = uploaded.url;
       }
-      onClose();
-    }, 600);
+
+      if (avatarUrl.startsWith('data:image')) {
+        throw new Error('Foto belum berhasil dikonversi menjadi URL Google Drive.');
+      }
+
+      const updated = storage.updateMemberPhoto(member.id, avatarUrl, currentUser);
+      if (!updated) throw new Error('Data anggota tidak ditemukan.');
+
+      setIsSaving(false);
+      setSaveSuccess(true);
+
+      setTimeout(() => {
+        if (onSuccess) onSuccess(updated);
+        onClose();
+      }, 600);
+    } catch (error: any) {
+      setIsSaving(false);
+      alert(error?.message || 'Gagal menyimpan foto anggota.');
+    }
   };
 
   return (
