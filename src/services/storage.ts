@@ -405,6 +405,15 @@ class StorageService {
     }
 
     try {
+      let configuredScriptUrl = '';
+      try {
+        const rawConfig = localStorage.getItem('saka_spreadsheet_config_v1');
+        if (rawConfig) {
+          const parsedConfig = JSON.parse(rawConfig);
+          configuredScriptUrl = String(parsedConfig?.scriptUrl || '').trim();
+        }
+      } catch {}
+
       const response = await fetch('/api/mutate', {
         method: 'POST',
         headers: {
@@ -416,7 +425,8 @@ class StorageService {
           type: 'MEMBER',
           action: 'UPDATE',
           payload: updatedMember,
-          reason: reason || 'Pembaruan profil anggota'
+          reason: reason || 'Pembaruan profil anggota',
+          scriptUrl: configuredScriptUrl
         })
       });
 
