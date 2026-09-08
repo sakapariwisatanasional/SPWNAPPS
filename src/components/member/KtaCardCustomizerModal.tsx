@@ -11,7 +11,9 @@ import {
   Calendar,
   Layers,
   FileDown,
-  Eye
+  Eye,
+  MapPin,
+  RefreshCw
 } from 'lucide-react';
 import { KtaCardSettings, Member } from '../../types';
 import { storage, DEFAULT_KTA_SETTINGS } from '../../services/storage';
@@ -32,6 +34,39 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
   const [settings, setSettings] = useState<KtaCardSettings>(storage.getKtaSettings());
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [regionProvinceId, setRegionProvinceId] = useState('');
+  const [regionRegencyId, setRegionRegencyId] = useState('');
+  const [regionDistrictId, setRegionDistrictId] = useState('');
+  const [regionBusy, setRegionBusy] = useState(false);
+
+  const provinces = storage.getProvinces();
+  const regencies = regionProvinceId ? storage.getRegencies(regionProvinceId) : [];
+  const districts = regionRegencyId ? storage.getDistricts(regionRegencyId) : [];
+
+  const handleGenerateByRegion = () => {
+    if (!regionProvinceId) {
+      alert('Pilih minimal Provinsi terlebih dahulu.');
+      return;
+    }
+    if (!confirm('Generate NTA untuk anggota yang belum memiliki nomor pada wilayah terpilih? Nomor NTA yang sudah ada tidak akan diubah.')) return;
+
+    setRegionBusy(true);
+    try {
+      const result = storage.generateNationalMemberNumbersByRegion(
+        regionProvinceId,
+        regionRegencyId || undefined,
+        regionDistrictId || undefined
+      );
+      alert(`Generate NTA selesai. ${result.updated} anggota mendapatkan nomor baru. ${result.skipped} anggota sudah memiliki NTA.`);
+      onSuccess?.();
+    } finally {
+      setRegionBusy(false);
+    }
+  };
+
+  const selectedProvince = provinces.find(p => p.id === regionProvinceId);
+  const selectedRegency = regencies.find(r => r.id === regionRegencyId);
+  const selectedDistrict = districts.find(d => d.id === regionDistrictId);
 
   // Ambil salah satu anggota untuk pratinjau kartu KTA
   const previewMember: Member = storage.getMembers()[0] || {
@@ -150,6 +185,40 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
               >
                 Bagian Depan & Tema Warna
               </button>
+            </div>
+
+            {/* Penerbitan NTA berdasarkan wilayah */}
+            <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50/70 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-900 text-white flex items-center justify-center shrink-0"><MapPin className="w-4 h-4" /></div>
+                <div>
+                  <p className="font-bold text-purple-950">Penerbitan Nomor Anggota Berdasarkan Wilayah</p>
+                  <p className="text-[10px] text-purple-800 mt-0.5">Super Admin dapat menerbitkan NTA untuk anggota yang belum memiliki nomor. Format: PP.KK.KC.NNNNNN.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <select value={regionProvinceId} onChange={e => { setRegionProvinceId(e.target.value); setRegionRegencyId(''); setRegionDistrictId(''); }} className="w-full px-3 py-2.5 bg-white border border-purple-200 rounded-xl text-xs font-semibold">
+                  <option value="">Pilih Provinsi</option>
+                  {provinces.filter(p => p.id !== '00').map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+                </select>
+                <select value={regionRegencyId} disabled={!regionProvinceId} onChange={e => { setRegionRegencyId(e.target.value); setRegionDistrictId(''); }} className="w-full px-3 py-2.5 bg-white border border-purple-200 rounded-xl text-xs font-semibold disabled:opacity-50">
+                  <option value="">Semua Kabupaten/Kota</option>
+                  {regencies.map(r => <option key={r.id} value={r.id}>{r.id} — {r.name}</option>)}
+                </select>
+                <select value={regionDistrictId} disabled={!regionRegencyId} onChange={e => setRegionDistrictId(e.target.value)} className="w-full px-3 py-2.5 bg-white border border-purple-200 rounded-xl text-xs font-semibold disabled:opacity-50">
+                  <option value="">Semua Kecamatan</option>
+                  {districts.map(d => <option key={d.id} value={d.id}>{d.id} — {d.name}</option>)}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] text-purple-700">Wilayah: {selectedDistrict?.name || selectedRegency?.name || selectedProvince?.name || 'Belum dipilih'}</p>
+                <button type="button" onClick={handleGenerateByRegion} disabled={!regionProvinceId || regionBusy} className="px-3.5 py-2 rounded-xl bg-purple-900 text-white font-bold text-[11px] hover:bg-purple-950 disabled:opacity-50 flex items-center gap-2">
+                  <RefreshCw className={`w-3.5 h-3.5 ${regionBusy ? 'animate-spin' : ''}`} />
+                  Generate NTA Wilayah
+                </button>
+              </div>
             </div>
 
             {activeTab === 'BACK' && (
