@@ -8,16 +8,6 @@ import {
   KtaCustomSettings,
   KridaModule
 } from '../types';
-import { initialMembers, initialTourPackages, initialActivities, initialCulinarySouvenirs } from '../data/initialData';
-import * as KridaDataModule from '../data/kridaModules2026';
-
-// Mendeteksi data master krida dari default export maupun named export
-const defaultKridaModules: KridaModule[] = 
-  (KridaDataModule as any).kridaModules2026 || 
-  (KridaDataModule as any).kridaModules || 
-  (KridaDataModule as any).initialKridaModules || 
-  (KridaDataModule as any).default || 
-  [];
 
 const STORAGE_KEYS = {
   MEMBERS: 'saka_members',
@@ -47,20 +37,22 @@ export const storage = {
   // ==========================================
   getKridaModules: (): KridaModule[] => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.KRIDA_MODULES);
-      if (data) {
-        return JSON.parse(data);
+      if (typeof window !== 'undefined') {
+        const data = localStorage.getItem(STORAGE_KEYS.KRIDA_MODULES);
+        if (data) {
+          return JSON.parse(data);
+        }
       }
     } catch (e) {
       console.error('Gagal mengambil modul krida dari storage:', e);
     }
-    return defaultKridaModules;
+    return [];
   },
 
   saveKridaModules: (modules: KridaModule[]): void => {
     try {
-      localStorage.setItem(STORAGE_KEYS.KRIDA_MODULES, JSON.stringify(modules));
       if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.KRIDA_MODULES, JSON.stringify(modules));
         window.dispatchEvent(new CustomEvent('krida-modules-updated', { detail: modules }));
       }
     } catch (e) {
@@ -69,21 +61,24 @@ export const storage = {
   },
 
   // ==========================================
-  // MEMBERS & REGISTRATION
+  // MEMBERS & REGISTRATION (Format member-01, member-02, dst.)
   // ==========================================
   getMembers: (): Member[] => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.MEMBERS);
-      return data ? JSON.parse(data) : initialMembers;
-    } catch {
-      return initialMembers;
+      if (typeof window !== 'undefined') {
+        const data = localStorage.getItem(STORAGE_KEYS.MEMBERS);
+        if (data) return JSON.parse(data);
+      }
+    } catch (e) {
+      console.error('Gagal mengambil data anggota:', e);
     }
+    return [];
   },
 
   saveMembers: (members: Member[]): void => {
     try {
-      localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
       if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
         window.dispatchEvent(new CustomEvent('saka-members-updated', { detail: members }));
       }
     } catch (e) {
@@ -94,7 +89,7 @@ export const storage = {
   registerMember: (data: Omit<Member, 'id' | 'createdAt' | 'status'>): Member => {
     const currentMembers = storage.getMembers();
 
-    // Hitung nomor urut terbesar (member-01, member-02, dst.)
+    // Hitung nomor urut tertinggi untuk format member-01, member-02, dst.
     let maxIdNum = 0;
     currentMembers.forEach(m => {
       if (typeof m?.id === 'string') {
@@ -146,17 +141,20 @@ export const storage = {
   // ==========================================
   getKtaSettings: (): KtaCustomSettings => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS);
-      return data ? { ...defaultKtaSettings, ...JSON.parse(data) } : defaultKtaSettings;
+      if (typeof window !== 'undefined') {
+        const data = localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS);
+        return data ? { ...defaultKtaSettings, ...JSON.parse(data) } : defaultKtaSettings;
+      }
     } catch {
       return defaultKtaSettings;
     }
+    return defaultKtaSettings;
   },
 
   saveKtaSettings: (settings: KtaCustomSettings): void => {
     try {
-      localStorage.setItem(STORAGE_KEYS.KTA_SETTINGS, JSON.stringify(settings));
       if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.KTA_SETTINGS, JSON.stringify(settings));
         window.dispatchEvent(new CustomEvent('kta-settings-updated', { detail: settings }));
       }
     } catch (e) {
@@ -169,16 +167,21 @@ export const storage = {
   // ==========================================
   getPackages: (): TourPackage[] => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.PACKAGES);
-      return data ? JSON.parse(data) : initialTourPackages;
-    } catch {
-      return initialTourPackages;
+      if (typeof window !== 'undefined') {
+        const data = localStorage.getItem(STORAGE_KEYS.PACKAGES);
+        if (data) return JSON.parse(data);
+      }
+    } catch (e) {
+      console.error('Gagal mengambil paket wisata:', e);
     }
+    return [];
   },
 
   savePackages: (packages: TourPackage[]): void => {
     try {
-      localStorage.setItem(STORAGE_KEYS.PACKAGES, JSON.stringify(packages));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.PACKAGES, JSON.stringify(packages));
+      }
     } catch (e) {
       console.error('Gagal menyimpan paket wisata:', e);
     }
@@ -189,16 +192,21 @@ export const storage = {
   // ==========================================
   getActivities: (): Activity[] => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
-      return data ? JSON.parse(data) : initialActivities;
-    } catch {
-      return initialActivities;
+      if (typeof window !== 'undefined') {
+        const data = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
+        if (data) return JSON.parse(data);
+      }
+    } catch (e) {
+      console.error('Gagal mengambil kegiatan:', e);
     }
+    return [];
   },
 
   saveActivities: (activities: Activity[]): void => {
     try {
-      localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
+      }
     } catch (e) {
       console.error('Gagal menyimpan kegiatan:', e);
     }
@@ -209,18 +217,23 @@ export const storage = {
   // ==========================================
   getCulinary: (): CulinarySouvenirItem[] => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.CULINARY);
-      return data ? JSON.parse(data) : initialCulinarySouvenirs;
-    } catch {
-      return initialCulinarySouvenirs;
+      if (typeof window !== 'undefined') {
+        const data = localStorage.getItem(STORAGE_KEYS.CULINARY);
+        if (data) return JSON.parse(data);
+      }
+    } catch (e) {
+      console.error('Gagal mengambil kuliner:', e);
     }
+    return [];
   },
 
   saveCulinary: (items: CulinarySouvenirItem[]): void => {
     try {
-      localStorage.setItem(STORAGE_KEYS.CULINARY, JSON.stringify(items));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.CULINARY, JSON.stringify(items));
+      }
     } catch (e) {
-      console.error('Gagal menyimpan kuliner/cenderamata:', e);
+      console.error('Gagal menyimpan kuliner:', e);
     }
   },
 
@@ -229,11 +242,14 @@ export const storage = {
   // ==========================================
   getAuditLogs: (): AuditLog[] => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
-      return data ? JSON.parse(data) : [];
+      if (typeof window !== 'undefined') {
+        const data = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
+        if (data) return JSON.parse(data);
+      }
     } catch {
       return [];
     }
+    return [];
   },
 
   addAuditLog: (log: Omit<AuditLog, 'id' | 'timestamp'>): void => {
@@ -245,7 +261,9 @@ export const storage = {
         timestamp: new Date().toISOString()
       };
       logs.unshift(newLog);
-      localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs.slice(0, 500)));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs.slice(0, 500)));
+      }
     } catch (e) {
       console.error('Gagal menambah log audit:', e);
     }
@@ -256,19 +274,24 @@ export const storage = {
   // ==========================================
   getCurrentUser: (): AdminUser | null => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.SESSION);
-      return data ? JSON.parse(data) : null;
+      if (typeof window !== 'undefined') {
+        const data = localStorage.getItem(STORAGE_KEYS.SESSION);
+        return data ? JSON.parse(data) : null;
+      }
     } catch {
       return null;
     }
+    return null;
   },
 
   setCurrentUser: (user: AdminUser | null): void => {
     try {
-      if (user) {
-        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.SESSION);
+      if (typeof window !== 'undefined') {
+        if (user) {
+          localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+        } else {
+          localStorage.removeItem(STORAGE_KEYS.SESSION);
+        }
       }
     } catch (e) {
       console.error('Gagal menyimpan sesi login:', e);
