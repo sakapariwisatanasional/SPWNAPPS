@@ -85,7 +85,7 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
         className="w-[340px] sm:w-[380px] h-[215px] sm:h-[240px] perspective-1000 cursor-pointer"
         onClick={() => setIsFlipped(!isFlipped)}
       >
-        <div className={`relative w-full h-full duration-500 preserve-3d transition-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
+        <div className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${isFlipped ? 'rotate-y-180' : ''}`} style={{ transformStyle: 'preserve-3d' }}>
           
           {/* SISI DEPAN KTA */}
           <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-slate-900 via-purple-950 to-slate-950 rounded-2xl p-4 text-white shadow-2xl border border-purple-800/40 backface-hidden flex flex-col justify-between overflow-hidden">
