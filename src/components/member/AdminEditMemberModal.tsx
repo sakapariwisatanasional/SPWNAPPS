@@ -360,7 +360,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
     setMemberSkills(prev => prev.filter(s => s.id !== skillId));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (isSubmitting) return;
@@ -427,7 +427,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         skills: memberSkills
       };
 
-      const result = storage.adminUpdateMember(
+      const result = await storage.adminUpdateMember(
         member.id,
         updatedPayload,
         currentUser,
@@ -437,6 +437,9 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       if (result) {
         onSuccess(result);
         onClose();
+        alert('Perubahan profil anggota berhasil disimpan.');
+      } else {
+        alert('Data anggota tidak ditemukan sehingga perubahan tidak dapat disimpan.');
       }
     } catch (err) {
       console.error('Error updating member:', err);
