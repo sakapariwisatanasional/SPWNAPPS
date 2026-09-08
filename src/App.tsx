@@ -297,17 +297,27 @@ export default function App() {
   }, [members]);
 
   // Handle Approve / Reject Member
-  const handleApproveMember = (memberId: string) => {
-    const success = storage.updateMemberStatus(memberId, 'ACTIVE', currentUser);
+  // Status tidak lagi hanya diubah di localStorage. Proses menunggu sampai
+  // /api/mutate berhasil menulis ke server dan Google Spreadsheet.
+  const handleApproveMember = async (memberId: string) => {
+    const success = await storage.updateMemberStatus(memberId, 'ACTIVE', currentUser);
     if (success) {
       setMembers(storage.getMembers());
+      alert('Anggota berhasil diverifikasi dan perubahan telah dikirim ke Google Spreadsheet.');
+    } else {
+      setMembers(storage.getMembers());
+      alert('Verifikasi gagal disimpan. Data dikembalikan ke status sebelumnya. Silakan coba lagi.');
     }
   };
 
-  const handleRejectMember = (memberId: string) => {
-    const success = storage.updateMemberStatus(memberId, 'SUSPENDED', currentUser);
+  const handleRejectMember = async (memberId: string) => {
+    const success = await storage.updateMemberStatus(memberId, 'SUSPENDED', currentUser);
     if (success) {
       setMembers(storage.getMembers());
+      alert('Status anggota berhasil diperbarui dan perubahan telah dikirim ke Google Spreadsheet.');
+    } else {
+      setMembers(storage.getMembers());
+      alert('Perubahan status gagal disimpan. Data dikembalikan ke status sebelumnya.');
     }
   };
 
