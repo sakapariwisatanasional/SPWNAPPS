@@ -283,6 +283,17 @@ class SpreadsheetService {
           // HANYA menjadi ACTIVE jika kolom status secara jelas tertulis ACTIVE / AKTIF / DISETUJUI
           const rawStatus = this.getRowVal(row, ['Status Verifikasi', 'Status Anggota', 'Status', 'status', 'Validasi']).toUpperCase();
           let finalStatus: 'ACTIVE' | 'PENDING' | 'SUSPENDED' = 'PENDING';
+
+          // Jika admin baru saja mengubah status, jangan izinkan polling
+          // Spreadsheet yang masih memakai nilai lama menimpa perubahan lokal.
+          // Penanda ini dibuat oleh StorageService saat /api/mutate sedang
+          // diproses. Setelah berhasil, penanda dihapus.
+          let pendingWrite: any = null;
+          try {
+            const pendingRaw = localStorage.getItem('saka_pending_member_writes_v1');
+            const pendingMap = pendingRaw ? JSON.parse(pendingRaw) : {};
+            pendingWrite = pendingMap?.[memberId];
+          } catch {}
           
           if (rawStatus.includes('AKTIF') || rawStatus.includes('ACTIVE') || rawStatus.includes('DISETUJUI') || rawStatus.includes('APPROVED')) {
             finalStatus = 'ACTIVE';
@@ -290,6 +301,10 @@ class SpreadsheetService {
             finalStatus = 'SUSPENDED';
           } else {
             finalStatus = 'PENDING';
+          }
+
+          if (pendingWrite && Date.now() - Number(pendingWrite.timestamp || 0) < 30000) {
+            finalStatus = pendingWrite.status || finalStatus;
           }
 
           // Cari data provinsi ID jika cocok
@@ -394,12 +409,19 @@ class SpreadsheetService {
     ];
 
     try {
-      await fetch(scriptUrl, {
+      const response = await fetch(scriptUrl, {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'UPSERT_MEMBER', sheet: 'Anggota', rowData })
+        body: JSON.stringify({ action: 'UPSERT_MEMBER', sheet: 'Anggota', memberId: member.id, rowData })
       });
+      if (!response.ok) {
+        throw new Error(`Google Apps Script HTTP ${response.status}`);
+      }
+      let result: any = null;
+      try { result = await response.json(); } catch {}
+      if (result?.status === 'error') {
+        throw new Error(result.message || 'Google Apps Script menolak penyimpanan.');
+      }
       return { success: true, synced: true, message: 'Data berhasil disimpan ke Google Spreadsheet.' };
     } catch (err: any) {
       return { success: false, synced: false, message: err?.message || 'Gagal mengirim data.' };
@@ -484,6 +506,27 @@ function doPost(e) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheetName = body.sheet || "Anggota";
     var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+
+    if (body.action === "UPDATE_AUTH_STATUS") {
+      var authSheet = ss.getSheetByName("Users") || ss.getSheetByName("Pengguna");
+      if (authSheet) {
+        var authValues = authSheet.getDataRange().getValues();
+        var authMemberId = String(body.memberId || "").trim();
+        for (var au = 1; au < authValues.length; au++) {
+          for (var ac = 0; ac < authValues[au].length; ac++) {
+            if (String(authValues[au][ac]).trim() === authMemberId) {
+              var statusCol = -1;
+              for (var ah = 0; ah < authValues[0].length; ah++) {
+                var header = String(authValues[0][ah]).toLowerCase();
+                if (header === "status" || header === "status anggota" || header === "status verifikasi") { statusCol = ah + 1; break; }
+              }
+              if (statusCol > 0) authSheet.getRange(au + 1, statusCol).setValue(body.status || "PENDING");
+              break;
+            }
+          }
+        }
+      }
+    }
 
     if (body.rowData && Array.isArray(body.rowData)) {
       var rowId = String(body.memberId || body.rowData[0] || "").trim();
