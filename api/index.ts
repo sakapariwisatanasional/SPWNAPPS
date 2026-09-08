@@ -72,10 +72,18 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-this-session-secret';
 const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
 
-// The Google Apps Script endpoint is the authoritative external write target.
-// Keep a production fallback so a fresh Vercel instance does not depend on the
-// writable local JSON file for its script configuration.
-const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekKQk_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
+// URL Google Apps Script TIDAK boleh ditentukan oleh source code.
+// Super Admin mengisinya melalui Dashboard > Pengaturan API.
+const DEFAULT_APPS_SCRIPT_URL = '';
+
+function normalizeManualAppsScriptUrl(raw: unknown): string {
+  const value = String(raw || '').trim().replace(/\s+/g, '');
+  if (!value) return '';
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(value)) {
+    return '';
+  }
+  return value;
+}
 
 function base64UrlEncode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url');
@@ -584,20 +592,14 @@ if (!IS_VERCEL) {
 }
 
 // Proxy mutation to Google Apps Script Web App
-function normalizeManualAppsScriptUrl(raw: any): string {
-  const value = String(raw || '').trim().replace(/\s+/g, '');
-  if (!value || !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(value)) {
-    return '';
-  }
-  return value;
-}
-
-async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: string): Promise<any> {
-  const scriptUrl =
-    normalizeManualAppsScriptUrl(requestedScriptUrl) ||
-    normalizeManualAppsScriptUrl(payload?.scriptUrl) ||
-    normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
-    '';
+async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
+  // Prioritas MUTLAK: URL yang dikirim aplikasi dari Dashboard.
+  // Environment/default hanya dipertahankan sebagai kompatibilitas server lama,
+  // tetapi tidak digunakan jika URL manual belum diberikan.
+  const manualUrl = normalizeManualAppsScriptUrl(requestedScriptUrl);
+  const configuredUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+  const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+  const scriptUrl = manualUrl || configuredUrl || envUrl || DEFAULT_APPS_SCRIPT_URL;
 
   if (!scriptUrl) {
     throw new Error('Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.');
@@ -637,7 +639,7 @@ async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: stri
 // require cross-origin handling. This route also keeps the GAS URL server-side.
 app.post('/api/upload-image', async (req, res) => {
   try {
-    const { base64, filename, category, scriptUrl: requestedScriptUrl } = req.body || {};
+    const { base64, filename, category, scriptUrl } = req.body || {};
     const value = String(base64 || '').trim();
 
     if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
@@ -661,8 +663,9 @@ app.post('/api/upload-image', async (req, res) => {
       action: 'UPLOAD_IMAGE',
       base64: value,
       filename: String(filename || `image_${Date.now()}.jpg`).trim(),
-      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase()
-    }, requestedScriptUrl);
+      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase(),
+      scriptUrl
+    }, scriptUrl);
 
     if (!result || result.success === false || !result.url) {
       return res.status(502).json({
@@ -1125,7 +1128,8 @@ app.post('/api/mutate', async (req, res) => {
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
   const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
-  const { type, action, payload } = req.body || {};
+  const { type, action, payload, scriptUrl } = req.body || {};
+  const requestScriptUrl = normalizeManualAppsScriptUrl(scriptUrl);
   if (!type || !action) {
     return res.status(400).json({ success: false, message: 'Parameter type atau action tidak lengkap.' });
   }
@@ -1142,6 +1146,17 @@ app.post('/api/mutate', async (req, res) => {
       }
     }
   }
+
+  if (!requestScriptUrl) {
+    return res.status(400).json({
+      success: false,
+      status: 'error',
+      message: 'Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.'
+    });
+  }
+
+  const forwardMutation = (gasPayload: any) =>
+    forwardToGoogleAppsScript(gasPayload, requestScriptUrl);
 
   // Audit Logging
   db.auditLogs.unshift({
@@ -1169,7 +1184,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        await forwardToGoogleAppsScript({
+        await forwardMutation({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1197,7 +1212,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        await forwardToGoogleAppsScript({
+        await forwardMutation({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1219,7 +1234,7 @@ app.post('/api/mutate', async (req, res) => {
           ]
         });
         if ((action === 'STATUS' || action === 'UPDATE') && member.id && member.status) {
-          await forwardToGoogleAppsScript({
+          await forwardMutation({
             action: 'UPDATE_AUTH_STATUS',
             memberId: member.id,
             status: member.status
@@ -1228,7 +1243,7 @@ app.post('/api/mutate', async (req, res) => {
       } else if (action === 'DELETE') {
         const memberId = payload.id || payload.memberId;
         db.members = db.members.filter(m => m.id !== memberId);
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Anggota',
           id: memberId,
@@ -1244,7 +1259,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.tours.unshift(tour);
         }
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'UPSERT_ROW',
           sheet: 'Paket_Wisata',
           id: tour.id,
@@ -1265,7 +1280,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.tours = db.tours.filter(t => t.id !== payload.id);
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Paket_Wisata',
           id: payload.id
@@ -1280,7 +1295,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.culinaryItems.unshift(item);
         }
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'UPSERT_ROW',
           sheet: 'Kuliner_Cinderamata',
           id: item.id,
@@ -1301,7 +1316,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.culinaryItems = db.culinaryItems.filter(c => c.id !== payload.id);
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Kuliner_Cinderamata',
           id: payload.id
@@ -1316,7 +1331,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.activities.unshift(act);
         }
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'UPSERT_ROW',
           sheet: 'Agenda_Kegiatan',
           id: act.id,
@@ -1339,7 +1354,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.activities = db.activities.filter(a => a.id !== payload.id);
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Agenda_Kegiatan',
           id: payload.id
