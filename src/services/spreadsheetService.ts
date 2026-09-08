@@ -5,7 +5,7 @@ import { MASTER_SKILLS } from '../data/initialData';
 
 export const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 export const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
-export const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekKQk_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
+export const DEFAULT_APPS_SCRIPT_URL = '';
 
 const SPREADSHEET_CONFIG_KEY = 'saka_spreadsheet_config_v1';
 
@@ -43,33 +43,6 @@ class SpreadsheetService {
     this.syncState.pollingIntervalSeconds = this.config.autoRefreshIntervalSeconds || 6;
     this.initAutoSync();
     this.startLiveSyncEngine((this.config.autoRefreshIntervalSeconds || 6) * 1000);
-    this.fetchServerConfig().catch(() => {});
-  }
-
-  public async fetchServerConfig() {
-    if (typeof window === 'undefined') return;
-    try {
-      const res = await fetch('/api/config');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.config) {
-          const localScriptUrl = String(this.config.scriptUrl || '').trim();
-          const localSpreadsheetId = String(this.config.spreadsheetId || '').trim();
-          const serverScriptUrl = String(data.config.scriptUrl || '').trim();
-          const serverSpreadsheetId = String(data.config.spreadsheetId || '').trim();
-
-          this.config = {
-            ...this.config,
-            ...data.config,
-            spreadsheetId: localSpreadsheetId || serverSpreadsheetId || DEFAULT_SPREADSHEET_ID,
-            spreadsheetUrl: this.config.spreadsheetUrl || data.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
-            scriptUrl: localScriptUrl || serverScriptUrl
-          };
-          localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
-          this.notifySyncState();
-        }
-      }
-    } catch {}
   }
 
   public startLiveSyncEngine(intervalMs: number = 6000) {
@@ -101,7 +74,7 @@ class SpreadsheetService {
     const defaultConf: SpreadsheetConfig = {
       spreadsheetId: DEFAULT_SPREADSHEET_ID,
       spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
-      scriptUrl: DEFAULT_APPS_SCRIPT_URL,
+      scriptUrl: '',
       autoSync: true,
       autoRefreshIntervalSeconds: 6,
       status: 'IDLE'
@@ -116,7 +89,7 @@ class SpreadsheetService {
           ...parsed,
           spreadsheetId: (parsed.spreadsheetId && parsed.spreadsheetId.trim()) || DEFAULT_SPREADSHEET_ID,
           spreadsheetUrl: (parsed.spreadsheetUrl && parsed.spreadsheetUrl.trim()) || DEFAULT_SPREADSHEET_URL,
-          scriptUrl: (parsed.scriptUrl && parsed.scriptUrl.trim()) || DEFAULT_APPS_SCRIPT_URL,
+          scriptUrl: (parsed.scriptUrl && parsed.scriptUrl.trim()) || '',
           autoSync: parsed.autoSync !== undefined ? parsed.autoSync : true,
           autoRefreshIntervalSeconds: parsed.autoRefreshIntervalSeconds || 6
         };
@@ -164,7 +137,7 @@ class SpreadsheetService {
     return {
       ...this.syncState,
       autoSync: this.config.autoSync !== false,
-      hasScriptUrl: Boolean(this.normalizeAppsScriptUrl(this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL)),
+      hasScriptUrl: Boolean(this.normalizeAppsScriptUrl(this.config.scriptUrl)),
       status: this.config.status,
       lastSyncedAt: this.config.lastSyncedAt,
       isLiveSyncActive: this.isLiveSyncActive
@@ -192,7 +165,7 @@ class SpreadsheetService {
   }
 
   private async handleAutoSyncMutation(event: any) {
-    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL);
+    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
     if (!scriptUrl) return;
 
     try {
@@ -236,7 +209,7 @@ class SpreadsheetService {
   }
 
   public async fetchSheetRows(sheetName: string = 'Anggota'): Promise<Record<string, any>[]> {
-    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL);
+    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
     if (!scriptUrl) return [];
 
     try {
@@ -436,7 +409,7 @@ class SpreadsheetService {
   }
 
   public async saveMemberAndWaitForSync(member: Member): Promise<{ success: boolean; synced: boolean; message: string; row?: number | null }> {
-    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL);
+    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
     if (!scriptUrl) return { success: false, synced: false, message: 'URL Apps Script belum diisi.' };
 
     const rowData = [
@@ -501,7 +474,7 @@ class SpreadsheetService {
   }
 
   public async pushAllDataToSpreadsheet(): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL);
+    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
     if (!scriptUrl) return { success: false, message: 'URL Apps Script belum diisi.' };
 
     try {
@@ -570,6 +543,11 @@ class SpreadsheetService {
       throw new Error('Format foto tidak valid.');
     }
 
+    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
+    if (!scriptUrl) {
+      throw new Error('URL Google Apps Script belum diatur. Silakan isi URL Web App pada Dashboard > Database Google Spreadsheet & Drive > Pengaturan API.');
+    }
+
     const response = await fetch('/api/upload-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -578,7 +556,7 @@ class SpreadsheetService {
         base64,
         filename: filename || `image_${Date.now()}.jpg`,
         category,
-        scriptUrl: this.normalizeAppsScriptUrl(this.config.scriptUrl || '') || undefined
+        scriptUrl
       })
     });
 
