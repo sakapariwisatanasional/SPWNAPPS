@@ -1,1222 +1,808 @@
-import {
-  Member,
-  TourPackage,
-  Activity,
-  Province,
-  Regency,
-  District,
-  Branch,
-  Skill,
-  AuditLog,
-  CurrentUser,
-  KtaCardSettings,
-  CulinarySouvenirItem,
-  KridaModuleItem,
-  NotificationItem
-} from '../types';
+import React, { useState, useEffect } from 'react';
+import { 
+  Member, 
+  TourPackage, 
+  Activity, 
+  Province, 
+  Skill, 
+  AuditLog, 
+  CurrentUser, 
+  CulinarySouvenirItem 
+} from './types';
+import { storage } from './services/storage';
+import { DEFAULT_PUBLIC_USER } from './data/initialData';
+import { spreadsheetService } from './services/spreadsheetService';
+import { verifyMemberUniversal } from './services/ktaVerificationService';
 
-import {
-  INITIAL_MEMBERS,
-  INITIAL_TOUR_PACKAGES,
-  INITIAL_ACTIVITIES,
-  INITIAL_AUDIT_LOGS,
-  DEFAULT_PUBLIC_USER,
-  DEMO_USERS,
-  MASTER_SKILLS,
-  INITIAL_CULINARY_SOUVENIRS
-} from '../data/initialData';
-
-import {
-  INITIAL_KRIDA_MODULES
-} from '../data/kridaData';
-
-import {
-  PROVINCES_DATA,
-  REGENCIES_DATA,
-  getDistrictsForRegency
-} from '../data/indonesiaTerritories';
-
-const STORAGE_KEYS = {
-  MEMBERS: 'saka_members',
-  TOURS: 'saka_tours',
-  ACTIVITIES: 'saka_activities',
-  AUDIT_LOGS: 'saka_audit_logs',
-  USERS: 'saka_users',
-  CURRENT_USER: 'saka_current_user',
-  KTA_SETTINGS: 'saka_kta_settings_v2',
-  CULINARY_SOUVENIRS: 'saka_culinary_souvenirs',
-  AUTH_TOKEN: 'saka_auth_token',
-  NOTIFICATIONS: 'saka_notifications'
+// Route Mappings for Full SPA Navigation
+const TAB_ROUTES: Record<string, string> = {
+  landing: '/',
+  dashboard: '/dashboard',
+  'my-card': '/profile',
+  members: '/members',
+  tours: '/tours',
+  'culinary-souvenirs': '/culinary',
+  skills: '/skills',
+  'krida-modules': '/krida',
+  activities: '/activities',
+  'verify-portal': '/verify',
+  territories: '/territories',
+  'audit-logs': '/audit'
 };
 
-/**
- * Pengaturan default KTA Digital.
- *
- * Diekspor karena digunakan oleh:
- * src/components/member/KtaCardCustomizerModal.tsx
- *
- * Jangan ubah nama export ini menjadi:
- * defaultKtaSettings
- *
- * Komponen KtaCardCustomizerModal mengimpor:
- * DEFAULT_KTA_SETTINGS
- */
-export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
-  issueLocationDate: 'Jakarta, 14 Agustus 2026',
-  signerName: 'Reza Pahlevi',
-  signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
-  barcodeCustomValue: '',
-  frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota',
-  bgOpacity: 0.10,
-  bgImageUrl: ''
+const ROUTE_TO_TAB: Record<string, string> = {
+  '/': 'landing',
+  '/landing': 'landing',
+  '/dashboard': 'dashboard',
+  '/profile': 'my-card',
+  '/my-card': 'my-card',
+  '/members': 'members',
+  '/tours': 'tours',
+  '/culinary': 'culinary-souvenirs',
+  '/culinary-souvenirs': 'culinary-souvenirs',
+  '/skills': 'skills',
+  '/krida': 'krida-modules',
+  '/krida-modules': 'krida-modules',
+  '/activities': 'activities',
+  '/verify': 'verify-portal',
+  '/verify-portal': 'verify-portal',
+  '/territories': 'territories',
+  '/audit': 'audit-logs',
+  '/audit-logs': 'audit-logs'
 };
 
-class StorageService {
-  private listeners: (() => void)[] = [];
+// Layout Components
+import { Sidebar } from './components/layout/Sidebar';
+import { Header } from './components/layout/Header';
+import { MobileBottomNav } from './components/layout/MobileBottomNav';
 
-  constructor() {
-    this.initDefaultData();
+// Page Views
+import { LandingPageView } from './pages/LandingPageView';
+import { DashboardView } from './pages/DashboardView';
+import { MemberManagementView } from './pages/MemberManagementView';
+import { TourismDirectoryView } from './pages/TourismDirectoryView';
+import { SkillDirectoryView } from './pages/SkillDirectoryView';
+import { ActivitiesView } from './pages/ActivitiesView';
+import { TerritoryManagementView } from './pages/TerritoryManagementView';
+import { AuditLogsView } from './pages/AuditLogsView';
+import { MyCardView } from './pages/MyCardView';
+import { KridaModulesView } from './pages/KridaModulesView';
+import { PublicPortalView } from './pages/PublicPortalView';
+
+// Modals
+import { AuthModal } from './components/auth/AuthModal';
+import { SpreadsheetSyncModal } from './components/database/SpreadsheetSyncModal';
+import { MemberFormModal } from './components/member/MemberFormModal';
+import { TourPackageFormModal } from './components/tourism/TourPackageFormModal';
+import { TourPackageDetailModal } from './components/tourism/TourPackageDetailModal';
+import { KtaCardCustomizerModal } from './components/member/KtaCardCustomizerModal';
+import { CulinarySouvenirFormModal } from './components/culinary/CulinarySouvenirFormModal';
+import { CulinarySouvenirDetailModal } from './components/culinary/CulinarySouvenirDetailModal';
+import { ActivityFormModal } from './components/activities/ActivityFormModal';
+import { ActivityDetailModal } from './components/activities/ActivityDetailModal';
+import { MemberPhotoEditModal } from './components/member/MemberPhotoEditModal';
+import { AdminEditMemberModal } from './components/member/AdminEditMemberModal';
+import { KtaPrintPdfModal } from './components/member/KtaPrintPdfModal';
+import { QuickShareBadgeModal } from './components/member/QuickShareBadgeModal';
+import { OperatorRoleModal } from './components/member/OperatorRoleModal';
+import { MemberVerificationModal } from './components/member/MemberVerificationModal';
+import { MemberTransferModal } from './components/member/MemberTransferModal';
+import { DriveMediaRepositoryModal } from './components/common/DriveMediaRepositoryModal';
+import { CulinarySouvenirGallerySection } from './components/dashboard/CulinarySouvenirGallerySection';
+
+// Error Boundary Component
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
 
-  private initDefaultData() {
-    if (typeof window === 'undefined') {
-      return;
-    }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
 
-    try {
-      if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
-        localStorage.setItem(
-          STORAGE_KEYS.NOTIFICATIONS,
-          JSON.stringify([])
-        );
-      }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[AppErrorBoundary Catch]:', error, errorInfo);
+  }
 
-      if (!localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS)) {
-        localStorage.setItem(
-          STORAGE_KEYS.KTA_SETTINGS,
-          JSON.stringify(DEFAULT_KTA_SETTINGS)
-        );
-      }
-    } catch (error) {
-      console.error(
-        'Gagal menginisialisasi pengaturan KTA:',
-        error
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6 text-center">
+          <div className="p-4 bg-rose-500/20 border border-rose-500 rounded-2xl max-w-md w-full space-y-3">
+            <h2 className="text-lg font-bold text-rose-400">Terjadi Kendala Memuat Halaman</h2>
+            <p className="text-xs text-slate-300">
+              {this.state.error?.message || 'Gagal merender komponen dashboard.'}
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-colors"
+            >
+              Muat Ulang Halaman
+            </button>
+          </div>
+        </div>
       );
     }
-  }
-
-  public subscribe(listener: () => void): () => void {
-    this.listeners.push(listener);
-
-    return () => {
-      this.listeners = this.listeners.filter(
-        listenerItem => listenerItem !== listener
-      );
-    };
-  }
-
-  public subscribeMutation(
-    listener: (event: any) => void
-  ): () => void {
-    if (typeof window === 'undefined') {
-      return () => {};
-    }
-
-    const handler = (e: StorageEvent) => {
-      if (
-        e.key &&
-        Object.values(STORAGE_KEYS).includes(e.key)
-      ) {
-        try {
-          listener({
-            type: e.key,
-            payload: JSON.parse(e.newValue || '{}')
-          });
-        } catch {
-          listener({
-            type: e.key,
-            payload: null
-          });
-        }
-      }
-    };
-
-    window.addEventListener('storage', handler);
-
-    return () => {
-      window.removeEventListener('storage', handler);
-    };
-  }
-
-  public notify() {
-    this.listeners.forEach(cb => {
-      try {
-        cb();
-      } catch (error) {
-        console.error(
-          'Error pada storage listener:',
-          error
-        );
-      }
-    });
-  }
-
-  // =========================================================
-  // NOTIFICATIONS
-  // =========================================================
-
-  /** Mengambil notifikasi lokal untuk pengguna saat ini. */
-  public getNotifications(userId?: string): NotificationItem[] {
-    if (typeof window === 'undefined') {
-      return [];
-    }
-
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-      if (!data) return [];
-
-      const notifications = JSON.parse(data) as NotificationItem[];
-      if (!Array.isArray(notifications)) return [];
-
-      const targetUserId = userId ?? this.getCurrentUser()?.id;
-      if (!targetUserId) return notifications;
-
-      return notifications.filter(
-        notification =>
-          notification.userId === targetUserId ||
-          notification.userId === '*'
-      );
-    } catch (error) {
-      console.error('Gagal membaca notifikasi:', error);
-      return [];
-    }
-  }
-
-  /** Menyimpan seluruh notifikasi. */
-  public setNotifications(notifications: NotificationItem[]): void {
-    if (typeof window === 'undefined') return;
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.NOTIFICATIONS,
-        JSON.stringify(notifications)
-      );
-      this.notify();
-    } catch (error) {
-      console.error('Gagal menyimpan notifikasi:', error);
-    }
-  }
-
-  /** Menambahkan satu notifikasi baru. */
-  public addNotification(notification: NotificationItem): void {
-    const notifications = this.getAllNotifications();
-    this.setNotifications([notification, ...notifications]);
-  }
-
-  /** Menandai notifikasi tertentu sebagai sudah dibaca. */
-  public markNotificationAsRead(id: string): boolean {
-    const notifications = this.getAllNotifications();
-    const index = notifications.findIndex(notification => notification.id === id);
-
-    if (index === -1) return false;
-    if (notifications[index].isRead) return true;
-
-    notifications[index] = { ...notifications[index], isRead: true };
-    this.setNotifications(notifications);
-    return true;
-  }
-
-  private getAllNotifications(): NotificationItem[] {
-    if (typeof window === 'undefined') return [];
-
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-      if (!data) return [];
-      const notifications = JSON.parse(data);
-      return Array.isArray(notifications) ? notifications : [];
-    } catch (error) {
-      console.error('Gagal membaca seluruh notifikasi:', error);
-      return [];
-    }
-  }
-
-  // =========================================================
-  // MEMBERS MANAGEMENT
-  // =========================================================
-
-  public getMembers(): Member[] {
-    if (typeof window === 'undefined') {
-      return INITIAL_MEMBERS;
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.MEMBERS
-      );
-
-      return data
-        ? JSON.parse(data)
-        : INITIAL_MEMBERS;
-    } catch (error) {
-      console.error(
-        'Gagal membaca data anggota:',
-        error
-      );
-
-      return INITIAL_MEMBERS;
-    }
-  }
-
-  public setMembers(members: Member[]) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.MEMBERS,
-        JSON.stringify(members)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan data anggota:',
-        error
-      );
-    }
-  }
-
-  public saveMembers(members: Member[]) {
-    this.setMembers(members);
-  }
-
-  /**
-   * Memperbarui foto anggota dan menyinkronkannya ke profil user.
-   * Foto dapat berupa data URL hasil upload lokal atau URL/Google Drive.
-   */
-  /**
-   * Memperbarui seluruh data profil anggota dari panel administrator.
-   * Perubahan disimpan ke LocalStorage terlebih dahulu agar UI langsung
-   * terbarui, kemudian dikirim ke API /api/mutate agar tersimpan di server
-   * dan diteruskan ke Google Apps Script.
-   */
-  public async adminUpdateMember(
-    memberId: string,
-    payload: Partial<Member>,
-    actor: CurrentUser,
-    reason: string
-  ): Promise<Member | null> {
-    if (!memberId) return null;
-
-    const members = this.getMembers();
-    const index = members.findIndex(member => member.id === memberId);
-    if (index === -1) return null;
-
-    const current = members[index];
-    const updatedMember: Member = {
-      ...current,
-      ...payload,
-      id: memberId,
-      // Field wajib jangan sampai hilang akibat payload parsial.
-      userId: payload.userId ?? current.userId,
-      registeredAt: current.registeredAt || new Date().toISOString(),
-      verificationToken: current.verificationToken || `VERIFY-${memberId}`,
-      locationHistory: current.locationHistory || [],
-      certifications: payload.certifications ?? current.certifications ?? [],
-      skills: payload.skills ?? current.skills ?? []
-    };
-
-    // Validasi isolasi wilayah di sisi client sebagai lapisan pertama.
-    const role = actor?.role;
-    const jurisdictionId = actor?.jurisdictionId;
-    if (role === 'ADMIN_PROVINCE' && jurisdictionId && updatedMember.provinceId !== jurisdictionId) {
-      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke provinsi lain.');
-    }
-    if (role === 'ADMIN_REGENCY' && jurisdictionId && updatedMember.regencyId !== jurisdictionId) {
-      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke Kwartir Cabang lain.');
-    }
-    if (role === 'ADMIN_BRANCH' && jurisdictionId && updatedMember.branchId !== jurisdictionId) {
-      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke wilayah cabang lain.');
-    }
-
-    // Simpan lokal terlebih dahulu.
-    members[index] = updatedMember;
-    this.setMembers(members);
-
-    // Sinkronkan avatar dengan akun user yang terkait.
-    if (updatedMember.userId) {
-      const users = this.getUsers();
-      const userIndex = users.findIndex(user => user.id === updatedMember.userId);
-      if (userIndex !== -1) {
-        users[userIndex] = {
-          ...users[userIndex],
-          name: updatedMember.fullName,
-          email: updatedMember.email,
-          avatarUrl: updatedMember.avatarUrl
-        };
-        this.setUsers(users);
-      }
-    }
-
-    // Audit lokal.
-    const audit: AuditLog = {
-      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      userId: actor?.id || 'unknown',
-      userName: actor?.name || 'Operator',
-      userRole: actor?.role || 'SUPER_ADMIN',
-      action: 'UPDATE_MEMBER_PROFILE',
-      entityType: 'MEMBER',
-      entityId: memberId,
-      description: reason || 'Pembaruan profil anggota',
-      timestamp: new Date().toISOString(),
-      ipAddress: 'client'
-    };
-    const logs = this.getAuditLogs();
-    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([audit, ...logs].slice(0, 500)));
-    this.notify();
-
-    // Jika aplikasi berjalan dengan sesi API, kirim perubahan ke server.
-    const token = this.getAuthToken();
-    if (token) {
-      const response = await fetch('/api/mutate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          type: 'MEMBER',
-          action: 'UPDATE',
-          payload: updatedMember,
-          reason: reason || 'Pembaruan profil anggota'
-        })
-      });
-
-      let result: any = null;
-      try {
-        result = await response.json();
-      } catch {
-        result = null;
-      }
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || `Server menolak perubahan profil (HTTP ${response.status}).`);
-      }
-    }
-
-    return updatedMember;
-  }
-
-  public updateMemberPhoto(
-    memberId: string,
-    avatarUrl: string,
-    actor?: CurrentUser
-  ): Member | null {
-    if (!avatarUrl || !avatarUrl.trim()) {
-      return null;
-    }
-
-    const members = this.getMembers();
-    const index = members.findIndex(member => member.id === memberId);
-
-    if (index === -1) {
-      return null;
-    }
-
-    const updatedMember: Member = {
-      ...members[index],
-      avatarUrl: avatarUrl.trim()
-    };
-
-    members[index] = updatedMember;
-    this.setMembers(members);
-
-    // Sinkronkan foto ke akun user yang terhubung dengan anggota.
-    const users = this.getUsers();
-    const userIndex = users.findIndex(
-      user => user.id === updatedMember.userId
-    );
-
-    if (userIndex !== -1) {
-      users[userIndex] = {
-        ...users[userIndex],
-        avatarUrl: updatedMember.avatarUrl
-      };
-      this.setUsers(users);
-    }
-
-    // Jika current user adalah pemilik akun anggota, perbarui juga sesi aktif.
-    const currentUser = this.getCurrentUser();
-    if (
-      currentUser?.id === updatedMember.userId ||
-      currentUser?.id === actor?.id
-    ) {
-      this.setCurrentUser({
-        ...currentUser,
-        avatarUrl: updatedMember.avatarUrl
-      });
-    }
-
-    return updatedMember;
-  }
-
-
-  /**
-   * Generate Nomor Tanda Anggota (NTA) berdasarkan kode wilayah.
-   * Format: PP.KK.KC.NNNNNN
-   * PP = kode provinsi, KK = kode kabupaten/kota, KC = kode kecamatan,
-   * NNNNNN = nomor urut 6 digit yang unik di dalam wilayah tersebut.
-   */
-  public generateNationalMemberNumber(
-    provinceCode: string,
-    regencyCode: string,
-    districtCode: string
-  ): string {
-    const pp = String(provinceCode || '00').replace(/\D/g, '').slice(-2).padStart(2, '0');
-    const kk = String(regencyCode || '00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
-    const kc = String(districtCode || '00.00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
-    const prefix = `${pp}.${kk}.${kc}.`;
-
-    const members = this.getMembers();
-    let maxSequence = 0;
-
-    members.forEach(member => {
-      const nta = String(member?.nationalMemberNumber || '').trim();
-      if (!nta.startsWith(prefix)) return;
-
-      const sequence = parseInt(nta.slice(prefix.length).replace(/\D/g, ''), 10);
-      if (Number.isFinite(sequence) && sequence > maxSequence) {
-        maxSequence = sequence;
-      }
-    });
-
-    return `${prefix}${String(maxSequence + 1).padStart(6, '0')}`;
-  }
-
-  /**
-   * Menerbitkan NTA untuk anggota yang belum memiliki nomor.
-   * Nomor selalu mengikuti wilayah anggota saat ini.
-   */
-  public assignNationalMemberNumber(memberId: string): Member | null {
-    const members = this.getMembers();
-    const index = members.findIndex(member => member.id === memberId);
-    if (index === -1) return null;
-
-    const member = members[index];
-    const nta = member.nationalMemberNumber || this.generateNationalMemberNumber(
-      member.provinceId || '00',
-      member.regencyId || '00.00',
-      member.districtId || '00.00.00'
-    );
-
-    members[index] = { ...member, nationalMemberNumber: nta };
-    this.setMembers(members);
-    return members[index];
-  }
-
-  /**
-   * Generate NTA massal berdasarkan wilayah yang dipilih.
-   * Hanya anggota tanpa NTA yang diberi nomor agar nomor lama tidak berubah.
-   */
-  public generateNationalMemberNumbersByRegion(
-    provinceId?: string,
-    regencyId?: string,
-    districtId?: string
-  ): { updated: number; skipped: number; total: number } {
-    const members = this.getMembers();
-    let sequenceByPrefix: Record<string, number> = {};
-    let updated = 0;
-    let skipped = 0;
-
-    const selected = members.filter(member => {
-      if (provinceId && member.provinceId !== provinceId) return false;
-      if (regencyId && member.regencyId !== regencyId) return false;
-      if (districtId && member.districtId !== districtId) return false;
-      return true;
-    });
-
-    // Seed sequence dari semua nomor yang sudah ada, bukan hanya hasil filter.
-    members.forEach(member => {
-      const nta = String(member.nationalMemberNumber || '');
-      const match = nta.match(/^(\d{2}\.\d{2}\.\d{2})\.(\d{6})$/);
-      if (match) {
-        const n = Number(match[2]);
-        sequenceByPrefix[match[1]] = Math.max(sequenceByPrefix[match[1]] || 0, n);
-      }
-    });
-
-    selected.forEach(member => {
-      if (member.nationalMemberNumber) {
-        skipped++;
-        return;
-      }
-
-      const pp = String(member.provinceId || '00').replace(/\D/g, '').slice(-2).padStart(2, '0');
-      const kk = String(member.regencyId || '00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
-      const kc = String(member.districtId || '00.00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
-      const prefix = `${pp}.${kk}.${kc}`;
-      const next = (sequenceByPrefix[prefix] || 0) + 1;
-      sequenceByPrefix[prefix] = next;
-
-      member.nationalMemberNumber = `${prefix}.${String(next).padStart(6, '0')}`;
-      updated++;
-    });
-
-    if (updated > 0) this.setMembers(members);
-    return { updated, skipped, total: selected.length };
-  }
-
-  /**
-   * Registrasi anggota baru.
-   *
-   * ID otomatis:
-   * member-01
-   * member-02
-   * member-03
-   * dst.
-   */
-  public registerMember(
-    payload: Omit<
-      Member,
-      | 'id'
-      | 'status'
-      | 'registeredAt'
-      | 'verificationToken'
-      | 'locationHistory'
-    >
-  ): Member {
-    const members = this.getMembers();
-
-    let maxNumber = 0;
-
-    members.forEach(existingMember => {
-      if (
-        existingMember?.id &&
-        typeof existingMember.id === 'string' &&
-        existingMember.id.startsWith('member-')
-      ) {
-        const numPart = parseInt(
-          existingMember.id.replace('member-', ''),
-          10
-        );
-
-        if (
-          !isNaN(numPart) &&
-          numPart > maxNumber
-        ) {
-          maxNumber = numPart;
-        }
-      }
-    });
-
-    const nextNumber = maxNumber + 1;
-
-    const formattedId = `member-${String(
-      nextNumber
-    ).padStart(2, '0')}`;
-
-    const newMember: Member = {
-      ...payload,
-      id: formattedId,
-      status: 'PENDING',
-      registeredAt: new Date().toISOString(),
-      verificationToken: `VERIFY-${formattedId}-${Date.now()
-        .toString(36)
-        .toUpperCase()}`,
-      locationHistory: [],
-      nationalMemberNumber: payload.nationalMemberNumber || this.generateNationalMemberNumber(
-        payload.provinceId,
-        payload.regencyId,
-        payload.districtId
-      ),
-      skills: payload.skills || [],
-      certifications: payload.certifications || []
-    };
-
-    members.unshift(newMember);
-
-    this.setMembers(members);
-
-    return newMember;
-  }
-
-  public updateMemberStatus(
-    memberId: string,
-    status: 'ACTIVE' | 'PENDING' | 'SUSPENDED',
-    actor?: any
-  ): boolean {
-    const members = this.getMembers();
-
-    const index = members.findIndex(
-      member => member.id === memberId
-    );
-
-    if (index === -1) {
-      return false;
-    }
-
-    members[index].status = status;
-
-    this.setMembers(members);
-
-    return true;
-  }
-
-  public deleteMember(
-    memberId: string,
-    actor?: any
-  ): boolean {
-    const members = this.getMembers();
-
-    const filteredMembers = members.filter(
-      member => member.id !== memberId
-    );
-
-    if (filteredMembers.length === members.length) {
-      return false;
-    }
-
-    this.setMembers(filteredMembers);
-
-    return true;
-  }
-
-  public deleteAllDummyMembers(
-    actor?: any
-  ): number {
-    const members = this.getMembers();
-
-    const filteredMembers = members.filter(
-      member =>
-        !member.id.includes('dummy') &&
-        !member.id.includes('demo')
-    );
-
-    const deletedCount =
-      members.length - filteredMembers.length;
-
-    this.setMembers(filteredMembers);
-
-    return deletedCount;
-  }
-
-  // =========================================================
-  // KTA CARD SETTINGS
-  // =========================================================
-
-  public getKtaSettings(): KtaCardSettings {
-    if (typeof window === 'undefined') {
-      return DEFAULT_KTA_SETTINGS;
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.KTA_SETTINGS
-      );
-
-      if (data) {
-        const parsedData = JSON.parse(data);
-
-        return {
-          ...DEFAULT_KTA_SETTINGS,
-          ...parsedData
-        };
-      }
-    } catch (error) {
-      console.error(
-        'Gagal membaca pengaturan KTA:',
-        error
-      );
-    }
-
-    return DEFAULT_KTA_SETTINGS;
-  }
-
-  public saveKtaSettings(
-    settings: KtaCardSettings
-  ) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      const updatedSettings: KtaCardSettings = {
-        ...DEFAULT_KTA_SETTINGS,
-        ...settings
-      };
-
-      localStorage.setItem(
-        STORAGE_KEYS.KTA_SETTINGS,
-        JSON.stringify(updatedSettings)
-      );
-
-      this.notify();
-
-      window.dispatchEvent(
-        new CustomEvent(
-          'saka:kta-settings-updated',
-          {
-            detail: updatedSettings
-          }
-        )
-      );
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan pengaturan KTA:',
-        error
-      );
-    }
-  }
-
-  // =========================================================
-  // TOUR PACKAGES
-  // =========================================================
-
-  public getTourPackages(): TourPackage[] {
-    if (typeof window === 'undefined') {
-      return INITIAL_TOUR_PACKAGES;
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.TOURS
-      );
-
-      return data
-        ? JSON.parse(data)
-        : INITIAL_TOUR_PACKAGES;
-    } catch (error) {
-      console.error(
-        'Gagal membaca paket wisata:',
-        error
-      );
-
-      return INITIAL_TOUR_PACKAGES;
-    }
-  }
-
-  public setTourPackages(
-    tours: TourPackage[]
-  ) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.TOURS,
-        JSON.stringify(tours)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan paket wisata:',
-        error
-      );
-    }
-  }
-
-  public deleteTourPackage(
-    id: string,
-    actor?: any
-  ) {
-    const filteredTours =
-      this.getTourPackages().filter(
-        tour => tour.id !== id
-      );
-
-    this.setTourPackages(filteredTours);
-  }
-
-  // =========================================================
-  // ACTIVITIES
-  // =========================================================
-
-  public getActivities(): Activity[] {
-    if (typeof window === 'undefined') {
-      return INITIAL_ACTIVITIES;
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.ACTIVITIES
-      );
-
-      return data
-        ? JSON.parse(data)
-        : INITIAL_ACTIVITIES;
-    } catch (error) {
-      console.error(
-        'Gagal membaca kegiatan:',
-        error
-      );
-
-      return INITIAL_ACTIVITIES;
-    }
-  }
-
-  public setActivities(
-    activities: Activity[]
-  ) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.ACTIVITIES,
-        JSON.stringify(activities)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan kegiatan:',
-        error
-      );
-    }
-  }
-
-  public deleteActivity(
-    id: string,
-    actor?: any
-  ) {
-    const filteredActivities =
-      this.getActivities().filter(
-        activity => activity.id !== id
-      );
-
-    this.setActivities(filteredActivities);
-  }
-
-  // =========================================================
-  // CULINARY & SOUVENIRS
-  // =========================================================
-
-  public getCulinarySouvenirs():
-    CulinarySouvenirItem[] {
-    if (typeof window === 'undefined') {
-      return INITIAL_CULINARY_SOUVENIRS;
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.CULINARY_SOUVENIRS
-      );
-
-      return data
-        ? JSON.parse(data)
-        : INITIAL_CULINARY_SOUVENIRS;
-    } catch (error) {
-      console.error(
-        'Gagal membaca data kuliner dan cinderamata:',
-        error
-      );
-
-      return INITIAL_CULINARY_SOUVENIRS;
-    }
-  }
-
-  public setCulinarySouvenirs(
-    items: CulinarySouvenirItem[]
-  ) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.CULINARY_SOUVENIRS,
-        JSON.stringify(items)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan data kuliner dan cinderamata:',
-        error
-      );
-    }
-  }
-
-  // =========================================================
-  // KRIDA MODULES
-  // =========================================================
-
-  /**
-   * Mengambil seluruh modul Krida resmi.
-   *
-   * Sumber data:
-   * src/data/kridaData.ts
-   *
-   * Data modul bersifat statis dan berasal dari:
-   * INITIAL_KRIDA_MODULES
-   *
-   * Method ini dibutuhkan oleh:
-   * src/components/krida/KridaModulesView.tsx
-   */
-  public getKridaModules(): KridaModuleItem[] {
-    return INITIAL_KRIDA_MODULES;
-  }
-
-  // =========================================================
-  // INDONESIA TERRITORIES
-  // =========================================================
-
-  public getProvinces(): Province[] {
-    return PROVINCES_DATA;
-  }
-
-  public getRegencies(
-    provinceId?: string
-  ): Regency[] {
-    if (!provinceId) {
-      return REGENCIES_DATA;
-    }
-
-    return REGENCIES_DATA.filter(
-      regency =>
-        regency.provinceId === provinceId
-    );
-  }
-
-  public getDistricts(
-    regencyId?: string
-  ): District[] {
-    if (!regencyId) {
-      return [];
-    }
-
-    return getDistrictsForRegency(regencyId);
-  }
-
-  public getBranches(
-    districtId?: string
-  ): Branch[] {
-    return [];
-  }
-
-  public getSkills(): Skill[] {
-    return MASTER_SKILLS;
-  }
-
-  // =========================================================
-  // AUDIT LOGS
-  // =========================================================
-
-  public getAuditLogs(): AuditLog[] {
-    if (typeof window === 'undefined') {
-      return INITIAL_AUDIT_LOGS;
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.AUDIT_LOGS
-      );
-
-      return data
-        ? JSON.parse(data)
-        : INITIAL_AUDIT_LOGS;
-    } catch (error) {
-      console.error(
-        'Gagal membaca audit logs:',
-        error
-      );
-
-      return INITIAL_AUDIT_LOGS;
-    }
-  }
-
-  // =========================================================
-  // USERS & AUTH
-  // =========================================================
-
-  public getUsers(): CurrentUser[] {
-    if (typeof window === 'undefined') {
-      return DEMO_USERS;
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.USERS
-      );
-
-      return data
-        ? JSON.parse(data)
-        : DEMO_USERS;
-    } catch (error) {
-      console.error(
-        'Gagal membaca data users:',
-        error
-      );
-
-      return DEMO_USERS;
-    }
-  }
-
-  public setUsers(
-    users: CurrentUser[]
-  ) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.USERS,
-        JSON.stringify(users)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan users:',
-        error
-      );
-    }
-  }
-
-  public saveUsers(
-    users: CurrentUser[]
-  ) {
-    this.setUsers(users);
-  }
-
-  public getCurrentUser(): CurrentUser {
-    if (typeof window === 'undefined') {
-      return DEFAULT_PUBLIC_USER;
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.CURRENT_USER
-      );
-
-      return data
-        ? JSON.parse(data)
-        : DEFAULT_PUBLIC_USER;
-    } catch (error) {
-      console.error(
-        'Gagal membaca current user:',
-        error
-      );
-
-      return DEFAULT_PUBLIC_USER;
-    }
-  }
-
-  public setCurrentUser(
-    user: CurrentUser
-  ) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.CURRENT_USER,
-        JSON.stringify(user)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan current user:',
-        error
-      );
-    }
-  }
-
-  public getAuthToken(): string | null {
-    if (typeof window === 'undefined') {
-      return null;
-    }
-
-    try {
-      return localStorage.getItem(
-        STORAGE_KEYS.AUTH_TOKEN
-      );
-    } catch {
-      return null;
-    }
-  }
-
-  public setAuthToken(
-    token: string | null
-  ) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      if (token) {
-        localStorage.setItem(
-          STORAGE_KEYS.AUTH_TOKEN,
-          token
-        );
-      } else {
-        localStorage.removeItem(
-          STORAGE_KEYS.AUTH_TOKEN
-        );
-      }
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan auth token:',
-        error
-      );
-    }
-  }
-
-  // =========================================================
-  // SERVER SYNCHRONIZATION
-  // =========================================================
-
-  public async syncWithServer(): Promise<boolean> {
-    const token = this.getAuthToken();
-    if (!token) return false;
-
-    try {
-      const response = await fetch('/api/data', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include'
-      });
-
-      if (!response.ok) return false;
-
-      const data = await response.json();
-      if (!data || !Array.isArray(data.members)) return false;
-
-      // Jangan menghapus data lokal hanya karena server sedang kosong.
-      if (data.members.length > 0) {
-        this.setMembers(data.members as Member[]);
-      }
-
-      if (Array.isArray(data.users) && data.users.length > 0) {
-        this.setUsers(data.users as CurrentUser[]);
-      }
-
-      if (Array.isArray(data.auditLogs)) {
-        try {
-          localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(data.auditLogs));
-        } catch {}
-      }
-
-      this.notify();
-      return true;
-    } catch (error) {
-      console.warn('[Storage] Sinkronisasi server gagal:', error);
-      return false;
-    }
+    return this.props.children;
   }
 }
 
-export const storage =
-  new StorageService();
+export default function App() {
+  // Current logged in user dengan fallback aman
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
+    try {
+      const stored = storage.getCurrentUser();
+      return stored && stored.role ? stored : DEFAULT_PUBLIC_USER;
+    } catch {
+      return DEFAULT_PUBLIC_USER;
+    }
+  });
+  
+  // Resolve initial tab directly from URL pathname so direct links work immediately
+  const getInitialTab = (): string => {
+    if (typeof window === 'undefined') return 'landing';
+    const pathname = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+    if (pathname.startsWith('/verify')) return 'verify-portal';
+    return ROUTE_TO_TAB[pathname] || 'landing';
+  };
+
+  const [currentTab, setCurrentTab] = useState<string>(getInitialTab);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Synchronize URL and History when changing tabs
+  const handleNavigateTab = (tab: string) => {
+    setCurrentTab(tab);
+    setSearchQuery('');
+    const targetPath = TAB_ROUTES[tab] || '/';
+    if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
+      window.history.pushState(null, '', targetPath);
+    }
+  };
+
+  // Reactive State from storage service
+  const [members, setMembers] = useState<Member[]>([]);
+  const [tours, setTours] = useState<TourPackage[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [culinaryItems, setCulinaryItems] = useState<CulinarySouvenirItem[]>([]);
+
+  // Auth & Spreadsheet Modals State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register' | 'forgot'>('login');
+  const [isSpreadsheetModalOpen, setIsSpreadsheetModalOpen] = useState(false);
+  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
+
+  // Other Modals State
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isTourFormModalOpen, setIsTourFormModalOpen] = useState(false);
+  const [editingTour, setEditingTour] = useState<TourPackage | null>(null);
+  const [isEditKtaModalOpen, setIsEditKtaModalOpen] = useState(false);
+  const [isCulinaryFormOpen, setIsCulinaryFormOpen] = useState(false);
+  const [editingCulinaryItem, setEditingCulinaryItem] = useState<CulinarySouvenirItem | null>(null);
+  const [selectedCulinaryDetail, setSelectedCulinaryDetail] = useState<CulinarySouvenirItem | null>(null);
+  const [selectedActivityDetail, setSelectedActivityDetail] = useState<Activity | null>(null);
+  const [isActivityFormOpen, setIsActivityFormOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [editingPhotoMember, setEditingPhotoMember] = useState<Member | null>(null);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [printingKtaMember, setPrintingKtaMember] = useState<Member | null>(null);
+  const [quickSharingMember, setQuickSharingMember] = useState<Member | null>(null);
+  const [managingOperatorMember, setManagingOperatorMember] = useState<Member | null>(null);
+  const [verifyingMember, setVerifyingMember] = useState<Member | null>(null);
+  const [transferringMember, setTransferringMember] = useState<Member | null>(null);
+  const [selectedTourDetail, setSelectedTourDetail] = useState<TourPackage | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [liveSyncToast, setLiveSyncToast] = useState<{ message: string; visible: boolean } | null>(null);
+
+  // Verifikasi sesi backend dengan mempertahankan sesi login lokal
+  useEffect(() => {
+    let cancelled = false;
+
+    const verifySession = async () => {
+      const token = storage.getAuthToken();
+      const storedUser = storage.getCurrentUser();
+
+      // Pertahankan user lokal jika token tidak ada
+      if (!token) {
+        if (!storedUser || !storedUser.role) {
+          setCurrentUser(DEFAULT_PUBLIC_USER);
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (cancelled) return;
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.user) {
+            storage.setCurrentUser(data.user);
+            setCurrentUser(data.user);
+            return;
+          }
+        } else if (res.status === 401 || res.status === 403) {
+          // Token memang expired / revoked
+          storage.setAuthToken(null);
+          storage.setCurrentUser(DEFAULT_PUBLIC_USER);
+          setCurrentUser(DEFAULT_PUBLIC_USER);
+        }
+      } catch {
+        // Jaringan offline / serverless sleeping: PERTAHANKAN user login yang ada di storage
+        if (storedUser && storedUser.role) {
+          setCurrentUser(storedUser);
+        }
+      }
+    };
+
+    verifySession();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Subscribe to storage changes
+  useEffect(() => {
+    const refreshAll = () => {
+      setMembers(storage.getMembers() || []);
+      setTours(storage.getTourPackages() || []);
+      setActivities(storage.getActivities() || []);
+      setProvinces(storage.getProvinces() || []);
+      setSkills(storage.getSkills() || []);
+      setAuditLogs(storage.getAuditLogs() || []);
+      setCulinaryItems(storage.getCulinarySouvenirs() || []);
+      
+      const usr = storage.getCurrentUser();
+      if (usr && usr.role) {
+        setCurrentUser(usr);
+      }
+    };
+
+    refreshAll();
+    const unsubscribe = storage.subscribe(refreshAll);
+    return () => unsubscribe();
+  }, []);
+
+  // Listen to popstate for browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathname = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+      const resolved = pathname.startsWith('/verify') ? 'verify-portal' : (ROUTE_TO_TAB[pathname] || 'landing');
+      setCurrentTab(resolved);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Listen to QR Code / URL parameters on landing
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const verifyId = params.get('verifyId') || params.get('verify') || params.get('id');
+    
+    if (verifyId) {
+      const found = verifyMemberUniversal(verifyId, members);
+      if (found.member) {
+        setVerifyingMember(found.member);
+      }
+    }
+  }, [members]);
+
+  // Handle Approve / Reject Member
+  // Status tidak lagi hanya diubah di localStorage. Proses menunggu sampai
+  // /api/mutate berhasil menulis ke server dan Google Spreadsheet.
+  const handleApproveMember = async (memberId: string) => {
+    const success = await storage.updateMemberStatus(memberId, 'ACTIVE', currentUser);
+    if (success) {
+      setMembers(storage.getMembers());
+      alert('Anggota berhasil diverifikasi dan perubahan telah dikirim ke Google Spreadsheet.');
+    } else {
+      setMembers(storage.getMembers());
+      alert('Verifikasi gagal disimpan. Data dikembalikan ke status sebelumnya. Silakan coba lagi.');
+    }
+  };
+
+  const handleRejectMember = async (memberId: string) => {
+    const success = await storage.updateMemberStatus(memberId, 'SUSPENDED', currentUser);
+    if (success) {
+      setMembers(storage.getMembers());
+      alert('Status anggota berhasil diperbarui dan perubahan telah dikirim ke Google Spreadsheet.');
+    } else {
+      setMembers(storage.getMembers());
+      alert('Perubahan status gagal disimpan. Data dikembalikan ke status sebelumnya.');
+    }
+  };
+
+  const handleDeleteMember = (member: Member) => {
+    const success = storage.deleteMember(member.id, currentUser);
+    if (success) {
+      alert(`Data keanggotaan ${member.fullName} telah berhasil dihapus dari database.`);
+    }
+  };
+
+  const handleDeleteAllDummyMembers = () => {
+    if ((currentUser?.role || 'PUBLIC') !== 'SUPER_ADMIN') {
+      alert('Hanya Super Admin Nasional yang memiliki wewenang membersihkan data dummy.');
+      return;
+    }
+    const count = storage.deleteAllDummyMembers(currentUser);
+    alert(`Berhasil menghapus ${count} data anggota dummy. Database anggota kini bersih.`);
+  };
+
+  // Open Auth Modal helper
+  const handleOpenAuth = (type: 'login' | 'register' | 'forgot') => {
+    setAuthModalTab(type);
+    setIsAuthModalOpen(true);
+  };
+
+  const handleOpenSpreadsheet = () => {
+    if ((currentUser?.role || 'PUBLIC') === 'SUPER_ADMIN') {
+      setIsSpreadsheetModalOpen(true);
+    }
+  };
+
+  const handleOpenDrive = () => {
+    if ((currentUser?.role || 'PUBLIC') === 'SUPER_ADMIN') {
+      setIsDriveModalOpen(true);
+    }
+  };
+
+  const userRole = currentUser?.role || 'PUBLIC';
+
+  // IF CURRENT TAB IS LANDING PAGE
+  if (currentTab === 'landing') {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <LandingPageView
+          currentUser={currentUser}
+          members={members}
+          tours={tours}
+          culinaryItems={culinaryItems}
+          activities={activities}
+          onOpenLoginModal={() => handleOpenAuth('login')}
+          onOpenRegisterModal={() => handleOpenAuth('register')}
+          onOpenVerifyModal={(m) => setVerifyingMember(m)}
+          onViewTourDetail={(t) => setSelectedTourDetail(t)}
+          onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
+          onViewActivityDetail={(a) => setSelectedActivityDetail(a)}
+          onOpenActivityForm={() => {
+            setEditingActivity(null);
+            setIsActivityFormOpen(true);
+          }}
+          onEnterDashboard={(tab) => handleNavigateTab(tab || 'dashboard')}
+        />
+
+        {/* Global Modals for Landing View */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          initialTab={authModalTab}
+          onClose={() => setIsAuthModalOpen(false)}
+          onLoginSuccess={(user) => {
+            setCurrentUser(user);
+            setIsAuthModalOpen(false);
+            if (user?.role === 'MEMBER') {
+              handleNavigateTab('my-card');
+            } else {
+              handleNavigateTab('dashboard');
+            }
+          }}
+        />
+
+        {verifyingMember && (
+          <MemberVerificationModal
+            member={verifyingMember}
+            onClose={() => setVerifyingMember(null)}
+          />
+        )}
+
+        {selectedTourDetail && (
+          <TourPackageDetailModal
+            tour={selectedTourDetail}
+            onClose={() => setSelectedTourDetail(null)}
+            onOpenVerifyModal={(m) => setVerifyingMember(m)}
+          />
+        )}
+
+        {selectedCulinaryDetail && (
+          <CulinarySouvenirDetailModal
+            item={selectedCulinaryDetail}
+            onClose={() => setSelectedCulinaryDetail(null)}
+          />
+        )}
+
+        {selectedActivityDetail && (
+          <ActivityDetailModal
+            activity={selectedActivityDetail}
+            onClose={() => setSelectedActivityDetail(null)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // MAIN APPLICATION LAYOUT
+  return (
+    <div className="flex h-screen bg-slate-100 overflow-hidden">
+      {/* Sidebar Desktop */}
+      <Sidebar
+        currentTab={currentTab}
+        onSelectTab={handleNavigateTab}
+        currentUser={currentUser}
+        onOpenSpreadsheetModal={userRole === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
+        onOpenDriveModal={userRole === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <Header
+          currentUser={currentUser}
+          currentTab={currentTab}
+          onLogout={() => {
+            storage.setAuthToken(null);
+            storage.setCurrentUser(DEFAULT_PUBLIC_USER);
+            setCurrentUser(DEFAULT_PUBLIC_USER);
+            handleNavigateTab('landing');
+          }}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onOpenRegisterModal={() => handleOpenAuth('register')}
+          onSelectTab={handleNavigateTab}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          onOpenSpreadsheetModal={userRole === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
+          onOpenDriveModal={userRole === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
+          onOpenLoginModal={() => handleOpenAuth('login')}
+        />
+
+        {/* Scrollable Page Body */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
+          <div className="max-w-7xl mx-auto">
+            {currentTab === 'dashboard' && (
+              <AppErrorBoundary>
+                <DashboardView
+                  currentUser={currentUser}
+                  members={members}
+                  tours={tours}
+                  provinces={provinces}
+                  culinaryItems={culinaryItems}
+                  onSelectTab={handleNavigateTab}
+                  onOpenRegisterModal={() => handleOpenAuth('register')}
+                  onVerifyMember={(m) => setVerifyingMember(m)}
+                  onApproveMemberQuick={handleApproveMember}
+                  onViewTourDetail={(t) => setSelectedTourDetail(t)}
+                  onOpenEditCardModal={() => setIsEditKtaModalOpen(true)}
+                  onOpenEditPhotoModal={(m) => setEditingPhotoMember(m)}
+                  onOpenEditMemberModal={(m) => setEditingMember(m)}
+                  onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
+                  onOpenCulinaryFormModal={(item) => {
+                    setEditingCulinaryItem(item || null);
+                    setIsCulinaryFormOpen(true);
+                  }}
+                  onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
+                  onOpenSpreadsheetModal={userRole === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
+                  onOpenDriveModal={userRole === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
+                />
+              </AppErrorBoundary>
+            )}
+
+            {currentTab === 'culinary-souvenirs' && (
+              <div className="space-y-6">
+                <CulinarySouvenirGallerySection
+                  items={culinaryItems}
+                  currentUser={currentUser}
+                  onOpenFormModal={(item) => {
+                    setEditingCulinaryItem(item || null);
+                    setIsCulinaryFormOpen(true);
+                  }}
+                  onSelectItemDetail={(item) => setSelectedCulinaryDetail(item)}
+                />
+              </div>
+            )}
+
+            {currentTab === 'members' && (
+              <MemberManagementView
+                currentUser={currentUser}
+                members={members}
+                provinces={provinces}
+                onOpenRegisterModal={() => handleOpenAuth('register')}
+                onOpenVerifyModal={(m) => setVerifyingMember(m)}
+                onOpenTransferModal={(m) => setTransferringMember(m)}
+                onApproveMember={handleApproveMember}
+                onRejectMember={handleRejectMember}
+                onOpenEditCardModal={() => setIsEditKtaModalOpen(true)}
+                onOpenEditPhotoModal={(m) => setEditingPhotoMember(m)}
+                onOpenEditMemberModal={(m) => setEditingMember(m)}
+                onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
+                onOpenQuickShareModal={(m) => setQuickSharingMember(m)}
+                onOpenOperatorModal={(m) => setManagingOperatorMember(m)}
+                onDeleteMember={handleDeleteMember}
+                onDeleteAllDummyMembers={handleDeleteAllDummyMembers}
+              />
+            )}
+
+            {currentTab === 'tours' && (
+              <TourismDirectoryView
+                currentUser={currentUser}
+                tours={tours}
+                provinces={provinces}
+                members={members}
+                onOpenTourFormModal={() => {
+                  setEditingTour(null);
+                  setIsTourFormModalOpen(true);
+                }}
+                onViewTourDetail={(t) => setSelectedTourDetail(t)}
+                onOpenVerifyModal={(m) => setVerifyingMember(m)}
+                onEditTour={(t) => {
+                  setEditingTour(t);
+                  setIsTourFormModalOpen(true);
+                }}
+                onDeleteTour={(tId) => {
+                  storage.deleteTourPackage(tId, currentUser);
+                }}
+              />
+            )}
+
+            {currentTab === 'skills' && (
+              <SkillDirectoryView
+                currentUser={currentUser}
+                members={members}
+                skills={skills}
+                onOpenVerifyModal={(m) => setVerifyingMember(m)}
+              />
+            )}
+
+            {currentTab === 'krida-modules' && (
+              <KridaModulesView
+                currentUser={currentUser}
+              />
+            )}
+
+            {currentTab === 'activities' && (
+              <ActivitiesView
+                currentUser={currentUser}
+                activities={activities}
+                onOpenFormModal={() => {
+                  setEditingActivity(null);
+                  setIsActivityFormOpen(true);
+                }}
+                onViewDetail={(a) => setSelectedActivityDetail(a)}
+                onEditActivity={(a) => {
+                  setEditingActivity(a);
+                  setIsActivityFormOpen(true);
+                }}
+                onDeleteActivity={(aId) => {
+                  storage.deleteActivity(aId, currentUser);
+                }}
+              />
+            )}
+
+            {currentTab === 'territories' && (
+              <TerritoryManagementView
+                currentUser={currentUser}
+              />
+            )}
+
+            {currentTab === 'audit-logs' && (
+              <AuditLogsView
+                logs={auditLogs}
+                currentUser={currentUser}
+              />
+            )}
+
+            {currentTab === 'verify-portal' && (
+              <PublicPortalView
+                members={members}
+                tours={tours}
+                skills={skills}
+                onOpenRegisterModal={() => handleOpenAuth('register')}
+                onOpenVerifyModal={(m) => setVerifyingMember(m)}
+                onViewTourDetail={(t) => setSelectedTourDetail(t)}
+                onSelectTab={handleNavigateTab}
+              />
+            )}
+
+            {currentTab === 'my-card' && (
+              <MyCardView
+                currentUser={currentUser}
+                members={members}
+                onOpenVerifyModal={(m) => setVerifyingMember(m)}
+                onOpenEditCardModal={() => setIsEditKtaModalOpen(true)}
+                onOpenEditPhotoModal={(m) => setEditingPhotoMember(m)}
+                onOpenEditMemberModal={(m) => setEditingMember(m)}
+                onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
+                onOpenQuickShareModal={(m) => setQuickSharingMember(m)}
+              />
+            )}
+          </div>
+        </main>
+
+        {/* Mobile Navigation Bar */}
+        <MobileBottomNav
+          currentTab={currentTab}
+          onSelectTab={handleNavigateTab}
+          currentUser={currentUser}
+        />
+      </div>
+
+      {/* Global Modals */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        initialTab={authModalTab}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setIsAuthModalOpen(false);
+          if (user?.role === 'MEMBER') {
+            handleNavigateTab('my-card');
+          } else {
+            handleNavigateTab('dashboard');
+          }
+        }}
+      />
+
+      {userRole === 'SUPER_ADMIN' && (
+        <SpreadsheetSyncModal
+          isOpen={isSpreadsheetModalOpen}
+          onClose={() => setIsSpreadsheetModalOpen(false)}
+        />
+      )}
+
+      <MemberFormModal
+        isOpen={isRegisterModalOpen}
+        currentUser={currentUser}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSuccess={() => {
+          setIsRegisterModalOpen(false);
+          handleNavigateTab('members');
+        }}
+      />
+
+      <MemberVerificationModal
+        member={verifyingMember}
+        onClose={() => setVerifyingMember(null)}
+      />
+
+      {selectedTourDetail && (
+        <TourPackageDetailModal
+          tour={selectedTourDetail}
+          onClose={() => setSelectedTourDetail(null)}
+          onOpenVerifyModal={(m) => setVerifyingMember(m)}
+        />
+      )}
+
+      <TourPackageFormModal
+        isOpen={isTourFormModalOpen}
+        onClose={() => {
+          setIsTourFormModalOpen(false);
+          setEditingTour(null);
+        }}
+        tourToEdit={editingTour}
+        currentUser={currentUser}
+        onSuccess={() => {
+          setIsTourFormModalOpen(false);
+          setEditingTour(null);
+          setTours(storage.getTourPackages());
+        }}
+      />
+
+      <ActivityFormModal
+        isOpen={isActivityFormOpen}
+        onClose={() => {
+          setIsActivityFormOpen(false);
+          setEditingActivity(null);
+        }}
+        activityToEdit={editingActivity}
+        currentUser={currentUser}
+        onSuccess={() => {
+          setIsActivityFormOpen(false);
+          setEditingActivity(null);
+          setActivities(storage.getActivities());
+        }}
+      />
+
+      {selectedActivityDetail && (
+        <ActivityDetailModal
+          activity={selectedActivityDetail}
+          onClose={() => setSelectedActivityDetail(null)}
+        />
+      )}
+
+      <KtaCardCustomizerModal
+        isOpen={isEditKtaModalOpen}
+        onClose={() => setIsEditKtaModalOpen(false)}
+        onSuccess={() => setIsEditKtaModalOpen(false)}
+      />
+
+      <MemberPhotoEditModal
+        isOpen={!!editingPhotoMember}
+        member={editingPhotoMember}
+        onClose={() => setEditingPhotoMember(null)}
+        onSuccess={() => {
+          setEditingPhotoMember(null);
+          setMembers(storage.getMembers());
+        }}
+      />
+
+      <AdminEditMemberModal
+        isOpen={!!editingMember}
+        member={editingMember}
+        currentUser={currentUser}
+        onClose={() => setEditingMember(null)}
+        onSuccess={() => {
+          setEditingMember(null);
+          setMembers(storage.getMembers());
+        }}
+      />
+
+      <KtaPrintPdfModal
+        isOpen={!!printingKtaMember}
+        member={printingKtaMember}
+        onClose={() => setPrintingKtaMember(null)}
+      />
+
+      <QuickShareBadgeModal
+        isOpen={!!quickSharingMember}
+        member={quickSharingMember}
+        onClose={() => setQuickSharingMember(null)}
+      />
+
+      <OperatorRoleModal
+        isOpen={!!managingOperatorMember}
+        member={managingOperatorMember}
+        currentUser={currentUser}
+        onClose={() => setManagingOperatorMember(null)}
+        onSuccess={() => {
+          setManagingOperatorMember(null);
+          setMembers(storage.getMembers());
+        }}
+      />
+
+      <CulinarySouvenirFormModal
+        isOpen={isCulinaryFormOpen}
+        itemToEdit={editingCulinaryItem}
+        currentUser={currentUser}
+        onClose={() => {
+          setIsCulinaryFormOpen(false);
+          setEditingCulinaryItem(null);
+        }}
+        onSuccess={() => {
+          setIsCulinaryFormOpen(false);
+          setEditingCulinaryItem(null);
+          setCulinaryItems(storage.getCulinarySouvenirs());
+        }}
+      />
+
+      {selectedCulinaryDetail && (
+        <CulinarySouvenirDetailModal
+          item={selectedCulinaryDetail}
+          onClose={() => setSelectedCulinaryDetail(null)}
+        />
+      )}
+
+      <MemberTransferModal
+        isOpen={!!transferringMember}
+        member={transferringMember}
+        currentUser={currentUser}
+        onClose={() => setTransferringMember(null)}
+        onSuccess={() => {
+          setTransferringMember(null);
+          setMembers(storage.getMembers());
+        }}
+      />
+
+      {userRole === 'SUPER_ADMIN' && (
+        <DriveMediaRepositoryModal
+          isOpen={isDriveModalOpen}
+          onClose={() => setIsDriveModalOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
