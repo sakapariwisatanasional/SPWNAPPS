@@ -739,7 +739,49 @@ class StorageService {
       return false;
     }
 
+    // Simpan perubahan lokal terlebih dahulu agar UI langsung berubah.
     this.setMembers(filteredMembers);
+
+    // DELETE harus diteruskan ke server agar benar-benar menghapus baris
+    // pada Google Spreadsheet. Jangan hanya mengandalkan LocalStorage.
+    const token = this.getAuthToken();
+    const scriptUrl = getManualAppsScriptUrl();
+    if (!token || !scriptUrl) {
+      // Rollback jika sesi/API atau URL Apps Script belum tersedia.
+      this.setMembers(members);
+      console.error('[Delete Member] Sesi administrator atau URL Apps Script tidak tersedia.');
+      return false;
+    }
+
+    void fetch('/api/mutate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        type: 'MEMBER',
+        action: 'DELETE',
+        payload: {
+          id: memberId,
+          memberId,
+          kta: members.find(member => member.id === memberId)?.nationalMemberNumber || ''
+        },
+        reason: 'Penghapusan anggota oleh administrator',
+        scriptUrl
+      })
+    }).then(async response => {
+      let result: any = null;
+      try { result = await response.json(); } catch {}
+      if (!response.ok || !result?.success) {
+        this.setMembers(members);
+        console.error('[Delete Member] Server/Spreadsheet menolak penghapusan:', result?.message || response.status);
+      }
+    }).catch(error => {
+      this.setMembers(members);
+      console.error('[Delete Member] Gagal menyinkronkan penghapusan ke Spreadsheet:', error);
+    });
 
     return true;
   }
@@ -884,12 +926,38 @@ class StorageService {
     id: string,
     actor?: any
   ) {
-    const filteredTours =
-      this.getTourPackages().filter(
-        tour => tour.id !== id
-      );
+    const tours = this.getTourPackages();
+    const filteredTours = tours.filter(tour => tour.id !== id);
+    if (filteredTours.length === tours.length) return false;
 
     this.setTourPackages(filteredTours);
+    const token = this.getAuthToken();
+    const scriptUrl = getManualAppsScriptUrl();
+    if (!token || !scriptUrl) {
+      this.setTourPackages(tours);
+      console.error('[Delete Tour] Sesi administrator atau URL Apps Script tidak tersedia.');
+      return false;
+    }
+
+    void fetch('/api/mutate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      credentials: 'include',
+      body: JSON.stringify({
+        type: 'TOUR', action: 'DELETE', payload: { id },
+        reason: 'Penghapusan paket wisata oleh administrator', scriptUrl
+      })
+    }).then(async response => {
+      let result: any = null; try { result = await response.json(); } catch {}
+      if (!response.ok || !result?.success) {
+        this.setTourPackages(tours);
+        console.error('[Delete Tour] Server/Spreadsheet menolak penghapusan:', result?.message || response.status);
+      }
+    }).catch(error => {
+      this.setTourPackages(tours);
+      console.error('[Delete Tour] Gagal menyinkronkan penghapusan:', error);
+    });
+    return true;
   }
 
   // =========================================================
@@ -945,12 +1013,38 @@ class StorageService {
     id: string,
     actor?: any
   ) {
-    const filteredActivities =
-      this.getActivities().filter(
-        activity => activity.id !== id
-      );
+    const activities = this.getActivities();
+    const filteredActivities = activities.filter(activity => activity.id !== id);
+    if (filteredActivities.length === activities.length) return false;
 
     this.setActivities(filteredActivities);
+    const token = this.getAuthToken();
+    const scriptUrl = getManualAppsScriptUrl();
+    if (!token || !scriptUrl) {
+      this.setActivities(activities);
+      console.error('[Delete Activity] Sesi administrator atau URL Apps Script tidak tersedia.');
+      return false;
+    }
+
+    void fetch('/api/mutate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      credentials: 'include',
+      body: JSON.stringify({
+        type: 'ACTIVITY', action: 'DELETE', payload: { id },
+        reason: 'Penghapusan kegiatan oleh administrator', scriptUrl
+      })
+    }).then(async response => {
+      let result: any = null; try { result = await response.json(); } catch {}
+      if (!response.ok || !result?.success) {
+        this.setActivities(activities);
+        console.error('[Delete Activity] Server/Spreadsheet menolak penghapusan:', result?.message || response.status);
+      }
+    }).catch(error => {
+      this.setActivities(activities);
+      console.error('[Delete Activity] Gagal menyinkronkan penghapusan:', error);
+    });
+    return true;
   }
 
   // =========================================================
