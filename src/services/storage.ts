@@ -84,28 +84,22 @@ class StorageService {
     }
 
     try {
-      if (!localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS)) {
-        localStorage.setItem(
-          STORAGE_KEYS.KTA_SETTINGS,
-          JSON.stringify(DEFAULT_KTA_SETTINGS)
-        );
-      }
-
-      /*
-       * Inisialisasi penyimpanan notifikasi.
-       *
-       * Jangan menggunakan array default yang sama secara langsung
-       * karena data akan disimpan di localStorage.
-       */
       if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
         localStorage.setItem(
           STORAGE_KEYS.NOTIFICATIONS,
           JSON.stringify([])
         );
       }
+
+      if (!localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS)) {
+        localStorage.setItem(
+          STORAGE_KEYS.KTA_SETTINGS,
+          JSON.stringify(DEFAULT_KTA_SETTINGS)
+        );
+      }
     } catch (error) {
       console.error(
-        'Gagal menginisialisasi pengaturan storage:',
+        'Gagal menginisialisasi pengaturan KTA:',
         error
       );
     }
@@ -168,6 +162,85 @@ class StorageService {
   }
 
   // =========================================================
+  // NOTIFICATIONS
+  // =========================================================
+
+  /** Mengambil notifikasi lokal untuk pengguna saat ini. */
+  public getNotifications(userId?: string): NotificationItem[] {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      if (!data) return [];
+
+      const notifications = JSON.parse(data) as NotificationItem[];
+      if (!Array.isArray(notifications)) return [];
+
+      const targetUserId = userId ?? this.getCurrentUser()?.id;
+      if (!targetUserId) return notifications;
+
+      return notifications.filter(
+        notification =>
+          notification.userId === targetUserId ||
+          notification.userId === '*'
+      );
+    } catch (error) {
+      console.error('Gagal membaca notifikasi:', error);
+      return [];
+    }
+  }
+
+  /** Menyimpan seluruh notifikasi. */
+  public setNotifications(notifications: NotificationItem[]): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.NOTIFICATIONS,
+        JSON.stringify(notifications)
+      );
+      this.notify();
+    } catch (error) {
+      console.error('Gagal menyimpan notifikasi:', error);
+    }
+  }
+
+  /** Menambahkan satu notifikasi baru. */
+  public addNotification(notification: NotificationItem): void {
+    const notifications = this.getAllNotifications();
+    this.setNotifications([notification, ...notifications]);
+  }
+
+  /** Menandai notifikasi tertentu sebagai sudah dibaca. */
+  public markNotificationAsRead(id: string): boolean {
+    const notifications = this.getAllNotifications();
+    const index = notifications.findIndex(notification => notification.id === id);
+
+    if (index === -1) return false;
+    if (notifications[index].isRead) return true;
+
+    notifications[index] = { ...notifications[index], isRead: true };
+    this.setNotifications(notifications);
+    return true;
+  }
+
+  private getAllNotifications(): NotificationItem[] {
+    if (typeof window === 'undefined') return [];
+
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      if (!data) return [];
+      const notifications = JSON.parse(data);
+      return Array.isArray(notifications) ? notifications : [];
+    } catch (error) {
+      console.error('Gagal membaca seluruh notifikasi:', error);
+      return [];
+    }
+  }
+
+  // =========================================================
   // MEMBERS MANAGEMENT
   // =========================================================
 
@@ -217,6 +290,64 @@ class StorageService {
   public saveMembers(members: Member[]) {
     this.setMembers(members);
   }
+
+  /**
+   * Memperbarui foto anggota dan menyinkronkannya ke profil user.
+   * Foto dapat berupa data URL hasil upload lokal atau URL/Google Drive.
+   */
+  public updateMemberPhoto(
+    memberId: string,
+    avatarUrl: string,
+    actor?: CurrentUser
+  ): Member | null {
+    if (!avatarUrl || !avatarUrl.trim()) {
+      return null;
+    }
+
+    const members = this.getMembers();
+    const index = members.findIndex(member => member.id === memberId);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const updatedMember: Member = {
+      ...members[index],
+      avatarUrl: avatarUrl.trim()
+    };
+
+    members[index] = updatedMember;
+    this.setMembers(members);
+
+    // Sinkronkan foto ke akun user yang terhubung dengan anggota.
+    const users = this.getUsers();
+    const userIndex = users.findIndex(
+      user => user.id === updatedMember.userId
+    );
+
+    if (userIndex !== -1) {
+      users[userIndex] = {
+        ...users[userIndex],
+        avatarUrl: updatedMember.avatarUrl
+      };
+      this.setUsers(users);
+    }
+
+    // Jika current user adalah pemilik akun anggota, perbarui juga sesi aktif.
+    const currentUser = this.getCurrentUser();
+    if (
+      currentUser?.id === updatedMember.userId ||
+      currentUser?.id === actor?.id
+    ) {
+      this.setCurrentUser({
+        ...currentUser,
+        avatarUrl: updatedMember.avatarUrl
+      });
+    }
+
+    return updatedMember;
+  }
+
 
   /**
    * Registrasi anggota baru.
@@ -673,327 +804,6 @@ class StorageService {
 
       return INITIAL_AUDIT_LOGS;
     }
-  }
-
-  // =========================================================
-  // NOTIFICATIONS
-  // =========================================================
-
-  /**
-   * Mengambil seluruh notifikasi yang tersimpan.
-   *
-   * Method internal ini digunakan agar:
-   * - getNotifications() dapat menyaring berdasarkan user
-   * - addNotification() tidak kehilangan notifikasi user lain
-   */
-  private getAllNotifications(): NotificationItem[] {
-    if (typeof window === 'undefined') {
-      return [];
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.NOTIFICATIONS
-      );
-
-      if (!data) {
-        return [];
-      }
-
-      const parsed = JSON.parse(data);
-
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-
-      return parsed;
-    } catch (error) {
-      console.error(
-        'Gagal membaca notifikasi:',
-        error
-      );
-
-      return [];
-    }
-  }
-
-  /**
-   * Mengambil notifikasi untuk current user.
-   *
-   * Notifikasi dengan userId "*"
-   * dianggap sebagai notifikasi global.
-   */
-  public getNotifications(): NotificationItem[] {
-    if (typeof window === 'undefined') {
-      return [];
-    }
-
-    try {
-      const currentUser = this.getCurrentUser();
-      const currentUserId = currentUser?.id;
-
-      const notifications =
-        this.getAllNotifications();
-
-      return notifications
-        .filter(notification => {
-          if (!notification) {
-            return false;
-          }
-
-          /*
-           * "*" = notifikasi global.
-           */
-          if (notification.userId === '*') {
-            return true;
-          }
-
-          /*
-           * Jika belum ada current user,
-           * jangan tampilkan notifikasi user tertentu.
-           */
-          if (!currentUserId) {
-            return false;
-          }
-
-          return notification.userId === currentUserId;
-        })
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() -
-            new Date(a.createdAt).getTime()
-        );
-    } catch (error) {
-      console.error(
-        'Gagal mengambil notifikasi:',
-        error
-      );
-
-      return [];
-    }
-  }
-
-  /**
-   * Menyimpan seluruh notifikasi.
-   */
-  public setNotifications(
-    notifications: NotificationItem[]
-  ): void {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.NOTIFICATIONS,
-        JSON.stringify(notifications)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan notifikasi:',
-        error
-      );
-    }
-  }
-
-  /**
-   * Menambahkan notifikasi baru.
-   *
-   * Contoh userId:
-   * - "user-01" = untuk user tertentu
-   * - "*" = notifikasi global
-   */
-  public addNotification(
-    notification: Omit<
-      NotificationItem,
-      'id' | 'createdAt' | 'isRead'
-    > & {
-      id?: string;
-      createdAt?: string;
-      isRead?: boolean;
-    }
-  ): NotificationItem {
-    const notifications =
-      this.getAllNotifications();
-
-    const newNotification: NotificationItem = {
-      id:
-        notification.id ||
-        `notification-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 8)}`,
-      userId: notification.userId,
-      title: notification.title,
-      message: notification.message,
-      type: notification.type,
-      createdAt:
-        notification.createdAt ||
-        new Date().toISOString(),
-      isRead:
-        notification.isRead ?? false,
-      actionUrl:
-        notification.actionUrl
-    };
-
-    notifications.unshift(newNotification);
-
-    this.setNotifications(notifications);
-
-    return newNotification;
-  }
-
-  /**
-   * Menandai notifikasi sebagai sudah dibaca.
-   */
-  public markNotificationAsRead(
-    notificationId: string
-  ): boolean {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
-    try {
-      const notifications =
-        this.getAllNotifications();
-
-      const index = notifications.findIndex(
-        notification =>
-          notification.id === notificationId
-      );
-
-      if (index === -1) {
-        return false;
-      }
-
-      notifications[index] = {
-        ...notifications[index],
-        isRead: true
-      };
-
-      this.setNotifications(notifications);
-
-      return true;
-    } catch (error) {
-      console.error(
-        'Gagal menandai notifikasi sebagai dibaca:',
-        error
-      );
-
-      return false;
-    }
-  }
-
-  /**
-   * Menandai semua notifikasi milik current user
-   * sebagai sudah dibaca.
-   */
-  public markAllNotificationsAsRead(): boolean {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
-    try {
-      const currentUser =
-        this.getCurrentUser();
-
-      const currentUserId =
-        currentUser?.id;
-
-      if (!currentUserId) {
-        return false;
-      }
-
-      const notifications =
-        this.getAllNotifications();
-
-      let changed = false;
-
-      const updatedNotifications =
-        notifications.map(notification => {
-          const belongsToUser =
-            notification.userId === currentUserId ||
-            notification.userId === '*';
-
-          if (
-            belongsToUser &&
-            !notification.isRead
-          ) {
-            changed = true;
-
-            return {
-              ...notification,
-              isRead: true
-            };
-          }
-
-          return notification;
-        });
-
-      if (changed) {
-        this.setNotifications(
-          updatedNotifications
-        );
-      }
-
-      return true;
-    } catch (error) {
-      console.error(
-        'Gagal menandai seluruh notifikasi:',
-        error
-      );
-
-      return false;
-    }
-  }
-
-  /**
-   * Menghapus notifikasi.
-   */
-  public deleteNotification(
-    notificationId: string
-  ): boolean {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
-    try {
-      const notifications =
-        this.getAllNotifications();
-
-      const filtered =
-        notifications.filter(
-          notification =>
-            notification.id !==
-            notificationId
-        );
-
-      if (
-        filtered.length ===
-        notifications.length
-      ) {
-        return false;
-      }
-
-      this.setNotifications(filtered);
-
-      return true;
-    } catch (error) {
-      console.error(
-        'Gagal menghapus notifikasi:',
-        error
-      );
-
-      return false;
-    }
-  }
-
-  /**
-   * Menghapus seluruh notifikasi.
-   */
-  public clearNotifications(): void {
-    this.setNotifications([]);
   }
 
   // =========================================================
