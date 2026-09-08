@@ -45,6 +45,9 @@ export const formatGoogleDriveDirectUrl = (inputUrlOrId?: string): string => {
   return trimmed;
 };
 
+// Alias agar kompatibel dengan file-file lama seperti AuthModal.tsx
+export const formatGoogleDriveUrl = formatGoogleDriveDirectUrl;
+
 /**
  * Kompresi gambar File atau Base64 di browser (Canvas API)
  * Mencegah error 413 Payload Too Large pada Vercel/GAS saat upload dari kamera ponsel
