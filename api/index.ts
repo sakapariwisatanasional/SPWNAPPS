@@ -584,19 +584,29 @@ if (!IS_VERCEL) {
 }
 
 // Proxy mutation to Google Apps Script Web App
-async function forwardToGoogleAppsScript(payload: any) {
-  const scriptUrl = (db.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL).trim();
-  if (!scriptUrl || scriptUrl.trim().length === 0) return;
-  try {
-    const res = await fetch(scriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    console.log(`[GAS Forward] Action ${payload.action} sent to GAS. Status: ${res.status}`);
-  } catch (err) {
-    console.warn('[GAS Forward] Failed forwarding to GAS:', err);
+async function forwardToGoogleAppsScript(payload: any): Promise<any> {
+  const scriptUrl = String(db.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL).trim();
+  if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
+
+  const res = await fetch(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const text = await res.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch {}
+
+  if (!res.ok) {
+    throw new Error(`Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`);
   }
+  if (data?.status === 'error' || data?.success === false) {
+    throw new Error(data.message || 'Google Apps Script menolak permintaan.');
+  }
+
+  console.log(`[GAS Forward] ${payload.action} berhasil.`, data || 'OK');
+  return data || { status: 'success' };
 }
 
 // ==========================================
