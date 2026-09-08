@@ -32,6 +32,7 @@ import {
   Clock
 } from 'lucide-react';
 import { storage } from '../../services/storage';
+import { spreadsheetService } from '../../services/spreadsheetService';
 import { Member, CurrentUser, Province, Regency, District, Branch, KridaType, MemberStatus, MemberSkill, SkillProficiency, Skill } from '../../types';
 import { formatDriveImageUrl, getDriveDirectFallbackUrl, getValidAvatarUrl } from '../common/SakaLogo';
 import { GOOGLE_DRIVE_MAIN_FOLDER } from '../../services/driveRepository';
@@ -393,6 +394,20 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         );
       }
 
+      let finalAvatarUrl = avatarUrl.trim() || member.avatarUrl;
+
+      // If an image is still Base64, upload it before touching local member/user state.
+      if (/^data:image\//i.test(finalAvatarUrl)) {
+        const cleanName = fullName.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `KTA_${finalNta || member.nationalMemberNumber || member.id}_${cleanName}.jpg`;
+        const uploaded = await spreadsheetService.uploadImageToDrive(finalAvatarUrl, filename, 'MEMBER_AVATAR');
+        finalAvatarUrl = uploaded.url;
+      }
+
+      if (/^data:image\//i.test(finalAvatarUrl)) {
+        throw new Error('Foto belum berhasil dikonversi menjadi URL Google Drive.');
+      }
+
       const updatedPayload: Partial<Member> = {
         fullName: fullName.trim(),
         nikMasked: nikMasked.trim(),
@@ -421,7 +436,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         occupation: occupation.trim(),
         bio: bio.trim(),
 
-        avatarUrl: avatarUrl.trim() || member.avatarUrl,
+        avatarUrl: finalAvatarUrl,
 
         nationalMemberNumber: finalNta || member.nationalMemberNumber,
         skills: memberSkills
