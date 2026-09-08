@@ -2,321 +2,268 @@ import {
   Member, 
   TourPackage, 
   Activity, 
-  Province, 
-  Regency, 
-  District, 
-  Branch, 
-  Skill, 
+  CulinarySouvenirItem, 
   AuditLog, 
-  CurrentUser, 
-  KtaCardSettings, 
-  CulinarySouvenirItem 
+  AdminUser, 
+  KtaCustomSettings,
+  KridaModule
 } from '../types';
-import { 
-  INITIAL_MEMBERS, 
-  INITIAL_TOUR_PACKAGES, 
-  INITIAL_ACTIVITIES, 
-  INITIAL_AUDIT_LOGS, 
-  DEFAULT_PUBLIC_USER, 
-  DEMO_USERS, 
-  MASTER_SKILLS, 
-  INITIAL_CULINARY_SOUVENIRS 
-} from '../data/initialData';
-import { PROVINCES_DATA, REGENCIES_DATA, getDistrictsForRegency } from '../data/indonesiaTerritories';
+import { initialMembers, initialTourPackages, initialActivities, initialCulinarySouvenirs } from '../data/initialData';
+import { kridaModules2026 } from '../data/kridaModules2026';
 
 const STORAGE_KEYS = {
   MEMBERS: 'saka_members',
-  TOURS: 'saka_tours',
+  PACKAGES: 'saka_packages',
   ACTIVITIES: 'saka_activities',
+  CULINARY: 'saka_culinary',
   AUDIT_LOGS: 'saka_audit_logs',
+  SESSION: 'saka_session',
   USERS: 'saka_users',
-  CURRENT_USER: 'saka_current_user',
-  KTA_SETTINGS: 'saka_kta_settings_v2',
-  CULINARY_SOUVENIRS: 'saka_culinary_souvenirs',
-  AUTH_TOKEN: 'saka_auth_token'
+  KTA_SETTINGS: 'saka_kta_custom_settings',
+  KRIDA_MODULES: 'saka_krida_modules_2026'
 };
 
-export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
-  issueLocationDate: 'Jakarta, 14 Agustus 2026',
-  signerName: 'Reza Pahlevi',
-  signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
-  barcodeCustomValue: '',
-  frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota',
-  bgOpacity: 0.10,
-  bgImageUrl: ''
+const defaultKtaSettings: KtaCustomSettings = {
+  themeColor: '#059669',
+  cardStyle: 'modern',
+  customTitle: 'KARTU TANDA ANGGOTA RESMI',
+  customSubtitle: 'SAKA PARIWISATA NASIONAL',
+  accentColor: '#10b981',
+  fontFamily: 'sans-serif',
+  opacity: 0.95
 };
 
-class StorageService {
-  private listeners: (() => void)[] = [];
-
-  constructor() {
-    this.initDefaultData();
-  }
-
-  private initDefaultData() {
-    if (!localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS)) {
-      localStorage.setItem(STORAGE_KEYS.KTA_SETTINGS, JSON.stringify(DEFAULT_KTA_SETTINGS));
-    }
-  }
-
-  public subscribe(listener: () => void): () => void {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
-    };
-  }
-
-  public subscribeMutation(listener: (event: any) => void): () => void {
-    const handler = (e: StorageEvent) => {
-      if (e.key && Object.values(STORAGE_KEYS).includes(e.key)) {
-        try {
-          listener({ type: e.key, payload: JSON.parse(e.newValue || '{}') });
-        } catch {}
+export const storage = {
+  // ==========================================
+  // KRIDA MODULES (Pencegah Layar Putih)
+  // ==========================================
+  getKridaModules: (): KridaModule[] => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.KRIDA_MODULES);
+      if (data) {
+        return JSON.parse(data);
       }
-    };
-    window.addEventListener('storage', handler);
-    return () => window.removeEventListener('storage', handler);
-  }
+    } catch (e) {
+      console.error('Gagal mengambil modul krida dari storage:', e);
+    }
+    return kridaModules2026;
+  },
 
-  public notify() {
-    this.listeners.forEach(cb => {
-      try { cb(); } catch {}
-    });
-  }
+  saveKridaModules: (modules: KridaModule[]): void => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.KRIDA_MODULES, JSON.stringify(modules));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('krida-modules-updated', { detail: modules }));
+      }
+    } catch (e) {
+      console.error('Gagal menyimpan modul krida:', e);
+    }
+  },
 
-  // --- MEMBERS MANAGEMENT ---
-  public getMembers(): Member[] {
+  // ==========================================
+  // MEMBERS & REGISTRATION
+  // ==========================================
+  getMembers: (): Member[] => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.MEMBERS);
-      return data ? JSON.parse(data) : INITIAL_MEMBERS;
+      return data ? JSON.parse(data) : initialMembers;
     } catch {
-      return INITIAL_MEMBERS;
+      return initialMembers;
     }
-  }
+  },
 
-  public setMembers(members: Member[]) {
-    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
-    this.notify();
-  }
+  saveMembers: (members: Member[]): void => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('saka-members-updated', { detail: members }));
+      }
+    } catch (e) {
+      console.error('Gagal menyimpan data anggota:', e);
+    }
+  },
 
-  public saveMembers(members: Member[]) {
-    this.setMembers(members);
-  }
+  registerMember: (data: Omit<Member, 'id' | 'createdAt' | 'status'>): Member => {
+    const currentMembers = storage.getMembers();
 
-  // Registrasi Anggota Baru dengan ID Berurutan Otomatis (member-01, member-02, dst.)
-  public registerMember(payload: Omit<Member, 'id' | 'status' | 'registeredAt' | 'verificationToken' | 'locationHistory'>): Member {
-    const members = this.getMembers();
-
-    // Hitung nomor urut terbesar dari ID yang berformat member-XX
-    let maxNumber = 0;
-    members.forEach(m => {
-      if (m.id && m.id.startsWith('member-')) {
-        const numPart = parseInt(m.id.replace('member-', ''), 10);
-        if (!isNaN(numPart) && numPart > maxNumber) {
-          maxNumber = numPart;
+    // Hitung nomor urut tertinggi (member-01, member-02, dst.)
+    let maxIdNum = 0;
+    currentMembers.forEach(m => {
+      if (typeof m?.id === 'string') {
+        const match = m.id.match(/member-(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxIdNum) {
+            maxIdNum = num;
+          }
         }
       }
     });
 
-    const nextNumber = maxNumber + 1;
-    // Format nomor menjadi minimal 2 digit (contoh: member-01, member-02, ..., member-10)
-    const formattedId = `member-${nextNumber < 10 ? '0' + nextNumber : nextNumber}`;
+    const nextSeq = maxIdNum + 1;
+    const newId = `member-${String(nextSeq).padStart(2, '0')}`;
 
     const newMember: Member = {
-      ...payload,
-      id: formattedId,
-      status: 'PENDING',
-      registeredAt: new Date().toISOString(),
-      verificationToken: `VERIFY-${formattedId}-${Date.now().toString(36).toUpperCase()}`,
-      locationHistory: [],
-      skills: payload.skills || [],
-      certifications: payload.certifications || []
+      ...data,
+      id: newId,
+      status: 'pending',
+      createdAt: new Date().toISOString()
     };
 
-    // Tambahkan pendaftar baru ke daftar
-    members.unshift(newMember);
-    this.setMembers(members);
-
+    currentMembers.push(newMember);
+    storage.saveMembers(currentMembers);
     return newMember;
-  }
+  },
 
-  public updateMemberStatus(memberId: string, status: 'ACTIVE' | 'PENDING' | 'SUSPENDED', actor?: any): boolean {
-    const members = this.getMembers();
-    const idx = members.findIndex(m => m.id === memberId);
-    if (idx !== -1) {
-      members[idx].status = status;
-      this.setMembers(members);
-      return true;
-    }
-    return false;
-  }
+  updateMember: (id: string, updatedData: Partial<Member>): Member | null => {
+    const members = storage.getMembers();
+    const index = members.findIndex(m => m.id === id);
+    if (index === -1) return null;
 
-  public deleteMember(memberId: string, actor?: any): boolean {
-    const members = this.getMembers().filter(m => m.id !== memberId);
-    this.setMembers(members);
+    members[index] = { ...members[index], ...updatedData };
+    storage.saveMembers(members);
+    return members[index];
+  },
+
+  deleteMember: (id: string): boolean => {
+    const members = storage.getMembers();
+    const filtered = members.filter(m => m.id !== id);
+    if (filtered.length === members.length) return false;
+    storage.saveMembers(filtered);
     return true;
-  }
+  },
 
-  public deleteAllDummyMembers(actor?: any): number {
-    const members = this.getMembers().filter(m => !m.id.includes('dummy') && !m.id.includes('demo'));
-    this.setMembers(members);
-    return members.length;
-  }
-
-  // --- KTA CARD SETTINGS (SUPER ADMIN) ---
-  public getKtaSettings(): KtaCardSettings {
+  // ==========================================
+  // KTA CUSTOM SETTINGS (Reaktif)
+  // ==========================================
+  getKtaSettings: (): KtaCustomSettings => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS);
-      if (data) {
-        return { ...DEFAULT_KTA_SETTINGS, ...JSON.parse(data) };
-      }
-    } catch {}
-    return DEFAULT_KTA_SETTINGS;
-  }
-
-  public saveKtaSettings(settings: KtaCardSettings) {
-    const updated = { ...DEFAULT_KTA_SETTINGS, ...settings };
-    localStorage.setItem(STORAGE_KEYS.KTA_SETTINGS, JSON.stringify(updated));
-    // Berikan sinyal perubahan ke semua komponen KTA
-    this.notify();
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('saka:kta-settings-updated', { detail: updated }));
-    }
-  }
-
-  // --- TOURS, ACTIVITIES, CULINARY, PROVINCES ---
-  public getTourPackages(): TourPackage[] {
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.TOURS);
-      return data ? JSON.parse(data) : INITIAL_TOUR_PACKAGES;
+      return data ? { ...defaultKtaSettings, ...JSON.parse(data) } : defaultKtaSettings;
     } catch {
-      return INITIAL_TOUR_PACKAGES;
+      return defaultKtaSettings;
     }
-  }
+  },
 
-  public setTourPackages(tours: TourPackage[]) {
-    localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(tours));
-    this.notify();
-  }
+  saveKtaSettings: (settings: KtaCustomSettings): void => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.KTA_SETTINGS, JSON.stringify(settings));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kta-settings-updated', { detail: settings }));
+      }
+    } catch (e) {
+      console.error('Gagal menyimpan pengaturan KTA:', e);
+    }
+  },
 
-  public deleteTourPackage(id: string, actor?: any) {
-    const filtered = this.getTourPackages().filter(t => t.id !== id);
-    this.setTourPackages(filtered);
-  }
+  // ==========================================
+  // TOUR PACKAGES
+  // ==========================================
+  getPackages: (): TourPackage[] => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.PACKAGES);
+      return data ? JSON.parse(data) : initialTourPackages;
+    } catch {
+      return initialTourPackages;
+    }
+  },
 
-  public getActivities(): Activity[] {
+  savePackages: (packages: TourPackage[]): void => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PACKAGES, JSON.stringify(packages));
+    } catch (e) {
+      console.error('Gagal menyimpan paket wisata:', e);
+    }
+  },
+
+  // ==========================================
+  // ACTIVITIES
+  // ==========================================
+  getActivities: (): Activity[] => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
-      return data ? JSON.parse(data) : INITIAL_ACTIVITIES;
+      return data ? JSON.parse(data) : initialActivities;
     } catch {
-      return INITIAL_ACTIVITIES;
+      return initialActivities;
     }
-  }
+  },
 
-  public setActivities(acts: Activity[]) {
-    localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(acts));
-    this.notify();
-  }
-
-  public deleteActivity(id: string, actor?: any) {
-    const filtered = this.getActivities().filter(a => a.id !== id);
-    this.setActivities(filtered);
-  }
-
-  public getCulinarySouvenirs(): CulinarySouvenirItem[] {
+  saveActivities: (activities: Activity[]): void => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.CULINARY_SOUVENIRS);
-      return data ? JSON.parse(data) : INITIAL_CULINARY_SOUVENIRS;
-    } catch {
-      return INITIAL_CULINARY_SOUVENIRS;
+      localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
+    } catch (e) {
+      console.error('Gagal menyimpan kegiatan:', e);
     }
-  }
+  },
 
-  public setCulinarySouvenirs(items: CulinarySouvenirItem[]) {
-    localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(items));
-    this.notify();
-  }
+  // ==========================================
+  // CULINARY & SOUVENIRS
+  // ==========================================
+  getCulinary: (): CulinarySouvenirItem[] => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.CULINARY);
+      return data ? JSON.parse(data) : initialCulinarySouvenirs;
+    } catch {
+      return initialCulinarySouvenirs;
+    }
+  },
 
-  public getProvinces(): Province[] {
-    return PROVINCES_DATA;
-  }
+  saveCulinary: (items: CulinarySouvenirItem[]): void => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.CULINARY, JSON.stringify(items));
+    } catch (e) {
+      console.error('Gagal menyimpan kuliner/cenderamata:', e);
+    }
+  },
 
-  public getRegencies(provinceId?: string): Regency[] {
-    if (!provinceId) return REGENCIES_DATA;
-    return REGENCIES_DATA.filter(r => r.provinceId === provinceId);
-  }
-
-  public getDistricts(regencyId?: string): District[] {
-    if (!regencyId) return [];
-    return getDistrictsForRegency(regencyId);
-  }
-
-  public getBranches(districtId?: string): Branch[] {
-    return [];
-  }
-
-  public getSkills(): Skill[] {
-    return MASTER_SKILLS;
-  }
-
-  public getAuditLogs(): AuditLog[] {
+  // ==========================================
+  // AUDIT LOGS
+  // ==========================================
+  getAuditLogs: (): AuditLog[] => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
-      return data ? JSON.parse(data) : INITIAL_AUDIT_LOGS;
+      return data ? JSON.parse(data) : [];
     } catch {
-      return INITIAL_AUDIT_LOGS;
+      return [];
     }
-  }
+  },
 
-  // --- USERS & AUTH ---
-  public getUsers(): CurrentUser[] {
+  addAuditLog: (log: Omit<AuditLog, 'id' | 'timestamp'>): void => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.USERS);
-      return data ? JSON.parse(data) : DEMO_USERS;
-    } catch {
-      return DEMO_USERS;
+      const logs = storage.getAuditLogs();
+      const newLog: AuditLog = {
+        ...log,
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: new Date().toISOString()
+      };
+      logs.unshift(newLog);
+      localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs.slice(0, 500)));
+    } catch (e) {
+      console.error('Gagal menambah log audit:', e);
     }
-  }
+  },
 
-  public setUsers(users: CurrentUser[]) {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-    this.notify();
-  }
-
-  public saveUsers(users: CurrentUser[]) {
-    this.setUsers(users);
-  }
-
-  public getCurrentUser(): CurrentUser {
+  // ==========================================
+  // USERS & SESSION
+  // ==========================================
+  getCurrentUser: (): AdminUser | null => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      return data ? JSON.parse(data) : DEFAULT_PUBLIC_USER;
+      const data = localStorage.getItem(STORAGE_KEYS.SESSION);
+      return data ? JSON.parse(data) : null;
     } catch {
-      return DEFAULT_PUBLIC_USER;
+      return null;
+    }
+  },
+
+  setCurrentUser: (user: AdminUser | null): void => {
+    try {
+      if (user) {
+        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.SESSION);
+      }
+    } catch (e) {
+      console.error('Gagal menyimpan sesi login:', e);
     }
   }
-
-  public setCurrentUser(user: CurrentUser) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-    this.notify();
-  }
-
-  public getAuthToken(): string | null {
-    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-  }
-
-  public setAuthToken(token: string | null) {
-    if (token) {
-      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    }
-    this.notify();
-  }
-
-  public async syncWithServer(): Promise<boolean> {
-    return true;
-  }
-}
-
-export const storage = new StorageService();
+};
