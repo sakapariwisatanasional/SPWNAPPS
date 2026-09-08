@@ -11,7 +11,8 @@ import {
   CurrentUser,
   KtaCardSettings,
   CulinarySouvenirItem,
-  KridaModuleItem
+  KridaModuleItem,
+  NotificationItem
 } from '../types';
 
 import {
@@ -44,7 +45,8 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'saka_current_user',
   KTA_SETTINGS: 'saka_kta_settings_v2',
   CULINARY_SOUVENIRS: 'saka_culinary_souvenirs',
-  AUTH_TOKEN: 'saka_auth_token'
+  AUTH_TOKEN: 'saka_auth_token',
+  NOTIFICATIONS: 'saka_notifications'
 };
 
 /**
@@ -88,9 +90,22 @@ class StorageService {
           JSON.stringify(DEFAULT_KTA_SETTINGS)
         );
       }
+
+      /*
+       * Inisialisasi penyimpanan notifikasi.
+       *
+       * Jangan menggunakan array default yang sama secara langsung
+       * karena data akan disimpan di localStorage.
+       */
+      if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
+        localStorage.setItem(
+          STORAGE_KEYS.NOTIFICATIONS,
+          JSON.stringify([])
+        );
+      }
     } catch (error) {
       console.error(
-        'Gagal menginisialisasi pengaturan KTA:',
+        'Gagal menginisialisasi pengaturan storage:',
         error
       );
     }
@@ -658,6 +673,327 @@ class StorageService {
 
       return INITIAL_AUDIT_LOGS;
     }
+  }
+
+  // =========================================================
+  // NOTIFICATIONS
+  // =========================================================
+
+  /**
+   * Mengambil seluruh notifikasi yang tersimpan.
+   *
+   * Method internal ini digunakan agar:
+   * - getNotifications() dapat menyaring berdasarkan user
+   * - addNotification() tidak kehilangan notifikasi user lain
+   */
+  private getAllNotifications(): NotificationItem[] {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    try {
+      const data = localStorage.getItem(
+        STORAGE_KEYS.NOTIFICATIONS
+      );
+
+      if (!data) {
+        return [];
+      }
+
+      const parsed = JSON.parse(data);
+
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed;
+    } catch (error) {
+      console.error(
+        'Gagal membaca notifikasi:',
+        error
+      );
+
+      return [];
+    }
+  }
+
+  /**
+   * Mengambil notifikasi untuk current user.
+   *
+   * Notifikasi dengan userId "*"
+   * dianggap sebagai notifikasi global.
+   */
+  public getNotifications(): NotificationItem[] {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    try {
+      const currentUser = this.getCurrentUser();
+      const currentUserId = currentUser?.id;
+
+      const notifications =
+        this.getAllNotifications();
+
+      return notifications
+        .filter(notification => {
+          if (!notification) {
+            return false;
+          }
+
+          /*
+           * "*" = notifikasi global.
+           */
+          if (notification.userId === '*') {
+            return true;
+          }
+
+          /*
+           * Jika belum ada current user,
+           * jangan tampilkan notifikasi user tertentu.
+           */
+          if (!currentUserId) {
+            return false;
+          }
+
+          return notification.userId === currentUserId;
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() -
+            new Date(a.createdAt).getTime()
+        );
+    } catch (error) {
+      console.error(
+        'Gagal mengambil notifikasi:',
+        error
+      );
+
+      return [];
+    }
+  }
+
+  /**
+   * Menyimpan seluruh notifikasi.
+   */
+  public setNotifications(
+    notifications: NotificationItem[]
+  ): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.NOTIFICATIONS,
+        JSON.stringify(notifications)
+      );
+
+      this.notify();
+    } catch (error) {
+      console.error(
+        'Gagal menyimpan notifikasi:',
+        error
+      );
+    }
+  }
+
+  /**
+   * Menambahkan notifikasi baru.
+   *
+   * Contoh userId:
+   * - "user-01" = untuk user tertentu
+   * - "*" = notifikasi global
+   */
+  public addNotification(
+    notification: Omit<
+      NotificationItem,
+      'id' | 'createdAt' | 'isRead'
+    > & {
+      id?: string;
+      createdAt?: string;
+      isRead?: boolean;
+    }
+  ): NotificationItem {
+    const notifications =
+      this.getAllNotifications();
+
+    const newNotification: NotificationItem = {
+      id:
+        notification.id ||
+        `notification-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}`,
+      userId: notification.userId,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      createdAt:
+        notification.createdAt ||
+        new Date().toISOString(),
+      isRead:
+        notification.isRead ?? false,
+      actionUrl:
+        notification.actionUrl
+    };
+
+    notifications.unshift(newNotification);
+
+    this.setNotifications(notifications);
+
+    return newNotification;
+  }
+
+  /**
+   * Menandai notifikasi sebagai sudah dibaca.
+   */
+  public markNotificationAsRead(
+    notificationId: string
+  ): boolean {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    try {
+      const notifications =
+        this.getAllNotifications();
+
+      const index = notifications.findIndex(
+        notification =>
+          notification.id === notificationId
+      );
+
+      if (index === -1) {
+        return false;
+      }
+
+      notifications[index] = {
+        ...notifications[index],
+        isRead: true
+      };
+
+      this.setNotifications(notifications);
+
+      return true;
+    } catch (error) {
+      console.error(
+        'Gagal menandai notifikasi sebagai dibaca:',
+        error
+      );
+
+      return false;
+    }
+  }
+
+  /**
+   * Menandai semua notifikasi milik current user
+   * sebagai sudah dibaca.
+   */
+  public markAllNotificationsAsRead(): boolean {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    try {
+      const currentUser =
+        this.getCurrentUser();
+
+      const currentUserId =
+        currentUser?.id;
+
+      if (!currentUserId) {
+        return false;
+      }
+
+      const notifications =
+        this.getAllNotifications();
+
+      let changed = false;
+
+      const updatedNotifications =
+        notifications.map(notification => {
+          const belongsToUser =
+            notification.userId === currentUserId ||
+            notification.userId === '*';
+
+          if (
+            belongsToUser &&
+            !notification.isRead
+          ) {
+            changed = true;
+
+            return {
+              ...notification,
+              isRead: true
+            };
+          }
+
+          return notification;
+        });
+
+      if (changed) {
+        this.setNotifications(
+          updatedNotifications
+        );
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        'Gagal menandai seluruh notifikasi:',
+        error
+      );
+
+      return false;
+    }
+  }
+
+  /**
+   * Menghapus notifikasi.
+   */
+  public deleteNotification(
+    notificationId: string
+  ): boolean {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    try {
+      const notifications =
+        this.getAllNotifications();
+
+      const filtered =
+        notifications.filter(
+          notification =>
+            notification.id !==
+            notificationId
+        );
+
+      if (
+        filtered.length ===
+        notifications.length
+      ) {
+        return false;
+      }
+
+      this.setNotifications(filtered);
+
+      return true;
+    } catch (error) {
+      console.error(
+        'Gagal menghapus notifikasi:',
+        error
+      );
+
+      return false;
+    }
+  }
+
+  /**
+   * Menghapus seluruh notifikasi.
+   */
+  public clearNotifications(): void {
+    this.setNotifications([]);
   }
 
   // =========================================================
