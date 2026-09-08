@@ -335,9 +335,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const regName = isNasional ? 'Pusat Nasional' : (regObj?.name || 'Kabupaten Bandung');
     const distName = isNasional ? 'Nasional' : (distObj?.name || 'Kecamatan');
 
-    const newMemberId = `mem-${Date.now()}`;
-    const newUserId = `user-${Date.now()}`;
-
     const cleanPhone = regPhone.replace(/\D/g, '');
     const generatedNikMasked = '3200******' + (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
 
