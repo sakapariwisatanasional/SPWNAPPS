@@ -75,7 +75,7 @@ const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
 // The Google Apps Script endpoint is the authoritative external write target.
 // Keep a production fallback so a fresh Vercel instance does not depend on the
 // writable local JSON file for its script configuration.
-const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0ZFGBmN3Hwt26lnUmpgXtwhs6f1PyWkezNsaU9OzSpKnIqxCaDnVcmJbl2sTaKJw4FQ/exec';
+const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekKQk_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
 
 function base64UrlEncode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url');
@@ -585,7 +585,7 @@ if (!IS_VERCEL) {
 
 // Proxy mutation to Google Apps Script Web App
 async function forwardToGoogleAppsScript(payload: any): Promise<any> {
-  const scriptUrl = String(db.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL).trim();
+  const scriptUrl = String(process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL).trim();
   if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
 
   const res = await fetch(scriptUrl, {
