@@ -143,7 +143,6 @@ const DB_FILE = path.join(DATA_DIR, 'saka-database.json');
 
 const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
-const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekKQk_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
 
 function hashPasswordForGoogleAppsScript(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -580,14 +579,18 @@ setInterval(() => {
 }, 25000);
 
 // Proxy mutation to Google Apps Script Web App
-async function forwardToGoogleAppsScript(payload: any, overrideScriptUrl?: string): Promise<any> {
-  const scriptUrl = String(overrideScriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL).trim();
-  if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
+async function forwardToGoogleAppsScript(payload: any, scriptUrlOverride?: string): Promise<any> {
+  const scriptUrl = String(scriptUrlOverride || payload?.scriptUrl || '').trim().replace(/\s+/g, '');
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(scriptUrl)) {
+    throw new Error('URL Google Apps Script belum diatur melalui Dashboard. Silakan buka Dashboard > Database Google Spreadsheet & Drive > Pengaturan API.');
+  }
+
+  const { scriptUrl: _ignoredScriptUrl, ...gasPayload } = payload || {};
 
   const res = await fetch(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(gasPayload)
   });
   const text = await res.text();
   let data: any = null;
@@ -636,8 +639,9 @@ app.post('/api/upload-image', async (req, res) => {
       action: 'UPLOAD_IMAGE',
       base64: value,
       filename: String(filename || `image_${Date.now()}.jpg`).trim(),
-      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase()
-    }, String(scriptUrl || '').trim() || undefined);
+      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase(),
+      scriptUrl
+    });
 
     if (!result || result.success === false || !result.url) {
       return res.status(502).json({
@@ -682,7 +686,7 @@ app.get('/api/health', (req, res) => {
 
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body || {};
+  const { username, password, scriptUrl } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Nama pengguna dan kata sandi wajib diisi.' });
   }
@@ -695,7 +699,8 @@ app.post('/api/auth/login', async (req, res) => {
     const gasResult = await forwardToGoogleAppsScript({
       action: 'AUTH_LOGIN',
       username: cleanUser,
-      password: rawPass
+      password: rawPass,
+      scriptUrl
     });
     if (gasResult?.status === 'success' && gasResult.user) {
       const gu = gasResult.user;
@@ -834,7 +839,7 @@ app.post('/api/auth/change-password', (req, res) => {
 
 // POST /api/auth/register - Public new member registration
 app.post('/api/auth/register', async (req, res) => {
-  const { memberData, password, centralAlreadyPersisted } = req.body || {};
+  const { memberData, password, centralAlreadyPersisted, scriptUrl } = req.body || {};
 
   if (!memberData || !memberData.fullName) {
     return res.status(400).json({ success: false, message: 'Data anggota wajib dilengkapi.' });
@@ -968,7 +973,8 @@ app.post('/api/auth/register', async (req, res) => {
         status: 'PENDING',
         createdAt: registeredAt
       },
-      passwordHash: gasPasswordHash
+      passwordHash: gasPasswordHash,
+      scriptUrl
     });
 
     await forwardToGoogleAppsScript({
@@ -991,7 +997,8 @@ app.post('/api/auth/register', async (req, res) => {
         newMember.avatarUrl || '',
         newMember.registeredAt,
         `https://spwnapps.vercel.app/?verifyId=${newMember.nationalMemberNumber || newMember.id}`
-      ]
+      ],
+      scriptUrl
     });
   } catch (gasErr: any) {
     // Roll back the transient Vercel records if the central write failed.
@@ -1182,8 +1189,9 @@ app.post('/api/mutate', async (req, res) => {
   const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
   const { type, action, payload, scriptUrl } = req.body || {};
-  const requestScriptUrl = String(scriptUrl || '').trim();
-  const forwardRequest = (gasPayload: any) => forwardToGoogleAppsScript(gasPayload, requestScriptUrl || undefined);
+  const forwardMutationToGoogleAppsScript = (gasPayload: any) =>
+    forwardToGoogleAppsScript(gasPayload, scriptUrl);
+
   if (!type || !action) {
     return res.status(400).json({ success: false, message: 'Parameter type atau action tidak lengkap.' });
   }
@@ -1227,7 +1235,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        await forwardRequest({
+        await forwardMutationToGoogleAppsScript({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1255,7 +1263,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        await forwardRequest({
+        await forwardMutationToGoogleAppsScript({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1277,7 +1285,7 @@ app.post('/api/mutate', async (req, res) => {
           ]
         });
         if ((action === 'STATUS' || action === 'UPDATE') && member.id && member.status) {
-          await forwardRequest({
+          await forwardMutationToGoogleAppsScript({
             action: 'UPDATE_AUTH_STATUS',
             memberId: member.id,
             status: member.status
@@ -1286,7 +1294,7 @@ app.post('/api/mutate', async (req, res) => {
       } else if (action === 'DELETE') {
         const memberId = payload.id || payload.memberId;
         db.members = db.members.filter(m => m.id !== memberId);
-        forwardRequest({
+        forwardMutationToGoogleAppsScript({
           action: 'DELETE_ROW',
           sheet: 'Anggota',
           id: memberId,
@@ -1302,7 +1310,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.tours.unshift(tour);
         }
-        forwardRequest({
+        forwardMutationToGoogleAppsScript({
           action: 'UPSERT_ROW',
           sheet: 'Paket_Wisata',
           id: tour.id,
@@ -1323,7 +1331,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.tours = db.tours.filter(t => t.id !== payload.id);
-        forwardRequest({
+        forwardMutationToGoogleAppsScript({
           action: 'DELETE_ROW',
           sheet: 'Paket_Wisata',
           id: payload.id
@@ -1338,7 +1346,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.culinaryItems.unshift(item);
         }
-        forwardRequest({
+        forwardMutationToGoogleAppsScript({
           action: 'UPSERT_ROW',
           sheet: 'Kuliner_Cinderamata',
           id: item.id,
@@ -1359,7 +1367,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.culinaryItems = db.culinaryItems.filter(c => c.id !== payload.id);
-        forwardRequest({
+        forwardMutationToGoogleAppsScript({
           action: 'DELETE_ROW',
           sheet: 'Kuliner_Cinderamata',
           id: payload.id
@@ -1374,7 +1382,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.activities.unshift(act);
         }
-        forwardRequest({
+        forwardMutationToGoogleAppsScript({
           action: 'UPSERT_ROW',
           sheet: 'Agenda_Kegiatan',
           id: act.id,
@@ -1397,7 +1405,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.activities = db.activities.filter(a => a.id !== payload.id);
-        forwardRequest({
+        forwardMutationToGoogleAppsScript({
           action: 'DELETE_ROW',
           sheet: 'Agenda_Kegiatan',
           id: payload.id
