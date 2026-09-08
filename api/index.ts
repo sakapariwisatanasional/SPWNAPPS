@@ -1076,7 +1076,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        forwardToGoogleAppsScript({
+        await forwardToGoogleAppsScript({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1104,7 +1104,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        forwardToGoogleAppsScript({
+        await forwardToGoogleAppsScript({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1125,6 +1125,13 @@ app.post('/api/mutate', async (req, res) => {
             `https://sakapariwisata-nasional.vercel.app/?verifyId=${member.nationalMemberNumber || member.id}`
           ]
         });
+        if ((action === 'STATUS' || action === 'UPDATE') && member.id && member.status) {
+          await forwardToGoogleAppsScript({
+            action: 'UPDATE_AUTH_STATUS',
+            memberId: member.id,
+            status: member.status
+          });
+        }
       } else if (action === 'DELETE') {
         const memberId = payload.id || payload.memberId;
         db.members = db.members.filter(m => m.id !== memberId);
