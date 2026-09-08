@@ -1,1129 +1,1277 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  X, LogIn, UserPlus, Lock, User, Shield, MapPin, 
-  CheckCircle, AlertCircle, ArrowRight, Compass,
-  Eye, EyeOff, Camera, Upload, Link as LinkIcon,
-  Globe2, Building, Sparkles
-} from 'lucide-react';
-import { CurrentUser, KridaType, Regency, District } from '../../types';
-import { storage } from '../../services/storage';
-import { PROVINCES_DATA } from '../../data/indonesiaTerritories';
-import { formatGoogleDriveUrl } from '../../services/driveRepository';
-import { spreadsheetService } from '../../services/spreadsheetService';
+import {
+  Member,
+  TourPackage,
+  Activity,
+  Province,
+  Regency,
+  District,
+  Branch,
+  Skill,
+  AuditLog,
+  CurrentUser,
+  KtaCardSettings,
+  CulinarySouvenirItem,
+  KridaModuleItem,
+  NotificationItem
+} from '../types';
 
-interface AuthModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  initialTab?: 'login' | 'register' | 'forgot';
-  onLoginSuccess: (user: CurrentUser) => void;
-}
+import {
+  INITIAL_MEMBERS,
+  INITIAL_TOUR_PACKAGES,
+  INITIAL_ACTIVITIES,
+  INITIAL_AUDIT_LOGS,
+  DEFAULT_PUBLIC_USER,
+  DEMO_USERS,
+  MASTER_SKILLS,
+  INITIAL_CULINARY_SOUVENIRS
+} from '../data/initialData';
 
-export const AuthModal: React.FC<AuthModalProps> = ({
-  isOpen,
-  onClose,
-  initialTab = 'login',
-  onLoginSuccess
-}) => {
-  const [tab, setTab] = useState<'login' | 'register' | 'forgot'>(initialTab);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+import {
+  INITIAL_KRIDA_MODULES
+} from '../data/kridaData';
 
-  // Login form state
-  const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
+import {
+  PROVINCES_DATA,
+  REGENCIES_DATA,
+  getDistrictsForRegency
+} from '../data/indonesiaTerritories';
 
-  // Register form state
-  const [regFullName, setRegFullName] = useState('');
-  const [regGender, setRegGender] = useState<'LAKI_LAKI' | 'PEREMPUAN'>('LAKI_LAKI');
-  const [regBirthPlace, setRegBirthPlace] = useState('');
-  const [regBirthDate, setRegBirthDate] = useState('2002-05-15');
-  const [regEmail, setRegEmail] = useState('');
-  const [regPhone, setRegPhone] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regConfirmPassword, setRegConfirmPassword] = useState('');
-  
-  // Wilayah & Struktur Organisasi
-  const [kwartirLevel, setKwartirLevel] = useState<'NASIONAL' | 'DAERAH'>('DAERAH');
-  const [regProvinceId, setRegProvinceId] = useState('32');
-  const [regRegencyId, setRegRegencyId] = useState('32.04');
-  const [regDistrictId, setRegDistrictId] = useState('');
-  const [regenciesList, setRegenciesList] = useState<Regency[]>([]);
-  const [districtsList, setDistrictsList] = useState<District[]>([]);
+const STORAGE_KEYS = {
+  MEMBERS: 'saka_members',
+  TOURS: 'saka_tours',
+  ACTIVITIES: 'saka_activities',
+  AUDIT_LOGS: 'saka_audit_logs',
+  USERS: 'saka_users',
+  CURRENT_USER: 'saka_current_user',
+  KTA_SETTINGS: 'saka_kta_settings_v2',
+  CULINARY_SOUVENIRS: 'saka_culinary_souvenirs',
+  AUTH_TOKEN: 'saka_auth_token',
+  NOTIFICATIONS: 'saka_notifications',
+  PENDING_MEMBER_WRITES: 'saka_pending_member_writes_v1'
+};
 
-  const [regGudep, setRegGudep] = useState('');
-  const [regKrida, setRegKrida] = useState<KridaType>('Krida Pemandu');
-  const [regEducationLevel, setRegEducationLevel] = useState('SMA / SMK / Sederajat');
-  const [regOccupation, setRegOccupation] = useState('Pelajar / Mahasiswa');
-  const [regBio, setRegBio] = useState('');
+/**
+ * Pengaturan default KTA Digital.
+ *
+ * Diekspor karena digunakan oleh:
+ * src/components/member/KtaCardCustomizerModal.tsx
+ *
+ * Jangan ubah nama export ini menjadi:
+ * defaultKtaSettings
+ *
+ * Komponen KtaCardCustomizerModal mengimpor:
+ * DEFAULT_KTA_SETTINGS
+ */
+export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
+  issueLocationDate: 'Jakarta, 14 Agustus 2026',
+  signerName: 'Reza Pahlevi',
+  signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
+  barcodeCustomValue: '',
+  frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota',
+  bgOpacity: 0.10,
+  bgImageUrl: ''
+};
 
-  // Foto Profil / KTA
-  const [regAvatarUrl, setRegAvatarUrl] = useState('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80');
-  const [regPhotoInputUrl, setRegPhotoInputUrl] = useState('');
-  const [photoUploadSource, setPhotoUploadSource] = useState<'FILE' | 'URL'>('FILE');
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+class StorageService {
+  private listeners: (() => void)[] = [];
 
-  const [regError, setRegError] = useState('');
-  const [regSuccessMsg, setRegSuccessMsg] = useState('');
+  constructor() {
+    this.initDefaultData();
+  }
 
-  // Forgot Password form state
-  const [forgotIdentifier, setForgotIdentifier] = useState('');
-  const [forgotNewPassword, setForgotNewPassword] = useState('');
-  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
-  const [forgotStep, setForgotStep] = useState<'request' | 'reset' | 'done'>('request');
-  const [forgotError, setForgotError] = useState('');
-  const [forgotUserFound, setForgotUserFound] = useState<CurrentUser | null>(null);
-
-  // Helper penyimpanan list users yang aman
-  const persistUsersList = (users: CurrentUser[]) => {
-    if (typeof (storage as any).setUsers === 'function') {
-      (storage as any).setUsers(users);
-    } else if (typeof (storage as any).saveUsers === 'function') {
-      (storage as any).saveUsers(users);
-    } else {
-      try {
-        localStorage.setItem('saka_users', JSON.stringify(users));
-      } catch (err) {
-        console.warn('Gagal menyimpan pengguna ke local storage:', err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      setTab(initialTab);
-      setLoginError('');
-      setRegError('');
-      setRegSuccessMsg('');
-      setForgotError('');
-    }
-  }, [isOpen, initialTab]);
-
-  useEffect(() => {
-    if (regProvinceId) {
-      const regs = storage.getRegencies(regProvinceId) || [];
-      setRegenciesList(regs);
-      if (regs.length > 0 && !regs.some(r => r.id === regRegencyId)) {
-        setRegRegencyId(regs[0].id);
-      }
-    }
-  }, [regProvinceId]);
-
-  useEffect(() => {
-    if (regRegencyId) {
-      const dists = storage.getDistricts(regRegencyId) || [];
-      setDistrictsList(dists);
-      if (dists.length > 0 && !dists.some(d => d.id === regDistrictId)) {
-        setRegDistrictId(dists[0].id);
-      }
-    }
-  }, [regRegencyId]);
-
-  if (!isOpen) return null;
-
-  const provinces = PROVINCES_DATA;
-
-  const processAndCompressFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Mohon pilih berkas gambar yang valid (JPG, PNG, WEBP).');
-      return;
-    }
-    setIsUploadingPhoto(true);
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 800;
-        let width = img.width;
-        let height = img.height;
-        if (width > height) {
-          if (width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          }
-        } else {
-          if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          setRegAvatarUrl(canvas.toDataURL('image/jpeg', 0.85));
-        } else {
-          setRegAvatarUrl(event.target?.result as string);
-        }
-        setIsUploadingPhoto(false);
-      };
-      img.onerror = () => {
-        setRegAvatarUrl(event.target?.result as string);
-        setIsUploadingPhoto(false);
-      };
-    };
-    reader.onerror = () => {
-      alert('Gagal membaca berkas foto.');
-      setIsUploadingPhoto(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processAndCompressFile(file);
-    }
-  };
-
-  const handlePhotoDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDraggingPhoto(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      processAndCompressFile(file);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-    setIsLoading(true);
-
-    const ident = loginIdentifier.trim();
-    const pass = loginPassword;
-
-    if (!ident || !pass) {
-      setIsLoading(false);
-      setLoginError('Nama pengguna dan kata sandi wajib diisi.');
+  private initDefaultData() {
+    if (typeof window === 'undefined') {
       return;
     }
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username: ident, password: pass })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result && result.success && result.user) {
-          if (result.token) storage.setAuthToken(result.token);
-          storage.setCurrentUser(result.user);
-          onLoginSuccess(result.user);
-          storage.syncWithServer().catch(() => {});
-          setIsLoading(false);
-          onClose();
-          return;
-        }
+      if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
+        localStorage.setItem(
+          STORAGE_KEYS.NOTIFICATIONS,
+          JSON.stringify([])
+        );
       }
-    } catch (apiErr) {
-      console.warn('[Auth] Mode offline/fallback:', apiErr);
+
+      if (!localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS)) {
+        localStorage.setItem(
+          STORAGE_KEYS.KTA_SETTINGS,
+          JSON.stringify(DEFAULT_KTA_SETTINGS)
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Gagal menginisialisasi pengaturan KTA:',
+        error
+      );
+    }
+  }
+
+  public subscribe(listener: () => void): () => void {
+    this.listeners.push(listener);
+
+    return () => {
+      this.listeners = this.listeners.filter(
+        listenerItem => listenerItem !== listener
+      );
+    };
+  }
+
+  public subscribeMutation(
+    listener: (event: any) => void
+  ): () => void {
+    if (typeof window === 'undefined') {
+      return () => {};
     }
 
-    const lowerIdent = ident.toLowerCase();
+    const handler = (e: StorageEvent) => {
+      if (
+        e.key &&
+        Object.values(STORAGE_KEYS).includes(e.key)
+      ) {
+        try {
+          listener({
+            type: e.key,
+            payload: JSON.parse(e.newValue || '{}')
+          });
+        } catch {
+          listener({
+            type: e.key,
+            payload: null
+          });
+        }
+      }
+    };
 
-    if ((lowerIdent === 'admin_saka' || lowerIdent === 'admin@sakapariwisata.id') && pass === 'SakaPariwisata#2026!') {
-      const fallbackAdmin: CurrentUser = {
-        id: 'user-superadmin-nasional',
-        username: 'admin_saka',
-        name: 'Super Admin Kwartir Nasional',
-        fullName: 'Super Admin Kwartir Nasional',
-        email: 'admin@sakapariwisata.id',
-        role: 'SUPER_ADMIN',
-        jurisdictionName: 'Kwartir Nasional (Pusat)',
-        jurisdictionId: '00',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-      };
-      storage.setAuthToken('offline-session-' + Date.now());
-      storage.setCurrentUser(fallbackAdmin);
-      onLoginSuccess(fallbackAdmin);
-      setIsLoading(false);
-      onClose();
+    window.addEventListener('storage', handler);
+
+    return () => {
+      window.removeEventListener('storage', handler);
+    };
+  }
+
+  public notify() {
+    this.listeners.forEach(cb => {
+      try {
+        cb();
+      } catch (error) {
+        console.error(
+          'Error pada storage listener:',
+          error
+        );
+      }
+    });
+  }
+
+  // =========================================================
+  // NOTIFICATIONS
+  // =========================================================
+
+  /** Mengambil notifikasi lokal untuk pengguna saat ini. */
+  public getNotifications(userId?: string): NotificationItem[] {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      if (!data) return [];
+
+      const notifications = JSON.parse(data) as NotificationItem[];
+      if (!Array.isArray(notifications)) return [];
+
+      const targetUserId = userId ?? this.getCurrentUser()?.id;
+      if (!targetUserId) return notifications;
+
+      return notifications.filter(
+        notification =>
+          notification.userId === targetUserId ||
+          notification.userId === '*'
+      );
+    } catch (error) {
+      console.error('Gagal membaca notifikasi:', error);
+      return [];
+    }
+  }
+
+  /** Menyimpan seluruh notifikasi. */
+  public setNotifications(notifications: NotificationItem[]): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.NOTIFICATIONS,
+        JSON.stringify(notifications)
+      );
+      this.notify();
+    } catch (error) {
+      console.error('Gagal menyimpan notifikasi:', error);
+    }
+  }
+
+  /** Menambahkan satu notifikasi baru. */
+  public addNotification(notification: NotificationItem): void {
+    const notifications = this.getAllNotifications();
+    this.setNotifications([notification, ...notifications]);
+  }
+
+  /** Menandai notifikasi tertentu sebagai sudah dibaca. */
+  public markNotificationAsRead(id: string): boolean {
+    const notifications = this.getAllNotifications();
+    const index = notifications.findIndex(notification => notification.id === id);
+
+    if (index === -1) return false;
+    if (notifications[index].isRead) return true;
+
+    notifications[index] = { ...notifications[index], isRead: true };
+    this.setNotifications(notifications);
+    return true;
+  }
+
+  private getAllNotifications(): NotificationItem[] {
+    if (typeof window === 'undefined') return [];
+
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      if (!data) return [];
+      const notifications = JSON.parse(data);
+      return Array.isArray(notifications) ? notifications : [];
+    } catch (error) {
+      console.error('Gagal membaca seluruh notifikasi:', error);
+      return [];
+    }
+  }
+
+  // =========================================================
+  // MEMBERS MANAGEMENT
+  // =========================================================
+
+  public getMembers(): Member[] {
+    if (typeof window === 'undefined') {
+      return INITIAL_MEMBERS;
+    }
+
+    try {
+      const data = localStorage.getItem(
+        STORAGE_KEYS.MEMBERS
+      );
+
+      return data
+        ? JSON.parse(data)
+        : INITIAL_MEMBERS;
+    } catch (error) {
+      console.error(
+        'Gagal membaca data anggota:',
+        error
+      );
+
+      return INITIAL_MEMBERS;
+    }
+  }
+
+  public setMembers(members: Member[]) {
+    if (typeof window === 'undefined') {
       return;
     }
 
-    const localUsers = storage.getUsers();
-    const matchedUser = localUsers.find(u => 
-      (u.username && u.username.toLowerCase() === lowerIdent) ||
-      (u.email && u.email.toLowerCase() === lowerIdent)
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.MEMBERS,
+        JSON.stringify(members)
+      );
+
+      this.notify();
+    } catch (error) {
+      console.error(
+        'Gagal menyimpan data anggota:',
+        error
+      );
+    }
+  }
+
+  public saveMembers(members: Member[]) {
+    this.setMembers(members);
+  }
+
+  /**
+   * Memperbarui foto anggota dan menyinkronkannya ke profil user.
+   * Foto dapat berupa data URL hasil upload lokal atau URL/Google Drive.
+   */
+  /**
+   * Memperbarui seluruh data profil anggota dari panel administrator.
+   * Perubahan disimpan ke LocalStorage terlebih dahulu agar UI langsung
+   * terbarui, kemudian dikirim ke API /api/mutate agar tersimpan di server
+   * dan diteruskan ke Google Apps Script.
+   */
+  public async adminUpdateMember(
+    memberId: string,
+    payload: Partial<Member>,
+    actor: CurrentUser,
+    reason: string
+  ): Promise<Member | null> {
+    if (!memberId) return null;
+
+    const members = this.getMembers();
+    const index = members.findIndex(member => member.id === memberId);
+    if (index === -1) return null;
+
+    const current = members[index];
+    const updatedMember: Member = {
+      ...current,
+      ...payload,
+      id: memberId,
+      // Field wajib jangan sampai hilang akibat payload parsial.
+      userId: payload.userId ?? current.userId,
+      registeredAt: current.registeredAt || new Date().toISOString(),
+      verificationToken: current.verificationToken || `VERIFY-${memberId}`,
+      locationHistory: current.locationHistory || [],
+      certifications: payload.certifications ?? current.certifications ?? [],
+      skills: payload.skills ?? current.skills ?? []
+    };
+
+    // Validasi isolasi wilayah di sisi client sebagai lapisan pertama.
+    const role = actor?.role;
+    const jurisdictionId = actor?.jurisdictionId;
+    if (role === 'ADMIN_PROVINCE' && jurisdictionId && updatedMember.provinceId !== jurisdictionId) {
+      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke provinsi lain.');
+    }
+    if (role === 'ADMIN_REGENCY' && jurisdictionId && updatedMember.regencyId !== jurisdictionId) {
+      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke Kwartir Cabang lain.');
+    }
+    if (role === 'ADMIN_BRANCH' && jurisdictionId && updatedMember.branchId !== jurisdictionId) {
+      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke wilayah cabang lain.');
+    }
+
+    // Simpan lokal terlebih dahulu agar UI responsif. Tandai record sebagai
+    // sedang dipersist ke server/Google Spreadsheet agar live-sync tidak
+    // menimpa perubahan ini dengan data Spreadsheet yang masih lama.
+    const previousMember = { ...current };
+    members[index] = updatedMember;
+    this.setMembers(members);
+
+    const markPendingWrite = (pending: boolean) => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.PENDING_MEMBER_WRITES);
+        const map = raw ? JSON.parse(raw) : {};
+        if (pending) {
+          map[memberId] = { status: updatedMember.status, timestamp: Date.now() };
+        } else {
+          delete map[memberId];
+        }
+        localStorage.setItem(STORAGE_KEYS.PENDING_MEMBER_WRITES, JSON.stringify(map));
+      } catch {}
+    };
+
+    markPendingWrite(true);
+
+    // Sinkronkan avatar dengan akun user yang terkait.
+    if (updatedMember.userId) {
+      const users = this.getUsers();
+      const userIndex = users.findIndex(user => user.id === updatedMember.userId);
+      if (userIndex !== -1) {
+        users[userIndex] = {
+          ...users[userIndex],
+          name: updatedMember.fullName,
+          email: updatedMember.email,
+          avatarUrl: updatedMember.avatarUrl
+        };
+        this.setUsers(users);
+      }
+    }
+
+    // Audit lokal.
+    const audit: AuditLog = {
+      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      userId: actor?.id || 'unknown',
+      userName: actor?.name || 'Operator',
+      userRole: actor?.role || 'SUPER_ADMIN',
+      action: 'UPDATE_MEMBER_PROFILE',
+      entityType: 'MEMBER',
+      entityId: memberId,
+      description: reason || 'Pembaruan profil anggota',
+      timestamp: new Date().toISOString(),
+      ipAddress: 'client'
+    };
+    const logs = this.getAuditLogs();
+    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([audit, ...logs].slice(0, 500)));
+    this.notify();
+
+    // Jika aplikasi berjalan dengan sesi API, kirim perubahan ke server.
+    const token = this.getAuthToken();
+    if (!token) {
+      members[index] = previousMember;
+      this.setMembers(members);
+      markPendingWrite(false);
+      throw new Error('Sesi administrator tidak ditemukan. Silakan login ulang sebelum mengubah status anggota.');
+    }
+
+    try {
+      let scriptUrl = '';
+      try {
+        const rawConfig = localStorage.getItem('saka_spreadsheet_config_v1');
+        const parsedConfig = rawConfig ? JSON.parse(rawConfig) : null;
+        scriptUrl = String(parsedConfig?.scriptUrl || '').trim().replace(/\s+/g, '');
+      } catch {}
+
+      if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(scriptUrl)) {
+        throw new Error('URL Google Apps Script belum diatur. Silakan isi URL Web App pada Dashboard > Database Google Spreadsheet & Drive > Pengaturan API.');
+      }
+
+      const response = await fetch('/api/mutate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          type: 'MEMBER',
+          action: 'UPDATE',
+          payload: updatedMember,
+          reason: reason || 'Pembaruan profil anggota',
+          scriptUrl
+        })
+      });
+
+      let result: any = null;
+      try {
+        result = await response.json();
+      } catch {
+        result = null;
+      }
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || `Server menolak perubahan profil (HTTP ${response.status}).`);
+      }
+
+      markPendingWrite(false);
+    } catch (error) {
+      // Jangan biarkan UI menyimpan status palsu jika server/Spreadsheet gagal.
+      const latestMembers = this.getMembers();
+      const latestIndex = latestMembers.findIndex(member => member.id === memberId);
+      if (latestIndex !== -1) {
+        latestMembers[latestIndex] = previousMember;
+        this.setMembers(latestMembers);
+      }
+      markPendingWrite(false);
+      throw error;
+    }
+
+    return updatedMember;
+  }
+
+  public updateMemberPhoto(
+    memberId: string,
+    avatarUrl: string,
+    actor?: CurrentUser
+  ): Member | null {
+    if (!avatarUrl || !avatarUrl.trim()) {
+      return null;
+    }
+
+    const members = this.getMembers();
+    const index = members.findIndex(member => member.id === memberId);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const updatedMember: Member = {
+      ...members[index],
+      avatarUrl: avatarUrl.trim()
+    };
+
+    members[index] = updatedMember;
+    this.setMembers(members);
+
+    // Sinkronkan foto ke akun user yang terhubung dengan anggota.
+    const users = this.getUsers();
+    const userIndex = users.findIndex(
+      user => user.id === updatedMember.userId
     );
 
-    if (matchedUser) {
-      const expectedPassword = (matchedUser as any).password || 'password123';
-      if (pass === expectedPassword || pass === 'password123') {
-        storage.setAuthToken('local-session-' + Date.now());
-        storage.setCurrentUser(matchedUser);
-        onLoginSuccess(matchedUser);
-        setIsLoading(false);
-        onClose();
+    if (userIndex !== -1) {
+      users[userIndex] = {
+        ...users[userIndex],
+        avatarUrl: updatedMember.avatarUrl
+      };
+      this.setUsers(users);
+    }
+
+    // Jika current user adalah pemilik akun anggota, perbarui juga sesi aktif.
+    const currentUser = this.getCurrentUser();
+    if (
+      currentUser?.id === updatedMember.userId ||
+      currentUser?.id === actor?.id
+    ) {
+      this.setCurrentUser({
+        ...currentUser,
+        avatarUrl: updatedMember.avatarUrl
+      });
+    }
+
+    return updatedMember;
+  }
+
+
+  /**
+   * Generate Nomor Tanda Anggota (NTA) berdasarkan kode wilayah.
+   * Format: PP.KK.KC.NNNNNN
+   * PP = kode provinsi, KK = kode kabupaten/kota, KC = kode kecamatan,
+   * NNNNNN = nomor urut 6 digit yang unik di dalam wilayah tersebut.
+   */
+  public generateNationalMemberNumber(
+    provinceCode: string,
+    regencyCode: string,
+    districtCode: string
+  ): string {
+    const pp = String(provinceCode || '00').replace(/\D/g, '').slice(-2).padStart(2, '0');
+    const kk = String(regencyCode || '00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
+    const kc = String(districtCode || '00.00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
+    const prefix = `${pp}.${kk}.${kc}.`;
+
+    const members = this.getMembers();
+    let maxSequence = 0;
+
+    members.forEach(member => {
+      const nta = String(member?.nationalMemberNumber || '').trim();
+      if (!nta.startsWith(prefix)) return;
+
+      const sequence = parseInt(nta.slice(prefix.length).replace(/\D/g, ''), 10);
+      if (Number.isFinite(sequence) && sequence > maxSequence) {
+        maxSequence = sequence;
+      }
+    });
+
+    return `${prefix}${String(maxSequence + 1).padStart(6, '0')}`;
+  }
+
+  /**
+   * Menerbitkan NTA untuk anggota yang belum memiliki nomor.
+   * Nomor selalu mengikuti wilayah anggota saat ini.
+   */
+  public assignNationalMemberNumber(memberId: string): Member | null {
+    const members = this.getMembers();
+    const index = members.findIndex(member => member.id === memberId);
+    if (index === -1) return null;
+
+    const member = members[index];
+    const nta = member.nationalMemberNumber || this.generateNationalMemberNumber(
+      member.provinceId || '00',
+      member.regencyId || '00.00',
+      member.districtId || '00.00.00'
+    );
+
+    members[index] = { ...member, nationalMemberNumber: nta };
+    this.setMembers(members);
+    return members[index];
+  }
+
+  /**
+   * Generate NTA massal berdasarkan wilayah yang dipilih.
+   * Hanya anggota tanpa NTA yang diberi nomor agar nomor lama tidak berubah.
+   */
+  public generateNationalMemberNumbersByRegion(
+    provinceId?: string,
+    regencyId?: string,
+    districtId?: string
+  ): { updated: number; skipped: number; total: number } {
+    const members = this.getMembers();
+    let sequenceByPrefix: Record<string, number> = {};
+    let updated = 0;
+    let skipped = 0;
+
+    const selected = members.filter(member => {
+      if (provinceId && member.provinceId !== provinceId) return false;
+      if (regencyId && member.regencyId !== regencyId) return false;
+      if (districtId && member.districtId !== districtId) return false;
+      return true;
+    });
+
+    // Seed sequence dari semua nomor yang sudah ada, bukan hanya hasil filter.
+    members.forEach(member => {
+      const nta = String(member.nationalMemberNumber || '');
+      const match = nta.match(/^(\d{2}\.\d{2}\.\d{2})\.(\d{6})$/);
+      if (match) {
+        const n = Number(match[2]);
+        sequenceByPrefix[match[1]] = Math.max(sequenceByPrefix[match[1]] || 0, n);
+      }
+    });
+
+    selected.forEach(member => {
+      if (member.nationalMemberNumber) {
+        skipped++;
         return;
       }
-    }
 
-    const members = storage.getMembers();
-    const matchedMember = members.find(m => 
-      (m.nationalMemberNumber && m.nationalMemberNumber.trim() === ident) ||
-      (m.email && m.email.toLowerCase() === lowerIdent) ||
-      (m.phone && m.phone === ident)
-    );
+      const pp = String(member.provinceId || '00').replace(/\D/g, '').slice(-2).padStart(2, '0');
+      const kk = String(member.regencyId || '00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
+      const kc = String(member.districtId || '00.00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
+      const prefix = `${pp}.${kk}.${kc}`;
+      const next = (sequenceByPrefix[prefix] || 0) + 1;
+      sequenceByPrefix[prefix] = next;
 
-    if (matchedMember) {
-      const memberUser: CurrentUser = {
-        id: matchedMember.userId || `user-${matchedMember.id}`,
-        username: matchedMember.nationalMemberNumber || matchedMember.email.split('@')[0],
-        name: matchedMember.fullName,
-        fullName: matchedMember.fullName,
-        email: matchedMember.email,
-        role: 'MEMBER',
-        memberId: matchedMember.id,
-        avatarUrl: matchedMember.avatarUrl,
-        jurisdictionName: matchedMember.regencyName,
-        jurisdictionId: matchedMember.regencyId
-      };
+      member.nationalMemberNumber = `${prefix}.${String(next).padStart(6, '0')}`;
+      updated++;
+    });
 
-      storage.setAuthToken('member-session-' + Date.now());
-      storage.setCurrentUser(memberUser);
-      onLoginSuccess(memberUser);
-      setIsLoading(false);
-      onClose();
-      return;
-    }
+    if (updated > 0) this.setMembers(members);
+    return { updated, skipped, total: selected.length };
+  }
 
-    setIsLoading(false);
-    setLoginError('Kombinasi nama pengguna/email/KTA atau kata sandi tidak sesuai.');
-  };
+  /**
+   * Registrasi anggota baru.
+   *
+   * ID otomatis:
+   * member-01
+   * member-02
+   * member-03
+   * dst.
+   */
+  public registerMember(
+    payload: Omit<
+      Member,
+      | 'id'
+      | 'status'
+      | 'registeredAt'
+      | 'verificationToken'
+      | 'locationHistory'
+    >
+  ): Member {
+    const members = this.getMembers();
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setRegError('');
-    setRegSuccessMsg('');
+    let maxNumber = 0;
 
-    if (!regFullName || !regEmail || !regPhone || !regPassword || !regGudep) {
-      setRegError('Harap lengkapi semua kolom yang wajib diisi (*).');
-      return;
-    }
+    members.forEach(existingMember => {
+      if (
+        existingMember?.id &&
+        typeof existingMember.id === 'string' &&
+        existingMember.id.startsWith('member-')
+      ) {
+        const numPart = parseInt(
+          existingMember.id.replace('member-', ''),
+          10
+        );
 
-    if (regPassword.length < 6) {
-      setRegError('Kata sandi minimal harus 6 karakter.');
-      return;
-    }
+        if (
+          !isNaN(numPart) &&
+          numPart > maxNumber
+        ) {
+          maxNumber = numPart;
+        }
+      }
+    });
 
-    if (regPassword !== regConfirmPassword) {
-      setRegError('Konfirmasi kata sandi tidak cocok.');
-      return;
-    }
+    const nextNumber = maxNumber + 1;
 
-    setIsLoading(true);
+    const formattedId = `member-${String(
+      nextNumber
+    ).padStart(2, '0')}`;
 
-    const isNasional = kwartirLevel === 'NASIONAL';
-    const provObj = provinces.find(p => p.id === regProvinceId);
-    const regObj = regenciesList.find(r => r.id === regRegencyId);
-    const distObj = districtsList.find(d => d.id === regDistrictId);
-
-    const provName = isNasional ? 'Kwartir Nasional' : (provObj?.name || 'Jawa Barat');
-    const regName = isNasional ? 'Pusat Nasional' : (regObj?.name || 'Kabupaten Bandung');
-    const distName = isNasional ? 'Nasional' : (distObj?.name || 'Kecamatan');
-
-    const newMemberId = `mem-${Date.now()}`;
-    const newUserId = `user-${Date.now()}`;
-
-    const cleanPhone = regPhone.replace(/\D/g, '');
-    const generatedNikMasked = '3200******' + (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
-
-    const newUser: CurrentUser = {
-      id: newUserId,
-      username: regEmail.split('@')[0],
-      name: regFullName,
-      fullName: regFullName,
-      email: regEmail,
-      role: 'MEMBER',
-      memberId: newMemberId,
-      jurisdictionId: isNasional ? '00.00' : regRegencyId,
-      jurisdictionName: isNasional ? 'Kwartir Nasional (Pusat)' : regName,
-      avatarUrl: regAvatarUrl
+    const newMember: Member = {
+      ...payload,
+      id: formattedId,
+      status: 'PENDING',
+      registeredAt: new Date().toISOString(),
+      verificationToken: `VERIFY-${formattedId}-${Date.now()
+        .toString(36)
+        .toUpperCase()}`,
+      locationHistory: [],
+      nationalMemberNumber: payload.nationalMemberNumber || this.generateNationalMemberNumber(
+        payload.provinceId,
+        payload.regencyId,
+        payload.districtId
+      ),
+      skills: payload.skills || [],
+      certifications: payload.certifications || []
     };
 
+    members.unshift(newMember);
+
+    this.setMembers(members);
+
+    return newMember;
+  }
+
+  public async updateMemberStatus(
+    memberId: string,
+    status: 'ACTIVE' | 'PENDING' | 'SUSPENDED',
+    actor?: CurrentUser
+  ): Promise<boolean> {
+    const current = this.getMembers().find(member => member.id === memberId);
+    if (!current) return false;
+
     try {
-      const registeredMember = storage.registerMember({
-        userId: newUserId,
-        fullName: regFullName,
-        nikMasked: generatedNikMasked,
-        avatarUrl: regAvatarUrl,
-        gender: regGender,
-        birthPlace: regBirthPlace || regName,
-        birthDate: regBirthDate,
-        phone: regPhone,
-        email: regEmail,
-        address: `Pangkalan ${regGudep}, ${distName}`,
-        provinceId: isNasional ? '00' : regProvinceId,
-        provinceName: provName,
-        regencyId: isNasional ? '00.00' : regRegencyId,
-        regencyName: regName,
-        districtId: isNasional ? '00.00.00' : (regDistrictId || `${regRegencyId}.01`),
-        districtName: distName,
-        branchId: isNasional ? 'branch-nasional' : `kwarran-${regRegencyId}`,
-        branchName: isNasional ? 'Pimpinan Saka Tingkat Nasional' : `Kwarran ${distName}`,
-        gugusDepan: regGudep,
-        joinYear: new Date().getFullYear(),
-        currentPosition: `Calon Anggota ${regKrida}`,
-        krida: regKrida,
-        educationLevel: regEducationLevel,
-        occupation: regOccupation,
-        bio: regBio || 'Calon anggota Saka Pariwisata yang siap memajukan pariwisata nusantara.',
-        skills: [],
-        certifications: []
-      });
-
-      const existingUsers = storage.getUsers();
-      persistUsersList([...existingUsers, { ...newUser, password: regPassword } as any]);
-
-      spreadsheetService.saveMemberAndWaitForSync(registeredMember).catch((syncErr) => {
-        console.warn('[AuthModal] Catatan sinkronisasi spreadsheet:', syncErr);
-      });
-
-      storage.setCurrentUser(newUser);
-      setIsLoading(false);
-      setRegSuccessMsg(`Pendaftaran berhasil! Selamat datang, ${regFullName}.`);
-      
-      setTimeout(() => {
-        onLoginSuccess(newUser);
-        onClose();
-      }, 1200);
-
-    } catch (err: any) {
-      setIsLoading(false);
-      setRegError(err?.message || 'Gagal mendaftar. Silakan coba kembali.');
+      await this.adminUpdateMember(
+        memberId,
+        { status },
+        actor || this.getCurrentUser() || DEFAULT_PUBLIC_USER as CurrentUser,
+        status === 'ACTIVE'
+          ? 'Verifikasi anggota oleh administrator'
+          : status === 'SUSPENDED'
+            ? 'Penolakan/penonaktifan anggota oleh administrator'
+            : 'Pengembalian status anggota menjadi pending'
+      );
+      return true;
+    } catch (error) {
+      console.error('[Member Status] Gagal menyimpan status:', error);
+      return false;
     }
-  };
+  }
 
-  const handleFindAccount = (e: React.FormEvent) => {
-    e.preventDefault();
-    setForgotError('');
-    const ident = forgotIdentifier.trim().toLowerCase();
+  public deleteMember(
+    memberId: string,
+    actor?: any
+  ): boolean {
+    const members = this.getMembers();
 
-    if (!ident) {
-      setForgotError('Masukkan email, username, atau nomor KTA Anda.');
+    const filteredMembers = members.filter(
+      member => member.id !== memberId
+    );
+
+    if (filteredMembers.length === members.length) {
+      return false;
+    }
+
+    this.setMembers(filteredMembers);
+
+    return true;
+  }
+
+  public deleteAllDummyMembers(
+    actor?: any
+  ): number {
+    const members = this.getMembers();
+
+    const filteredMembers = members.filter(
+      member =>
+        !member.id.includes('dummy') &&
+        !member.id.includes('demo')
+    );
+
+    const deletedCount =
+      members.length - filteredMembers.length;
+
+    this.setMembers(filteredMembers);
+
+    return deletedCount;
+  }
+
+  // =========================================================
+  // KTA CARD SETTINGS
+  // =========================================================
+
+  public getKtaSettings(): KtaCardSettings {
+    if (typeof window === 'undefined') {
+      return DEFAULT_KTA_SETTINGS;
+    }
+
+    try {
+      const data = localStorage.getItem(
+        STORAGE_KEYS.KTA_SETTINGS
+      );
+
+      if (data) {
+        const parsedData = JSON.parse(data);
+
+        return {
+          ...DEFAULT_KTA_SETTINGS,
+          ...parsedData
+        };
+      }
+    } catch (error) {
+      console.error(
+        'Gagal membaca pengaturan KTA:',
+        error
+      );
+    }
+
+    return DEFAULT_KTA_SETTINGS;
+  }
+
+  public saveKtaSettings(
+    settings: KtaCardSettings
+  ) {
+    if (typeof window === 'undefined') {
       return;
     }
 
-    const users = storage.getUsers();
-    const members = storage.getMembers();
-
-    const foundU = users.find(u => 
-      (u.email && u.email.toLowerCase() === ident) || 
-      (u.username && u.username.toLowerCase() === ident)
-    );
-
-    const foundM = members.find(m => 
-      (m.email && m.email.toLowerCase() === ident) || 
-      (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === ident) ||
-      (m.phone && m.phone === ident)
-    );
-
-    if (foundU || foundM) {
-      const userRef: CurrentUser = foundU || {
-        id: foundM!.userId || `user-${foundM!.id}`,
-        username: foundM!.nationalMemberNumber || foundM!.email.split('@')[0],
-        name: foundM!.fullName,
-        fullName: foundM!.fullName,
-        email: foundM!.email,
-        role: 'MEMBER'
+    try {
+      const updatedSettings: KtaCardSettings = {
+        ...DEFAULT_KTA_SETTINGS,
+        ...settings
       };
-      setForgotUserFound(userRef);
-      setForgotStep('reset');
-    } else {
-      setForgotError('Akun tidak ditemukan. Pastikan data yang dimasukkan sudah benar.');
+
+      localStorage.setItem(
+        STORAGE_KEYS.KTA_SETTINGS,
+        JSON.stringify(updatedSettings)
+      );
+
+      this.notify();
+
+      window.dispatchEvent(
+        new CustomEvent(
+          'saka:kta-settings-updated',
+          {
+            detail: updatedSettings
+          }
+        )
+      );
+    } catch (error) {
+      console.error(
+        'Gagal menyimpan pengaturan KTA:',
+        error
+      );
     }
-  };
+  }
 
-  const handleResetPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    setForgotError('');
+  // =========================================================
+  // TOUR PACKAGES
+  // =========================================================
 
-    if (forgotNewPassword.length < 6) {
-      setForgotError('Kata sandi baru minimal 6 karakter.');
+  public getTourPackages(): TourPackage[] {
+    if (typeof window === 'undefined') {
+      return INITIAL_TOUR_PACKAGES;
+    }
+
+    try {
+      const data = localStorage.getItem(
+        STORAGE_KEYS.TOURS
+      );
+
+      return data
+        ? JSON.parse(data)
+        : INITIAL_TOUR_PACKAGES;
+    } catch (error) {
+      console.error(
+        'Gagal membaca paket wisata:',
+        error
+      );
+
+      return INITIAL_TOUR_PACKAGES;
+    }
+  }
+
+  public setTourPackages(
+    tours: TourPackage[]
+  ) {
+    if (typeof window === 'undefined') {
       return;
     }
-    if (forgotNewPassword !== forgotConfirmPassword) {
-      setForgotError('Konfirmasi kata sandi tidak cocok.');
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.TOURS,
+        JSON.stringify(tours)
+      );
+
+      this.notify();
+    } catch (error) {
+      console.error(
+        'Gagal menyimpan paket wisata:',
+        error
+      );
+    }
+  }
+
+  public deleteTourPackage(
+    id: string,
+    actor?: any
+  ) {
+    const filteredTours =
+      this.getTourPackages().filter(
+        tour => tour.id !== id
+      );
+
+    this.setTourPackages(filteredTours);
+  }
+
+  // =========================================================
+  // ACTIVITIES
+  // =========================================================
+
+  public getActivities(): Activity[] {
+    if (typeof window === 'undefined') {
+      return INITIAL_ACTIVITIES;
+    }
+
+    try {
+      const data = localStorage.getItem(
+        STORAGE_KEYS.ACTIVITIES
+      );
+
+      return data
+        ? JSON.parse(data)
+        : INITIAL_ACTIVITIES;
+    } catch (error) {
+      console.error(
+        'Gagal membaca kegiatan:',
+        error
+      );
+
+      return INITIAL_ACTIVITIES;
+    }
+  }
+
+  public setActivities(
+    activities: Activity[]
+  ) {
+    if (typeof window === 'undefined') {
       return;
     }
 
-    if (forgotUserFound) {
-      const users = storage.getUsers();
-      const updated = users.map(u => {
-        if (u.id === forgotUserFound.id || u.email === forgotUserFound.email) {
-          return { ...u, password: forgotNewPassword };
-        }
-        return u;
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.ACTIVITIES,
+        JSON.stringify(activities)
+      );
+
+      this.notify();
+    } catch (error) {
+      console.error(
+        'Gagal menyimpan kegiatan:',
+        error
+      );
+    }
+  }
+
+  public deleteActivity(
+    id: string,
+    actor?: any
+  ) {
+    const filteredActivities =
+      this.getActivities().filter(
+        activity => activity.id !== id
+      );
+
+    this.setActivities(filteredActivities);
+  }
+
+  // =========================================================
+  // CULINARY & SOUVENIRS
+  // =========================================================
+
+  public getCulinarySouvenirs():
+    CulinarySouvenirItem[] {
+    if (typeof window === 'undefined') {
+      return INITIAL_CULINARY_SOUVENIRS;
+    }
+
+    try {
+      const data = localStorage.getItem(
+        STORAGE_KEYS.CULINARY_SOUVENIRS
+      );
+
+      return data
+        ? JSON.parse(data)
+        : INITIAL_CULINARY_SOUVENIRS;
+    } catch (error) {
+      console.error(
+        'Gagal membaca data kuliner dan cinderamata:',
+        error
+      );
+
+      return INITIAL_CULINARY_SOUVENIRS;
+    }
+  }
+
+  public setCulinarySouvenirs(
+    items: CulinarySouvenirItem[]
+  ) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.CULINARY_SOUVENIRS,
+        JSON.stringify(items)
+      );
+
+      this.notify();
+    } catch (error) {
+      console.error(
+        'Gagal menyimpan data kuliner dan cinderamata:',
+        error
+      );
+    }
+  }
+
+  // =========================================================
+  // KRIDA MODULES
+  // =========================================================
+
+  /**
+   * Mengambil seluruh modul Krida resmi.
+   *
+   * Sumber data:
+   * src/data/kridaData.ts
+   *
+   * Data modul bersifat statis dan berasal dari:
+   * INITIAL_KRIDA_MODULES
+   *
+   * Method ini dibutuhkan oleh:
+   * src/components/krida/KridaModulesView.tsx
+   */
+  public getKridaModules(): KridaModuleItem[] {
+    return INITIAL_KRIDA_MODULES;
+  }
+
+  // =========================================================
+  // INDONESIA TERRITORIES
+  // =========================================================
+
+  public getProvinces(): Province[] {
+    return PROVINCES_DATA;
+  }
+
+  public getRegencies(
+    provinceId?: string
+  ): Regency[] {
+    if (!provinceId) {
+      return REGENCIES_DATA;
+    }
+
+    return REGENCIES_DATA.filter(
+      regency =>
+        regency.provinceId === provinceId
+    );
+  }
+
+  public getDistricts(
+    regencyId?: string
+  ): District[] {
+    if (!regencyId) {
+      return [];
+    }
+
+    const regency = REGENCIES_DATA.find(r => r.id === regencyId);
+    return getDistrictsForRegency(regencyId, regency?.name);
+  }
+
+  public getBranches(
+    districtId?: string
+  ): Branch[] {
+    return [];
+  }
+
+  public getSkills(): Skill[] {
+    return MASTER_SKILLS;
+  }
+
+  // =========================================================
+  // AUDIT LOGS
+  // =========================================================
+
+  public getAuditLogs(): AuditLog[] {
+    if (typeof window === 'undefined') {
+      return INITIAL_AUDIT_LOGS;
+    }
+
+    try {
+      const data = localStorage.getItem(
+        STORAGE_KEYS.AUDIT_LOGS
+      );
+
+      return data
+        ? JSON.parse(data)
+        : INITIAL_AUDIT_LOGS;
+    } catch (error) {
+      console.error(
+        'Gagal membaca audit logs:',
+        error
+      );
+
+      return INITIAL_AUDIT_LOGS;
+    }
+  }
+
+  // =========================================================
+  // USERS & AUTH
+  // =========================================================
+
+  public getUsers(): CurrentUser[] {
+    if (typeof window === 'undefined') {
+      return DEMO_USERS;
+    }
+
+    try {
+      const data = localStorage.getItem(
+        STORAGE_KEYS.USERS
+      );
+
+      return data
+        ? JSON.parse(data)
+        : DEMO_USERS;
+    } catch (error) {
+      console.error(
+        'Gagal membaca data users:',
+        error
+      );
+
+      return DEMO_USERS;
+    }
+  }
+
+  public setUsers(
+    users: CurrentUser[]
+  ) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.USERS,
+        JSON.stringify(users)
+      );
+
+      this.notify();
+    } catch (error) {
+      console.error(
+        'Gagal menyimpan users:',
+        error
+      );
+    }
+  }
+
+  public saveUsers(
+    users: CurrentUser[]
+  ) {
+    this.setUsers(users);
+  }
+
+  public getCurrentUser(): CurrentUser {
+    if (typeof window === 'undefined') {
+      return DEFAULT_PUBLIC_USER;
+    }
+
+    try {
+      const data = localStorage.getItem(
+        STORAGE_KEYS.CURRENT_USER
+      );
+
+      return data
+        ? JSON.parse(data)
+        : DEFAULT_PUBLIC_USER;
+    } catch (error) {
+      console.error(
+        'Gagal membaca current user:',
+        error
+      );
+
+      return DEFAULT_PUBLIC_USER;
+    }
+  }
+
+  public setCurrentUser(
+    user: CurrentUser
+  ) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.CURRENT_USER,
+        JSON.stringify(user)
+      );
+
+      this.notify();
+    } catch (error) {
+      console.error(
+        'Gagal menyimpan current user:',
+        error
+      );
+    }
+  }
+
+  public getAuthToken(): string | null {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    try {
+      return localStorage.getItem(
+        STORAGE_KEYS.AUTH_TOKEN
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  public setAuthToken(
+    token: string | null
+  ) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      if (token) {
+        localStorage.setItem(
+          STORAGE_KEYS.AUTH_TOKEN,
+          token
+        );
+      } else {
+        localStorage.removeItem(
+          STORAGE_KEYS.AUTH_TOKEN
+        );
+      }
+
+      this.notify();
+    } catch (error) {
+      console.error(
+        'Gagal menyimpan auth token:',
+        error
+      );
+    }
+  }
+
+  // =========================================================
+  // SERVER SYNCHRONIZATION
+  // =========================================================
+
+  public async syncWithServer(): Promise<boolean> {
+    const token = this.getAuthToken();
+    if (!token) return false;
+
+    try {
+      const response = await fetch('/api/data', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include'
       });
-      persistUsersList(updated as any);
-      setForgotStep('done');
-      setTimeout(() => {
-        setTab('login');
-        setForgotStep('request');
-        setLoginIdentifier(forgotIdentifier);
-      }, 1500);
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      if (!data || !Array.isArray(data.members)) return false;
+
+      // Jangan menghapus data lokal hanya karena server sedang kosong.
+      if (data.members.length > 0) {
+        this.setMembers(data.members as Member[]);
+      }
+
+      if (Array.isArray(data.users) && data.users.length > 0) {
+        this.setUsers(data.users as CurrentUser[]);
+      }
+
+      if (Array.isArray(data.auditLogs)) {
+        try {
+          localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(data.auditLogs));
+        } catch {}
+      }
+
+      this.notify();
+      return true;
+    } catch (error) {
+      console.warn('[Storage] Sinkronisasi server gagal:', error);
+      return false;
     }
-  };
+  }
+}
 
-  const sampleAvatars = [
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80'
-  ];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 max-h-[92vh] flex flex-col">
-        
-        {/* Header */}
-        <div className="relative bg-gradient-to-r from-emerald-800 to-teal-900 p-6 text-white shrink-0">
-          <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors text-white/80 hover:text-white"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <Compass className="w-6 h-6 text-amber-300 animate-pulse" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold tracking-tight">
-                {tab === 'login' && 'Masuk ke Akun'}
-                {tab === 'register' && 'Pendaftaran Anggota Baru'}
-                {tab === 'forgot' && 'Reset Kata Sandi'}
-              </h2>
-              <p className="text-xs text-emerald-100/90">
-                Sistem Terintegrasi Kader & Pimpinan Saka Pariwisata
-              </p>
-            </div>
-          </div>
-
-          {/* Navigation Tabs */}
-          <div className="flex bg-black/20 p-1 rounded-xl mt-4 border border-white/10">
-            <button
-              type="button"
-              onClick={() => { setTab('login'); setLoginError(''); }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                tab === 'login' 
-                  ? 'bg-white text-emerald-900 shadow-md' 
-                  : 'text-white/80 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <LogIn className="w-3.5 h-3.5" /> Masuk
-            </button>
-            <button
-              type="button"
-              onClick={() => { setTab('register'); setRegError(''); setRegSuccessMsg(''); }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                tab === 'register' 
-                  ? 'bg-white text-emerald-900 shadow-md' 
-                  : 'text-white/80 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <UserPlus className="w-3.5 h-3.5" /> Daftar Anggota Baru
-            </button>
-          </div>
-        </div>
-
-        {/* Form Body */}
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar text-xs">
-
-          {/* TAB 1: LOGIN */}
-          {tab === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-4">
-              {loginError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{loginError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Email, Username, atau Nomor KTA
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    required
-                    value={loginIdentifier}
-                    onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="Contoh: 32.04... atau email@domain.com"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Kata Sandi</label>
-                  <button
-                    type="button"
-                    onClick={() => { setTab('forgot'); setForgotStep('request'); }}
-                    className="text-[11px] text-emerald-700 hover:text-emerald-800 font-medium"
-                  >
-                    Lupa sandi?
-                  </button>
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Masukkan kata sandi"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <span>Masuk ke Sistem</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* TAB 2: REGISTER */}
-          {tab === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-4">
-              {regError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{regError}</span>
-                </div>
-              )}
-              {regSuccessMsg && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
-                  <span>{regSuccessMsg}</span>
-                </div>
-              )}
-
-              {/* 1. Identitas Anggota */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
-                  <Shield className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>1. Identitas Anggota</span>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Nama Lengkap & Gelar *</label>
-                  <input
-                    type="text"
-                    required
-                    value={regFullName}
-                    onChange={(e) => setRegFullName(e.target.value)}
-                    placeholder="Contoh: Muhammad Farhan, S.Par."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Jenis Kelamin *</label>
-                    <select
-                      value={regGender}
-                      onChange={(e: any) => setRegGender(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                    >
-                      <option value="LAKI_LAKI">Laki-laki</option>
-                      <option value="PEREMPUAN">Perempuan</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Tempat Lahir</label>
-                    <input
-                      type="text"
-                      value={regBirthPlace}
-                      onChange={(e) => setRegBirthPlace(e.target.value)}
-                      placeholder="Kota Lahir"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Tanggal Lahir *</label>
-                    <input
-                      type="date"
-                      required
-                      value={regBirthDate}
-                      onChange={(e) => setRegBirthDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Alamat Email *</label>
-                    <input
-                      type="email"
-                      required
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="nama@email.com"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Nomor WhatsApp / HP *</label>
-                    <input
-                      type="tel"
-                      required
-                      value={regPhone}
-                      onChange={(e) => setRegPhone(e.target.value)}
-                      placeholder="0812-3456-7890"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                    />
-                  </div>
-                </div>
-
-                {/* Pas Foto */}
-                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-900">
-                        Pas Foto Resmi Anggota
-                      </label>
-                      <p className="text-[10px] text-slate-500">
-                        Upload berkas atau paste link Google Drive / URL gambar
-                      </p>
-                    </div>
-                    <div className="flex items-center bg-slate-200 p-0.5 rounded-lg text-[10px] font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setPhotoUploadSource('FILE')}
-                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                          photoUploadSource === 'FILE' 
-                            ? 'bg-white text-emerald-900 shadow-xs font-extrabold' 
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Upload Foto
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPhotoUploadSource('URL')}
-                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                          photoUploadSource === 'URL' 
-                            ? 'bg-white text-emerald-900 shadow-xs font-extrabold' 
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Link URL
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 pt-1">
-                    <div className="w-20 h-26 rounded-xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-900 relative flex-shrink-0">
-                      <img
-                        src={regAvatarUrl}
-                        alt="Preview Foto"
-                        className="w-full h-full object-cover"
-                      />
-                      {isUploadingPhoto && (
-                        <div className="absolute inset-0 bg-slate-950/70 flex flex-col items-center justify-center text-white text-[9px] font-bold gap-1">
-                          <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                          <span>Proses...</span>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="absolute inset-0 bg-slate-900/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[9px] font-bold"
-                      >
-                        <Camera className="w-4 h-4 mb-0.5 text-emerald-300" />
-                        <span>Ganti</span>
-                      </button>
-                    </div>
-
-                    <div className="flex-1 w-full space-y-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/png, image/jpeg, image/webp"
-                        onChange={handlePhotoFileUpload}
-                        className="hidden"
-                      />
-
-                      {photoUploadSource === 'FILE' ? (
-                        <div
-                          onDragOver={(e) => { e.preventDefault(); setIsDraggingPhoto(true); }}
-                          onDragLeave={() => setIsDraggingPhoto(false)}
-                          onDrop={handlePhotoDrop}
-                          onClick={() => fileInputRef.current?.click()}
-                          className={`border-2 border-dashed rounded-xl p-3 transition-all text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
-                            isDraggingPhoto 
-                              ? 'border-emerald-500 bg-emerald-50' 
-                              : 'border-slate-300 hover:border-emerald-500 bg-white'
-                          }`}
-                        >
-                          <Upload className="w-4 h-4 text-emerald-700" />
-                          <p className="text-[11px] font-bold text-slate-800">
-                            Pilih foto dari galeri / kamera
-                          </p>
-                          <p className="text-[9px] text-slate-400">
-                            Mendukung JPG, PNG, WEBP (Kompresi otomatis)
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          <div className="relative">
-                            <LinkIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                            <input
-                              type="url"
-                              value={regPhotoInputUrl}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setRegPhotoInputUrl(val);
-                                if (val.trim()) {
-                                  setRegAvatarUrl(formatGoogleDriveUrl(val.trim()));
-                                }
-                              }}
-                              placeholder="https://drive.google.com/... atau URL foto"
-                              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-1.5 pt-1">
-                        <span className="text-[10px] text-slate-400">Contoh:</span>
-                        {sampleAvatars.map((url, i) => (
-                          <button
-                            type="button"
-                            key={i}
-                            onClick={() => { setRegAvatarUrl(url); setRegPhotoInputUrl(''); }}
-                            className={`w-6 h-6 rounded-md overflow-hidden border transition-all ${
-                              regAvatarUrl === url ? 'border-emerald-600 scale-105 shadow-xs' : 'border-transparent opacity-60'
-                            }`}
-                          >
-                            <img src={url} alt="Option" className="w-full h-full object-cover" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. Struktur Wilayah Organisasi */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>2. Struktur Wilayah Kwartir Gerakan Pramuka</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setKwartirLevel('DAERAH')}
-                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      kwartirLevel === 'DAERAH'
-                        ? 'bg-white text-emerald-900 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>Kwarda / Kwarcab / Kwarran</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setKwartirLevel('NASIONAL')}
-                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      kwartirLevel === 'NASIONAL'
-                        ? 'bg-emerald-800 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Globe2 className="w-3.5 h-3.5" />
-                    <span>Kwartir Nasional (Kwarnas)</span>
-                  </button>
-                </div>
-
-                {kwartirLevel === 'NASIONAL' ? (
-                  <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[11px] text-emerald-800">
-                    Pendaftaran anggota terhubung langsung ke <strong>Kwartir Nasional (Pusat)</strong>.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">1. Kwarda (Provinsi) *</label>
-                      <select
-                        value={regProvinceId}
-                        onChange={(e) => setRegProvinceId(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
-                      >
-                        {provinces.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">2. Kwarcab (Kab/Kota) *</label>
-                      <select
-                        value={regRegencyId}
-                        onChange={(e) => setRegRegencyId(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
-                      >
-                        {regenciesList.map((r) => (
-                          <option key={r.id} value={r.id}>{r.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">3. Kwarran (Kecamatan) *</label>
-                      <select
-                        value={regDistrictId}
-                        onChange={(e) => setRegDistrictId(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
-                      >
-                        {districtsList.map((d) => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Data Kepramukaan & Krida */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center gap-2 pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
-                  <Building className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>3. Kepramukaan & Krida Saka Pariwisata</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Gugus Depan / Pangkalan Asal *</label>
-                    <input
-                      type="text"
-                      required
-                      value={regGudep}
-                      onChange={(e) => setRegGudep(e.target.value)}
-                      placeholder="Contoh: SMA Negeri 1..."
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Pilihan Krida *</label>
-                    <select
-                      value={regKrida}
-                      onChange={(e: any) => setRegKrida(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold"
-                    >
-                      <option value="Krida Pemandu">Krida Pemandu</option>
-                      <option value="Krida Penyuluh">Krida Penyuluh</option>
-                      <option value="Krida Mice & Event">Krida Mice & Event</option>
-                      <option value="Krida Kuliner & Cinderamata">Krida Kuliner & Cinderamata</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Pendidikan Terakhir</label>
-                    <input
-                      type="text"
-                      value={regEducationLevel}
-                      onChange={(e) => setRegEducationLevel(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Pekerjaan / Aktivitas</label>
-                    <input
-                      type="text"
-                      value={regOccupation}
-                      onChange={(e) => setRegOccupation(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-slate-800"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Bio & Motivasi Bergabung</label>
-                  <textarea
-                    rows={2}
-                    value={regBio}
-                    onChange={(e) => setRegBio(e.target.value)}
-                    placeholder="Ceritakan motivasi Anda memajukan pariwisata nusantara..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-slate-800"
-                  />
-                </div>
-              </div>
-
-              {/* 4. Kata Sandi Akun */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center gap-2 pb-1 border-b border-slate-200 text-slate-900 font-bold text-xs">
-                  <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>4. Keamanan & Kata Sandi Akun</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Kata Sandi *</label>
-                    <input
-                      type="password"
-                      required
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Minimal 6 karakter"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Konfirmasi Kata Sandi *</label>
-                    <input
-                      type="password"
-                      required
-                      value={regConfirmPassword}
-                      onChange={(e) => setRegConfirmPassword(e.target.value)}
-                      placeholder="Ketik ulang sandi"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/20 transition-all disabled:opacity-50 mt-4 cursor-pointer"
-              >
-                {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>Daftarkan Anggota Baru Sekarang</span>
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* TAB 3: FORGOT PASSWORD */}
-          {tab === 'forgot' && (
-            <div className="space-y-4">
-              {forgotError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{forgotError}</span>
-                </div>
-              )}
-
-              {forgotStep === 'request' && (
-                <form onSubmit={handleFindAccount} className="space-y-4">
-                  <p className="text-xs text-slate-600">
-                    Masukkan email, username, atau nomor KTA Anda untuk mencari akun dan mengatur ulang kata sandi.
-                  </p>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Identitas Akun</label>
-                    <input
-                      type="text"
-                      required
-                      value={forgotIdentifier}
-                      onChange={(e) => setForgotIdentifier(e.target.value)}
-                      placeholder="Email atau No. KTA"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold"
-                  >
-                    Temukan Akun
-                  </button>
-                </form>
-              )}
-
-              {forgotStep === 'reset' && (
-                <form onSubmit={handleResetPassword} className="space-y-3.5">
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
-                    Akun ditemukan: <strong>{forgotUserFound?.fullName || forgotUserFound?.name}</strong> ({forgotUserFound?.email})
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Kata Sandi Baru</label>
-                    <input
-                      type="password"
-                      required
-                      value={forgotNewPassword}
-                      onChange={(e) => setForgotNewPassword(e.target.value)}
-                      placeholder="Minimal 6 karakter"
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Konfirmasi Kata Sandi</label>
-                    <input
-                      type="password"
-                      required
-                      value={forgotConfirmPassword}
-                      onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                      placeholder="Ketik ulang sandi"
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold"
-                  >
-                    Simpan Kata Sandi Baru
-                  </button>
-                </form>
-              )}
-
-              {forgotStep === 'done' && (
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2">
-                  <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto" />
-                  <p className="text-xs font-semibold text-emerald-800">Kata sandi berhasil diperbarui!</p>
-                  <p className="text-[11px] text-emerald-600">Mengalihkan ke halaman login...</p>
-                </div>
-              )}
-            </div>
-          )}
-
-        </div>
-      </div>
-    </div>
-  );
-};
+export const storage =
+  new StorageService();
