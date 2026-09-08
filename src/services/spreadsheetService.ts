@@ -447,7 +447,7 @@ class SpreadsheetService {
       member.phone || '',
       member.provinceName || '',
       member.regencyName || '',
-      member.branchName || '',
+      member.districtName || '',
       member.gugusDepan || '',
       member.krida || '',
       member.status || 'PENDING',
