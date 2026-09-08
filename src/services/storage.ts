@@ -10,7 +10,8 @@ import {
   AuditLog,
   CurrentUser,
   KtaCardSettings,
-  CulinarySouvenirItem
+  CulinarySouvenirItem,
+  KridaModuleItem
 } from '../types';
 
 import {
@@ -23,6 +24,10 @@ import {
   MASTER_SKILLS,
   INITIAL_CULINARY_SOUVENIRS
 } from '../data/initialData';
+
+import {
+  INITIAL_KRIDA_MODULES
+} from '../data/kridaData';
 
 import {
   PROVINCES_DATA,
@@ -565,6 +570,26 @@ class StorageService {
         error
       );
     }
+  }
+
+  // =========================================================
+  // KRIDA MODULES
+  // =========================================================
+
+  /**
+   * Mengambil seluruh modul Krida resmi.
+   *
+   * Sumber data:
+   * src/data/kridaData.ts
+   *
+   * Data modul bersifat statis dan berasal dari:
+   * INITIAL_KRIDA_MODULES
+   *
+   * Method ini dibutuhkan oleh:
+   * src/components/krida/KridaModulesView.tsx
+   */
+  public getKridaModules(): KridaModuleItem[] {
+    return INITIAL_KRIDA_MODULES;
   }
 
   // =========================================================
