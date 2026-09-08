@@ -72,10 +72,18 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-this-session-secret';
 const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
 
-// The Google Apps Script endpoint is the authoritative external write target.
-// Keep a production fallback so a fresh Vercel instance does not depend on the
-// writable local JSON file for its script configuration.
+// URL Google Apps Script TIDAK boleh ditentukan oleh source code.
+// Super Admin mengisinya melalui Dashboard > Pengaturan API.
 const DEFAULT_APPS_SCRIPT_URL = '';
+
+function normalizeManualAppsScriptUrl(raw: unknown): string {
+  const value = String(raw || '').trim().replace(/\s+/g, '');
+  if (!value) return '';
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(value)) {
+    return '';
+  }
+  return value;
+}
 
 function base64UrlEncode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url');
@@ -584,16 +592,26 @@ if (!IS_VERCEL) {
 }
 
 // Proxy mutation to Google Apps Script Web App
-async function forwardToGoogleAppsScript(payload: any, explicitScriptUrl?: string): Promise<any> {
-  const scriptUrl = String(explicitScriptUrl || payload?.scriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL).trim();
-  if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
-  const outboundPayload = { ...payload };
-  delete outboundPayload.scriptUrl;
+async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
+  // Prioritas MUTLAK: URL yang dikirim aplikasi dari Dashboard.
+  // Environment/default hanya dipertahankan sebagai kompatibilitas server lama,
+  // tetapi tidak digunakan jika URL manual belum diberikan.
+  const manualUrl = normalizeManualAppsScriptUrl(requestedScriptUrl);
+  const configuredUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+  const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+  const scriptUrl = manualUrl || configuredUrl || envUrl || DEFAULT_APPS_SCRIPT_URL;
+
+  if (!scriptUrl) {
+    throw new Error('Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.');
+  }
+
+  const gasPayload = { ...payload };
+  delete gasPayload.scriptUrl;
 
   const res = await fetch(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(outboundPayload)
+    body: JSON.stringify(gasPayload)
   });
 
   const text = await res.text();
@@ -621,7 +639,7 @@ async function forwardToGoogleAppsScript(payload: any, explicitScriptUrl?: strin
 // require cross-origin handling. This route also keeps the GAS URL server-side.
 app.post('/api/upload-image', async (req, res) => {
   try {
-    const { base64, filename, category } = req.body || {};
+    const { base64, filename, category, scriptUrl } = req.body || {};
     const value = String(base64 || '').trim();
 
     if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
@@ -645,8 +663,9 @@ app.post('/api/upload-image', async (req, res) => {
       action: 'UPLOAD_IMAGE',
       base64: value,
       filename: String(filename || `image_${Date.now()}.jpg`).trim(),
-      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase()
-    });
+      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase(),
+      scriptUrl
+    }, scriptUrl);
 
     if (!result || result.success === false || !result.url) {
       return res.status(502).json({
@@ -727,26 +746,9 @@ app.post('/api/auth/login', (req, res) => {
     }
   }
 
-  if (!matchedUser) {
-    const scriptUrl = String(req.body?.scriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '').trim();
-    if (scriptUrl) {
-      try {
-        const remote = await forwardToGoogleAppsScript({ action: 'AUTH_GET_USER', identifier: cleanUser }, scriptUrl);
-        if (remote?.success && remote?.found && remote?.user?.passwordHash) {
-          matchedUser = remote.user;
-          db.users = db.users.filter(u => u.id !== matchedUser.id);
-          db.users.push(matchedUser);
-          saveDatabase();
-        }
-      } catch (remoteError) {
-        console.warn('[Auth] Gagal membaca akun persisten:', remoteError);
-      }
-    }
-  }
-
   if (!matchedUser || !matchedUser.passwordHash || !verifyPassword(rawPass, matchedUser.passwordHash)) {
     console.warn(`[Auth] Failed login attempt for user: ${cleanUser}`);
-    return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna/email/KTA atau kata sandi tidak valid.' });
+    return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid.' });
   }
 
   const token = createSession(matchedUser);
@@ -840,7 +842,7 @@ app.post('/api/auth/change-password', (req, res) => {
 });
 
 // POST /api/auth/register - Public new member registration
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', (req, res) => {
   const { memberData, password } = req.body || {};
 
   if (!memberData || !memberData.fullName) {
@@ -928,30 +930,28 @@ app.post('/api/auth/register', async (req, res) => {
   if (db.auditLogs.length > 500) db.auditLogs.pop();
   saveDatabase();
 
-  const registrationScriptUrl = String(req.body?.scriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '').trim();
-  if (!registrationScriptUrl) {
-    db.members = db.members.filter(m => m.id !== memberId);
-    db.users = db.users.filter(u => u.id !== userId);
-    saveDatabase();
-    return res.status(500).json({ success: false, message: 'Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.' });
-  }
-
-  try {
-    await forwardToGoogleAppsScript({
-      action: 'UPSERT_MEMBER', sheet: 'Anggota', memberId: newMember.id,
-      rowData: [newMember.id, newMember.nationalMemberNumber || '', newMember.fullName, newMember.email || '', newMember.phone || '', newMember.provinceName || '', newMember.regencyName || '', newMember.districtName || newMember.branchName || '', newMember.gugusDepan || '', newMember.krida || '', 'PENDING', newMember.avatarUrl || '', newMember.registeredAt, `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.nationalMemberNumber || newMember.id}`]
-    }, registrationScriptUrl);
-
-    await forwardToGoogleAppsScript({
-      action: 'UPSERT_USER',
-      user: { id: newUser.id, username: newUser.username, email: newUser.email, passwordHash: newUser.passwordHash, name: newUser.name, role: newUser.role, jurisdictionName: newUser.jurisdictionName, jurisdictionId: newUser.jurisdictionId, avatarUrl: newUser.avatarUrl, memberId: newUser.memberId, createdAt: newUser.createdAt, status: 'ACTIVE' }
-    }, registrationScriptUrl);
-  } catch (gasError: any) {
-    db.members = db.members.filter(m => m.id !== memberId);
-    db.users = db.users.filter(u => u.id !== userId);
-    saveDatabase();
-    return res.status(502).json({ success: false, message: gasError?.message || 'Pendaftaran gagal disimpan ke Google Spreadsheet.' });
-  }
+  // Do not block account creation on Google Apps Script availability.
+  void forwardToGoogleAppsScript({
+    action: 'UPSERT_MEMBER',
+    sheet: 'Anggota',
+    memberId: newMember.id,
+    rowData: [
+      newMember.id,
+      newMember.nationalMemberNumber || '',
+      newMember.fullName,
+      newMember.email || '',
+      newMember.phone || '',
+      newMember.provinceName || '',
+      newMember.regencyName || '',
+      newMember.districtName || newMember.branchName || '',
+      newMember.gugusDepan || '',
+      newMember.krida || '',
+      'PENDING',
+      newMember.avatarUrl || '',
+      newMember.registeredAt,
+      `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.nationalMemberNumber || newMember.id}`
+    ]
+  });
 
   // Registration creates a real server account and immediately establishes
   // a stateless session, so the newly registered user is already logged in.
@@ -991,11 +991,15 @@ app.get('/api/config', (req, res) => {
     // Only return safe public operational status
     return res.json({
       config: {
+        // Web App URL bukan credential rahasia; browser pengguna membutuhkannya
+        // agar dapat melakukan sinkronisasi langsung ke Google Apps Script.
+        scriptUrl: db.config.scriptUrl || '',
+        spreadsheetId: db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID,
+        spreadsheetUrl: db.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
         status: db.config.status || 'CONNECTED',
         autoSync: db.config.autoSync,
         autoRefreshIntervalSeconds: db.config.autoRefreshIntervalSeconds || 6,
-        lastSyncedAt: db.config.lastSyncedAt,
-        scriptUrl: db.config.scriptUrl || ''
+        lastSyncedAt: db.config.lastSyncedAt
       },
       lastUpdated: db.lastUpdated,
       version: db.version
@@ -1129,7 +1133,8 @@ app.post('/api/mutate', async (req, res) => {
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
   const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
-  const { type, action, payload } = req.body || {};
+  const { type, action, payload, scriptUrl } = req.body || {};
+  const requestScriptUrl = normalizeManualAppsScriptUrl(scriptUrl);
   if (!type || !action) {
     return res.status(400).json({ success: false, message: 'Parameter type atau action tidak lengkap.' });
   }
@@ -1146,6 +1151,17 @@ app.post('/api/mutate', async (req, res) => {
       }
     }
   }
+
+  if (!requestScriptUrl) {
+    return res.status(400).json({
+      success: false,
+      status: 'error',
+      message: 'Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.'
+    });
+  }
+
+  const forwardMutation = (gasPayload: any) =>
+    forwardToGoogleAppsScript(gasPayload, requestScriptUrl);
 
   // Audit Logging
   db.auditLogs.unshift({
@@ -1173,7 +1189,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        await forwardToGoogleAppsScript({
+        await forwardMutation({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1201,7 +1217,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        await forwardToGoogleAppsScript({
+        await forwardMutation({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
           memberId: member.id,
@@ -1223,7 +1239,7 @@ app.post('/api/mutate', async (req, res) => {
           ]
         });
         if ((action === 'STATUS' || action === 'UPDATE') && member.id && member.status) {
-          await forwardToGoogleAppsScript({
+          await forwardMutation({
             action: 'UPDATE_AUTH_STATUS',
             memberId: member.id,
             status: member.status
@@ -1232,7 +1248,7 @@ app.post('/api/mutate', async (req, res) => {
       } else if (action === 'DELETE') {
         const memberId = payload.id || payload.memberId;
         db.members = db.members.filter(m => m.id !== memberId);
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Anggota',
           id: memberId,
@@ -1248,7 +1264,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.tours.unshift(tour);
         }
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'UPSERT_ROW',
           sheet: 'Paket_Wisata',
           id: tour.id,
@@ -1269,7 +1285,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.tours = db.tours.filter(t => t.id !== payload.id);
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Paket_Wisata',
           id: payload.id
@@ -1284,7 +1300,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.culinaryItems.unshift(item);
         }
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'UPSERT_ROW',
           sheet: 'Kuliner_Cinderamata',
           id: item.id,
@@ -1305,7 +1321,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.culinaryItems = db.culinaryItems.filter(c => c.id !== payload.id);
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Kuliner_Cinderamata',
           id: payload.id
@@ -1320,7 +1336,7 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.activities.unshift(act);
         }
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'UPSERT_ROW',
           sheet: 'Agenda_Kegiatan',
           id: act.id,
@@ -1343,7 +1359,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.activities = db.activities.filter(a => a.id !== payload.id);
-        forwardToGoogleAppsScript({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Agenda_Kegiatan',
           id: payload.id
