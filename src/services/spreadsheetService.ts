@@ -570,6 +570,9 @@ class SpreadsheetService {
       throw new Error('Format foto tidak valid.');
     }
 
+    // Upload dilakukan melalui backend aplikasi. Backend memakai URL GAS
+    // yang disimpan oleh Super Admin melalui Dashboard, sehingga perangkat
+    // pengguna (termasuk HP) tidak perlu memiliki URL GAS di localStorage.
     const response = await fetch('/api/upload-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -577,8 +580,7 @@ class SpreadsheetService {
       body: JSON.stringify({
         base64,
         filename: filename || `image_${Date.now()}.jpg`,
-        category,
-        scriptUrl: this.config.scriptUrl || ''
+        category
       })
     });
 
