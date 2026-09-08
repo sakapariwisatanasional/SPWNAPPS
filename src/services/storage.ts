@@ -9,7 +9,15 @@ import {
   KridaModule
 } from '../types';
 import { initialMembers, initialTourPackages, initialActivities, initialCulinarySouvenirs } from '../data/initialData';
-import { kridaModules2026 } from '../data/kridaModules2026';
+import * as KridaDataModule from '../data/kridaModules2026';
+
+// Mendeteksi data master krida dari default export maupun named export
+const defaultKridaModules: KridaModule[] = 
+  (KridaDataModule as any).kridaModules2026 || 
+  (KridaDataModule as any).kridaModules || 
+  (KridaDataModule as any).initialKridaModules || 
+  (KridaDataModule as any).default || 
+  [];
 
 const STORAGE_KEYS = {
   MEMBERS: 'saka_members',
@@ -35,7 +43,7 @@ const defaultKtaSettings: KtaCustomSettings = {
 
 export const storage = {
   // ==========================================
-  // KRIDA MODULES (Pencegah Layar Putih)
+  // KRIDA MODULES
   // ==========================================
   getKridaModules: (): KridaModule[] => {
     try {
@@ -46,7 +54,7 @@ export const storage = {
     } catch (e) {
       console.error('Gagal mengambil modul krida dari storage:', e);
     }
-    return kridaModules2026;
+    return defaultKridaModules;
   },
 
   saveKridaModules: (modules: KridaModule[]): void => {
@@ -86,7 +94,7 @@ export const storage = {
   registerMember: (data: Omit<Member, 'id' | 'createdAt' | 'status'>): Member => {
     const currentMembers = storage.getMembers();
 
-    // Hitung nomor urut tertinggi (member-01, member-02, dst.)
+    // Hitung nomor urut terbesar (member-01, member-02, dst.)
     let maxIdNum = 0;
     currentMembers.forEach(m => {
       if (typeof m?.id === 'string') {
