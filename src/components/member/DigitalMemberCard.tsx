@@ -3,7 +3,7 @@ import { RotateCw, FileDown, Sliders, ShieldCheck } from 'lucide-react';
 import { Member, KtaCardSettings, KtaDataFieldConfig } from '../../types';
 import { SakaLogo, formatDriveImageUrl } from '../common/SakaLogo';
 import { Barcode } from '../common/Barcode';
-import { storage } from '../../services/storage';
+import { storage, DEFAULT_KTA_SETTINGS } from '../../services/storage';
 import { KtaQrCode } from './KtaQrCode';
 
 interface Props {
@@ -30,24 +30,25 @@ const valueOf = (member: Member, field: KtaDataFieldConfig['field']): string => 
 
 const weight = (w: KtaDataFieldConfig['fontWeight'] | string) => ({ normal:400, medium:500, bold:700, black:900 } as any)[w] || 400;
 
+/**
+ * KTA settings can come from old localStorage/Spreadsheet records.
+ * Never allow a partial/legacy object to crash the Dashboard.
+ */
 const normalizeKtaSettings = (value?: Partial<KtaCardSettings> | null): KtaCardSettings => {
-  const base = storage.getKtaSettings();
-  const merged = {
-    ...base,
-    ...(value && typeof value === 'object' ? value : {})
-  } as KtaCardSettings;
+  const source = value && typeof value === 'object' ? value : {};
+  const merged = { ...DEFAULT_KTA_SETTINGS, ...source } as KtaCardSettings;
 
   return {
     ...merged,
     logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
     dataFields: Array.isArray((merged as any).dataFields) ? (merged as any).dataFields : [],
     textElements: Array.isArray((merged as any).textElements) ? (merged as any).textElements : [],
-    terms: Array.isArray((merged as any).terms) ? (merged as any).terms : []
+    terms: Array.isArray((merged as any).terms) ? (merged as any).terms : [],
   };
 };
 
 export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrintPdf, showControls=true, allowAdminEdit=false, previewSettings }) => {
-  const [settings, setSettings] = useState<KtaCardSettings>(() => normalizeKtaSettings(previewSettings));
+  const [settings, setSettings] = useState<KtaCardSettings>(() => normalizeKtaSettings(previewSettings || storage.getKtaSettings()));
   const [flipped, setFlipped] = useState(false);
 
   useEffect(() => {
@@ -68,7 +69,6 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
   const textElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
   const logos = Array.isArray(settings?.logos) ? settings.logos : [];
   const terms = Array.isArray(settings?.terms) ? settings.terms : [];
-
   const frontFields = dataFields.filter(f=>f.side==='FRONT' && f.visible);
   const backFields = dataFields.filter(f=>f.side==='BACK' && f.visible);
   const frontTexts = textElements.filter(t=>t.side==='FRONT');
