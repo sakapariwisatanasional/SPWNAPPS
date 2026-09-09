@@ -542,77 +542,82 @@ async function renderFrontCardCanvas(
   ctx.textAlign = 'center';
   ctx.fillText('PINDAI VERIFIKASI', qrBoxX + qrBoxW / 2, qrBoxY + 188);
 
-  // 7c. Identity & Member Data (Center: between photo and QR box)
-  // Urutan Sesuai Ketentuan: 1. [Nomor urut anggota], 2. [Nama Lengkap], 3. [Jabatan], 4. [Kwartir]
-  const infoX = 268;
-  const infoMaxW = qrBoxX - infoX - 20; // ~506px
-  ctx.textAlign = 'left';
+  // 7c. Legacy Identity & Member Data.
+  // Jika Super Admin sudah mengatur dataFields, renderer menggunakan konfigurasi tersebut.
+  if (!(settings.dataFields || []).some((f: any) => f.side === 'FRONT' && f.visible)) {
+      // 7c. Identity & Member Data (Center: between photo and QR box)
+      // Urutan Sesuai Ketentuan: 1. [Nomor urut anggota], 2. [Nama Lengkap], 3. [Jabatan], 4. [Kwartir]
+      const infoX = 268;
+      const infoMaxW = qrBoxX - infoX - 20; // ~506px
+      ctx.textAlign = 'left';
 
-  // 1. [Nomor Urut Anggota] Container Box
-  const ntaBoxY = 200;
-  const ntaBoxW = infoMaxW;
-  const ntaBoxH = 60;
-  ctx.fillStyle = theme.boxBg;
-  roundRect(ctx, infoX, ntaBoxY, ntaBoxW, ntaBoxH, 12);
-  ctx.fill();
-  ctx.strokeStyle = theme.border;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+      // 1. [Nomor Urut Anggota] Container Box
+      const ntaBoxY = 200;
+      const ntaBoxW = infoMaxW;
+      const ntaBoxH = 60;
+      ctx.fillStyle = theme.boxBg;
+      roundRect(ctx, infoX, ntaBoxY, ntaBoxW, ntaBoxH, 12);
+      ctx.fill();
+      ctx.strokeStyle = theme.border;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
-  ctx.fillStyle = theme.accent;
-  ctx.font = 'bold 11px "Inter", sans-serif';
-  ctx.fillText('NOMOR URUT ANGGOTA (NTA)', infoX + 14, ntaBoxY + 20);
+      ctx.fillStyle = theme.accent;
+      ctx.font = 'bold 11px "Inter", sans-serif';
+      ctx.fillText('NOMOR URUT ANGGOTA (NTA)', infoX + 14, ntaBoxY + 20);
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 20px monospace';
-  ctx.fillText(
-    member.nationalMemberNumber || 'MENUNGGU VERIFIKASI',
-    infoX + 14,
-    ntaBoxY + 47
-  );
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px monospace';
+      ctx.fillText(
+        member.nationalMemberNumber || 'MENUNGGU VERIFIKASI',
+        infoX + 14,
+        ntaBoxY + 47
+      );
 
-  // 2. [Nama Lengkap dari Anggota]
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 25px "Inter", -apple-system, sans-serif';
-  ctx.fillText(member.fullName.toUpperCase(), infoX, 296, infoMaxW);
+      // 2. [Nama Lengkap dari Anggota]
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 25px "Inter", -apple-system, sans-serif';
+      ctx.fillText(member.fullName.toUpperCase(), infoX, 296, infoMaxW);
 
-  // 3. [Jabatan dari Anggota]
-  ctx.fillStyle = theme.accent;
-  ctx.font = 'bold 18px "Inter", sans-serif';
-  ctx.fillText(
-    (member.currentPosition || 'Anggota Saka Pariwisata').toUpperCase(),
-    infoX,
-    334,
-    infoMaxW
-  );
+      // 3. [Jabatan dari Anggota]
+      ctx.fillStyle = theme.accent;
+      ctx.font = 'bold 18px "Inter", sans-serif';
+      ctx.fillText(
+        (member.currentPosition || 'Anggota Saka Pariwisata').toUpperCase(),
+        infoX,
+        334,
+        infoMaxW
+      );
 
-  // 4. [Kwartir Nasional/Daerah/Cabang]
-  const isNasional = member.provinceId === '00' || member.provinceName?.toLowerCase().includes('nasional');
-  if (isNasional) {
-    ctx.fillStyle = '#f1f5f9';
-    ctx.font = 'bold 16px "Inter", sans-serif';
-    ctx.fillText('Kwartir Nasional Gerakan Pramuka', infoX, 374, infoMaxW);
-    ctx.fillStyle = theme.accentLight;
-    ctx.font = '14px "Inter", sans-serif';
-    ctx.fillText('Pimpinan Saka Pariwisata Tingkat Nasional', infoX, 404, infoMaxW);
-  } else {
-    const kwartirCabangText = member.regencyName ? `Kwartir Cabang ${member.regencyName}` : '';
-    const kwartirDaerahText = member.provinceName ? `Kwartir Daerah ${member.provinceName}` : '';
+      // 4. [Kwartir Nasional/Daerah/Cabang]
+      const isNasional = member.provinceId === '00' || member.provinceName?.toLowerCase().includes('nasional');
+      if (isNasional) {
+        ctx.fillStyle = '#f1f5f9';
+        ctx.font = 'bold 16px "Inter", sans-serif';
+        ctx.fillText('Kwartir Nasional Gerakan Pramuka', infoX, 374, infoMaxW);
+        ctx.fillStyle = theme.accentLight;
+        ctx.font = '14px "Inter", sans-serif';
+        ctx.fillText('Pimpinan Saka Pariwisata Tingkat Nasional', infoX, 404, infoMaxW);
+      } else {
+        const kwartirCabangText = member.regencyName ? `Kwartir Cabang ${member.regencyName}` : '';
+        const kwartirDaerahText = member.provinceName ? `Kwartir Daerah ${member.provinceName}` : '';
 
-    ctx.fillStyle = '#f1f5f9';
-    ctx.font = 'bold 16px "Inter", sans-serif';
-    ctx.fillText(
-      kwartirCabangText || kwartirDaerahText || 'Kwartir Nasional Gerakan Pramuka',
-      infoX,
-      374,
-      infoMaxW
-    );
+        ctx.fillStyle = '#f1f5f9';
+        ctx.font = 'bold 16px "Inter", sans-serif';
+        ctx.fillText(
+          kwartirCabangText || kwartirDaerahText || 'Kwartir Nasional Gerakan Pramuka',
+          infoX,
+          374,
+          infoMaxW
+        );
 
-    if (kwartirCabangText && kwartirDaerahText) {
-      ctx.fillStyle = theme.accentLight;
-      ctx.font = '14px "Inter", sans-serif';
-      ctx.fillText(kwartirDaerahText, infoX, 404, infoMaxW);
-    }
+        if (kwartirCabangText && kwartirDaerahText) {
+          ctx.fillStyle = theme.accentLight;
+          ctx.font = '14px "Inter", sans-serif';
+          ctx.fillText(kwartirDaerahText, infoX, 404, infoMaxW);
+        }
+      }
+
   }
 
   // 8. Footer Section
@@ -821,6 +826,31 @@ async function renderBackCardCanvas(
   return canvas;
 }
 
+
+function drawKtaConfiguredElements(ctx: CanvasRenderingContext2D, member: Member, settings: KtaCardSettings, side: 'FRONT' | 'BACK', logoImages: Array<{ cfg: any; img: HTMLImageElement }>) {
+  const valueOf = (field: any): string => {
+    const v: Record<string, any> = { fullName:member.fullName, id:member.id, nationalMemberNumber:member.nationalMemberNumber, currentPosition:member.currentPosition, provinceName:member.provinceName, regencyName:member.regencyName, districtName:member.districtName, branchName:member.branchName, gugusDepan:member.gugusDepan, krida:member.krida, phone:member.phone, email:member.email, joinYear:member.joinYear, status:member.status };
+    return String(v[field] ?? '');
+  };
+  const fontWeight = (w:string) => ({normal:'400',medium:'500',bold:'700',black:'900'} as any)[w] || '400';
+  (settings.dataFields || []).filter((f:any)=>f.side===side && f.visible).forEach((f:any)=>{
+    const raw=valueOf(f.field); const text=f.textTransform==='uppercase'?raw.toUpperCase():raw;
+    const x=CANVAS_WIDTH*f.x/100, y=CANVAS_HEIGHT*f.y/100, maxW=CANVAS_WIDTH*f.width/100;
+    ctx.save(); ctx.fillStyle=f.color||'#fff'; ctx.textAlign=f.align||'left'; ctx.font=`${fontWeight(f.fontWeight)} ${Math.max(8,f.fontSize||10)}px Arial, sans-serif`;
+    const label=f.label ? `${f.label}: ` : ''; ctx.fillText(label+text, x, y, maxW); ctx.restore();
+  });
+  (settings.textElements || []).filter((t:any)=>t.side===side).forEach((t:any)=>{
+    ctx.save(); ctx.fillStyle=t.color||'#fff'; ctx.textAlign=t.align||'left'; ctx.font=`${fontWeight(t.fontWeight)} ${Math.max(7,t.fontSize||9)}px Arial, sans-serif`;
+    const text=t.textTransform==='uppercase'?String(t.text||'').toUpperCase():String(t.text||'');
+    ctx.fillText(text, CANVAS_WIDTH*t.x/100, CANVAS_HEIGHT*t.y/100, CANVAS_WIDTH*t.width/100); ctx.restore();
+  });
+  logoImages.filter(x=>x.cfg.side===side).forEach(({cfg,img})=>{
+    if(!img || !img.complete || !(img.naturalWidth||img.width)) return;
+    const x=CANVAS_WIDTH*cfg.x/100, y=CANVAS_HEIGHT*cfg.y/100, w=CANVAS_WIDTH*cfg.width/100, h=CANVAS_HEIGHT*cfg.height/100;
+    ctx.save(); ctx.globalAlpha=cfg.opacity ?? 1; ctx.drawImage(img,x,y,w,h); ctx.restore();
+  });
+}
+
 export interface GenerateKtaOptions {
   member: Member;
   settings?: KtaCardSettings;
@@ -842,11 +872,13 @@ export async function generateKtaPdf({
   const nta = member.nationalMemberNumber || member.verificationToken || member.id;
   const verificationUrl = `${window.location.origin}/?verifyId=${encodeURIComponent(nta)}&tab=verify-portal`;
 
-  const [qrDataUrl, avatarImg, logoImg, bgImg] = await Promise.all([
+  const [qrDataUrl, avatarImg, logoImg, frontBgImg, backBgImg, configuredLogoImages] = await Promise.all([
     generateQrDataUrl(verificationUrl),
     loadImage(member.avatarUrl),
     loadOfficialSakaLogo(),
-    loadCardBgImage(settings.bgImageUrl)
+    loadCardBgImage(settings.frontBackgroundUrl || settings.bgImageUrl),
+    loadCardBgImage(settings.backBackgroundUrl || settings.bgImageUrl),
+    Promise.all((settings.logos || []).filter((l:any)=>l.url).map(async (cfg:any) => ({ cfg, img: await loadImage(cfg.url) })))
   ]);
 
   const qrImg = await loadImage(qrDataUrl);
@@ -860,10 +892,13 @@ export async function generateKtaPdf({
     logoImg,
     avatarImg,
     qrImg,
-    bgImg
+    frontBgImg
   );
 
-  const backCanvas = await renderBackCardCanvas(member, settings, logoImg, bgImg);
+  drawKtaConfiguredElements(frontCanvas.getContext('2d')!, member, settings, 'FRONT', configuredLogoImages);
+
+  const backCanvas = await renderBackCardCanvas(member, settings, logoImg, backBgImg);
+  drawKtaConfiguredElements(backCanvas.getContext('2d')!, member, settings, 'BACK', configuredLogoImages);
 
   const frontImgData = frontCanvas.toDataURL('image/png');
   const backImgData = backCanvas.toDataURL('image/png');
@@ -875,15 +910,15 @@ export async function generateKtaPdf({
     const doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
-      format: [CR80_WIDTH_MM, CR80_HEIGHT_MM]
+      format: [settings.widthMm || CR80_WIDTH_MM, settings.heightMm || CR80_HEIGHT_MM]
     });
 
     // Page 1: Front Side
-    doc.addImage(frontImgData, 'PNG', 0, 0, CR80_WIDTH_MM, CR80_HEIGHT_MM, undefined, 'FAST');
+    doc.addImage(frontImgData, 'PNG', 0, 0, settings.widthMm || CR80_WIDTH_MM, settings.heightMm || CR80_HEIGHT_MM, undefined, 'FAST');
 
     // Page 2: Back Side
-    doc.addPage([CR80_WIDTH_MM, CR80_HEIGHT_MM], 'landscape');
-    doc.addImage(backImgData, 'PNG', 0, 0, CR80_WIDTH_MM, CR80_HEIGHT_MM, undefined, 'FAST');
+    doc.addPage([settings.widthMm || CR80_WIDTH_MM, settings.heightMm || CR80_HEIGHT_MM], 'landscape');
+    doc.addImage(backImgData, 'PNG', 0, 0, settings.widthMm || CR80_WIDTH_MM, settings.heightMm || CR80_HEIGHT_MM, undefined, 'FAST');
 
     return doc;
   } else {
