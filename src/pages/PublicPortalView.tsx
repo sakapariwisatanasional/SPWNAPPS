@@ -157,7 +157,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
 
   // Filtered Talents
   const filteredTalents = useMemo(() => {
-    return members.filter(m => {
+    return (Array.isArray(members) ? members : []).filter(m => {
       if (m.status !== 'ACTIVE') return false;
       if (!m.skills || m.skills.length === 0) return false;
 
@@ -185,7 +185,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
     });
   }, [members, talentSearchQuery, talentCategoryFilter, talentSkillFilter]);
 
-  const activeTalentCount = members.filter(m => m.status === 'ACTIVE' && m.skills && m.skills.length > 0).length;
+  const activeTalentCount = (Array.isArray(members) ? members : []).filter(m => m.status === 'ACTIVE' && m.skills && m.skills.length > 0).length;
 
   return (
     <div className="space-y-12 pb-20">
