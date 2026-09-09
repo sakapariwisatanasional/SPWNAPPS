@@ -1,4 +1,4 @@
-import { Member, TourPackage, CulinarySouvenirItem, Activity, CurrentUser, UserRole, Certification, MemberSkill } from '../types';
+import { Member, TourPackage, CulinarySouvenirItem, Activity, CurrentUser, UserRole, Certification, MemberSkill, KtaCardSettings } from '../types';
 import { storage } from './storage';
 import { PROVINCES_DATA, REGENCIES_DATA } from '../data/indonesiaTerritories';
 import { MASTER_SKILLS } from '../data/initialData';
@@ -783,7 +783,7 @@ class SpreadsheetService {
             joinYear: new Date().getFullYear(),
             educationLevel: 'SMA/SMK',
             occupation: 'Anggota Pramuka',
-            bio: `Anggota resmi Saka Pariwisata ${territory.provinceName}. Berdasarkan pusat data Saka Pariwisata Nasional.`,
+            bio: `Anggota resmi Saka Pariwisata ${territory.provinceName}. Terdata langsung dari Google Spreadsheet.`,
             status: statusRaw === 'ACTIVE' || statusRaw === 'PENDING' ? statusRaw : 'ACTIVE',
             registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_11']) || new Date().toISOString(),
             verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
@@ -1763,6 +1763,85 @@ class SpreadsheetService {
       return {
         success: false,
         message: `Gagal mengunggah foto ke Google Drive: ${err.message}`
+      };
+    }
+  }
+
+  /**
+   * Ambil desain KTA yang saat ini dipublikasikan oleh Super Admin.
+   * Endpoint aplikasi membaca sumber pusat (Google Spreadsheet melalui GAS),
+   * bukan localStorage perangkat pengguna.
+   */
+  public async refreshKtaSettings(): Promise<KtaCardSettings | null> {
+    try {
+      const response = await fetch('/api/kta-settings', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success !== true || !data?.settings) {
+        return null;
+      }
+
+      const settings = data.settings as KtaCardSettings;
+      storage.saveKtaSettings(settings);
+      return settings;
+    } catch (error) {
+      console.warn('[KTA Settings] Gagal memuat pengaturan pusat:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Publikasikan desain KTA ke sumber pusat.
+   * Hanya sesi Super Admin yang diterima oleh endpoint backend.
+   */
+  public async saveKtaSettings(settings: KtaCardSettings): Promise<{ success: boolean; message: string; settings?: KtaCardSettings }> {
+    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
+    if (!scriptUrl) {
+      return { success: false, message: 'Google Apps Script Web App URL belum diisi melalui Dashboard > Pengaturan API.' };
+    }
+
+    const token = storage.getAuthToken();
+    if (!token) {
+      return { success: false, message: 'Sesi Super Admin tidak ditemukan. Silakan login kembali.' };
+    }
+
+    try {
+      const response = await fetch('/api/kta-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        credentials: 'include',
+        cache: 'no-store',
+        body: JSON.stringify({ settings, scriptUrl })
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data?.success !== true) {
+        throw new Error(data?.message || `Gagal menyimpan pengaturan KTA (HTTP ${response.status}).`);
+      }
+
+      const savedSettings = (data.settings || settings) as KtaCardSettings;
+      // Local cache hanya diperbarui SETELAH server mengonfirmasi bahwa
+      // Spreadsheet berhasil menerima desain baru.
+      storage.saveKtaSettings(savedSettings);
+      this.broadcastRemoteEvent('KTA_SETTINGS', savedSettings);
+
+      return {
+        success: true,
+        message: data.message || 'Pengaturan KTA tersimpan di Google Spreadsheet.',
+        settings: savedSettings
+      };
+    } catch (error: any) {
+      console.error('[KTA Settings] Gagal menyimpan pengaturan pusat:', error);
+      return {
+        success: false,
+        message: error?.message || 'Gagal menyimpan pengaturan KTA pusat.'
       };
     }
   }
