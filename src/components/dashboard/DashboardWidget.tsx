@@ -97,6 +97,8 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
   isSuperAdmin = true,
   defaultViewMode = 'cumulative'
 }) => {
+  const safeMembers = Array.isArray(members) ? members : [];
+
   const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
   const [timeRange, setTimeRange] = useState<TimeRange>('12M');
   const [selectedKrida, setSelectedKrida] = useState<string>('ALL');
@@ -110,9 +112,9 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
 
   // Filter members by selected Krida if any
   const filteredMembers = useMemo(() => {
-    if (selectedKrida === 'ALL') return members;
-    return members.filter(m => m.krida === selectedKrida);
-  }, [members, selectedKrida]);
+    if (selectedKrida === 'ALL') return safeMembers;
+    return safeMembers.filter(m => m.krida === selectedKrida);
+  }, [safeMembers, selectedKrida]);
 
   // Aggregate membership growth data over time
   const chartData = useMemo(() => {
