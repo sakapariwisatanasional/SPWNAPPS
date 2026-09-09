@@ -13,12 +13,15 @@ export const NationalMapVisual: React.FC<NationalMapVisualProps> = ({
   members = [],
   onSelectProvince
 }) => {
+  const safeProvinces = Array.isArray(provinces) ? provinces : [];
+  const safeMembers = Array.isArray(members) ? members : [];
+
   // Hitung jumlah riil anggota per provinsi dari data Google Spreadsheet
   const { provinceDistribution, totalRealMembers } = useMemo(() => {
     const countsMap: Record<string, number> = {};
 
     // Normalisasi dan hitung kemunculan provinsi dari data anggota aktif/terdaftar
-    members.forEach((m) => {
+    safeMembers.forEach((m) => {
       if (!m) return;
       
       // Ambil kode/ID atau nama provinsi anggota
@@ -36,10 +39,10 @@ export const NationalMapVisual: React.FC<NationalMapVisualProps> = ({
       countsMap[targetKey] = (countsMap[targetKey] || 0) + 1;
     });
 
-    const total = members.length;
+    const total = safeMembers.length;
 
     // Petakan ke seluruh provinsi resmi (38 Provinsi) dengan data riil
-    const list = provinces.map((p) => {
+    const list = safeProvinces.map((p) => {
       const realCount = countsMap[p.id] || 0;
       const percentage = total > 0 ? Math.round((realCount / total) * 100) : 0;
       return {
@@ -56,7 +59,7 @@ export const NationalMapVisual: React.FC<NationalMapVisualProps> = ({
       provinceDistribution: list,
       totalRealMembers: total
     };
-  }, [provinces, members]);
+  }, [safeProvinces, safeMembers]);
 
   // Tampilkan provinsi teratas (atau semua provinsi yang memiliki anggota)
   const displayProvinces = useMemo(() => {
