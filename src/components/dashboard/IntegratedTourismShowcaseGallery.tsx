@@ -72,6 +72,12 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   onSelectMember,
   onSelectTab
 }) => {
+  // Defensive normalization: Dashboard/public portal data may arrive before sync completes.
+  // Never allow an undefined/non-array collection to reach a filter/map useMemo.
+  const safeTours = Array.isArray(tours) ? tours : [];
+  const safeProducts = Array.isArray(products) ? products : [];
+  const safeMembers = Array.isArray(members) ? members : [];
+  const safeInitialActivities = Array.isArray(initialActivities) ? initialActivities : null;
   // Main Tab Navigation: 'DESTINATIONS' | 'KRIDA_PRODUCTS' | 'AGENDA_ACTIVITIES' | 'RECOMMENDED_MEMBERS'
   const [activeMainTab, setActiveMainTab] = useState<'DESTINATIONS' | 'KRIDA_PRODUCTS' | 'AGENDA_ACTIVITIES' | 'RECOMMENDED_MEMBERS'>('DESTINATIONS');
 
@@ -89,7 +95,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   const [productSearchQuery, setProductSearchQuery] = useState<string>('');
 
   // Filters for Agenda Kegiatan Saka
-  const [activitiesList, setActivitiesList] = useState<Activity[]>(initialActivities || storage.getActivities());
+  const [activitiesList, setActivitiesList] = useState<Activity[]>(safeInitialActivities || storage.getActivities());
   const [activityCategoryFilter, setActivityCategoryFilter] = useState<string>('ALL');
   const [activityLevelFilter, setActivityLevelFilter] = useState<string>('ALL');
   const [activitySearchQuery, setActivitySearchQuery] = useState<string>('');
@@ -111,12 +117,12 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   };
 
   useEffect(() => {
-    if (initialActivities) {
-      setActivitiesList(initialActivities);
+    if (safeInitialActivities) {
+      setActivitiesList(safeInitialActivities);
     } else {
       setActivitiesList(storage.getActivities());
     }
-  }, [initialActivities]);
+  }, [safeInitialActivities]);
 
   // Subscribe to Location updates
   useEffect(() => {
@@ -191,9 +197,9 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
 
   // 1. FILTERED TOURS (DESTINATIONS)
   const publishedTours = useMemo(() => {
-    const pub = tours.filter(t => t.status === 'APPROVED_PUBLISHED' || !t.status);
-    return pub.length > 0 ? pub : tours;
-  }, [tours]);
+    const pub = safeTours.filter(t => t.status === 'APPROVED_PUBLISHED' || !t.status);
+    return pub.length > 0 ? pub : safeTours;
+  }, [safeTours]);
 
   const uniqueTourCategories = useMemo(() => {
     return Array.from(new Set(publishedTours.map(t => t.category).filter(Boolean)));
@@ -214,9 +220,9 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
 
   // 2. FILTERED 4 KRIDA PRODUCTS
   const approvedProducts = useMemo(() => {
-    const app = products.filter(p => (p.status || 'APPROVED') === 'APPROVED');
-    return app.length > 0 ? app : products;
-  }, [products]);
+    const app = safeProducts.filter(p => (p.status || 'APPROVED') === 'APPROVED');
+    return app.length > 0 ? app : safeProducts;
+  }, [safeProducts]);
 
   const filteredProducts = useMemo(() => {
     return approvedProducts.filter(p => {
@@ -259,13 +265,14 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
       regencyName: userLocation.city,
       city: userLocation.city
     };
-    const scored = ipLocationService.getRecommendedMembers(members, targetLoc, selectedTourForMatching);
+    const scoredRaw = ipLocationService.getRecommendedMembers(safeMembers, targetLoc, selectedTourForMatching);
+    const scored = Array.isArray(scoredRaw) ? scoredRaw : [];
     
     if (memberSkillCategoryFilter === 'ALL') {
       return scored;
     }
     return scored.filter(m => m.skills?.some(s => s.category.toLowerCase().includes(memberSkillCategoryFilter.toLowerCase())));
-  }, [members, userLocation, selectedTourForMatching, memberSkillCategoryFilter]);
+  }, [safeMembers, userLocation, selectedTourForMatching, memberSkillCategoryFilter]);
 
   // Check if current user is admin/operator
   const isOperatorOrAdmin = [
