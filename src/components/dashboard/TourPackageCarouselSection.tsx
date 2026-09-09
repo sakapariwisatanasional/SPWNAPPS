@@ -29,9 +29,8 @@ export const TourPackageCarouselSection: React.FC<TourPackageCarouselSectionProp
   onViewTourDetail,
   onSelectTab
 }) => {
-  const safeTours = Array.isArray(tours) ? tours : [];
   const publishedTours = safeTours.filter(t => t.status === 'APPROVED_PUBLISHED' || !t.status);
-  const displayTours = publishedTours.length > 0 ? publishedTours : safeTours;
+  const displayTours = publishedTours.length > 0 ? publishedTours : tours;
 
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'grid' | 'carousel'>('grid');
