@@ -1,11 +1,11 @@
 import {
   Member,
+  MemberLocationHistory,
   TourPackage,
   Activity,
   Province,
   Regency,
   District,
-  Branch,
   Skill,
   AuditLog,
   CurrentUser,
@@ -318,7 +318,24 @@ class StorageService {
       );
 
       const parsed = data ? JSON.parse(data) : INITIAL_MEMBERS;
-      return Array.isArray(parsed) ? parsed : INITIAL_MEMBERS;
+      if (!Array.isArray(parsed)) return INITIAL_MEMBERS;
+
+      // Reset aplikasi: data anggota tidak lagi memiliki lapisan Pangkalan/Gudep.
+      // Hapus field legacy agar data lama tidak pernah kembali ke UI/API.
+      const cleaned = parsed.map((member: any) => {
+        if (!member || typeof member !== 'object') return member;
+        const { branchId, branchName, gugusDepan, ...cleanMember } = member;
+        return cleanMember as Member;
+      });
+
+      const hadLegacyFields = parsed.some((member: any) =>
+        member && typeof member === 'object' &&
+        ('branchId' in member || 'branchName' in member || 'gugusDepan' in member)
+      );
+      if (hadLegacyFields) {
+        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(cleaned));
+      }
+      return cleaned as Member[];
     } catch (error) {
       console.error(
         'Gagal membaca data anggota:',
@@ -385,9 +402,14 @@ class StorageService {
     }
 
     try {
+      const cleanedMembers = members.map((member: any) => {
+        if (!member || typeof member !== 'object') return member;
+        const { branchId, branchName, gugusDepan, ...cleanMember } = member;
+        return cleanMember;
+      });
       localStorage.setItem(
         STORAGE_KEYS.MEMBERS,
-        JSON.stringify(members)
+        JSON.stringify(cleanedMembers)
       );
 
       this.notify();
@@ -448,8 +470,8 @@ class StorageService {
     if (role === 'ADMIN_REGENCY' && jurisdictionId && updatedMember.regencyId !== jurisdictionId) {
       throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke Kwartir Cabang lain.');
     }
-    if (role === 'ADMIN_BRANCH' && jurisdictionId && updatedMember.branchId !== jurisdictionId) {
-      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke wilayah cabang lain.');
+    if (role === 'ADMIN_BRANCH' && jurisdictionId && updatedMember.districtId !== jurisdictionId) {
+      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke kecamatan lain.');
     }
 
     // Simpan lokal terlebih dahulu agar UI responsif. Tandai record sebagai
@@ -675,6 +697,49 @@ class StorageService {
    * Generate NTA massal berdasarkan wilayah yang dipilih.
    * Hanya anggota tanpa NTA yang diberi nomor agar nomor lama tidak berubah.
    */
+  public transferMemberLocation(
+    memberId: string,
+    district: District,
+    regency: Regency,
+    province: Province,
+    reason: string,
+    authorizedByName: string
+  ): Member | null {
+    const members = this.getMembers();
+    const index = members.findIndex(member => member.id === memberId);
+    if (index === -1) return null;
+
+    const current = members[index];
+    const history: MemberLocationHistory = {
+      id: `history-${Date.now()}-${memberId}`,
+      memberId,
+      prevDistrictName: current.districtName,
+      newDistrictName: district.name,
+      prevMemberNumber: current.nationalMemberNumber || '',
+      newMemberNumber: this.generateNationalMemberNumber(province.id, regency.id, district.id),
+      transferDate: new Date().toISOString(),
+      reason,
+      authorizedByName
+    };
+
+    const updated = {
+      ...current,
+      provinceId: province.id,
+      provinceName: province.name,
+      regencyId: regency.id,
+      regencyName: regency.name,
+      districtId: district.id,
+      districtName: district.name,
+      nationalMemberNumber: history.newMemberNumber,
+      locationHistory: [...(current.locationHistory || []), history]
+    };
+
+    members[index] = updated;
+    this.setMembers(members);
+    this.notify();
+    return updated;
+  }
+
   public generateNationalMemberNumbersByRegion(
     provinceId?: string,
     regencyId?: string,
@@ -1243,14 +1308,7 @@ class StorageService {
       return [];
     }
 
-    const regency = REGENCIES_DATA.find(r => r.id === regencyId);
-    return getDistrictsForRegency(regencyId, regency?.name);
-  }
-
-  public getBranches(
-    districtId?: string
-  ): Branch[] {
-    return [];
+    return getDistrictsForRegency(regencyId);
   }
 
   public getSkills(): Skill[] {
