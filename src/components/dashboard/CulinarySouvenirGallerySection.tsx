@@ -43,8 +43,6 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
   onOpenFormModal,
   onSelectItemDetail
 }) => {
-  const safeItems = Array.isArray(items) ? items : [];
-
   // Tabs: 'PUBLISHED' | 'PENDING' | 'MY_ITEMS'
   const [activeTab, setActiveTab] = useState<'PUBLISHED' | 'PENDING' | 'MY_ITEMS'>('PUBLISHED');
   
@@ -104,7 +102,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
       i.authorMemberId === currentUser.id || 
       i.authorName === currentUser.name
     ).length;
-  }, [safeItems, currentUser]);
+  }, [items, currentUser]);
 
   // Filter items
   const filteredItems = useMemo(() => {
@@ -153,7 +151,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
 
       return true;
     });
-  }, [safeItems, activeTab, selectedKrida, selectedProvince, searchQuery, currentUser]);
+  }, [items, activeTab, selectedKrida, selectedProvince, searchQuery, currentUser]);
 
   const getKridaIcon = (krida?: KridaType) => {
     switch (krida) {
