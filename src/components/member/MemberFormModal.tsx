@@ -48,9 +48,9 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   
-  const [selectedProvinceId, setSelectedProvinceId] = useState('32');
-  const [selectedRegencyId, setSelectedRegencyId] = useState('32.06');
-  const [selectedDistrictId, setSelectedDistrictId] = useState('32.06.12');
+  const [selectedProvinceId, setSelectedProvinceId] = useState('00');
+  const [selectedRegencyId, setSelectedRegencyId] = useState('00.00');
+  const [selectedDistrictId, setSelectedDistrictId] = useState('00.00.00');
   
   const [krida, setKrida] = useState<KridaType>('Krida Pemandu');
   const [joinYear, setJoinYear] = useState(2024);
@@ -147,7 +147,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         const regencyId = currentUser.jurisdictionId;
         const allRegs = storage.getRegencies();
         const targetReg = allRegs.find(r => r.id === regencyId);
-        const provId = targetReg ? targetReg.provinceId : regencyId.split('.')[0] || '32';
+        const provId = targetReg ? targetReg.provinceId : regencyId.split('.')[0] || '00';
         
         setSelectedProvinceId(provId);
         setSelectedRegencyId(regencyId);
@@ -301,7 +301,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         address: address || 'Jl. Pramuka Raya',
         
         provinceId: selectedProvinceId,
-        provinceName: currentProvince?.name || 'Jawa Barat',
+        provinceName: currentProvince?.name || (selectedProvinceId === '00' ? 'Kwartir Nasional' : ''),
         regencyId: selectedRegencyId,
         regencyName: currentRegency?.name || 'Kwartir Cabang',
         districtId: selectedDistrictId,
