@@ -272,7 +272,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
         />
 
         <div className="text-center text-xs text-slate-400 max-w-md">
-          <p>Klik kartu di atas untuk membalik dan melihat barcode, data pangkalan, serta pengesahan Kwartir Nasional.</p>
+          <p>Klik kartu di atas untuk membalik dan melihat barcode, data wilayah, serta pengesahan Kwartir Nasional.</p>
         </div>
       </div>
 
@@ -297,8 +297,8 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
             <p className="font-bold text-emerald-800 text-sm">{member.krida}</p>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-            <span className="text-slate-400 text-[10px] font-bold uppercase">Gugus Depan / Pangkalan</span>
-            <p className="font-semibold text-slate-800">{member.gugusDepan || '-'}</p>
+            <span className="text-slate-400 text-[10px] font-bold uppercase">Kecamatan</span>
+            <p className="font-semibold text-slate-800">{'' || '-'}</p>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl space-y-1">
             <span className="text-slate-400 text-[10px] font-bold uppercase">Wilayah Kwartir</span>
