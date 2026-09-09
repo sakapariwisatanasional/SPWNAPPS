@@ -781,7 +781,7 @@ export async function renderHorizontalBadgeCanvas(
   const contactList: string[] = [];
   if (options.showContactPhone && member.phone) contactList.push(`WhatsApp: ${member.phone}`);
   if (options.showEmail && member.email) contactList.push(`Email: ${member.email}`);
-  contactList.push(`Pangkalan: ${member.branchName || member.gugusDepan}`);
+  contactList.push(`Pangkalan: ${member.districtName || ''}`);
 
   ctx.fillText(contactList.join('   •   '), 48, bottomBarY + 35);
 
