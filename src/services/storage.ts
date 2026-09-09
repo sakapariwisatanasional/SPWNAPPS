@@ -280,6 +280,56 @@ class StorageService {
     }
   }
 
+  /**
+   * Members deduplication used by live spreadsheet synchronization.
+   * Primary identity is SPW/member ID, then KTA, then email. The first
+   * complete record is preserved and later duplicates are merged into it.
+   */
+  public deduplicateDatabase(): void {
+    const members = this.getMembers();
+    if (!Array.isArray(members) || members.length < 2) return;
+
+    const result: Member[] = [];
+    const byKey = new Map<string, number>();
+
+    const norm = (value: any) => String(value ?? '').trim().toLowerCase();
+    const keysFor = (member: Member) => {
+      const keys: string[] = [];
+      const id = norm(member.id);
+      const kta = norm((member as any).nationalMemberNumber);
+      const email = norm(member.email);
+      if (id) keys.push(`id:${id}`);
+      if (kta) keys.push(`kta:${kta}`);
+      if (email) keys.push(`email:${email}`);
+      return keys;
+    };
+
+    for (const member of members) {
+      if (!member || typeof member !== 'object') continue;
+      const keys = keysFor(member);
+      const existingIndex = keys.map(k => byKey.get(k)).find(v => v !== undefined);
+
+      if (existingIndex === undefined) {
+        const index = result.length;
+        result.push(member);
+        keys.forEach(k => byKey.set(k, index));
+        continue;
+      }
+
+      const merged = { ...result[existingIndex], ...member };
+      // Never allow a legacy ID to overwrite a permanent SPW ID.
+      const existingId = norm(result[existingIndex].id);
+      const incomingId = norm(member.id);
+      if (/^spw-\d+$/i.test(existingId) && !/^spw-\d+$/i.test(incomingId)) {
+        merged.id = result[existingIndex].id;
+      }
+      result[existingIndex] = merged;
+      keysFor(merged).forEach(k => byKey.set(k, existingIndex));
+    }
+
+    if (result.length !== members.length) this.setMembers(result);
+  }
+
   public setMembers(members: Member[]) {
     if (typeof window === 'undefined') {
       return;
@@ -872,8 +922,9 @@ class StorageService {
         STORAGE_KEYS.TOURS
       );
 
-      const parsed = data ? JSON.parse(data) : INITIAL_TOUR_PACKAGES;
-      return Array.isArray(parsed) ? parsed : INITIAL_TOUR_PACKAGES;
+      return data
+        ? JSON.parse(data)
+        : INITIAL_TOUR_PACKAGES;
     } catch (error) {
       console.error(
         'Gagal membaca paket wisata:',
@@ -958,8 +1009,9 @@ class StorageService {
         STORAGE_KEYS.ACTIVITIES
       );
 
-      const parsed = data ? JSON.parse(data) : INITIAL_ACTIVITIES;
-      return Array.isArray(parsed) ? parsed : INITIAL_ACTIVITIES;
+      return data
+        ? JSON.parse(data)
+        : INITIAL_ACTIVITIES;
     } catch (error) {
       console.error(
         'Gagal membaca kegiatan:',
@@ -1045,8 +1097,9 @@ class StorageService {
         STORAGE_KEYS.CULINARY_SOUVENIRS
       );
 
-      const parsed = data ? JSON.parse(data) : INITIAL_CULINARY_SOUVENIRS;
-      return Array.isArray(parsed) ? parsed : INITIAL_CULINARY_SOUVENIRS;
+      return data
+        ? JSON.parse(data)
+        : INITIAL_CULINARY_SOUVENIRS;
     } catch (error) {
       console.error(
         'Gagal membaca data kuliner dan cinderamata:',
