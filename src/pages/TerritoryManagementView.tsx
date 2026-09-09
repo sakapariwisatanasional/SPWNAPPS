@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   MapPin, 
   ChevronRight, 
@@ -9,25 +9,52 @@ import {
   Globe2, 
   Layers 
 } from 'lucide-react';
-import { Province, Regency, District, Branch } from '../types';
+import { Province, Regency, District, Branch, CurrentUser } from '../types';
 import { storage } from '../services/storage';
 
 interface TerritoryManagementViewProps {
-  provinces: Province[];
+  currentUser?: CurrentUser;
 }
 
 export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = ({
-  provinces
+  currentUser
 }) => {
-  const [selectedProvinceId, setSelectedProvinceId] = useState<string>('32'); // Default Jawa Barat
+  const provinces = storage.getProvinces();
   const [searchProvince, setSearchProvince] = useState('');
+  const [selectedProvinceId, setSelectedProvinceId] = useState<string>('');
+  const [selectedRegencyId, setSelectedRegencyId] = useState<string>('');
+
+  // Struktur yang ditampilkan harus mengikuti wilayah user yang sudah tersimpan.
+  useEffect(() => {
+    let provinceId = '32';
+    let regencyId = '';
+
+    if (currentUser?.role === 'ADMIN_PROVINCE' && currentUser.jurisdictionId) {
+      provinceId = currentUser.jurisdictionId;
+    } else if (currentUser?.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId) {
+      const reg = storage.getRegencies().find(r => r.id === currentUser.jurisdictionId);
+      provinceId = reg?.provinceId || currentUser.jurisdictionId.split('.')[0] || '32';
+      regencyId = reg?.id || currentUser.jurisdictionId;
+    } else if (currentUser?.role === 'ADMIN_BRANCH' && currentUser.jurisdictionId) {
+      const district = storage.getDistricts().find(d => d.id === currentUser.jurisdictionId || currentUser.jurisdictionId.startsWith(d.id));
+      const reg = district ? storage.getRegencies().find(r => r.id === district.regencyId) : undefined;
+      provinceId = reg?.provinceId || '32';
+      regencyId = reg?.id || '';
+    }
+
+    if (!provinces.some(p => p.id === provinceId)) provinceId = provinces[0]?.id || '';
+    setSelectedProvinceId(provinceId);
+
+    const regs = storage.getRegencies(provinceId);
+    if (!regencyId || !regs.some(r => r.id === regencyId)) {
+      regencyId = regs[0]?.id || '';
+    }
+    setSelectedRegencyId(regencyId);
+  }, [currentUser]);
 
   const selectedProvince = provinces.find(p => p.id === selectedProvinceId) || provinces[0];
   const regencies = selectedProvince ? storage.getRegencies(selectedProvince.id) : [];
-
-  const [selectedRegencyId, setSelectedRegencyId] = useState<string>(regencies[0]?.id || '32.06');
   const selectedRegency = regencies.find(r => r.id === selectedRegencyId) || regencies[0];
-
   const districts = selectedRegency ? storage.getDistricts(selectedRegency.id) : [];
 
   const filteredProvinces = provinces.filter(p => 
@@ -79,9 +106,10 @@ export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = (
                 <button
                   key={prov.id}
                   onClick={() => {
+                    if (currentUser?.role === 'ADMIN_PROVINCE' || currentUser?.role === 'ADMIN_REGENCY' || currentUser?.role === 'ADMIN_BRANCH') return;
                     setSelectedProvinceId(prov.id);
                     const regs = storage.getRegencies(prov.id);
-                    if (regs.length > 0) setSelectedRegencyId(regs[0].id);
+                    setSelectedRegencyId(regs[0]?.id || '');
                   }}
                   className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-colors ${
                     isSelected 
@@ -129,7 +157,10 @@ export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = (
                 return (
                   <button
                     key={reg.id}
-                    onClick={() => setSelectedRegencyId(reg.id)}
+                    onClick={() => {
+                      if (currentUser?.role === 'ADMIN_REGENCY' || currentUser?.role === 'ADMIN_BRANCH') return;
+                      setSelectedRegencyId(reg.id);
+                    }}
                     className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-colors ${
                       isSelected 
                         ? 'bg-emerald-50 text-emerald-950 font-bold border border-emerald-300 shadow-xs' 
