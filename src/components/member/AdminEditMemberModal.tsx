@@ -208,9 +208,26 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       setAvatarUrl(member.avatarUrl || '');
       setCustomPhotoUrl(member.avatarUrl?.startsWith('http') ? member.avatarUrl : '');
 
-      setSelectedProvinceId(member.provinceId || '32');
-      setSelectedRegencyId(member.regencyId || '32.06');
-      setSelectedDistrictId(member.districtId || '32.06.12');
+      // Selalu pulihkan hierarchy berdasarkan ID yang valid.
+      // Jika ID lama tidak tersedia, fallback ke nama wilayah yang tersimpan.
+      const allProvinces = storage.getProvinces();
+      const savedProvince = allProvinces.find(p => p.id === member.provinceId) ||
+        allProvinces.find(p => p.name.trim().toLowerCase() === (member.provinceName || '').trim().toLowerCase());
+      const provinceId = savedProvince?.id || member.provinceId || '32';
+
+      const provinceRegencies = storage.getRegencies(provinceId);
+      const savedRegency = provinceRegencies.find(r => r.id === member.regencyId) ||
+        provinceRegencies.find(r => r.name.trim().toLowerCase() === (member.regencyName || '').trim().toLowerCase());
+      const regencyId = savedRegency?.id || provinceRegencies[0]?.id || member.regencyId || '32.06';
+
+      const regencyDistricts = storage.getDistricts(regencyId);
+      const savedDistrict = regencyDistricts.find(d => d.id === member.districtId) ||
+        regencyDistricts.find(d => d.name.trim().toLowerCase() === (member.districtName || '').trim().toLowerCase());
+      const districtId = savedDistrict?.id || regencyDistricts[0]?.id || member.districtId || '';
+
+      setSelectedProvinceId(provinceId);
+      setSelectedRegencyId(regencyId);
+      setSelectedDistrictId(districtId);
       setSelectedBranchId(member.branchId || '');
 
       setGugusDepan(member.gugusDepan || '');
@@ -234,24 +251,44 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
   // Load Regencies when Province changes
   useEffect(() => {
-    if (selectedProvinceId) {
-      const regs = storage.getRegencies(selectedProvinceId);
-      setRegencies(regs);
-      // Only reset if current selected regency doesn't belong to this province
-      if (regs.length > 0 && !regs.some(r => r.id === selectedRegencyId)) {
-        setSelectedRegencyId(regs[0].id);
-      }
+    if (!selectedProvinceId) {
+      setRegencies([]);
+      return;
+    }
+
+    const regs = storage.getRegencies(selectedProvinceId);
+    setRegencies(regs);
+
+    // Kabupaten/Kota WAJIB berasal dari provinsi yang sedang dipilih.
+    if (regs.length === 0) {
+      setSelectedRegencyId('');
+      return;
+    }
+
+    if (!regs.some(r => r.id === selectedRegencyId)) {
+      setSelectedRegencyId(regs[0].id);
     }
   }, [selectedProvinceId]);
 
   // Load Districts when Regency changes
   useEffect(() => {
-    if (selectedRegencyId) {
-      const dists = storage.getDistricts(selectedRegencyId);
-      setDistricts(dists);
-      if (dists.length > 0 && !dists.some(d => d.id === selectedDistrictId)) {
-        setSelectedDistrictId(dists[0].id);
-      }
+    if (!selectedRegencyId) {
+      setDistricts([]);
+      setSelectedDistrictId('');
+      return;
+    }
+
+    const dists = storage.getDistricts(selectedRegencyId);
+    setDistricts(dists);
+
+    // Kecamatan/kwarran WAJIB berasal dari Kabupaten/Kota yang dipilih.
+    if (dists.length === 0) {
+      setSelectedDistrictId('');
+      return;
+    }
+
+    if (!dists.some(d => d.id === selectedDistrictId)) {
+      setSelectedDistrictId(dists[0].id);
     }
   }, [selectedRegencyId]);
 
@@ -382,6 +419,16 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
     if (!fullName.trim()) {
       alert('Nama lengkap tidak boleh kosong');
+      return;
+    }
+
+    const validProvince = storage.getProvinces().find(p => p.id === selectedProvinceId);
+    const validRegency = storage.getRegencies(selectedProvinceId).find(r => r.id === selectedRegencyId);
+    const validDistrict = storage.getDistricts(selectedRegencyId).find(d => d.id === selectedDistrictId);
+
+    if (!validProvince || !validRegency || validRegency.provinceId !== validProvince.id ||
+        !validDistrict || validDistrict.regencyId !== validRegency.id) {
+      alert('Struktur wilayah tidak valid. Provinsi, Kabupaten/Kota, dan Kecamatan harus berasal dari hierarki wilayah yang sama.');
       return;
     }
 
