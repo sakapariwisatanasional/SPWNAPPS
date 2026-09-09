@@ -392,33 +392,62 @@ export interface CurrentUser {
 
 export type KtaCardTheme = 'purple_saka' | 'emerald_pesona' | 'indigo_navy' | 'dark_slate' | 'gold_amber';
 export type KtaBarcodeType = 'CODE128' | 'STANDARD' | 'QR';
+export type KtaCardPreset = 'CR80_KTA' | 'KTP' | 'SIM' | 'CUSTOM';
+export type KtaCardSide = 'FRONT' | 'BACK';
+export type KtaMemberFieldKey =
+  | 'fullName' | 'id' | 'nationalMemberNumber' | 'currentPosition'
+  | 'provinceName' | 'regencyName' | 'districtName' | 'branchName'
+  | 'gugusDepan' | 'krida' | 'phone' | 'email' | 'joinYear' | 'status';
+
+export interface KtaDataFieldConfig {
+  id: string;
+  field: KtaMemberFieldKey;
+  label?: string;
+  showLabel?: boolean;
+  side: KtaCardSide;
+  visible: boolean;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  fontWeight: 'normal' | 'medium' | 'bold' | 'black';
+  color: string;
+  textTransform?: 'none' | 'uppercase' | 'lowercase';
+  align?: 'left' | 'center' | 'right';
+}
+
+export interface KtaLogoElement {
+  id: string; name: string; url: string; side: KtaCardSide;
+  x: number; y: number; width: number; height: number; opacity?: number;
+  objectFit?: 'contain' | 'cover' | 'fill';
+}
+
+export interface KtaTextElement {
+  id: string; text: string; side: KtaCardSide; x: number; y: number; width: number;
+  fontSize: number; fontWeight: 'normal' | 'medium' | 'bold' | 'black'; color: string;
+  align?: 'left' | 'center' | 'right'; textTransform?: 'none' | 'uppercase' | 'lowercase';
+}
 
 export interface KtaCardSettings {
-  // Background & Theme Customization
-  cardTheme: KtaCardTheme;
-  bgImageUrl?: string;
-  bgOpacity?: number; // 0.0 - 1.0 (default 0.10 / 10%)
-
-  // Front Side Customization
-  frontOrganizationTitle: string;
-  frontOrganizationSubtitle: string;
-  frontValidityText: string;
-  watermarkOpacity: number;
-  showKridaBadge: boolean;
-
-  // Back Side Customization
-  backHeaderTitle: string;
-  backHeaderSubtitle: string;
-  terms: string[];
-  issueLocationDate: string;
-  barcodeType: KtaBarcodeType;
-  barcodeCustomValue?: string;
-  signerName: string;
-  signerTitle: string;
-  signerSubtitle?: string;
-  showStamp: boolean;
-  lastUpdated?: string;
-  updatedBy?: string;
+  preset?: KtaCardPreset; widthMm: number; heightMm: number; cornerRadiusMm: number;
+  cardTheme: KtaCardTheme; bgImageUrl?: string; frontBackgroundUrl?: string; backBackgroundUrl?: string;
+  customBackgroundColorFront?: string; customBackgroundColorBack?: string; bgOpacity?: number;
+  frontLogoUrl?: string; backLogoUrl?: string; logos: KtaLogoElement[];
+  dataFields: KtaDataFieldConfig[]; textElements: KtaTextElement[];
+  frontOrganizationTitle: string; frontOrganizationSubtitle: string;
+  frontOrganizationTitleX?: number; frontOrganizationTitleY?: number; frontOrganizationTitleWidth?: number;
+  frontOrganizationTitleFontSize?: number; frontOrganizationTitleFontWeight?: 'normal'|'medium'|'bold'|'black';
+  frontOrganizationTitleColor?: string; frontOrganizationTitleAlign?: 'left'|'center'|'right';
+  frontOrganizationSubtitleX?: number; frontOrganizationSubtitleY?: number; frontOrganizationSubtitleWidth?: number;
+  frontOrganizationSubtitleFontSize?: number; frontOrganizationSubtitleFontWeight?: 'normal'|'medium'|'bold'|'black';
+  frontOrganizationSubtitleColor?: string; frontOrganizationSubtitleAlign?: 'left'|'center'|'right';
+  frontValidityText: string; watermarkOpacity: number; showKridaBadge: boolean;
+  showPhoto: boolean; showQrCode: boolean; qrX?: number; qrY?: number; qrSize?: number;
+  backHeaderTitle: string; backHeaderSubtitle: string; terms: string[]; issueLocationDate: string;
+  barcodeType: KtaBarcodeType; barcodeCustomValue?: string; showBarcode?: boolean;
+  barcodeX?: number; barcodeY?: number; barcodeWidth?: number; barcodeHeight?: number; barcodeShowText?: boolean;
+  signerName: string; signerTitle: string; signerSubtitle?: string; showStamp: boolean;
+  lastUpdated?: string; updatedBy?: string;
 }
 
 // ==========================================
