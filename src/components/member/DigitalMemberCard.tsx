@@ -99,14 +99,22 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
               className="absolute"
               style={{
                 left: `${settings.qrX ?? 78}%`,
-                top: `${settings.qrY ?? 30}%`
+                top: `${settings.qrY ?? 30}%`,
+                zIndex: 20
               }}
             >
               <KtaQrCode
                 member={member}
-                size={Math.max(36, Math.round(Math.min(widthPx, heightPx) * ((settings.qrSize ?? 22) / 100)))}
+                size={Math.max(
+                  36,
+                  Math.round(
+                    Math.min(widthPx, heightPx) *
+                    ((settings.qrSize ?? 22) / 100)
+                  )
+                )}
                 showLabel={false}
                 interactive={false}
+                className="!m-0"
               />
             </div>
           )}
