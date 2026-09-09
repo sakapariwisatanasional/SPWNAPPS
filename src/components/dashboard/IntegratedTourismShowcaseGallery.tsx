@@ -72,6 +72,8 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   onSelectMember,
   onSelectTab
 }) => {
+  // Normalize all collection props at component boundary. A failed live-sync must never
+  // turn a Dashboard collection into undefined/null and crash a useMemo/filter render.
   const safeTours = Array.isArray(tours) ? tours : [];
   const safeProducts = Array.isArray(products) ? products : [];
   const safeMembers = Array.isArray(members) ? members : [];
@@ -112,16 +114,18 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
 
   // Synchronize activities list
   const refreshActivities = () => {
-    setActivitiesList(storage.getActivities());
+    const latestActivities = storage.getActivities();
+    setActivitiesList(Array.isArray(latestActivities) ? latestActivities : []);
   };
 
   useEffect(() => {
-    if (Array.isArray(initialActivities)) {
-      setActivitiesList(initialActivities);
+    if (safeInitialActivities.length > 0) {
+      setActivitiesList(safeInitialActivities);
     } else {
-      setActivitiesList(storage.getActivities());
+      const latestActivities = storage.getActivities();
+    setActivitiesList(Array.isArray(latestActivities) ? latestActivities : []);
     }
-  }, [initialActivities]);
+  }, [safeInitialActivities]);
 
   // Subscribe to Location updates
   useEffect(() => {
@@ -198,7 +202,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   const publishedTours = useMemo(() => {
     const pub = safeTours.filter(t => t.status === 'APPROVED_PUBLISHED' || !t.status);
     return pub.length > 0 ? pub : safeTours;
-  }, [safeTours]);
+  }, [tours]);
 
   const uniqueTourCategories = useMemo(() => {
     return Array.from(new Set(publishedTours.map(t => t.category).filter(Boolean)));
@@ -221,7 +225,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   const approvedProducts = useMemo(() => {
     const app = safeProducts.filter(p => (p.status || 'APPROVED') === 'APPROVED');
     return app.length > 0 ? app : safeProducts;
-  }, [safeProducts]);
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     return approvedProducts.filter(p => {
@@ -264,7 +268,8 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
       regencyName: userLocation.city,
       city: userLocation.city
     };
-    const scored = ipLocationService.getRecommendedMembers(safeMembers, targetLoc, selectedTourForMatching);
+    const scoredRaw = ipLocationService.getRecommendedMembers(safeMembers, targetLoc, selectedTourForMatching);
+    const scored = Array.isArray(scoredRaw) ? scoredRaw : [];
     
     if (memberSkillCategoryFilter === 'ALL') {
       return scored;
