@@ -38,23 +38,11 @@ export interface District {
   name: string;
 }
 
-export interface Branch {
-  id: string;          // UUID
-  districtId: string;
-  regencyId: string;
-  provinceId: string;
-  code: string;        // e.g. '01'
-  name: string;        // e.g. 'Ranting Ciawi'
-  address: string;
-  contactPerson: string;
-  phone: string;
-}
-
 export interface MemberLocationHistory {
   id: string;
   memberId: string;
-  prevBranchName: string;
-  newBranchName: string;
+  prevDistrictName: string;
+  newDistrictName: string;
   prevMemberNumber: string;
   newMemberNumber: string;
   transferDate: string;
@@ -135,9 +123,6 @@ export interface Member {
   regencyName: string;
   districtId: string;
   districtName: string;
-  branchId: string;
-  branchName: string;
-  gugusDepan: string;
   
   joinYear: number;
   status: MemberStatus;
@@ -349,7 +334,6 @@ export interface CulinarySouvenirItem {
   regencyName: string;
   districtId: string; // Kwarran ID
   districtName: string; // Kwarran / Kecamatan Name
-  gudepOrPangkalan?: string;
   
   // Penginput (Anggota Saka)
   authorMemberId: string;
@@ -396,8 +380,7 @@ export type KtaCardPreset = 'CR80_KTA' | 'KTP' | 'SIM' | 'CUSTOM';
 export type KtaCardSide = 'FRONT' | 'BACK';
 export type KtaMemberFieldKey =
   | 'fullName' | 'id' | 'nationalMemberNumber' | 'currentPosition'
-  | 'provinceName' | 'regencyName' | 'districtName' | 'branchName'
-  | 'gugusDepan' | 'krida' | 'phone' | 'email' | 'joinYear' | 'status';
+  | 'provinceName' | 'regencyName' | 'districtName' | 'krida' | 'phone' | 'email' | 'joinYear' | 'status';
 
 export interface KtaDataFieldConfig {
   id: string;
