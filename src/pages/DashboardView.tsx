@@ -33,7 +33,7 @@ import {
   Check
 } from 'lucide-react';
 
-// Subkomponen dashboard internal
+// Subkomponen dashboard
 import { DashboardWidget } from '../components/dashboard/DashboardWidget';
 import { NationalMapVisual } from '../components/dashboard/NationalMapVisual';
 import { TourPackageCarouselSection } from '../components/dashboard/TourPackageCarouselSection';
@@ -54,7 +54,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  currentUser,
+  currentUser = null,
   members = [],
   activities = [],
   tourPackages = [],
@@ -66,30 +66,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [searchPending, setSearchPending] = useState('');
   const [selectedKwardaFilter, setSelectedKwardaFilter] = useState('ALL');
 
-  // ==========================================
-  // SAFE DATA NORMALIZATION (Pencegah Crash)
-  // ==========================================
+  // =========================================================================
+  // NORMALISASI DATA (Mencegah Crash "Cannot read properties of undefined")
+  // =========================================================================
   const safeMembers = useMemo(() => (Array.isArray(members) ? members : []), [members]);
   const safeActivities = useMemo(() => (Array.isArray(activities) ? activities : []), [activities]);
   const safeTourPackages = useMemo(() => (Array.isArray(tourPackages) ? tourPackages : []), [tourPackages]);
   const safeCulinaryItems = useMemo(() => (Array.isArray(culinaryItems) ? culinaryItems : []), [culinaryItems]);
   const safeAuditLogs = useMemo(() => (Array.isArray(auditLogs) ? auditLogs : []), [auditLogs]);
 
-  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin';
+  // Cek apakah akun adalah Super Admin
+  const isSuperAdmin = useMemo(() => {
+    const role = currentUser?.role?.toLowerCase();
+    return role === 'superadmin' || role === 'super_admin' || role === 'kwarnas';
+  }, [currentUser]);
 
-  // Anggota sesuai hak akses wilayah (Super Admin melihat seluruh Indonesia)
+  // Scoping anggota sesuai hak akses wilayah
   const scopedMembers = useMemo(() => {
+    if (!safeMembers.length) return [];
     if (isSuperAdmin) return safeMembers;
+
     if (currentUser?.kwarda && !currentUser?.kwarcab) {
       return safeMembers.filter(
-        (m) => m?.kwarda?.toLowerCase() === currentUser.kwarda.toLowerCase()
+        (m) => m?.kwarda && m.kwarda.toLowerCase() === currentUser.kwarda.toLowerCase()
       );
     }
+
     if (currentUser?.kwarcab) {
       return safeMembers.filter(
-        (m) => m?.kwarcab?.toLowerCase() === currentUser.kwarcab.toLowerCase()
+        (m) => m?.kwarcab && m.kwarcab.toLowerCase() === currentUser.kwarcab.toLowerCase()
       );
     }
+
     return safeMembers;
   }, [safeMembers, isSuperAdmin, currentUser]);
 
@@ -112,7 +120,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     );
   }, [scopedMembers]);
 
-  // Antrean Verifikasi Cepat (dengan fitur pencarian)
+  // Antrean Verifikasi Cepat
   const filteredPendingList = useMemo(() => {
     return pendingMembers.filter((m) => {
       const q = searchPending.toLowerCase();
@@ -129,7 +137,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [pendingMembers, searchPending, selectedKwardaFilter]);
 
-  // Log Aktivitas Audit Terbaru (Khusus Super Admin)
+  // Log Audit Sistem (Khusus Super Admin)
   const recentAuditLogs = useMemo(() => {
     return [...safeAuditLogs]
       .filter((log) => Boolean(log))
@@ -141,18 +149,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       .slice(0, 6);
   }, [safeAuditLogs]);
 
-  // Persebaran Wilayah Kwarda
-  const kwardaStats = useMemo(() => {
-    const counts: Record<string, number> = {};
-    safeMembers.forEach((m) => {
-      const region = m?.kwarda || 'Belum Terdata';
-      counts[region] = (counts[region] || 0) + 1;
-    });
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [safeMembers]);
-
   const handleNavigate = (view: string) => {
     if (typeof onNavigate === 'function') {
       onNavigate(view);
@@ -161,7 +157,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 pt-4 px-4 sm:px-6 lg:px-8 space-y-8">
-      {/* ================= HEADER SECTION ================= */}
+      {/* ================= HERO HEADER ================= */}
       <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-900/10 relative overflow-hidden">
         <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -205,7 +201,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* ================= METRIC CARDS / WIDGETS ================= */}
+      {/* ================= METRIC CARDS ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <DashboardWidget
           title="Total Anggota Terdaftar"
@@ -245,7 +241,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         />
       </div>
 
-      {/* ================= ANTREAN VERIFIKASI CEPAT ================= */}
+      {/* ================= ANTREAN VERIFIKASI ================= */}
       <div id="pending-verification-section" className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
           <div>
@@ -288,7 +284,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <tr>
                   <th className="py-3 px-4 rounded-l-xl">Nama & NTA</th>
                   <th className="py-3 px-4">Kwarda / Kwarcab</th>
-                  <th className="py-3 px-4">Pangkalan / Gugus Depan</th>
+                  <th className="py-3 px-4">Pangkalan / Gudep</th>
                   <th className="py-3 px-4">Pilihan Krida</th>
                   <th className="py-3 px-4 text-right rounded-r-xl">Aksi</th>
                 </tr>
@@ -353,9 +349,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* ================= SEKSI PETA & LOG AUDIT ================= */}
+      {/* ================= PETA & LOG AUDIT ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Peta Persebaran Anggota */}
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
@@ -380,7 +375,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Log Audit Terkini */}
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -429,12 +423,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* ================= PORTAL KRIDA SAKA ================= */}
       <div className="space-y-3">
-        <CompactKridaPortal
-          onSelectKrida={() => handleNavigate('krida')}
-        />
+        <CompactKridaPortal onSelectKrida={() => handleNavigate('krida')} />
       </div>
 
-      {/* ================= SHOWCASE POTENSI WISATA & KULINER ================= */}
+      {/* ================= SHOWCASE WISATA & KULINER ================= */}
       <div className="space-y-6">
         <IntegratedTourismShowcaseGallery />
 
