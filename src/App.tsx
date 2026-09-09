@@ -714,11 +714,13 @@ export default function App() {
         />
       )}
 
-      <KtaCardCustomizerModal
-        isOpen={isEditKtaModalOpen}
-        onClose={() => setIsEditKtaModalOpen(false)}
-        onSuccess={() => setIsEditKtaModalOpen(false)}
-      />
+      {isEditKtaModalOpen && (
+        <KtaCardCustomizerModal
+          isOpen={true}
+          onClose={() => setIsEditKtaModalOpen(false)}
+          onSuccess={() => setIsEditKtaModalOpen(false)}
+        />
+      )}
 
       <MemberPhotoEditModal
         isOpen={!!editingPhotoMember}
