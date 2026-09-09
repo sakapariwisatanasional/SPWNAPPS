@@ -385,7 +385,7 @@ export const MemberSkillManagementModal: React.FC<MemberSkillManagementModalProp
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 truncate mt-0.5">
-                    <strong>{selectedMember.krida || 'Krida Pemandu'}</strong> • {selectedMember.branchName}, {selectedMember.regencyName} ({selectedMember.provinceName})
+                    <strong>{selectedMember.krida || 'Krida Pemandu'}</strong> • {selectedMember.districtName}, {selectedMember.regencyName} ({selectedMember.provinceName})
                   </p>
                 </div>
               </div>
