@@ -505,7 +505,11 @@ class SpreadsheetService {
       });
       if (!response.ok) return [];
       const data = await response.json();
-      return Array.isArray(data) ? data : [];
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.rows)) return data.rows;
+      if (Array.isArray(data?.data)) return data.data;
+      if (Array.isArray(data?.records)) return data.records;
+      return [];
     } catch (error) {
       console.warn(`[Spreadsheet] Gagal membaca sheet ${sheetName} melalui Google Apps Script.`, error);
       return [];
@@ -1186,41 +1190,87 @@ class SpreadsheetService {
   private async checkRecordInSpreadsheet(
     sheet: string,
     id: string,
-    secondaryId?: string
+    secondaryId?: string,
+    email?: string
   ): Promise<{ found: boolean; row?: number | null; message?: string }> {
     const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
     if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum diisi.');
 
-    const params = new URLSearchParams();
-    params.set('action', 'CHECK_RECORD');
-    params.set('sheet', sheet);
-    params.set('id', String(id || ''));
-    if (secondaryId) params.set('secondaryId', String(secondaryId));
-    params.set('_t', String(Date.now()));
-    params.set('_r', String(Math.floor(Math.random() * 1000000)));
+    const normalize = (value: any) => String(value ?? '').trim().toLowerCase();
+    const targetId = normalize(id);
+    const targetKta = normalize(secondaryId);
+    const targetEmail = normalize(email);
 
-    const separator = scriptUrl.includes('?') ? '&' : '?';
-    const verifyUrl = `${scriptUrl}${separator}${params.toString()}`;
+    // 1) Coba CHECK_RECORD terlebih dahulu.
+    try {
+      const params = new URLSearchParams();
+      params.set('action', 'CHECK_RECORD');
+      params.set('sheet', sheet);
+      params.set('id', String(id || ''));
+      if (secondaryId) params.set('secondaryId', String(secondaryId));
+      if (email) params.set('email', String(email));
+      params.set('_t', String(Date.now()));
+      params.set('_r', String(Math.floor(Math.random() * 1000000)));
 
-    const response = await fetch(verifyUrl, {
-      method: 'GET',
-      cache: 'no-store',
+      const separator = scriptUrl.includes('?') ? '&' : '?';
+      const verifyUrl = `${scriptUrl}${separator}${params.toString()}`;
+      const response = await fetch(verifyUrl, { method: 'GET', cache: 'no-store' });
 
-    });
-
-    if (!response.ok) {
-      throw new Error(`CHECK_RECORD HTTP ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.status === 'error') {
+          console.warn('[SpreadsheetService] CHECK_RECORD mengembalikan error:', data.message);
+        } else if (Boolean(data?.found)) {
+          return {
+            found: true,
+            row: data?.row ?? null,
+            message: data?.message || 'Record ditemukan melalui CHECK_RECORD.'
+          };
+        }
+      } else {
+        console.warn(`[SpreadsheetService] CHECK_RECORD HTTP ${response.status}; lanjut verifikasi langsung ke sheet.`);
+      }
+    } catch (checkError) {
+      // Jangan membatalkan pendaftaran hanya karena endpoint CHECK_RECORD gagal.
+      // Verifikasi langsung ke data sheet tetap dijalankan di bawah.
+      console.warn('[SpreadsheetService] CHECK_RECORD gagal; fallback ke pembacaan sheet:', checkError);
     }
 
-    const data = await response.json();
-    if (data?.status === 'error') {
-      throw new Error(data.message || 'CHECK_RECORD gagal diproses Apps Script.');
+    // 2) Fallback: baca sheet Anggota dan cocokkan ID, KTA, atau email.
+    // Ini penting untuk deployment Apps Script yang sudah berhasil menulis data,
+    // tetapi endpoint CHECK_RECORD belum kompatibel dengan format deployment lama.
+    const rows = await this.fetchSheetRows(sheet);
+    const foundIndex = rows.findIndex((row: Record<string, any>) => {
+      const rowId = normalize(this.getRowValue(row, [
+        'ID', 'id', 'Id', 'member_id', 'Member ID', 'Nomor ID', 'col_0'
+      ]));
+      const rowKta = normalize(this.getRowValue(row, [
+        'Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA',
+        'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_1'
+      ]));
+      const rowEmail = normalize(this.getRowValue(row, [
+        'Email', 'email', 'E-mail', 'Alamat Email', 'col_3'
+      ]));
+
+      return Boolean(
+        (targetId && rowId === targetId) ||
+        (targetKta && rowKta === targetKta) ||
+        (targetEmail && rowEmail === targetEmail)
+      );
+    });
+
+    if (foundIndex >= 0) {
+      return {
+        found: true,
+        row: foundIndex + 2,
+        message: 'Record ditemukan melalui verifikasi langsung data sheet.'
+      };
     }
 
     return {
-      found: Boolean(data?.found),
-      row: data?.row ?? null,
-      message: data?.message
+      found: false,
+      row: null,
+      message: 'Record belum ditemukan pada endpoint verifikasi maupun data sheet.'
     };
   }
 
@@ -1325,7 +1375,8 @@ class SpreadsheetService {
           const check = await this.checkRecordInSpreadsheet(
             'Anggota',
             String(member.id || ''),
-            member.nationalMemberNumber || ''
+            member.nationalMemberNumber || '',
+            member.email || ''
           );
 
           if (check.found) {
