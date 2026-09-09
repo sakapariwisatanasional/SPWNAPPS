@@ -282,18 +282,36 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Listen to QR Code / URL parameters on landing
+  // Listen to QR Code / Barcode verification URLs.
+  // verifyMemberUniversal is async, so the result must be awaited before
+  // reading result.member. This makes a scanned KTA link open the real member profile.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
     const params = new URLSearchParams(window.location.search);
     const verifyId = params.get('verifyId') || params.get('verify') || params.get('id');
-    
-    if (verifyId) {
-      const found = verifyMemberUniversal(verifyId, members);
-      if (found.member) {
-        setVerifyingMember(found.member);
+    if (!verifyId) return;
+
+    let cancelled = false;
+
+    const resolveVerification = async () => {
+      try {
+        const result = await verifyMemberUniversal(verifyId, members);
+
+        if (!cancelled && result.found && result.member) {
+          setCurrentTab('verify-portal');
+          setVerifyingMember(result.member);
+        }
+      } catch (error) {
+        console.warn('KTA URL verification failed:', error);
       }
-    }
+    };
+
+    void resolveVerification();
+
+    return () => {
+      cancelled = true;
+    };
   }, [members]);
 
   // Handle Approve / Reject Member
