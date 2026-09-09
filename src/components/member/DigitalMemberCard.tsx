@@ -3,7 +3,7 @@ import { RotateCw, FileDown, Sliders, ShieldCheck } from 'lucide-react';
 import { Member, KtaCardSettings, KtaDataFieldConfig } from '../../types';
 import { SakaLogo, formatDriveImageUrl } from '../common/SakaLogo';
 import { Barcode } from '../common/Barcode';
-import { storage } from '../../services/storage';
+import { storage, DEFAULT_KTA_SETTINGS } from '../../services/storage';
 import { KtaQrCode, getMemberVerificationUrl } from './KtaQrCode';
 
 interface Props {
@@ -31,17 +31,67 @@ const valueOf = (member: Member, field: KtaDataFieldConfig['field']): string => 
 const weight = (w: KtaDataFieldConfig['fontWeight'] | string) => ({ normal:400, medium:500, bold:700, black:900 } as any)[w] || 400;
 
 export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrintPdf, showControls=true, allowAdminEdit=false, previewSettings }) => {
-  const [settings, setSettings] = useState<KtaCardSettings>(previewSettings || storage.getKtaSettings());
+  const normalizeSettings = (value?: Partial<KtaCardSettings> | null): KtaCardSettings => {
+    const merged = {
+      ...DEFAULT_KTA_SETTINGS,
+      ...(value && typeof value === 'object' ? value : {})
+    } as KtaCardSettings;
+    return {
+      ...merged,
+      logos: Array.isArray(merged.logos) ? merged.logos : [],
+      dataFields: Array.isArray(merged.dataFields) ? merged.dataFields : [],
+      textElements: Array.isArray(merged.textElements) ? merged.textElements : [],
+      terms: Array.isArray(merged.terms) ? merged.terms : []
+    };
+  };
+
+  const [settings, setSettings] = useState<KtaCardSettings>(() => normalizeSettings(previewSettings || storage.getKtaSettings()));
   const [flipped, setFlipped] = useState(false);
 
   useEffect(() => {
-    if (previewSettings) { setSettings(previewSettings); return; }
-    const refresh=()=>setSettings(storage.getKtaSettings());
-    const unsub=storage.subscribe(refresh);
-    const evt=(e:any)=>e.detail&&setSettings(e.detail);
-    window.addEventListener('saka:kta-settings-updated',evt);
-    return ()=>{unsub();window.removeEventListener('saka:kta-settings-updated',evt);};
-  },[previewSettings]);
+    if (previewSettings) {
+      setSettings(normalizeSettings(previewSettings));
+      return;
+    }
+
+    let disposed = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const applyLocal = () => setSettings(normalizeSettings(storage.getKtaSettings()));
+    const applyRemote = async () => {
+      try {
+        const { spreadsheetService } = await import('../../services/spreadsheetService');
+        const remote = await spreadsheetService.refreshKtaSettings();
+        if (!disposed && remote) setSettings(normalizeSettings(remote));
+      } catch (error) {
+        console.warn('[KTA Settings] Refresh remote gagal:', error);
+      }
+    };
+
+    applyLocal();
+    void applyRemote();
+
+    const unsub = storage.subscribe(applyLocal);
+    const evt = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) setSettings(normalizeSettings(detail));
+    };
+    const refreshOnFocus = () => { void applyRemote(); };
+
+    window.addEventListener('saka:kta-settings-updated', evt);
+    window.addEventListener('focus', refreshOnFocus);
+    window.addEventListener('online', refreshOnFocus);
+    timer = setInterval(() => { void applyRemote(); }, 15000);
+
+    return () => {
+      disposed = true;
+      unsub();
+      window.removeEventListener('saka:kta-settings-updated', evt);
+      window.removeEventListener('focus', refreshOnFocus);
+      window.removeEventListener('online', refreshOnFocus);
+      if (timer) clearInterval(timer);
+    };
+  }, [previewSettings]);
 
   const dataFields = Array.isArray(settings?.dataFields) ? settings.dataFields : [];
   const textElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
