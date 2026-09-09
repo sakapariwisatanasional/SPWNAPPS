@@ -148,6 +148,26 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
           </section>
 
           {side==='FRONT' && <>
+          <section className="p-4 rounded-2xl border border-purple-200 bg-purple-50/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-purple-950"><Eye/><span>4. QR Code Profil + Logo Saka</span></div>
+              <label className="text-xs font-bold flex items-center gap-2">
+                <input type="checkbox" checked={settings.showQrCode !== false} onChange={e=>setSettings(s=>({...s,showQrCode:e.target.checked}))}/>
+                Tampilkan QR
+              </label>
+            </div>
+            <p className="text-[10px] text-slate-600">Atur posisi dan ukuran QR Code yang berisi logo Saka di tengahnya. X/Y adalah posisi dari sudut kiri atas kartu, sedangkan ukuran adalah persentase dari sisi kartu yang lebih pendek.</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <label className="text-[9px] font-bold">X{numberInput(settings.qrX ?? 78,v=>setSettings(s=>({...s,qrX:v})))}</label>
+              <label className="text-[9px] font-bold">Y{numberInput(settings.qrY ?? 30,v=>setSettings(s=>({...s,qrY:v})))}</label>
+              <label className="text-[9px] font-bold">Ukuran QR{numberInput(settings.qrSize ?? 22,v=>setSettings(s=>({...s,qrSize:v})))}</label>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[10px] text-slate-500">
+              <div><b>X:</b> 0 = kiri, 100 = kanan</div>
+              <div><b>Y:</b> 0 = atas, 100 = bawah</div>
+              <div><b>Ukuran:</b> persen dari sisi terpendek</div>
+            </div>
+          </section>
           <section className="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 space-y-3">
             <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold text-blue-950"><Eye/><span>4. Barcode Sisi Depan</span></div><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={(settings as any).showBarcodeFront!==false} onChange={e=>setSettings(s=>({...s,showBarcodeFront:e.target.checked}))}/> Tampilkan Barcode</label></div>
             <p className="text-[10px] text-slate-600">X/Y mengatur posisi pada kartu. Lebar/Tinggi mengatur area Barcode secara langsung.</p>
