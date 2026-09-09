@@ -4,36 +4,21 @@ import {
   UserCheck,
   Clock,
   ShieldCheck,
-  ShieldAlert,
-  MapPin,
   Calendar,
   Compass,
-  Award,
-  TrendingUp,
   Search,
-  Filter,
   CheckCircle2,
-  XCircle,
-  AlertTriangle,
   ChevronRight,
-  Database,
-  RefreshCw,
-  Eye,
-  FileSpreadsheet,
   Activity as ActivityIcon,
   Sparkles,
-  Layers,
   Map,
-  ShoppingBag,
-  UtensilsCrossed,
-  ArrowUpRight,
-  UserCog,
   FileText,
-  Building2,
-  Check
+  Check,
+  ArrowUpRight,
+  UtensilsCrossed,
+  ShoppingBag
 } from 'lucide-react';
 
-// Subkomponen dashboard
 import { DashboardWidget } from '../components/dashboard/DashboardWidget';
 import { NationalMapVisual } from '../components/dashboard/NationalMapVisual';
 import { TourPackageCarouselSection } from '../components/dashboard/TourPackageCarouselSection';
@@ -41,7 +26,7 @@ import { CulinarySouvenirGallerySection } from '../components/dashboard/Culinary
 import { IntegratedTourismShowcaseGallery } from '../components/dashboard/IntegratedTourismShowcaseGallery';
 import { CompactKridaPortal } from '../components/krida/CompactKridaPortal';
 
-interface DashboardViewProps {
+export interface DashboardViewProps {
   currentUser?: any;
   members?: any[];
   activities?: any[];
@@ -66,78 +51,94 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [searchPending, setSearchPending] = useState('');
   const [selectedKwardaFilter, setSelectedKwardaFilter] = useState('ALL');
 
-  // =========================================================================
-  // NORMALISASI DATA (Mencegah Crash "Cannot read properties of undefined")
-  // =========================================================================
+  // Normalisasi data dengan array fallback mutlak
   const safeMembers = useMemo(() => (Array.isArray(members) ? members : []), [members]);
   const safeActivities = useMemo(() => (Array.isArray(activities) ? activities : []), [activities]);
   const safeTourPackages = useMemo(() => (Array.isArray(tourPackages) ? tourPackages : []), [tourPackages]);
   const safeCulinaryItems = useMemo(() => (Array.isArray(culinaryItems) ? culinaryItems : []), [culinaryItems]);
   const safeAuditLogs = useMemo(() => (Array.isArray(auditLogs) ? auditLogs : []), [auditLogs]);
 
-  // Cek apakah akun adalah Super Admin
+  // Evaluasi peran akun
   const isSuperAdmin = useMemo(() => {
-    const role = currentUser?.role?.toLowerCase();
-    return role === 'superadmin' || role === 'super_admin' || role === 'kwarnas';
+    const role = (currentUser?.role || '').toLowerCase();
+    return (
+      role === 'superadmin' ||
+      role === 'super_admin' ||
+      role === 'kwarnas' ||
+      currentUser?.isSuperAdmin === true
+    );
   }, [currentUser]);
 
-  // Scoping anggota sesuai hak akses wilayah
+  // Cakupan data anggota (Super admin membaca seluruh data nasional)
   const scopedMembers = useMemo(() => {
-    if (!safeMembers.length) return [];
-    if (isSuperAdmin) return safeMembers;
+    if (isSuperAdmin) {
+      return safeMembers;
+    }
 
     if (currentUser?.kwarda && !currentUser?.kwarcab) {
-      return safeMembers.filter(
-        (m) => m?.kwarda && m.kwarda.toLowerCase() === currentUser.kwarda.toLowerCase()
-      );
+      const userKwarda = currentUser.kwarda.toLowerCase();
+      return safeMembers.filter((m) => {
+        return m?.kwarda && m.kwarda.toLowerCase() === userKwarda;
+      });
     }
 
     if (currentUser?.kwarcab) {
-      return safeMembers.filter(
-        (m) => m?.kwarcab && m.kwarcab.toLowerCase() === currentUser.kwarcab.toLowerCase()
-      );
+      const userKwarcab = currentUser.kwarcab.toLowerCase();
+      return safeMembers.filter((m) => {
+        return m?.kwarcab && m.kwarcab.toLowerCase() === userKwarcab;
+      });
     }
 
     return safeMembers;
   }, [safeMembers, isSuperAdmin, currentUser]);
 
-  // Statistik Anggota
+  // Statistik anggota
   const verifiedMembers = useMemo(() => {
-    return scopedMembers.filter(
-      (m) =>
-        m?.verificationStatus === 'verified' ||
-        m?.status === 'Aktif' ||
-        m?.status === 'active'
-    );
+    return (scopedMembers || []).filter((m) => {
+      if (!m) return false;
+      const status = (m.status || '').toLowerCase();
+      const verificationStatus = (m.verificationStatus || '').toLowerCase();
+      return (
+        verificationStatus === 'verified' ||
+        verificationStatus === 'terverifikasi' ||
+        status === 'aktif' ||
+        status === 'active'
+      );
+    });
   }, [scopedMembers]);
 
   const pendingMembers = useMemo(() => {
-    return scopedMembers.filter(
-      (m) =>
-        m?.verificationStatus === 'pending' ||
-        m?.status === 'Menunggu Verifikasi' ||
-        m?.status === 'pending'
-    );
+    return (scopedMembers || []).filter((m) => {
+      if (!m) return false;
+      const status = (m.status || '').toLowerCase();
+      const verificationStatus = (m.verificationStatus || '').toLowerCase();
+      return (
+        verificationStatus === 'pending' ||
+        verificationStatus === 'menunggu verifikasi' ||
+        status === 'pending' ||
+        status === 'menunggu verifikasi'
+      );
+    });
   }, [scopedMembers]);
 
-  // Antrean Verifikasi Cepat
+  // Antrean verifikasi yang difilter oleh input pencarian
   const filteredPendingList = useMemo(() => {
-    return pendingMembers.filter((m) => {
-      const q = searchPending.toLowerCase();
-      const matchSearch =
-        !q ||
-        (m?.name || m?.fullName || '').toLowerCase().includes(q) ||
-        (m?.ktaNumber || m?.ktaId || '').toLowerCase().includes(q) ||
-        (m?.kwarcab || '').toLowerCase().includes(q);
+    const query = (searchPending || '').trim().toLowerCase();
+    return (pendingMembers || []).filter((m) => {
+      if (!m) return false;
+      const name = (m.name || m.fullName || '').toLowerCase();
+      const nta = (m.ktaNumber || m.ktaId || '').toLowerCase();
+      const kwarcab = (m.kwarcab || '').toLowerCase();
+      const kwarda = m.kwarda || '';
 
-      const matchKwarda =
-        selectedKwardaFilter === 'ALL' || m?.kwarda === selectedKwardaFilter;
+      const matchesQuery = !query || name.includes(query) || nta.includes(query) || kwarcab.includes(query);
+      const matchesKwarda = selectedKwardaFilter === 'ALL' || kwarda === selectedKwardaFilter;
 
-      return matchSearch && matchKwarda;
+      return matchesQuery && matchesKwarda;
     });
   }, [pendingMembers, searchPending, selectedKwardaFilter]);
 
-  // Log Audit Sistem (Khusus Super Admin)
+  // Riwayat audit terkini
   const recentAuditLogs = useMemo(() => {
     return [...safeAuditLogs]
       .filter((log) => Boolean(log))
@@ -157,7 +158,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 pt-4 px-4 sm:px-6 lg:px-8 space-y-8">
-      {/* ================= HERO HEADER ================= */}
+      {/* Banner Utama */}
       <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-900/10 relative overflow-hidden">
         <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -166,8 +167,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
                 {isSuperAdmin
-                  ? 'SUPER ADMIN - KWARTIR NASIONAL'
-                  : `ADMINISTRATOR - ${currentUser?.kwarcab || currentUser?.kwarda || 'REGIONAL'}`}
+                  ? 'SUPER ADMIN — TINGKAT NASIONAL'
+                  : `ADMINISTRATOR — ${currentUser?.kwarcab || currentUser?.kwarda || 'REGIONAL'}`}
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-emerald-100">
                 <Sparkles className="w-3 h-3 text-amber-300" />
@@ -178,12 +179,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Pusat Kendali & Informasi Nasional
             </h1>
             <p className="text-emerald-100/80 text-sm max-w-2xl">
-              Monitoring pendaftaran anggota Saka Pariwisata, verifikasi digital, persebaran krida, dan kegiatan pariwisata se-Indonesia.
+              Monitoring pendaftaran anggota Saka Pariwisata, verifikasi KTA digital, persebaran krida, dan agenda kegiatan nasional.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
+              type="button"
               onClick={() => handleNavigate('audit-logs')}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition backdrop-blur-sm border border-white/10"
             >
@@ -191,6 +193,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Log Audit
             </button>
             <button
+              type="button"
               onClick={() => handleNavigate('members')}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
             >
@@ -201,12 +204,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* ================= METRIC CARDS ================= */}
+      {/* Kartu Metrik Utama */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <DashboardWidget
-          title="Total Anggota Terdaftar"
+          title="Total Anggota"
           value={scopedMembers.length.toLocaleString('id-ID')}
-          subtitle={isSuperAdmin ? 'Seluruh Indonesia' : 'Wilayah Anda'}
+          subtitle={isSuperAdmin ? 'Cakupan Seluruh Indonesia' : 'Wilayah Terdaftar'}
           icon={<Users className="w-6 h-6 text-emerald-600" />}
           color="emerald"
           onClick={() => handleNavigate('members')}
@@ -222,7 +225,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <DashboardWidget
           title="Menunggu Verifikasi"
           value={pendingMembers.length.toLocaleString('id-ID')}
-          subtitle="Perlu Tindakan Admin"
+          subtitle="Menunggu Validasi Admin"
           icon={<Clock className="w-6 h-6 text-amber-600" />}
           color="amber"
           badge={pendingMembers.length > 0 ? `${pendingMembers.length} Antrean` : undefined}
@@ -232,16 +235,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           }}
         />
         <DashboardWidget
-          title="Kegiatan & Event Saka"
+          title="Kegiatan & Bhakti"
           value={safeActivities.length.toLocaleString('id-ID')}
-          subtitle="Pelatihan & Bhakti"
+          subtitle="Pelatihan & Agenda Saka"
           icon={<Calendar className="w-6 h-6 text-indigo-600" />}
           color="indigo"
           onClick={() => handleNavigate('activities')}
         />
       </div>
 
-      {/* ================= ANTREAN VERIFIKASI ================= */}
+      {/* Tabel Antrean Verifikasi */}
       <div id="pending-verification-section" className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
           <div>
@@ -252,7 +255,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Calon anggota yang telah mendaftar dan menunggu validasi data KTA
+              Calon anggota yang telah mendaftar dan menunggu pengesahan KTA digital
             </p>
           </div>
 
@@ -261,13 +264,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Cari nama / NTA / Kwarcab..."
+                placeholder="Cari nama, NTA, atau Kwarcab..."
                 value={searchPending}
                 onChange={(e) => setSearchPending(e.target.value)}
                 className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-52 sm:w-64"
               />
             </div>
             <button
+              type="button"
               onClick={() => handleNavigate('members')}
               className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
             >
@@ -301,11 +305,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-xs">
-                      <div className="font-medium text-slate-700">{m?.kwarcab || '-'}</div>
-                      <div className="text-slate-400">{m?.kwarda || '-'}</div>
+                      <div className="font-medium text-slate-700">{m?.kwarcab || '—'}</div>
+                      <div className="text-slate-400">{m?.kwarda || '—'}</div>
                     </td>
                     <td className="py-3.5 px-4 text-xs text-slate-600">
-                      {m?.pangkalan || m?.gudep || '-'}
+                      {m?.pangkalan || m?.gudep || '—'}
                     </td>
                     <td className="py-3.5 px-4 text-xs">
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-100">
@@ -316,6 +320,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <div className="flex items-center justify-end gap-2">
                         {typeof onVerifyMember === 'function' && (
                           <button
+                            type="button"
                             onClick={() => onVerifyMember(m.id)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition"
                           >
@@ -324,6 +329,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </button>
                         )}
                         <button
+                          type="button"
                           onClick={() => handleNavigate('members')}
                           className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs transition"
                         >
@@ -342,14 +348,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Tidak ada antrean verifikasi saat ini
               </p>
               <p className="text-xs text-slate-400">
-                Semua data anggota telah terverifikasi secara lengkap.
+                Seluruh data anggota telah terverifikasi dengan lengkap.
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* ================= PETA & LOG AUDIT ================= */}
+      {/* Bagian Peta Nasional & Log Audit */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -359,10 +365,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Persebaran Saka Pariwisata Nasional
               </h2>
               <p className="text-xs text-slate-400">
-                Distribusi anggota berdasarkan wilayah Kwarda & Kwarcab
+                Distribusi anggota berdasarkan wilayah Kwartir Daerah se-Indonesia
               </p>
             </div>
             <button
+              type="button"
               onClick={() => handleNavigate('territory')}
               className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
             >
@@ -370,7 +377,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
-          <div className="min-h-[280px]">
+          <div className="min-h-[260px]">
             <NationalMapVisual members={safeMembers} />
           </div>
         </div>
@@ -382,6 +389,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Aktivitas Sistem
             </h2>
             <button
+              type="button"
               onClick={() => handleNavigate('audit-logs')}
               className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
             >
@@ -407,26 +415,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {log?.userName || log?.performedBy || 'Operator Sistem'}
                     </p>
                     <span className="text-[10px] text-slate-400">
-                      {log?.timestamp ? new Date(log.timestamp).toLocaleString('id-ID') : '-'}
+                      {log?.timestamp ? new Date(log.timestamp).toLocaleString('id-ID') : '—'}
                     </span>
                   </div>
                 </div>
               ))
             ) : (
               <div className="py-8 text-center text-xs text-slate-400">
-                Belum ada aktivitas yang tercatat.
+                Belum ada aktivitas audit yang tercatat.
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* ================= PORTAL KRIDA SAKA ================= */}
+      {/* Portal Krida Saka Pariwisata */}
       <div className="space-y-3">
         <CompactKridaPortal onSelectKrida={() => handleNavigate('krida')} />
       </div>
 
-      {/* ================= SHOWCASE WISATA & KULINER ================= */}
+      {/* Galeri Showcase Potensi Wisata & Kuliner */}
       <div className="space-y-6">
         <IntegratedTourismShowcaseGallery />
 
