@@ -25,6 +25,7 @@ import { TourPackageCarouselSection } from '../components/dashboard/TourPackageC
 import { CulinarySouvenirGallerySection } from '../components/dashboard/CulinarySouvenirGallerySection';
 import { IntegratedTourismShowcaseGallery } from '../components/dashboard/IntegratedTourismShowcaseGallery';
 import { CompactKridaPortal } from '../components/krida/CompactKridaPortal';
+import { INITIAL_KRIDA_MODULES } from '../data/kridaData';
 
 export interface DashboardViewProps {
   currentUser?: any;
@@ -34,6 +35,8 @@ export interface DashboardViewProps {
   culinaryItems?: any[];
   auditLogs?: any[];
   onNavigate?: (view: string) => void;
+  // Backward-compatible alias used by older callers.
+  onSelectTab?: (view: string) => void;
   onVerifyMember?: (id: string) => void;
   [key: string]: any;
 }
@@ -46,6 +49,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   culinaryItems = [],
   auditLogs = [],
   onNavigate,
+  onSelectTab,
   onVerifyMember,
 }) => {
   const [searchPending, setSearchPending] = useState('');
@@ -129,7 +133,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const name = (m.name || m.fullName || '').toLowerCase();
       const nta = (m.ktaNumber || m.ktaId || '').toLowerCase();
       const kwarcab = (m.kwarcab || '').toLowerCase();
-      const kwarda = m.kwarda || '';
+      const kwarda = String(m.kwarda || '').trim();
 
       const matchesQuery = !query || name.includes(query) || nta.includes(query) || kwarcab.includes(query);
       const matchesKwarda = selectedKwardaFilter === 'ALL' || kwarda === selectedKwardaFilter;
@@ -153,6 +157,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const handleNavigate = (view: string) => {
     if (typeof onNavigate === 'function') {
       onNavigate(view);
+      return;
+    }
+
+    if (typeof onSelectTab === 'function') {
+      onSelectTab(view);
     }
   };
 
@@ -370,7 +379,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => handleNavigate('territory')}
+              onClick={() => handleNavigate('territories')}
               className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
             >
               Detail Wilayah
@@ -431,12 +440,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Portal Krida Saka Pariwisata */}
       <div className="space-y-3">
-        <CompactKridaPortal onSelectKrida={() => handleNavigate('krida')} />
+        <CompactKridaPortal
+          modules={INITIAL_KRIDA_MODULES}
+          currentUser={currentUser}
+          onOpenFullExplorer={(kridaId) => handleNavigate('krida')}
+          variant="light"
+        />
       </div>
 
       {/* Galeri Showcase Potensi Wisata & Kuliner */}
       <div className="space-y-6">
-        <IntegratedTourismShowcaseGallery />
+        <IntegratedTourismShowcaseGallery
+          tours={safeTourPackages}
+          products={safeCulinaryItems}
+          members={safeMembers}
+          activities={safeActivities}
+          currentUser={currentUser}
+          onSelectTab={handleNavigate}
+          onViewTourDetail={() => handleNavigate('tours')}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
