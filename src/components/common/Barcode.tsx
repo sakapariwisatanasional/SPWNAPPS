@@ -11,16 +11,6 @@ interface BarcodeProps {
   bgColor?: string;
 }
 
-/**
- * Code 128 barcode patterns.
- *
- * Index:
- * 0 - 102  : data / checksum
- * 103      : Start Code A
- * 104      : Start Code B
- * 105      : Start Code C
- * 106      : Stop
- */
 const CODE128_PATTERNS: string[] = [
   '11011001100',
   '11001101100',
@@ -131,16 +121,10 @@ const CODE128_PATTERNS: string[] = [
   '1100011101011'
 ];
 
-/**
- * Encode text using Code 128-B.
- *
- * Code 128-B supports printable ASCII characters 32-126.
- * Unsupported characters are replaced with '?'.
- */
 function encodeCode128B(value: string): string {
-  const source = String(value ?? '').trim();
+  const source = String(value || 'SAKA-2026');
 
-  const input = (source || 'SAKA-2026')
+  const safeValue = source
     .split('')
     .map((character) => {
       const code = character.charCodeAt(0);
@@ -153,47 +137,24 @@ function encodeCode128B(value: string): string {
     })
     .join('');
 
-  const values = Array.from(input, (character) => {
-    return character.charCodeAt(0) - 32;
-  });
+  const values = Array.from(
+    safeValue,
+    (character) => character.charCodeAt(0) - 32
+  );
 
-  /**
-   * Code 128-B:
-   *
-   * Start B = 104
-   *
-   * Checksum =
-   *   (Start B + sum(dataValue * position)) % 103
-   *
-   * Position starts at 1.
-   */
   const checksum =
-    (
-      104 +
+    (104 +
       values.reduce(
-        (total, value, index) =>
-          total + value * (index + 1),
+        (total, valueNumber, index) =>
+          total + valueNumber * (index + 1),
         0
-      )
-    ) % 103;
+      )) %
+    103;
 
-  /**
-   * Barcode sequence:
-   *
-   * Start B
-   * + Data
-   * + Checksum
-   * + Stop
-   */
-  const symbols = [
-    104,
-    ...values,
-    checksum,
-    106
-  ];
+  const sequence = [104, ...values, checksum, 106];
 
-  return symbols
-    .map((symbol) => CODE128_PATTERNS[symbol] || '')
+  return sequence
+    .map((code) => CODE128_PATTERNS[code] || '')
     .join('');
 }
 
@@ -211,76 +172,74 @@ export const Barcode: React.FC<BarcodeProps> = ({
     [value]
   );
 
-  /**
-   * Prevent invalid SVG dimensions if an unexpected
-   * barcode value reaches the component.
-   */
-  const safeEncoded =
-    encoded.length > 0
-      ? encoded
-      : CODE128_PATTERNS[104] + CODE128_PATTERNS[106];
+  const barcodeWidth =
+    typeof width === 'number'
+      ? String(width) + 'px'
+      : width;
+
+  const barcodeHeight =
+    String(height) + 'px';
+
+  const containerClass =
+    'inline-flex flex-col items-center select-none ' + className;
+
+  const ariaLabel =
+    'Barcode: ' + String(value || '');
 
   return (
-    <div
-      className={`inline-flex flex-col items-center select-none ${className}`}
-    >
+    <div className={containerClass}>
       <svg
-        viewBox={`0 0 ${safeEncoded.length} ${height}`}
+        viewBox={'0 0 ' + encoded.length + ' ' + height}
         preserveAspectRatio="none"
         style={{
-          width:
-            typeof width === 'number'
-              ? `${width}px`
-              : width,
-          height: `${height}px`
+          width: barcodeWidth,
+          height: barcodeHeight
         }}
         className="overflow-hidden"
         xmlns="http://www.w3.org/2000/svg"
         shapeRendering="crispEdges"
         role="img"
-        aria-label={`Barcode: ${value || 'SAKA-2026'}`}
+        aria-label={ariaLabel}
       >
-        {bgColor !== 'transparent' && (
+        {bgColor !== 'transparent' ? (
           <rect
             x="0"
             y="0"
-            width={safeEncoded.length}
+            width={encoded.length}
             height={height}
             fill={bgColor}
           />
-        )}
+        ) : null}
 
-        {safeEncoded.split('').map(
-          (bit, index) => {
-            if (bit !== '1') {
-              return null;
-            }
-
-            return (
-              <rect
-                key={index}
-                x={index}
-                y="0"
-                width="1"
-                height={height}
-                fill={barColor}
-              />
-            );
+        {encoded.split('').map((bit, index) => {
+          if (bit !== '1') {
+            return null;
           }
-        )}
+
+          return (
+            <rect
+              key={index}
+              x={index}
+              y="0"
+              width="1"
+              height={height}
+              fill={barColor}
+            />
+          );
+        })}
       </svg>
 
-      {showText && (
+      {showText ? (
         <span
           className="text-[7.5px] font-mono tracking-widest mt-0.5"
-          style={{
-            color: barColor
-          }}
+          style={{ color: barColor }}
         >
           {value}
         </span>
-      )}
+      ) : null}
     </div>
   );
 };
+
+export default Barcode;
 ```
