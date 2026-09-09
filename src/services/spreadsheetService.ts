@@ -1903,545 +1903,2045 @@ class SpreadsheetService {
    * Hasilkan Template Script Google Apps Script yang siap di-copy-paste oleh user
    */
   public getGoogleAppsScriptTemplate(): string {
-    return `// =========================================================================
-// GOOGLE APPS SCRIPT: MASTER DATABASE & DRIVE API SAKA PARIWISATA INDONESIA
-// =========================================================================
-// Spreadsheet Target:
-// https://docs.google.com/spreadsheets/d/1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E/edit
-//
-// Folder Google Drive Target:
-// https://drive.google.com/drive/folders/16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh
-//
-// =========================================================================
-// CARA PENGGUNAAN (1 KLIK & DEPLOY WEB APP):
-// 1. Tempelkan seluruh kode ini ke Apps Script (Kode.gs).
-// 2. Jika ingin mengetes di editor, pilih fungsi "jalankanTesKoneksiLengkap" lalu klik "Jalankan".
-// 3. Klik "Deploy" (Penerapan) di pojok kanan atas > "New deployment" (Penerapan baru).
-// 4. Pilih tipe: "Web app" (Aplikasi web).
-// 5. Konfigurasi:
-//    - Description: "Saka Pariwisata Master Database & Drive API v5.0"
-//    - Execute as: "Me" (Saya / akun email pemilik spreadsheet)
-//    - Who has access: "Anyone" (Siapa saja)  <-- WAJIB PILIH "ANYONE"
-// 6. Klik "Deploy", lalu salin URL Web App yang berakhiran "/exec".
-// 7. Tempelkan ke Pengaturan Database di Aplikasi Saka Pariwisata.
-// =========================================================================
-
-var MASTER_SPREADSHEET_ID = "1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E";
-var MASTER_DRIVE_FOLDER_ID = "16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh";
-
-/**
- * FUNGSI TEST UTAMA: Aman dijalankan langsung dari menu dropdown Apps Script!
+    return `/**
+ * ============================================================
+ * SISTEM SINKRONISASI REAL-TIME SAKA PARIWISATA
+ * GOOGLE APPS SCRIPT - Code.gs
+ * ============================================================
+ *
+ * Fungsi:
+ * 1. Membaca data anggota dari Spreadsheet
+ * 2. Menerima pendaftaran anggota baru
+ * 3. UPSERT data anggota
+ * 4. Memperbarui status verifikasi anggota
+ * 5. Mendukung sinkronisasi aplikasi web
+ *
+ * SHEET:
+ * Anggota
+ *
+ * KOLOM:
+ * A = ID Anggota
+ * B = Nomor KTA
+ * C = Nama Lengkap
+ * D = Email
+ * E = Nomor WhatsApp
+ * F = Kwarda / Provinsi
+ * G = Kwarcab / Kabupaten
+ * H = Kwarran / Kecamatan
+ * I = Gugus Depan / Pangkalan
+ * J = Krida
+ * K = Status Verifikasi
+ * L = Foto URL
+ * M = Tanggal Daftar
+ * N = Link Verifikasi Cepat
+ * ============================================================
  */
-function jalankanTesKoneksiLengkap() {
-  Logger.log("=== MEMULAI TES KONEKSI SAKA PARIWISATA ===");
-  
-  // 1. Tes Google Drive
-  var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
-  var subfolders = setupAllSubfolders(rootFolder);
-  Logger.log("✅ Google Drive OK: " + rootFolder.getName() + " (ID: " + rootFolder.getId() + ")");
-  Logger.log("✅ 5 Subfolder Terverifikasi: " + Object.keys(subfolders).join(", "));
-  
-  // 2. Tes Google Spreadsheet
-  var ss = getActiveOrConfiguredSpreadsheet();
-  if (ss) {
-    Logger.log("✅ Google Spreadsheet OK: " + ss.getName() + " (ID: " + ss.getId() + ")");
-    var sheets = ss.getSheets().map(function(s) { return s.getName(); });
-    Logger.log("✅ Sheet yang terdeteksi: " + sheets.join(", "));
-  } else {
-    Logger.log("⚠️ Gagal membuka Spreadsheet. Pastikan Apps Script memiliki izin ke ID: " + MASTER_SPREADSHEET_ID);
+
+
+/* ============================================================
+ * KONFIGURASI
+ * ============================================================ */
+
+var SHEET_MEMBER = "Anggota";
+
+// ID Spreadsheet tujuan. Ambil dari URL Google Spreadsheet.
+var SPREADSHEET_ID = "1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E";
+
+function getSpreadsheet() {
+  if (!SPREADSHEET_ID) {
+    throw new Error("SPREADSHEET_ID belum diisi.");
   }
-  
-  Logger.log("=== SEMUA TES KONEKSI BERHASIL ===");
-  return "Koneksi Google Drive & Spreadsheet Berhasil!";
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
+// Folder utama Google Drive repository.
+var GOOGLE_DRIVE_MAIN_FOLDER_ID = "16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh";
+
+// Lima kategori folder yang digunakan aplikasi.
+var DRIVE_CATEGORY_FOLDERS = {
+  MEMBER_AVATAR: "Foto Anggota & Pasfoto",
+  TOUR_PACKAGES: "Foto Paket Wisata",
+  CULINARY_SOUVENIRS: "Foto Kuliner & Cinderamata",
+  KTA_CARD: "Desain KTA & Latar Belakang",
+  ICONS_LOGOS: "Logo, Lambang & Vektor",
+  DOCUMENTS: "Dokumen"
+};
+
+function getDriveMainFolder() {
+  if (!GOOGLE_DRIVE_MAIN_FOLDER_ID) {
+    throw new Error("GOOGLE_DRIVE_MAIN_FOLDER_ID belum diisi.");
+  }
+  return DriveApp.getFolderById(GOOGLE_DRIVE_MAIN_FOLDER_ID);
+}
+
+function getOrCreateDriveSubfolder(parentFolder, folderName) {
+  var folders = parentFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return parentFolder.createFolder(folderName);
+}
+
+function getDriveFolderForCategory(category) {
+  var key = String(category || "MEMBER_AVATAR").trim().toUpperCase();
+  var folderName = DRIVE_CATEGORY_FOLDERS[key] || DRIVE_CATEGORY_FOLDERS.MEMBER_AVATAR;
+  return getOrCreateDriveSubfolder(getDriveMainFolder(), folderName);
 }
 
 /**
- * Inisialisasi struktur folder di Google Drive
+ * Membuat/menjamin lima subfolder repository Drive.
+ * Aman dijalankan berulang kali; tidak membuat duplikasi jika folder
+ * dengan nama yang sama sudah tersedia di folder utama.
  */
 function inisialisasiFolderGoogleDrive() {
-  Logger.log("Memulai inisialisasi folder Google Drive: " + MASTER_DRIVE_FOLDER_ID);
-  var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
-  var subfolders = setupAllSubfolders(rootFolder);
+  var mainFolder = getDriveMainFolder();
+  var created = [];
+  var existing = [];
 
-  var statusContent = "SISTEM DATABASE & MEDIA SAKA PARIWISATA INDONESIA\\n" +
-    "Diperbarui pada: " + new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB\\n" +
-    "Folder Utama: " + rootFolder.getName() + " (ID: " + rootFolder.getId() + ")\\n" +
-    "Status: 5 SUBFOLDER BERHASIL DIBUAT & TERHUBUNG AKTIF TANPA DUPLIKASI\\n\\n" +
-    "Daftar Subfolder Resmi:\\n" +
-    "1. 01_Pas_Foto_KTA_Anggota\\n" +
-    "2. 02_Paket_Wisata\\n" +
-    "3. 03_Kuliner_dan_Cinderamata\\n" +
-    "4. 04_Agenda_Kegiatan\\n" +
-    "5. 05_Dokumen_dan_Surat\\n";
+  var categories = [
+    "MEMBER_AVATAR",
+    "TOUR_PACKAGES",
+    "CULINARY_SOUVENIRS",
+    "KTA_CARD",
+    "ICONS_LOGOS"
+  ];
 
-  // Hapus status file lama jika ada agar tidak double file
-  var oldStatus = rootFolder.getFilesByName("STATUS_KONEKSI_SAKA_PARIWISATA.txt");
-  while (oldStatus.hasNext()) {
-    oldStatus.next().setTrashed(true);
+  for (var i = 0; i < categories.length; i++) {
+    var key = categories[i];
+    var folderName = DRIVE_CATEGORY_FOLDERS[key];
+    var folders = mainFolder.getFoldersByName(folderName);
+
+    if (folders.hasNext()) {
+      var existingFolder = folders.next();
+      existing.push({
+        category: key,
+        name: folderName,
+        folderId: existingFolder.getId(),
+        url: "https://drive.google.com/drive/folders/" + existingFolder.getId()
+      });
+    } else {
+      var newFolder = mainFolder.createFolder(folderName);
+      existing.push({
+        category: key,
+        name: folderName,
+        folderId: newFolder.getId(),
+        url: "https://drive.google.com/drive/folders/" + newFolder.getId()
+      });
+      created.push(folderName);
+    }
   }
 
-  var statusBlob = Utilities.newBlob(statusContent, "text/plain", "STATUS_KONEKSI_SAKA_PARIWISATA.txt");
-  var statusFile = rootFolder.createFile(statusBlob);
-  statusFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-
-  Logger.log("✅ SUKSES! 5 Subfolder dan File STATUS_KONEKSI_SAKA_PARIWISATA.txt berhasil diperbarui.");
   return {
+    success: true,
     status: "success",
-    folderId: rootFolder.getId(),
-    subfolders: Object.keys(subfolders)
+    action: "SETUP_DRIVE_FOLDERS",
+    mainFolderId: GOOGLE_DRIVE_MAIN_FOLDER_ID,
+    mainFolderUrl: "https://drive.google.com/drive/folders/" + GOOGLE_DRIVE_MAIN_FOLDER_ID,
+    created: created,
+    folders: existing,
+    message: created.length > 0
+      ? "Struktur folder Google Drive berhasil dibuat."
+      : "Struktur folder Google Drive sudah tersedia."
   };
 }
 
-/**
- * Helper fleksibel untuk mengambil Spreadsheet aktif atau membuka berdasarkan MASTER_SPREADSHEET_ID
- */
-function getActiveOrConfiguredSpreadsheet() {
-  var ss = null;
-  try {
-    ss = SpreadsheetApp.getActiveSpreadsheet();
-  } catch (e) {}
-  
-  if (!ss && MASTER_SPREADSHEET_ID) {
-    try {
-      ss = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID);
-    } catch (err) {
-      Logger.log("Gagal membuka spreadsheet via openById: " + err.toString());
+var SHEET_USERS = "Users";
+var USER_HEADERS = ["ID User", "Username", "Email", "Password Hash", "Nama", "Role", "Jurisdiction Name", "Jurisdiction ID", "Avatar URL", "Member ID", "Created At", "Status"];
+
+function getOrInitUsersSheet(ss) {
+  var sheet = ss.getSheetByName(SHEET_USERS);
+  if (!sheet) sheet = ss.insertSheet(SHEET_USERS);
+  if (sheet.getMaxColumns() < USER_HEADERS.length) sheet.insertColumnsAfter(sheet.getMaxColumns(), USER_HEADERS.length - sheet.getMaxColumns());
+  var headers = sheet.getRange(1, 1, 1, USER_HEADERS.length).getValues()[0];
+  var needs = false;
+  for (var i = 0; i < USER_HEADERS.length; i++) { if (String(headers[i] || "").trim() !== USER_HEADERS[i]) { needs = true; break; } }
+  if (needs) sheet.getRange(1, 1, 1, USER_HEADERS.length).setValues([USER_HEADERS]).setFontWeight("bold");
+  return sheet;
+}
+function findUserRow(sheet, identifier) {
+  var needle = String(identifier || "").trim().toLowerCase();
+  if (!needle || sheet.getLastRow() <= 1) return null;
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, USER_HEADERS.length).getValues();
+  for (var i = 0; i < values.length; i++) { if (String(values[i][1] || "").trim().toLowerCase() === needle || String(values[i][2] || "").trim().toLowerCase() === needle) return { rowNumber: i + 2, index: i, values: values[i] }; }
+  return null;
+}
+function userRowToObject(row) { return { id: row[0] || "", username: row[1] || "", email: row[2] || "", passwordHash: row[3] || "", name: row[4] || "", role: row[5] || "MEMBER", jurisdictionName: row[6] || "", jurisdictionId: row[7] || "", avatarUrl: row[8] || "", memberId: row[9] || "", createdAt: row[10] || "", status: row[11] || "ACTIVE" }; }
+function upsertUserRecord(user) {
+  var sheet = getOrInitUsersSheet(getSpreadsheet());
+  user = user || {};
+  if (!user.id || !user.username || !user.email) throw new Error("ID User, username, dan email wajib diisi.");
+
+  var incomingHash = String(user.passwordHash || "").trim();
+  if (!incomingHash) throw new Error("Password Hash wajib diisi. Akun tidak boleh dibuat tanpa password.");
+
+  var username = String(user.username).trim().toLowerCase();
+  var email = String(user.email).trim().toLowerCase();
+  var memberId = String(user.memberId || "").trim();
+
+  var found = findUserRowByMemberId_(sheet, memberId) ||
+              findUserRowByUserId_(sheet, user.id) ||
+              findUserRow(sheet, username) ||
+              findUserRow(sheet, email);
+
+  var rowNumber = found ? found.rowNumber : Math.max(sheet.getLastRow() + 1, 2);
+  var old = found ? sheet.getRange(rowNumber, 1, 1, USER_HEADERS.length).getValues()[0] : null;
+  var row = [
+    user.id || (old ? old[0] : ""),
+    username || (old ? old[1] : ""),
+    email || (old ? old[2] : ""),
+    incomingHash,
+    user.name !== undefined ? user.name : (old ? old[4] : ""),
+    user.role !== undefined ? user.role : (old ? old[5] : "MEMBER"),
+    user.jurisdictionName !== undefined ? user.jurisdictionName : (old ? old[6] : ""),
+    user.jurisdictionId !== undefined ? user.jurisdictionId : (old ? old[7] : ""),
+    user.avatarUrl !== undefined ? user.avatarUrl : (old ? old[8] : ""),
+    memberId || (old ? old[9] : ""),
+    user.createdAt || (old ? old[10] : new Date().toISOString()),
+    user.status || (old ? old[11] : "ACTIVE")
+  ];
+
+  sheet.getRange(rowNumber, 1, 1, USER_HEADERS.length).setValues([row]);
+  SpreadsheetApp.flush();
+
+  var saved = sheet.getRange(rowNumber, 1, 1, USER_HEADERS.length).getValues()[0];
+  if (String(saved[0] || "") !== String(row[0])) throw new Error("Verifikasi penyimpanan akun gagal.");
+  if (String(saved[3] || "") !== incomingHash) throw new Error("Verifikasi Password Hash gagal.");
+
+  // Satu akun = satu baris Users. Hapus record lama yang identitasnya sama.
+  var last = sheet.getLastRow();
+  var duplicateRows = [];
+  if (last > 1) {
+    var all = sheet.getRange(2, 1, last - 1, USER_HEADERS.length).getValues();
+    for (var i = 0; i < all.length; i++) {
+      var rn = i + 2;
+      if (rn === rowNumber) continue;
+      var same =
+        (memberId && String(all[i][9] || "").trim() === memberId) ||
+        String(all[i][0] || "").trim() === String(row[0] || "").trim() ||
+        String(all[i][1] || "").trim().toLowerCase() === username ||
+        String(all[i][2] || "").trim().toLowerCase() === email;
+      if (same) duplicateRows.push(rn);
     }
   }
-  return ss;
+  for (var d = duplicateRows.length - 1; d >= 0; d--) sheet.deleteRow(duplicateRows[d]);
+
+  var canonical = findUserRowByMemberId_(sheet, memberId) ||
+                  findUserRowByUserId_(sheet, row[0]) ||
+                  findUserRow(sheet, username) ||
+                  findUserRow(sheet, email);
+  if (!canonical) throw new Error("Verifikasi akhir Users gagal: akun tidak ditemukan.");
+
+  var finalSaved = sheet.getRange(canonical.rowNumber, 1, 1, USER_HEADERS.length).getValues()[0];
+  if (String(finalSaved[3] || "") !== incomingHash) throw new Error("Verifikasi akhir Password Hash gagal.");
+
+  return {
+    success: true,
+    status: "success",
+    found: !!found,
+    row: canonical.rowNumber,
+    duplicateRemoved: duplicateRows.length,
+    user: userRowToObject(finalSaved),
+    message: found ? "Akun berhasil diperbarui" : "Akun berhasil disimpan"
+  };
 }
 
-function doGet(e) {
-  var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "";
+function findUserRowByMemberId_(sheet, memberId) {
+  var needle = String(memberId || "").trim();
+  if (!needle || sheet.getLastRow() <= 1) return null;
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, USER_HEADERS.length).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][9] || "").trim() === needle) return { rowNumber: i + 2, index: i, values: values[i] };
+  }
+  return null;
+}
 
-  // 1. Eksekusi inisialisasi Drive lewat GET
-  if (action === "SETUP_DRIVE_FOLDERS" || action === "SETUP_DRIVE" || action === "INIT_DRIVE") {
-    inisialisasiFolderGoogleDrive();
-    var htmlOutput = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Inisialisasi Google Drive Berhasil</title>" +
-      "<style>body{font-family:system-ui,-apple-system,sans-serif;padding:30px;background:#f0fdf4;color:#166534;line-height:1.6} " +
-      ".card{background:#fff;padding:28px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,0.08);max-width:560px;margin:30px auto;border:1px solid #bbf7d0} " +
-      "h1{color:#15803d;margin-top:0;font-size:22px;display:flex;align-items:center;gap:8px} " +
-      "ul{text-align:left;background:#f8fafc;padding:16px 28px;border-radius:12px;border:1px solid #e2e8f0;font-family:monospace;font-size:13px} " +
-      "li{margin:6px 0} .btn{display:inline-block;padding:12px 20px;background:#059669;color:#fff;text-decoration:none;border-radius:12px;font-weight:bold;margin-top:10px}</style></head>" +
-      "<body><div class='card'><h1>✅ Inisialisasi Google Drive Sukses!</h1>" +
-      "<p>5 Subfolder resmi dan file verifikasi telah berhasil dibuat di Google Drive Saka Pariwisata:</p>" +
-      "<ul><li>📁 01_Pas_Foto_KTA_Anggota</li><li>📁 02_Paket_Wisata</li><li>📁 03_Kuliner_dan_Cinderamata</li><li>📁 04_Agenda_Kegiatan</li><li>📁 05_Dokumen_dan_Surat</li></ul>" +
-      "<p><a class='btn' href='https://drive.google.com/drive/folders/16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh' target='_blank'>📂 Buka Folder di Google Drive</a></p>" +
-      "<p style='font-size:12px;color:#64748b;margin-top:20px'>Anda sekarang dapat kembali ke aplikasi Saka Pariwisata dan mulai sinkronisasi data.</p></div></body></html>";
-    return HtmlService.createHtmlOutput(htmlOutput);
+function findUserRowByUserId_(sheet, userId) {
+  var needle = String(userId || "").trim();
+  if (!needle || sheet.getLastRow() <= 1) return null;
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, USER_HEADERS.length).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0] || "").trim() === needle) return { rowNumber: i + 2, index: i, values: values[i] };
   }
+  return null;
+}
 
-  // 2. Baca data Spreadsheet
-  var sheetName = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : "Anggota";
-  var ss = getActiveOrConfiguredSpreadsheet();
-  
-  if (!ss) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Spreadsheet tidak dapat dibuka." }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
+function syncUserFromMember_(member) {
+  member = member || {};
+  var memberId = String(firstNonEmpty_(member, ["id", "memberId", "idAnggota"], "")).trim();
+  if (!memberId) return { success: true, skipped: true, found: false, message: "Member ID kosong." };
 
-  var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Sheet tidak ditemukan: " + sheetName }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  
-  var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) {
-    return ContentService.createTextOutput(JSON.stringify([]))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  
-  var headers = data[0];
-  var rows = data.slice(1);
-  
-  var result = rows.map(function(row) {
-    var item = {};
-    headers.forEach(function(header, idx) {
-      item[header] = row[idx];
-    });
-    return item;
-  });
-  
-  return ContentService.createTextOutput(JSON.stringify(result))
+  var usersSheet = getOrInitUsersSheet(getSpreadsheet());
+  var found = findUserRowByMemberId_(usersSheet, memberId);
+  if (!found) return { success: true, skipped: true, found: false, memberId: memberId, message: "Akun Users belum ada." };
+
+  var old = usersSheet.getRange(found.rowNumber, 1, 1, USER_HEADERS.length).getValues()[0];
+  var updated = old.slice();
+  updated[2] = String(firstNonEmpty_(member, ["email", "emailAddress"], old[2]) || "").trim().toLowerCase();
+  updated[4] = firstNonEmpty_(member, ["fullName", "namaLengkap", "name", "nama"], old[4]);
+  updated[8] = firstNonEmpty_(member, ["avatarUrl", "photoUrl", "fotoUrl", "foto", "profilePhoto"], old[8]);
+  updated[9] = memberId;
+
+  var memberStatus = String(firstNonEmpty_(member, ["status", "verificationStatus", "statusVerifikasi"], old[11] || "ACTIVE")).trim().toUpperCase();
+  updated[11] = memberStatus === "SUSPENDED" ? "SUSPENDED" : memberStatus;
+
+  // Kolom 4 (Password Hash) sengaja TIDAK disentuh.
+  usersSheet.getRange(found.rowNumber, 1, 1, USER_HEADERS.length).setValues([updated]);
+  SpreadsheetApp.flush();
+
+  var saved = usersSheet.getRange(found.rowNumber, 1, 1, USER_HEADERS.length).getValues()[0];
+  if (String(saved[9] || "").trim() !== memberId) throw new Error("Sinkronisasi Users gagal: Member ID tidak sesuai.");
+  if (String(saved[3] || "") !== String(old[3] || "")) throw new Error("Sinkronisasi Users gagal: Password Hash berubah secara tidak sah.");
+
+  return { success: true, skipped: false, found: true, row: found.rowNumber, memberId: memberId, user: userRowToObject(saved), message: "Users berhasil disinkronkan dengan Anggota." };
+}
+
+var MEMBER_HEADERS = [
+  "ID Anggota",
+  "Nomor KTA",
+  "Nama Lengkap",
+  "Email",
+  "Nomor WhatsApp",
+  "Kwarda / Provinsi",
+  "Kwarcab / Kabupaten",
+  "Kwarran / Kecamatan",
+  "Gugus Depan / Pangkalan",
+  "Krida",
+  "Status Verifikasi",
+  "Foto URL",
+  "Tanggal Daftar",
+  "Link Verifikasi Cepat"
+];
+
+
+/* ============================================================
+ * RESPONSE JSON
+ * ============================================================ */
+
+function jsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function doPost(e) {
+
+/* ============================================================
+ * INISIALISASI SHEET
+ * ============================================================ */
+
+function getOrInitSheet(ss) {
+  var sheet = ss.getSheetByName(SHEET_MEMBER);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_MEMBER);
+  }
+
+  ensureHeaders(sheet);
+
+  return sheet;
+}
+
+
+/* ============================================================
+ * MEMASTIKAN HEADER
+ * ============================================================ */
+
+function ensureHeaders(sheet) {
+
+  var requiredColumns = MEMBER_HEADERS.length;
+
+  if (sheet.getMaxColumns() < requiredColumns) {
+    sheet.insertColumnsAfter(
+      sheet.getMaxColumns(),
+      requiredColumns - sheet.getMaxColumns()
+    );
+  }
+
+  var currentHeaders = sheet
+    .getRange(1, 1, 1, requiredColumns)
+    .getValues()[0];
+
+  var needsUpdate = false;
+
+  for (var i = 0; i < requiredColumns; i++) {
+
+    if (
+      String(currentHeaders[i] || "").trim() !==
+      MEMBER_HEADERS[i]
+    ) {
+      needsUpdate = true;
+      break;
+    }
+
+  }
+
+  if (needsUpdate) {
+
+    sheet
+      .getRange(1, 1, 1, requiredColumns)
+      .setValues([MEMBER_HEADERS]);
+
+    sheet
+      .getRange(1, 1, 1, requiredColumns)
+      .setFontWeight("bold");
+
+  }
+
+}
+
+
+/* ============================================================
+ * HELPER DATA ANGGOTA
+ *
+ * Menormalkan nama properti dari beberapa versi frontend dan
+ * memastikan Base64 foto tidak pernah ditulis langsung ke Sheet.
+ * ============================================================ */
+function firstNonEmpty_(obj, keys, fallback) {
+  obj = obj || {};
+  for (var i = 0; i < keys.length; i++) {
+    var value = obj[keys[i]];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return value;
+    }
+  }
+  return fallback === undefined ? "" : fallback;
+}
+
+function sanitizeSheetValue_(value, fieldName) {
+  if (value === undefined || value === null) return "";
+  var text = String(value);
+  // Google Sheets: maksimum 50.000 karakter per sel.
+  if (text.length > 50000) {
+    throw new Error("Data pada kolom " + fieldName + " melebihi batas 50.000 karakter.");
+  }
+  return value;
+}
+
+function uploadMemberAvatarIfBase64_(avatarValue, filenameHint) {
+  var value = String(avatarValue || "").trim();
+  if (!value) return "";
+  if (!/^data:image\//i.test(value)) return value;
+
+  var match = value.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/s);
+  if (!match) throw new Error("Format Base64 foto anggota tidak valid.");
+
+  var encoded = match[2] || "";
+  if (encoded.length > 12 * 1024 * 1024) {
+    throw new Error("Foto anggota terlalu besar untuk diunggah.");
+  }
+
+  var bytes = Utilities.base64Decode(encoded);
+  var mime = match[1];
+  var extension = mime.split("/")[1].toLowerCase().replace("jpeg", "jpg");
+  var filename = String(filenameHint || ("member_" + new Date().getTime()))
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
+  if (!/\.[a-z0-9]+$/i.test(filename)) filename += "." + extension;
+
+  var folder = getDriveFolderForCategory("MEMBER_AVATAR");
+  var file = folder.createFile(Utilities.newBlob(bytes, mime, filename));
   try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Tidak ada payload data" }))
-        .setMimeType(ContentService.MimeType.JSON);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (sharingError) {
+    console.log("Peringatan sharing Drive: " + sharingError);
+  }
+
+  return "https://lh3.googleusercontent.com/d/" + file.getId();
+}
+
+function memberObjectToRow_(m) {
+  m = m || {};
+  var memberId = firstNonEmpty_(m, ["id", "memberId", "idAnggota"]);
+  var kta = firstNonEmpty_(m, ["nationalMemberNumber", "ktaNumber", "nomorKTA", "kta", "nationalMemberNo"]);
+  var name = firstNonEmpty_(m, ["fullName", "namaLengkap", "name", "nama"]);
+  var email = firstNonEmpty_(m, ["email", "emailAddress"]);
+  var phone = firstNonEmpty_(m, ["phone", "noHp", "nomorWhatsApp", "whatsapp", "phoneNumber"]);
+  var province = firstNonEmpty_(m, ["provinceName", "province", "kwarda", "kwardaName"]);
+  var regency = firstNonEmpty_(m, ["regencyName", "regency", "kwarcab", "kwarcabName"]);
+  var district = firstNonEmpty_(m, ["districtName", "district", "branchName", "kwarran", "kwarranName"]);
+  var gudep = firstNonEmpty_(m, ["gugusDepan", "gugusDepanName", "pangkalan", "gudep"]);
+  var krida = firstNonEmpty_(m, ["krida", "kridaName"]);
+  var status = firstNonEmpty_(m, ["status", "verificationStatus", "statusVerifikasi"], "PENDING");
+  var avatar = firstNonEmpty_(m, ["avatarUrl", "photoUrl", "fotoUrl", "foto", "profilePhoto"]);
+  var registeredAt = firstNonEmpty_(m, ["registeredAt", "tanggalDaftar", "createdAt"], new Date().toISOString());
+  var verificationLink = firstNonEmpty_(m, ["verificationLink", "linkVerifikasi", "quickVerificationLink"]);
+
+  // Jika frontend masih mengirim Base64, unggah otomatis ke Drive terlebih dahulu.
+  avatar = uploadMemberAvatarIfBase64_(avatar, "member_" + String(memberId || new Date().getTime()));
+
+  return [
+    memberId, kta, name, email, phone, province, regency, district,
+    gudep, krida, status, avatar, registeredAt, verificationLink
+  ];
+}
+
+function deleteDriveFileByUrl_(url) {
+  var value = String(url || "").trim();
+  if (!value || /^data:image\//i.test(value)) return { found: false, deleted: false };
+
+  var match = value.match(/(?:\/d\/|id=)([a-zA-Z0-9_-]{10,})/);
+  if (!match) return { found: false, deleted: false };
+
+  try {
+    var file = DriveApp.getFileById(match[1]);
+    file.setTrashed(true);
+    return { found: true, deleted: true, fileId: match[1] };
+  } catch (err) {
+    console.log("File Drive tidak dapat dihapus: " + err);
+    return { found: true, deleted: false, fileId: match[1], message: String(err) };
+  }
+}
+
+function deleteMemberRow_(sheet, memberId, memberKta, deleteDriveFile) {
+  var found = findMemberRow(sheet, memberId, memberKta);
+  if (!found) {
+    return { success: false, status: "error", found: false, message: "Anggota tidak ditemukan" };
+  }
+
+  var oldRow = sheet.getRange(found.rowNumber, 1, 1, MEMBER_HEADERS.length).getValues()[0];
+  var driveResult = { found: false, deleted: false };
+
+  if (deleteDriveFile !== false) {
+    driveResult = deleteDriveFileByUrl_(oldRow[11]);
+  }
+
+  sheet.deleteRow(found.rowNumber);
+  SpreadsheetApp.flush();
+
+  // Verifikasi bahwa baris dengan ID/KTA tersebut benar-benar sudah tidak ada.
+  var stillExists = findMemberRow(sheet, memberId, memberKta);
+  if (stillExists) {
+    return { success: false, status: "error", found: true, deleted: false, message: "Baris anggota gagal dihapus dari Spreadsheet" };
+  }
+
+  return {
+    success: true,
+    status: "success",
+    found: true,
+    deleted: true,
+    row: found.rowNumber,
+    memberId: String(memberId || ""),
+    drive: driveResult,
+    message: "Data anggota berhasil dihapus dari Spreadsheet"
+  };
+}
+
+/* ============================================================
+ * NORMALISASI DATA
+ * ============================================================ */
+
+function normalizeMemberRow(row) {
+
+  var result = [];
+
+  for (var i = 0; i < MEMBER_HEADERS.length; i++) {
+
+    if (
+      row &&
+      row[i] !== undefined &&
+      row[i] !== null
+    ) {
+      result.push(row[i]);
+    } else {
+      result.push("");
     }
 
-    var body;
-    try {
-      body = JSON.parse(e.postData.contents);
-    } catch (parseErr) {
-      body = e.parameter || {};
+  }
+
+  return result;
+}
+
+
+/* ============================================================
+ * MENCARI ANGGOTA
+ *
+ * Berdasarkan:
+ * - ID Anggota
+ * - Nomor KTA
+ * ============================================================ */
+
+function findMemberRow(sheet, memberId, memberKta, memberEmail) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return null;
+  var values = sheet.getRange(2, 1, lastRow - 1, MEMBER_HEADERS.length).getValues();
+  var id = String(memberId || "").trim();
+  var kta = String(memberKta || "").trim();
+  var email = String(memberEmail || "").trim().toLowerCase();
+
+  // Identitas utama: Member ID -> Nomor KTA -> Email.
+  for (var i = 0; i < values.length; i++) {
+    if (id && String(values[i][0] || "").trim() === id) return { rowNumber: i + 2, index: i };
+  }
+  for (var j = 0; j < values.length; j++) {
+    if (kta && String(values[j][1] || "").trim() === kta) return { rowNumber: j + 2, index: j };
+  }
+  for (var k = 0; k < values.length; k++) {
+    if (email && String(values[k][3] || "").trim().toLowerCase() === email) return { rowNumber: k + 2, index: k };
+  }
+  return null;
+}
+
+function removeDuplicateMemberRows_(sheet, keepRowNumber, memberId, kta, email) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 0;
+  var values = sheet.getRange(2, 1, lastRow - 1, MEMBER_HEADERS.length).getValues();
+  var id = String(memberId || "").trim();
+  var k = String(kta || "").trim();
+  var em = String(email || "").trim().toLowerCase();
+  var deleteRows = [];
+
+  for (var i = 0; i < values.length; i++) {
+    var rowNumber = i + 2;
+    if (rowNumber === keepRowNumber) continue;
+    var rowId = String(values[i][0] || "").trim();
+    var rowKta = String(values[i][1] || "").trim();
+    var rowEmail = String(values[i][3] || "").trim().toLowerCase();
+    if ((em && rowEmail === em) || (k && rowKta === k) || (id && rowId === id)) {
+      deleteRows.push(rowNumber);
     }
+  }
 
-    var ss = getActiveOrConfiguredSpreadsheet();
-    var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
+  for (var d = deleteRows.length - 1; d >= 0; d--) sheet.deleteRow(deleteRows[d]);
+  return deleteRows.length;
+}
 
-    // 1. AKSI INISIALISASI STRUKTUR SUBFOLDER DI GOOGLE DRIVE (TANPA DUPLIKASI)
-    if (body.action === "SETUP_DRIVE_FOLDERS" || (e.parameter && e.parameter.action === "SETUP_DRIVE_FOLDERS")) {
-      var res = inisialisasiFolderGoogleDrive();
-      return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
-    }
+/* ============================================================
+ * GET
+ *
+ * Digunakan oleh Web App untuk membaca anggota.
+ *
+ * Contoh:
+ * ?action=CHECK_RECORD&id=ABC123
+ *
+ * atau:
+ * ?action=CHECK_RECORD&secondaryId=KTA123
+ * ============================================================ */
 
-    // 2. AKSI UPLOAD GAMBAR TUNGGAL KE GOOGLE DRIVE
-    if (body.action === "UPLOAD_DRIVE_IMAGE") {
-      var targetSubfolder = getCategorySubfolder(rootFolder, body.category || "MEMBER_AVATAR");
-      
-      var base64Data = (body.base64 || "").replace(/^data:image\\/\\w+;base64,/, "");
-      if (!base64Data) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Data base64 gambar kosong" }))
-          .setMimeType(ContentService.MimeType.JSON);
-      }
+function doGet(e) {
 
-      var decoded = Utilities.base64Decode(base64Data);
-      var filename = body.filename || ("saka_photo_" + Date.now() + ".jpg");
-      
-      // Hapus file lama dengan nama persis sama di folder tujuan agar tidak berlipat ganda
-      var oldFiles = targetSubfolder.getFilesByName(filename);
-      while (oldFiles.hasNext()) {
-        oldFiles.next().setTrashed(true);
-      }
+  try {
 
-      var blob = Utilities.newBlob(decoded, body.mimeType || "image/jpeg", filename);
-      var file = targetSubfolder.createFile(blob);
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      
-      var directUrl = "https://lh3.googleusercontent.com/d/" + file.getId();
-      var viewUrl = file.getUrl();
+    var params =
+      e && e.parameter
+        ? e.parameter
+        : {};
 
-      return ContentService.createTextOutput(JSON.stringify({
+    var action =
+      String(params.action || "").trim().toUpperCase();
+
+    /* --------------------------------------------------------
+     * PING / STATUS API
+     * Tidak membaca seluruh Spreadsheet.
+     * -------------------------------------------------------- */
+
+    if (action === "PING" || action === "STATUS") {
+
+      var pingSs = getSpreadsheet();
+
+      return jsonResponse({
+        success: true,
         status: "success",
-        fileId: file.getId(),
-        directUrl: directUrl,
-        viewUrl: viewUrl,
-        folderName: targetSubfolder.getName()
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // 3. AKSI BATCH SINKRONISASI SELURUH DATA & ANTI DATA GANDA (SYNC_ALL_DATA)
-    if (body.action === "SYNC_ALL_DATA") {
-      var driveSubfolders = setupAllSubfolders(rootFolder);
-      var avatarFolder = driveSubfolders["01_Pas_Foto_KTA_Anggota"];
-
-      // Proses dan simpan foto anggota jika dalam format base64
-      var processedMembers = (body.members || []).map(function(row) {
-        var photoUrl = row[11]; // Kolom Foto URL
-        if (photoUrl && typeof photoUrl === "string" && photoUrl.indexOf("data:image") === 0) {
-          try {
-            var b64 = photoUrl.replace(/^data:image\\/\\w+;base64,/, "");
-            var dec = Utilities.base64Decode(b64);
-            var memberNtaOrId = row[1] || row[0] || Date.now();
-            var memberName = (row[2] || "Anggota").replace(/[^a-zA-Z0-9]/g, "_");
-            var fName = "KTA_" + memberNtaOrId + "_" + memberName + ".jpg";
-            
-            // Hapus file foto lama jika sudah ada
-            var oldAvatar = avatarFolder.getFilesByName(fName);
-            while (oldAvatar.hasNext()) {
-              oldAvatar.next().setTrashed(true);
-            }
-
-            var blb = Utilities.newBlob(dec, "image/jpeg", fName);
-            var f = avatarFolder.createFile(blb);
-            f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-            row[11] = "https://lh3.googleusercontent.com/d/" + f.getId();
-          } catch (imgErr) {
-            // Keep original if error
-          }
-        }
-        return row;
+        action: "PING",
+        spreadsheet: pingSs.getName(),
+        message: "Google Apps Script aktif"
       });
 
-      // Tulis / Update (Upsert) ke masing-masing Sheet
-      syncSheetData(ss, "Anggota", [
-        "ID", "Nomor KTA", "Nama Lengkap", "Email", "Nomor WA", "Provinsi", "Kabupaten/Kota", 
-        "Kwarran/Kecamatan", "Gudep", "Krida", "Status", "Foto URL", "Tanggal Daftar", "Link Verifikasi"
-      ], processedMembers);
-
-      syncSheetData(ss, "Paket_Wisata", [
-        "ID", "Nama Paket", "Kategori", "Harga", "Durasi (Hari)", "Lokasi", "Provinsi", 
-        "Kabupaten/Kota", "Penyelenggara", "Kontak WA", "Foto Banner", "Waktu Diperbarui"
-      ], body.tours || []);
-
-      syncSheetData(ss, "Kuliner_Cinderamata", [
-        "ID", "Nama Produk", "Jenis", "Kategori", "Harga", "Produsen/Pengrajin", "Kontak WA", 
-        "Provinsi", "Kabupaten/Kota", "Foto Produk", "Sertifikasi Halal", "Waktu Diperbarui"
-      ], body.culinary || []);
-
-      syncSheetData(ss, "Agenda_Kegiatan", [
-        "ID", "Nama Agenda", "Kategori", "Skala Tingkat", "Penyelenggara", "Lokasi", 
-        "Provinsi", "Tanggal Mulai", "Tanggal Selesai", "Jenis Biaya", "Nominal Biaya", 
-        "Kontak Narahubung", "Didaftarkan Oleh", "Waktu Diperbarui"
-      ], body.activities || []);
-
-      // Buat file rekapitulasi data di Google Drive (gantikan rekap lama)
-      var rekapText = "REKAPITULASI DATABASE SAKA PARIWISATA INDONESIA\\n" +
-        "Waktu Sinkronisasi: " + new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB\\n" +
-        "Jumlah Anggota: " + (body.members ? body.members.length : 0) + "\\n" +
-        "Jumlah Paket Wisata: " + (body.tours ? body.tours.length : 0) + "\\n" +
-        "Jumlah Kuliner & Cinderamata: " + (body.culinary ? body.culinary.length : 0) + "\\n" +
-        "Jumlah Agenda Kegiatan: " + (body.activities ? body.activities.length : 0) + "\\n";
-      
-      var oldRekap = rootFolder.getFilesByName("REKAP_DATABASE_TERBARU.txt");
-      while (oldRekap.hasNext()) {
-        oldRekap.next().setTrashed(true);
-      }
-
-      var rekapBlob = Utilities.newBlob(rekapText, "text/plain", "REKAP_DATABASE_TERBARU.txt");
-      rootFolder.createFile(rekapBlob);
-
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "success",
-        message: "Seluruh data dan foto berhasil disinkronkan ke Google Spreadsheet dan Google Drive tanpa duplikasi."
-      })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 4. AKSI HAPUS BARIS TERTENTU (DELETE_ROW)
-    if (body.action === "DELETE_ROW") {
-      var targetSheetName = body.sheet || "Anggota";
-      if (!ss) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Spreadsheet tidak dapat diakses." })).setMimeType(ContentService.MimeType.JSON);
-      }
-      var targetSheet = ss.getSheetByName(targetSheetName);
-      if (!targetSheet) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Sheet tidak ada, tidak ada yang dihapus." })).setMimeType(ContentService.MimeType.JSON);
-      }
 
-      var delId = String(body.id || "").trim();
-      var delSecId = String(body.secondaryId || "").trim();
-      var sheetVals = targetSheet.getDataRange().getValues();
+    /* --------------------------------------------------------
+     * SETUP DRIVE FOLDERS
+     *
+     * Dipanggil oleh tombol "Inisialisasi Folder di Google Drive"
+     * pada Dashboard.
+     * -------------------------------------------------------- */
 
-      for (var rowIdx = sheetVals.length - 1; rowIdx >= 1; rowIdx--) {
-        var cell1 = String(sheetVals[rowIdx][0] || "").trim();
-        var cell2 = String(sheetVals[rowIdx][1] || "").trim();
-        if ((delId && cell1 === delId) || (delSecId && cell2 === delSecId)) {
-          targetSheet.deleteRow(rowIdx + 1);
-          break;
-        }
-      }
+    if (action === "SETUP_DRIVE_FOLDERS") {
 
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "success",
-        message: "Data " + delId + " berhasil dihapus dari " + targetSheetName
-      })).setMimeType(ContentService.MimeType.JSON);
+      return jsonResponse(
+        inisialisasiFolderGoogleDrive()
+      );
+
     }
 
-    // 5. AKSI TULIS BARIS TUNGGAL DENGAN UPSERT (CEK DUPLIKASI ID & KTA)
-    var sheetName = body.sheet || "Anggota";
-    if (!ss) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Spreadsheet tidak dapat diakses." })).setMimeType(ContentService.MimeType.JSON);
+
+    var ss =
+      getSpreadsheet();
+
+    var sheetName =
+      SHEET_MEMBER;
+
+    if (params.sheet) {
+      sheetName =
+        String(params.sheet).trim();
     }
-    var sheet = ss.getSheetByName(sheetName);
+
+    var sheet =
+      ss.getSheetByName(sheetName);
+
     if (!sheet) {
-      sheet = ss.insertSheet(sheetName);
+
+      return jsonResponse({
+        success: true,
+        found: false,
+        data: [],
+        message: "Sheet belum ada"
+      });
+
     }
 
-    if (body.rowData && Array.isArray(body.rowData)) {
-      var rowId = String(body.memberId || body.itemId || body.rowData[0] || "").trim();
-      var rowKta = body.rowData[1] ? String(body.rowData[1]).trim() : "";
-      var dataRange = sheet.getDataRange();
-      var values = dataRange.getValues();
-      var targetRowIndex = -1;
 
-      if (values.length > 1 && (rowId || rowKta)) {
-        for (var r = 1; r < values.length; r++) {
-          var cellId = String(values[r][0] || "").trim();
-          var cellKta = String(values[r][1] || "").trim();
-          if ((rowId && cellId === rowId) || (rowKta && rowKta.length > 5 && cellKta === rowKta)) {
-            targetRowIndex = r + 1; // 1-indexed for Sheet range
-            break;
-          }
+    /* --------------------------------------------------------
+     * CHECK RECORD
+     * -------------------------------------------------------- */
+
+    if (action === "CHECK_RECORD") {
+
+      var checkId =
+        String(params.id || "").trim();
+
+      var checkSecondaryId =
+        String(params.secondaryId || "").trim();
+
+      var lastRow =
+        sheet.getLastRow();
+
+      if (lastRow <= 1) {
+
+        return jsonResponse({
+          success: true,
+          found: false,
+          message: "Belum ada data anggota"
+        });
+
+      }
+
+      var values =
+        sheet
+          .getRange(
+            2,
+            1,
+            lastRow - 1,
+            MEMBER_HEADERS.length
+          )
+          .getValues();
+
+      for (
+        var r = 0;
+        r < values.length;
+        r++
+      ) {
+
+        var rowId =
+          String(values[r][0] || "").trim();
+
+        var rowKta =
+          String(values[r][1] || "").trim();
+
+        if (
+          (checkId && rowId === checkId) ||
+          (checkSecondaryId && rowKta === checkSecondaryId)
+        ) {
+
+          return jsonResponse({
+            success: true,
+            found: true,
+            row: r + 2,
+            status:
+              values[r][10] || "PENDING",
+            message: "Record ditemukan"
+          });
+
         }
+
       }
 
-      if (targetRowIndex > 0) {
-        sheet.getRange(targetRowIndex, 1, 1, body.rowData.length).setValues([body.rowData]);
-      } else {
-        sheet.appendRow(body.rowData);
-      }
+      return jsonResponse({
+        success: true,
+        found: false,
+        message: "Record belum tercatat"
+      });
+
     }
 
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "success",
-      message: "Data berhasil disimpan dan disinkronkan ke sheet " + sheetName
-    })).setMimeType(ContentService.MimeType.JSON);
+
+    /* --------------------------------------------------------
+     * DEFAULT GET
+     *
+     * Untuk kompatibilitas dengan aplikasi yang membaca data
+     * menggunakan ?sheet=Anggota.
+     *
+     * Jika URL dibuka langsung tanpa action dan tanpa sheet,
+     * JANGAN keluarkan seluruh database ke browser.
+     * -------------------------------------------------------- */
+
+    if (!params.sheet) {
+
+      return jsonResponse({
+        success: true,
+        status: "success",
+        action: "PING",
+        message: "Google Apps Script aktif. Gunakan action atau parameter sheet."
+      });
+
+    }
+
+    var lastRowDefault =
+      sheet.getLastRow();
+
+    if (lastRowDefault <= 1) {
+      return jsonResponse([]);
+    }
+
+    var data =
+      sheet
+        .getRange(
+          1,
+          1,
+          lastRowDefault,
+          MEMBER_HEADERS.length
+        )
+        .getValues();
+
+    var result = [];
+
+    for (
+      var i = 1;
+      i < data.length;
+      i++
+    ) {
+
+      var row =
+        data[i];
+
+      var hasIdentity =
+        String(row[0] || "").trim() ||
+        String(row[1] || "").trim() ||
+        String(row[2] || "").trim();
+
+      if (!hasIdentity) {
+        continue;
+      }
+
+      var item = {};
+
+      for (
+        var h = 0;
+        h < MEMBER_HEADERS.length;
+        h++
+      ) {
+
+        item[MEMBER_HEADERS[h]] =
+          row[h] !== undefined
+            ? row[h]
+            : "";
+
+      }
+
+      result.push(item);
+
+    }
+
+    return jsonResponse(result);
+
 
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
+
+    return jsonResponse({
+      success: false,
       status: "error",
-      message: err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+      message:
+        err && err.message
+          ? err.message
+          : String(err)
+    });
+
   }
+
 }
 
-function getOrCreateDriveFolder(folderId) {
-  if (folderId && typeof folderId === "string" && folderId.trim()) {
-    try {
-      var folder = DriveApp.getFolderById(folderId.trim());
-      if (folder && !folder.isTrashed()) return folder;
-    } catch (err) {
-      Logger.log("getFolderById info: " + err.toString());
-    }
-  }
+/* ============================================================
+ * POST
+ *
+ * Semua transaksi dari aplikasi web masuk melalui sini.
+ * ============================================================ */
+
+function doPost(e) {
+
+  var lock =
+    LockService.getScriptLock();
+
 
   try {
-    var existing = DriveApp.getRootFolder().getFoldersByName("SAKA_PARIWISATA_DATABASE_MEDIA");
-    while (existing.hasNext()) {
-      var f = existing.next();
-      if (!f.isTrashed()) return f;
+
+    lock.waitLock(30000);
+
+
+    /* --------------------------------------------------------
+     * VALIDASI PAYLOAD
+     * -------------------------------------------------------- */
+
+    if (
+      !e ||
+      !e.postData ||
+      !e.postData.contents
+    ) {
+
+      return jsonResponse({
+        success: false,
+        status: "error",
+        message: "Payload kosong"
+      });
+
     }
 
-    var newRoot = DriveApp.getRootFolder().createFolder("SAKA_PARIWISATA_DATABASE_MEDIA");
-    newRoot.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return newRoot;
-  } catch (driveErr) {
-    Logger.log("Drive root error: " + driveErr.toString());
-    return DriveApp.getRootFolder();
-  }
-}
 
-function setupAllSubfolders(rootFolder) {
-  // Pengaman: Jika fungsi dijalankan langsung dari dropdown Apps Script tanpa parameter
-  if (!rootFolder || typeof rootFolder.getFoldersByName !== "function") {
-    rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
-  }
-  if (!rootFolder || typeof rootFolder.getFoldersByName !== "function") {
-    rootFolder = DriveApp.getRootFolder();
-  }
+    /* --------------------------------------------------------
+     * PARSE JSON
+     * -------------------------------------------------------- */
 
-  var folderNames = [
-    "01_Pas_Foto_KTA_Anggota",
-    "02_Paket_Wisata",
-    "03_Kuliner_dan_Cinderamata",
-    "04_Agenda_Kegiatan",
-    "05_Dokumen_dan_Surat"
-  ];
+    var body = null;
 
-  var map = {};
-  folderNames.forEach(function(fName) {
+
     try {
-      var it = rootFolder.getFoldersByName(fName);
-      var found = null;
-      while (it && it.hasNext()) {
-        var f = it.next();
-        if (!f.isTrashed()) {
-          found = f;
-          break;
-        }
+
+      body =
+        JSON.parse(
+          e.postData.contents
+        );
+
+    } catch (parseError) {
+
+      body =
+        e.parameter || {};
+
+    }
+
+
+    if (!body) {
+
+      return jsonResponse({
+        success: false,
+        status: "error",
+        message: "Payload tidak valid"
+      });
+
+    }
+
+
+    /* --------------------------------------------------------
+     * SPREADSHEET
+     * -------------------------------------------------------- */
+
+    var ss =
+      getSpreadsheet();
+
+    var sheet =
+      getOrInitSheet(ss);
+
+
+    /* ========================================================
+     * AUTHENTICATION STORAGE
+     * Password hanya disimpan sebagai hash.
+     * ======================================================== */
+    if (body.action === "UPSERT_USER") {
+      return jsonResponse(upsertUserRecord(body.user || {}));
+    }
+
+    if (body.action === "AUTH_GET_USER") {
+      var usersSheet = getOrInitUsersSheet(ss);
+      var userFound = findUserRow(usersSheet, body.identifier || "");
+      if (!userFound) return jsonResponse({ success: true, status: "success", found: false, message: "Akun tidak ditemukan" });
+      return jsonResponse({ success: true, status: "success", found: true, row: userFound.rowNumber, user: userRowToObject(userFound.values), message: "Akun ditemukan" });
+    }
+
+    /* ========================================================
+     * ACTION 1
+     *
+     * UPDATE_AUTH_STATUS
+     *
+     * Mengubah:
+     * ACTIVE
+     * PENDING
+     * SUSPENDED
+     * ======================================================== */
+
+    if (
+      body.action ===
+      "UPDATE_AUTH_STATUS"
+    ) {
+
+      var authMemberId =
+        String(
+          body.memberId || ""
+        ).trim();
+
+
+      var authStatus =
+        String(
+          body.status || "PENDING"
+        )
+        .trim()
+        .toUpperCase();
+
+
+      var allowedStatuses = [
+        "ACTIVE",
+        "PENDING",
+        "SUSPENDED"
+      ];
+
+
+      if (
+        allowedStatuses.indexOf(
+          authStatus
+        ) === -1
+      ) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "Status tidak valid: " +
+            authStatus
+        });
+
       }
+
+
+      if (!authMemberId) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "memberId wajib diisi"
+        });
+
+      }
+
+
+      var authFound =
+        findMemberRow(
+          sheet,
+          authMemberId,
+          ""
+        );
+
+
+      if (!authFound) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "Anggota dengan ID " +
+            authMemberId +
+            " tidak ditemukan"
+        });
+
+      }
+
+
+      /* Kolom K = 11 */
+
+      sheet
+        .getRange(
+          authFound.rowNumber,
+          11
+        )
+        .setValue(authStatus);
+
+
+      SpreadsheetApp.flush();
+
+
+      var savedStatus =
+        String(
+          sheet
+            .getRange(
+              authFound.rowNumber,
+              11
+            )
+            .getValue() || ""
+        )
+        .trim()
+        .toUpperCase();
+
+
+      if (
+        savedStatus !==
+        authStatus
+      ) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "Status gagal disimpan"
+        });
+
+      }
+
+
+      return jsonResponse({
+        success: true,
+        status: "success",
+        action:
+          "UPDATE_AUTH_STATUS",
+        memberId:
+          authMemberId,
+        newStatus:
+          savedStatus,
+        row:
+          authFound.rowNumber,
+        message:
+          "Status anggota berhasil diperbarui"
+      });
+
+    }
+
+
+    /* ========================================================
+     * ACTION 1.5
+     *
+     * UPLOAD_IMAGE
+     *
+     * Menerima data:image/* Base64 hanya untuk dibuat menjadi file
+     * Google Drive. Base64 TIDAK pernah ditulis ke Spreadsheet.
+     * ======================================================== */
+
+    if (body.action === "UPLOAD_IMAGE" || body.action === "UPLOAD_DRIVE_IMAGE") {
+
+      var imageBase64 = String(body.base64 || "").trim();
+      var imageFilename = String(body.filename || ("image_" + new Date().getTime() + ".jpg")).trim();
+      var imageCategory = String(body.category || "MEMBER_AVATAR").trim().toUpperCase();
+
+      if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(imageBase64)) {
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message: "Data gambar tidak valid."
+        });
+      }
+
+      var MAX_IMAGE_BASE64 = 12 * 1024 * 1024;
+      if (imageBase64.length > MAX_IMAGE_BASE64) {
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message: "Data gambar terlalu besar."
+        });
+      }
+
+      var imageMatch = imageBase64.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/s);
+      if (!imageMatch) {
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message: "Format Base64 gambar tidak valid."
+        });
+      }
+
+      var mimeType = imageMatch[1];
+      var bytes = Utilities.base64Decode(imageMatch[2]);
+      var blob = Utilities.newBlob(bytes, mimeType, imageFilename);
+
+      // Simpan foto ke subfolder sesuai kategori.
+      // Jika subfolder belum ada, sistem membuatnya otomatis.
+      var folder = getDriveFolderForCategory(imageCategory);
+      var file = folder.createFile(blob);
+
+      file.setName(imageFilename);
+
+      try {
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (sharingError) {
+        console.log("Peringatan sharing Drive: " + sharingError);
+      }
+
+      var fileId = file.getId();
+      var directUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+      var viewUrl = "https://drive.google.com/file/d/" + fileId + "/view";
+
+      return jsonResponse({
+        success: true,
+        status: "success",
+        action: body.action,
+        fileId: fileId,
+        url: directUrl,
+        directUrl: directUrl,
+        viewUrl: viewUrl,
+        category: imageCategory,
+        filename: imageFilename,
+        folderId: folder.getId(),
+        folderUrl: "https://drive.google.com/drive/folders/" + folder.getId(),
+        message: "Foto berhasil disimpan ke Google Drive"
+      });
+    }
+
+
+    /* ========================================================
+     * ACTION 1.6
+     *
+     * CHECK_DRIVE_FILE
+     *
+     * Memverifikasi file foto berdasarkan nama file dan kategori.
+     * Dipakai oleh frontend lama/kompatibel untuk memastikan
+     * upload Drive benar-benar selesai sebelum data anggota
+     * disimpan.
+     * ======================================================== */
+
+    if (body.action === "CHECK_DRIVE_FILE") {
+
+      var checkFilename = String(body.filename || "").trim();
+
+      if (!checkFilename) {
+        return jsonResponse({
+          success: false,
+          status: "error",
+          found: false,
+          message: "filename wajib diisi"
+        });
+      }
+
+      var checkFolderId = "16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh";
+      var checkFolder = DriveApp.getFolderById(checkFolderId);
+      var files = checkFolder.getFilesByName(checkFilename);
+
+      if (!files.hasNext()) {
+        return jsonResponse({
+          success: true,
+          status: "success",
+          found: false,
+          filename: checkFilename,
+          message: "File belum ditemukan di Google Drive"
+        });
+      }
+
+      var driveFile = files.next();
+      var driveFileId = driveFile.getId();
+      var driveDirectUrl =
+        "https://lh3.googleusercontent.com/d/" + driveFileId;
+      var driveViewUrl =
+        "https://drive.google.com/file/d/" + driveFileId + "/view";
+
+      return jsonResponse({
+        success: true,
+        status: "success",
+        found: true,
+        fileId: driveFileId,
+        filename: driveFile.getName(),
+        directUrl: driveDirectUrl,
+        url: driveDirectUrl,
+        viewUrl: driveViewUrl,
+        message: "File Drive berhasil diverifikasi"
+      });
+    }
+
+
+    /* ========================================================
+     * ACTION 2
+     *
+     * UPSERT_MEMBER
+     * ======================================================== */
+
+    if (
+      body.action ===
+      "UPSERT_MEMBER"
+    ) {
+
+      var row =
+        body.rowData || null;
+
+
+      /* ------------------------------------------------------
+       * Jika data dikirim sebagai object member
+       * ------------------------------------------------------ */
+
+      if (
+        !row &&
+        body.member
+      ) {
+
+        var m =
+          body.member;
+
+
+        row = memberObjectToRow_(m);
+
+      }
+
+
+      if (
+        !row ||
+        !Array.isArray(row)
+      ) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "rowData atau member wajib diisi"
+        });
+
+      }
+
+
+      row =
+        normalizeMemberRow(row);
+
+      // Jangan pernah menulis Base64 mentah ke Google Sheets.
+      if (/^data:image\//i.test(String(row[11] || "").trim())) {
+        row[11] = uploadMemberAvatarIfBase64_(row[11], "member_" + String(row[0] || new Date().getTime()));
+      }
+
+      for (var safeIndex = 0; safeIndex < row.length; safeIndex++) {
+        row[safeIndex] = sanitizeSheetValue_(row[safeIndex], MEMBER_HEADERS[safeIndex]);
+      }
+
+
+      var rowId =
+        String(
+          body.memberId ||
+          row[0] ||
+          ""
+        ).trim();
+
+
+      var rowKta =
+        String(
+          row[1] || ""
+        ).trim();
+
+
+      if (!rowId) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "ID Anggota wajib diisi"
+        });
+
+      }
+
+
+      var found =
+        findMemberRow(
+          sheet,
+          rowId,
+          rowKta,
+          row[3]
+        );
+
+
+      var targetRow = 0;
+
+
+      /* ------------------------------------------------------
+       * UPDATE DATA LAMA
+       * ------------------------------------------------------ */
 
       if (found) {
-        map[fName] = found;
+
+        targetRow =
+          found.rowNumber;
+
+
+        var oldRow =
+          sheet
+            .getRange(
+              targetRow,
+              1,
+              1,
+              MEMBER_HEADERS.length
+            )
+            .getValues()[0];
+
+
+        var mergedRow = [];
+
+
+        for (
+          var c = 0;
+          c < MEMBER_HEADERS.length;
+          c++
+        ) {
+
+          var incoming =
+            row[c];
+
+          var oldValue =
+            oldRow[c];
+
+
+          /* ID tidak boleh hilang */
+
+          if (c === 0) {
+            // ID transaksi menjadi ID kanonik. Record legacy seperti
+            // sheet-member-1 dikonversi ke SPW-XXXXXX.
+            mergedRow.push(incoming || oldValue || rowId);
+            continue;
+          }
+
+
+          /* Data kosong tidak menimpa data lama */
+
+          if (
+            incoming === "" ||
+            incoming === null ||
+            incoming === undefined
+          ) {
+
+            mergedRow.push(
+              oldValue
+            );
+
+          } else {
+
+            mergedRow.push(
+              incoming
+            );
+
+          }
+
+        }
+
+
+        sheet
+          .getRange(
+            targetRow,
+            1,
+            1,
+            MEMBER_HEADERS.length
+          )
+          .setValues([
+            mergedRow
+          ]);
+
+
       } else {
-        var target = rootFolder.createFolder(fName);
-        target.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        map[fName] = target;
+
+
+        /* ----------------------------------------------------
+         * TAMBAH ANGGOTA BARU
+         * ---------------------------------------------------- */
+
+        targetRow =
+          sheet.getLastRow() + 1;
+
+
+        if (targetRow < 2) {
+          targetRow = 2;
+        }
+
+
+        sheet
+          .getRange(
+            targetRow,
+            1,
+            1,
+            MEMBER_HEADERS.length
+          )
+          .setValues([
+            row
+          ]);
+
       }
-    } catch (subErr) {
-      Logger.log("Subfolder setup info (" + fName + "): " + subErr.toString());
-    }
-  });
 
-  return map;
-}
 
-function getCategorySubfolder(rootFolder, category) {
-  // Pengaman: Jika rootFolder kosong
-  if (!rootFolder || typeof rootFolder.getFoldersByName !== "function") {
-    rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
-  }
-  if (!rootFolder || typeof rootFolder.getFoldersByName !== "function") {
-    rootFolder = DriveApp.getRootFolder();
-  }
+      SpreadsheetApp.flush();
 
-  var targetName = "01_Pas_Foto_KTA_Anggota";
-  if (category === "TOUR_PACKAGES") targetName = "02_Paket_Wisata";
-  else if (category === "CULINARY_SOUVENIRS") targetName = "03_Kuliner_dan_Cinderamata";
-  else if (category === "DOCUMENTS" || category === "KTA_CARD") targetName = "05_Dokumen_dan_Surat";
-  else if (category === "ACTIVITIES") targetName = "04_Agenda_Kegiatan";
 
-  try {
-    var it = rootFolder.getFoldersByName(targetName);
-    var found = null;
-    while (it && it.hasNext()) {
-      var f = it.next();
-      if (!f.isTrashed()) {
-        found = f;
-        break;
+      /* ------------------------------------------------------
+       * VERIFIKASI DATA
+       * ------------------------------------------------------ */
+
+      var savedRow =
+        sheet
+          .getRange(
+            targetRow,
+            1,
+            1,
+            MEMBER_HEADERS.length
+          )
+          .getValues()[0];
+
+
+      var savedId =
+        String(
+          savedRow[0] || ""
+        ).trim();
+
+
+      var savedMemberStatus =
+        String(
+          savedRow[10] || ""
+        ).trim();
+
+
+      if (
+        savedId !== rowId
+      ) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "Verifikasi penyimpanan gagal"
+        });
+
       }
+
+      // Bersihkan record Anggota duplikat berdasarkan ID/KTA/email.
+      var duplicateCount = removeDuplicateMemberRows_(
+        sheet,
+        targetRow,
+        savedRow[0],
+        savedRow[1],
+        savedRow[3]
+      );
+
+      // Penghapusan baris di atas target dapat menggeser nomor baris.
+      // Cari ulang record kanonik berdasarkan ID.
+      var canonicalMember = findMemberRow(sheet, savedRow[0], savedRow[1], savedRow[3]);
+      if (canonicalMember) targetRow = canonicalMember.rowNumber;
+      savedRow = sheet.getRange(targetRow, 1, 1, MEMBER_HEADERS.length).getValues()[0];
+
+      // Setelah Anggota berhasil disimpan, sinkronkan profil akun Users
+      // berdasarkan Member ID. Password Hash tetap dipertahankan.
+      var syncMemberObject = {
+        id: savedRow[0],
+        nationalMemberNumber: savedRow[1],
+        fullName: savedRow[2],
+        email: savedRow[3],
+        phone: savedRow[4],
+        provinceName: savedRow[5],
+        regencyName: savedRow[6],
+        districtName: savedRow[7],
+        gugusDepan: savedRow[8],
+        krida: savedRow[9],
+        status: savedRow[10],
+        avatarUrl: savedRow[11],
+        registeredAt: savedRow[12],
+        verificationLink: savedRow[13]
+      };
+
+      var userSync = syncUserFromMember_(syncMemberObject);
+
+      return jsonResponse({
+        success: true,
+        status: "success",
+        action:
+          "UPSERT_MEMBER",
+        memberId:
+          savedId,
+        statusVerifikasi:
+          savedMemberStatus,
+        row:
+          targetRow,
+        userSync: userSync,
+        duplicateRemoved: duplicateCount,
+        message:
+          found
+            ? "Data anggota berhasil diperbarui"
+            : "Data anggota berhasil ditambahkan"
+      });
+
     }
 
-    if (found) {
-      return found;
-    } else {
-      var created = rootFolder.createFolder(targetName);
-      created.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      return created;
-    }
-  } catch (err) {
-    Logger.log("getCategorySubfolder error: " + err.toString());
-    return rootFolder;
-  }
-}
 
-function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
-  // Pengaman jika parameter ss tidak terkirim (misal fungsi dijalankan langsung dari tombol Run)
-  if (!ss) {
-    ss = getActiveOrConfiguredSpreadsheet();
-  }
-  if (!ss) {
-    Logger.log("⚠️ PERINGATAN: Spreadsheet tidak ditemukan atau tidak dapat diakses.");
-    return;
-  }
+    /* ========================================================
+     * ACTION 3
+     *
+     * DELETE MEMBER / REMOVE MEMBER / DELETE_ROW
+     * Menghapus baris anggota dari Spreadsheet dan, bila ada,
+     * memindahkan file foto terkait ke Trash Google Drive.
+     * ======================================================== */
 
-  if (!sheetName) sheetName = "Anggota";
-  if (!defaultHeaders) defaultHeaders = ["ID", "Nama Lengkap", "Waktu Diperbarui"];
+    if (
+      body.action === "DELETE" ||
+      body.action === "DELETE_MEMBER" ||
+      body.action === "REMOVE_MEMBER" ||
+      body.action === "DELETE_ROW"
+    ) {
+      var deleteSheetName = String(body.sheet || SHEET_MEMBER).trim();
 
-  var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
-    sheet.appendRow(defaultHeaders);
-  }
-  
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(defaultHeaders);
-  }
+      // Fokus utama DELETE_ROW dari aplikasi adalah sheet Anggota.
+      if (deleteSheetName === SHEET_MEMBER || deleteSheetName === "Anggota") {
+        var deleteMemberId = String(
+          body.memberId || body.id || (body.payload && (body.payload.memberId || body.payload.id)) || ""
+        ).trim();
+        var deleteMemberKta = String(
+          body.kta || body.secondaryId || body.nationalMemberNumber ||
+          (body.payload && (body.payload.kta || body.payload.nationalMemberNumber)) || ""
+        ).trim();
 
-  // Melakukan Upsert agar data di sheet tidak berlipat ganda
-  if (rowsData && rowsData.length > 0) {
-    var existingValues = sheet.getDataRange().getValues();
-    var idToRowIndex = {};
+        if (!deleteMemberId && !deleteMemberKta) {
+          return jsonResponse({ success: false, status: "error", message: "memberId atau nomor KTA wajib diisi untuk DELETE" });
+        }
 
-    for (var i = 1; i < existingValues.length; i++) {
-      var rowId = String(existingValues[i][0] || "").trim();
-      var rowKta = String(existingValues[i][1] || "").trim();
-      if (rowId) idToRowIndex[rowId] = i + 1;
-      if (rowKta && rowKta.length > 5) idToRowIndex[rowKta] = i + 1;
-    }
-
-    rowsData.forEach(function(row) {
-      var newId = String(row[0] || "").trim();
-      var newKta = String(row[1] || "").trim();
-      var targetIndex = idToRowIndex[newId] || (newKta && newKta.length > 5 ? idToRowIndex[newKta] : null);
-
-      if (targetIndex) {
-        sheet.getRange(targetIndex, 1, 1, row.length).setValues([row]);
-      } else {
-        sheet.appendRow(row);
-        var lastRow = sheet.getLastRow();
-        if (newId) idToRowIndex[newId] = lastRow;
-        if (newKta && newKta.length > 5) idToRowIndex[newKta] = lastRow;
+        return jsonResponse(deleteMemberRow_(sheet, deleteMemberId, deleteMemberKta, body.deleteDriveFile !== false));
       }
+
+      return jsonResponse({
+        success: false,
+        status: "error",
+        message: "DELETE untuk sheet " + deleteSheetName + " belum didukung oleh Code.gs"
+      });
+    }
+
+
+    /* ========================================================
+     * ACTION 4
+     *
+     * SYNC_ALL_DATA
+     *
+     * Menerima seluruh data anggota dari aplikasi web.
+     * Setiap anggota diproses sebagai UPSERT berdasarkan ID/KTA.
+     * ======================================================== */
+
+    if (body.action === "SYNC_ALL_DATA") {
+
+      var syncData = body.data || {};
+      var syncMembers = syncData.members || [];
+
+      if (!Array.isArray(syncMembers)) {
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message: "data.members harus berupa array"
+        });
+      }
+
+      var inserted = 0;
+      var updated = 0;
+      var skipped = 0;
+
+      for (var sm = 0; sm < syncMembers.length; sm++) {
+        var syncRow = syncMembers[sm];
+
+        if (!Array.isArray(syncRow)) {
+          skipped++;
+          continue;
+        }
+
+        syncRow = normalizeMemberRow(syncRow);
+
+        var syncId = String(syncRow[0] || "").trim();
+        var syncKta = String(syncRow[1] || "").trim();
+
+        if (!syncId) {
+          skipped++;
+          continue;
+        }
+
+        var syncFound = findMemberRow(sheet, syncId, syncKta);
+
+        if (syncFound) {
+          var syncOldRow = sheet
+            .getRange(syncFound.rowNumber, 1, 1, MEMBER_HEADERS.length)
+            .getValues()[0];
+
+          var syncMergedRow = [];
+
+          for (var sc = 0; sc < MEMBER_HEADERS.length; sc++) {
+            var incomingValue = syncRow[sc];
+            var oldValue = syncOldRow[sc];
+
+            if (incomingValue === "" || incomingValue === null || incomingValue === undefined) {
+              syncMergedRow.push(oldValue);
+            } else {
+              syncMergedRow.push(incomingValue);
+            }
+          }
+
+          syncMergedRow[0] = syncOldRow[0] || syncId;
+
+          sheet
+            .getRange(syncFound.rowNumber, 1, 1, MEMBER_HEADERS.length)
+            .setValues([syncMergedRow]);
+
+          updated++;
+        } else {
+          var newSyncRow = Math.max(sheet.getLastRow() + 1, 2);
+          sheet
+            .getRange(newSyncRow, 1, 1, MEMBER_HEADERS.length)
+            .setValues([syncRow]);
+
+          inserted++;
+        }
+      }
+
+      SpreadsheetApp.flush();
+
+      return jsonResponse({
+        success: true,
+        status: "success",
+        action: "SYNC_ALL_DATA",
+        inserted: inserted,
+        updated: updated,
+        skipped: skipped,
+        total: syncMembers.length,
+        message: "Sinkronisasi seluruh data anggota berhasil"
+      });
+    }
+
+
+    /* ========================================================
+     * ACTION 4
+     *
+     * VALIDATE_MEMBER
+     *
+     * Kompatibilitas sistem lama.
+     * ======================================================== */
+
+    if (
+      body.action ===
+      "VALIDATE_MEMBER"
+    ) {
+
+      var targetId =
+        String(
+          body.memberId || ""
+        ).trim();
+
+
+      var newStatus =
+        String(
+          body.status || "ACTIVE"
+        )
+        .trim()
+        .toUpperCase();
+
+
+      if (!targetId) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "memberId wajib diisi"
+        });
+
+      }
+
+
+      var validateFound =
+        findMemberRow(
+          sheet,
+          targetId,
+          ""
+        );
+
+
+      if (!validateFound) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "Anggota tidak ditemukan"
+        });
+
+      }
+
+
+      sheet
+        .getRange(
+          validateFound.rowNumber,
+          11
+        )
+        .setValue(newStatus);
+
+
+      SpreadsheetApp.flush();
+
+
+      var validateResult =
+        String(
+          sheet
+            .getRange(
+              validateFound.rowNumber,
+              11
+            )
+            .getValue() || ""
+        )
+        .trim()
+        .toUpperCase();
+
+
+      if (
+        validateResult !==
+        newStatus
+      ) {
+
+        return jsonResponse({
+          success: false,
+          status: "error",
+          message:
+            "Status gagal disimpan"
+        });
+
+      }
+
+
+      return jsonResponse({
+        success: true,
+        status: "success",
+        action:
+          "VALIDATE_MEMBER",
+        memberId:
+          targetId,
+        newStatus:
+          validateResult,
+        row:
+          validateFound.rowNumber,
+        message:
+          "Status anggota berhasil diubah"
+      });
+
+    }
+
+
+    /* ========================================================
+     * ACTION TIDAK DIKENAL
+     * ======================================================== */
+
+    return jsonResponse({
+      success: false,
+      status: "error",
+      action:
+        body.action || "",
+      message:
+        "Action Google Apps Script tidak dikenali: " +
+        String(body.action || "")
     });
+
+
+  } catch (err) {
+
+
+    console.error(
+      "GAS ERROR:",
+      err
+    );
+
+
+    return jsonResponse({
+      success: false,
+      status: "error",
+      message:
+        err && err.message
+          ? err.message
+          : String(err)
+    });
+
+
+  } finally {
+
+
+    try {
+
+      lock.releaseLock();
+
+    } catch (releaseError) {
+
+      /* Tidak melakukan apa-apa */
+
+    }
+
   }
+
 }
-`;
+
+
+/* ============================================================
+ * FUNGSI TEST
+ *
+ * Gunakan fungsi ini dengan tombol RUN.
+ *
+ * Fungsi ini TIDAK membutuhkan doPost(e).
+ *
+ * Tes akan:
+ * 1. Membuka Sheet Anggota
+ * 2. Memastikan header tersedia
+ * 3. Membaca jumlah data anggota
+ * 4. Menampilkan hasil di Execution Log
+ * ============================================================ */
+
+function testConnection() {
+
+  var ss =
+    getSpreadsheet();
+
+
+  if (!ss) {
+
+    throw new Error(
+      "Spreadsheet tidak ditemukan."
+    );
+
+  }
+
+
+  var sheet =
+    getOrInitSheet(ss);
+
+
+  var lastRow =
+    sheet.getLastRow();
+
+
+  console.log(
+    "===================================="
+  );
+
+  console.log(
+    "TEST SISTEM SAKA PARIWISATA"
+  );
+
+  console.log(
+    "Spreadsheet: " +
+    ss.getName()
+  );
+
+  console.log(
+    "Sheet: " +
+    sheet.getName()
+  );
+
+  console.log(
+    "Jumlah baris: " +
+    lastRow
+  );
+
+  console.log(
+    "Status: KONEKSI BERHASIL"
+  );
+
+  console.log(
+    "===================================="
+  );
+
+
+  return {
+    success: true,
+    spreadsheet:
+      ss.getName(),
+    sheet:
+      sheet.getName(),
+    rows:
+      lastRow
+  };
+
+}
+
+
+/* ============================================================
+ * TEST UPDATE STATUS
+ *
+ * GANTI ID_TEST DENGAN ID ANGGOTA YANG ADA.
+ *
+ * Contoh:
+ * var ID_TEST = "SPW-0001";
+ * ============================================================ */
+
+function testUpdateStatus() {
+
+  var ID_TEST = "member-1788799985377";
+
+
+  if (
+    ID_TEST ===
+    "GANTI_DENGAN_ID_ANGGOTA"
+  ) {
+
+    throw new Error(
+      "Silakan isi ID_TEST terlebih dahulu."
+    );
+
+  }
+
+
+  var ss =
+    getSpreadsheet();
+
+
+  var sheet =
+    getOrInitSheet(ss);
+
+
+  var found =
+    findMemberRow(
+      sheet,
+      ID_TEST,
+      ""
+    );
+
+
+  if (!found) {
+
+    throw new Error(
+      "Anggota dengan ID " +
+      ID_TEST +
+      " tidak ditemukan."
+    );
+
+  }
+
+
+  sheet
+    .getRange(
+      found.rowNumber,
+      11
+    )
+    .setValue("ACTIVE");
+
+
+  SpreadsheetApp.flush();
+
+
+  var result =
+    String(
+      sheet
+        .getRange(
+          found.rowNumber,
+          11
+        )
+        .getValue() || ""
+    )
+    .trim()
+    .toUpperCase();
+
+
+  console.log(
+    "ID Anggota: " +
+    ID_TEST
+  );
+
+  console.log(
+    "Baris: " +
+    found.rowNumber
+  );
+
+  console.log(
+    "Status baru: " +
+    result
+  );
+
+
+  return {
+    success:
+      result === "ACTIVE",
+    memberId:
+      ID_TEST,
+    row:
+      found.rowNumber,
+    status:
+      result
+  };
+
+}`;
   }
 }
 
