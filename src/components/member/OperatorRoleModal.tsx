@@ -95,8 +95,8 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
         const reg = allRegencies.find(r => r.id === selectedRegencyId);
         jurisdictionName = reg ? `Kwarcab ${reg.name}` : `Kwarcab ID ${selectedRegencyId}`;
       } else if (selectedRole === 'ADMIN_BRANCH') {
-        jurisdictionId = member.branchId;
-        jurisdictionName = `Kwarran ${member.branchName}`;
+        jurisdictionId = member.districtId;
+        jurisdictionName = `Kecamatan ${member.districtName}`;
       } else {
         jurisdictionId = selectedRegencyId;
         jurisdictionName = `Kwarcab ${member.regencyName}`;
@@ -216,7 +216,7 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
               </p>
               <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                 <MapPin className="w-3 h-3 text-slate-400" />
-                <span>{member.regencyName} • {member.branchName}</span>
+                <span>{member.regencyName} • {member.districtName}</span>
               </p>
             </div>
           </div>
@@ -226,7 +226,7 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
             <p className={`text-xs font-extrabold ${member.isOperator ? 'text-purple-700' : 'text-slate-700'}`}>
               {member.isOperator 
                 ? (member.operatorRole === 'ADMIN_REGENCY' ? 'Operator Kwarcab' :
-                   member.operatorRole === 'ADMIN_PROVINCE' ? 'Operator Kwarda' : 'Operator Kwarran')
+                   member.operatorRole === 'ADMIN_PROVINCE' ? 'Operator Kwarda' : 'Operator Kecamatan')
                 : 'Anggota Reguler'}
             </p>
           </div>
@@ -358,7 +358,7 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
                       : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
                   }`}>
                     <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-xs">Kwarran (Ranting)</span>
+                      <span className="font-extrabold text-xs">Kecamatan (Kecamatan)</span>
                       <input
                         type="radio"
                         name="operatorRole"
@@ -369,7 +369,7 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
                       />
                     </div>
                     <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
-                      Operator Kecamatan / Pangkalan Saka Pariwisata
+                      Operator Kecamatan / Kecamatan
                     </p>
                   </label>
                 </div>
