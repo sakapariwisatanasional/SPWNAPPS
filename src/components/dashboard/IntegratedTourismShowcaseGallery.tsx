@@ -63,11 +63,11 @@ interface IntegratedTourismShowcaseGalleryProps {
 }
 
 export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcaseGalleryProps> = ({
-  tours,
-  products,
-  members,
-  activities: initialActivities,
-  currentUser,
+  tours = [],
+  products = [],
+  members = [],
+  activities: initialActivities = [],
+  currentUser = {} as CurrentUser,
   onViewTourDetail,
   onSelectMember,
   onSelectTab
@@ -202,7 +202,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   const publishedTours = useMemo(() => {
     const pub = safeTours.filter(t => t.status === 'APPROVED_PUBLISHED' || !t.status);
     return pub.length > 0 ? pub : safeTours;
-  }, [tours]);
+  }, [safeTours]);
 
   const uniqueTourCategories = useMemo(() => {
     return Array.from(new Set(publishedTours.map(t => t.category).filter(Boolean)));
@@ -225,7 +225,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   const approvedProducts = useMemo(() => {
     const app = safeProducts.filter(p => (p.status || 'APPROVED') === 'APPROVED');
     return app.length > 0 ? app : safeProducts;
-  }, [products]);
+  }, [safeProducts]);
 
   const filteredProducts = useMemo(() => {
     return approvedProducts.filter(p => {
@@ -358,7 +358,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                 onChange={(e) => handleProvinceDropdownChange(e.target.value)}
                 className="bg-slate-950/80 text-white text-xs border border-purple-700/60 rounded-xl px-3 py-1.5 outline-none focus:border-teal-400 cursor-pointer"
               >
-                {PROVINCES_DATA.filter(p => p.id !== '00').map((prov) => (
+                {(Array.isArray(PROVINCES_DATA) ? PROVINCES_DATA : []).filter(p => p.id !== '00').map((prov) => (
                   <option key={prov.id} value={prov.name} className="bg-slate-900 text-white">
                     {prov.name} ({prov.island})
                   </option>
