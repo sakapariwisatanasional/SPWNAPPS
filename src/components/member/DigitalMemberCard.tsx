@@ -1,25 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import QRCode from 'qrcode';
-import { 
-  RotateCw, 
-  Download, 
-  FileDown,
-  ShieldCheck, 
-  Sparkles, 
-  CheckCircle2, 
-  Award, 
-  Compass, 
-  Sliders, 
-  Camera, 
-  Edit3
-} from 'lucide-react';
-import { Member, KtaCardSettings } from '../../types';
-import { SakaLogo, SAKA_CARD_BG_DRIVE_DIRECT_URL, formatDriveImageUrl } from '../common/SakaLogo';
+import React, { useEffect, useMemo, useState } from 'react';
+import { RotateCw, FileDown, Sliders, ShieldCheck } from 'lucide-react';
+import { Member, KtaCardSettings, KtaDataFieldConfig } from '../../types';
+import { SakaLogo, formatDriveImageUrl } from '../common/SakaLogo';
 import { Barcode } from '../common/Barcode';
 import { storage } from '../../services/storage';
 import { KtaQrCode } from './KtaQrCode';
 
-interface DigitalMemberCardProps {
+interface Props {
   member: Member;
   onVerifyClick?: (member: Member) => void;
   onEditCard?: () => void;
@@ -31,233 +18,85 @@ interface DigitalMemberCardProps {
   previewSettings?: KtaCardSettings;
 }
 
-export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
-  member,
-  onVerifyClick,
-  onEditCard,
-  onEditPhoto,
-  onEditMemberProfile,
-  onPrintPdf,
-  showControls = true,
-  allowAdminEdit = false,
-  previewSettings
-}) => {
-  const [isFlipped, setIsFlipped] = useState(false);
+const valueOf = (member: Member, field: KtaDataFieldConfig['field']): string => {
+  const values: Record<string, any> = {
+    fullName: member.fullName, id: member.id, nationalMemberNumber: member.nationalMemberNumber,
+    currentPosition: member.currentPosition, provinceName: member.provinceName, regencyName: member.regencyName,
+    districtName: member.districtName, branchName: member.branchName, gugusDepan: member.gugusDepan,
+    krida: member.krida, phone: member.phone, email: member.email, joinYear: member.joinYear, status: member.status
+  };
+  return String(values[field] ?? '');
+};
+
+const weight = (w: KtaDataFieldConfig['fontWeight'] | string) => ({ normal:400, medium:500, bold:700, black:900 } as any)[w] || 400;
+
+export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrintPdf, showControls=true, allowAdminEdit=false, previewSettings }) => {
   const [settings, setSettings] = useState<KtaCardSettings>(previewSettings || storage.getKtaSettings());
+  const [flipped, setFlipped] = useState(false);
 
-  // Dengarkan pembaruan pengaturan desain KTA dari Super Admin secara real-time
   useEffect(() => {
-    if (previewSettings) {
-      setSettings(previewSettings);
-      return;
-    }
+    if (previewSettings) { setSettings(previewSettings); return; }
+    const refresh=()=>setSettings(storage.getKtaSettings());
+    const unsub=storage.subscribe(refresh);
+    void import('../../services/spreadsheetService').then(({ spreadsheetService }) => spreadsheetService.refreshKtaSettings().then(remote => { if (remote) setSettings(remote); }));
+    const evt=(e:any)=>e.detail&&setSettings(e.detail);
+    window.addEventListener('saka:kta-settings-updated',evt);
+    return ()=>{unsub();window.removeEventListener('saka:kta-settings-updated',evt);};
+  },[previewSettings]);
 
-    const refreshSettings = () => {
-      setSettings(storage.getKtaSettings());
-    };
+  const ratio = Math.max(0.45, settings.widthMm / Math.max(settings.heightMm, 1));
+  const widthPx = 380;
+  const heightPx = widthPx / ratio;
+  const photo = formatDriveImageUrl(member.avatarUrl) || member.avatarUrl;
+  const frontFields = settings.dataFields.filter(f=>f.side==='FRONT' && f.visible);
+  const backFields = settings.dataFields.filter(f=>f.side==='BACK' && f.visible);
+  const frontTexts = settings.textElements.filter(t=>t.side==='FRONT');
+  const backTexts = settings.textElements.filter(t=>t.side==='BACK');
+  const frontLogos = settings.logos.filter(l=>l.side==='FRONT' && l.url);
+  const backLogos = settings.logos.filter(l=>l.side==='BACK' && l.url);
+  const bgFront = settings.frontBackgroundUrl || settings.bgImageUrl;
+  const bgBack = settings.backBackgroundUrl || settings.bgImageUrl;
+  const radius = Math.max(8, settings.cornerRadiusMm * 3);
 
-    const unsubscribe = storage.subscribe(refreshSettings);
-    const handleCustomEvent = (e: any) => {
-      if (e.detail) setSettings(e.detail);
-    };
+  const renderField = (f:KtaDataFieldConfig) => {
+    const raw=valueOf(member,f.field); const text=f.textTransform==='uppercase'?raw.toUpperCase():raw;
+    return <div key={f.id} className="absolute overflow-hidden" style={{left:`${f.x}%`,top:`${f.y}%`,width:`${f.width}%`,fontSize:`${f.fontSize}px`,fontWeight:weight(f.fontWeight),color:f.color,textAlign:f.align||'left',lineHeight:1.15,whiteSpace:'nowrap',textOverflow:'ellipsis'}} title={text}>
+      {f.label && <span style={{opacity:.75,marginRight:5,fontSize:Math.max(7,f.fontSize*.68)}}>{f.label}:</span>}{text || '—'}
+    </div>;
+  };
+  const renderText=(t:any)=><div key={t.id} className="absolute overflow-hidden" style={{left:`${t.x}%`,top:`${t.y}%`,width:`${t.width}%`,fontSize:`${t.fontSize}px`,fontWeight:weight(t.fontWeight),color:t.color,textAlign:t.align||'left',whiteSpace:'nowrap',textTransform:t.textTransform||'none'}}>{t.text}</div>;
+  const renderLogos=(logos:any[])=><>{logos.map(l=><img key={l.id} src={formatDriveImageUrl(l.url)||l.url} alt={l.name} className="absolute pointer-events-none" style={{left:`${l.x}%`,top:`${l.y}%`,width:`${l.width}%`,height:`${l.height}%`,opacity:l.opacity,objectFit:l.objectFit||'contain'}}/>)}</>;
 
-    window.addEventListener('saka:kta-settings-updated', handleCustomEvent);
+  const bgStyle=(url?:string, color?:string):React.CSSProperties => ({backgroundColor:color||'#24105b',backgroundImage:url?`linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("${formatDriveImageUrl(url)||url}")`:undefined,backgroundSize:'cover',backgroundPosition:'center'});
 
-    return () => {
-      unsubscribe();
-      window.removeEventListener('saka:kta-settings-updated', handleCustomEvent);
-    };
-  }, [previewSettings]);
+  return <div className="flex flex-col items-center gap-3 select-none">
+    <div style={{width:widthPx,height:heightPx,perspective:'1000px'}} className="cursor-pointer" onClick={()=>setFlipped(v=>!v)}>
+      <div className="relative w-full h-full transition-transform duration-500" style={{transformStyle:'preserve-3d',transform:flipped?'rotateY(180deg)':'none'}}>
+        <div className="absolute inset-0 overflow-hidden shadow-2xl border border-white/20 text-white" style={{...bgStyle(bgFront,settings.customBackgroundColorFront),borderRadius:radius,backfaceVisibility:'hidden'}}>
+          <div className="absolute inset-0 bg-black/10" style={{opacity:settings.bgOpacity??.1}}/>
+          {renderLogos(frontLogos)}
+          {!frontLogos.length && <div className="absolute left-[4%] top-[5%]"><SakaLogo size={38}/></div>}
+          <div className="absolute left-[15%] top-[6%] right-[5%] font-bold text-[11px] uppercase tracking-wider">{settings.frontOrganizationTitle}</div>
+          <div className="absolute left-[15%] top-[12%] right-[5%] text-[8px] opacity-80">{settings.frontOrganizationSubtitle}</div>
+          {settings.showPhoto && <div className="absolute left-[4%] top-[27%] w-[22%] h-[48%] rounded-xl overflow-hidden border-2 border-amber-300 bg-slate-800"><img src={photo} alt={member.fullName} className="w-full h-full object-cover"/></div>}
+          {settings.showQrCode && <div className="absolute right-[4%] top-[30%]"><KtaQrCode member={member} size={Math.round(Math.min(widthPx,heightPx)*.22)} showLabel={false} interactive={false}/></div>}
+          {frontFields.map(renderField)}{frontTexts.map(renderText)}
+          <div className="absolute left-[4%] right-[4%] bottom-[4%] border-t border-white/20 pt-1 text-[7px] opacity-80">{settings.frontValidityText}</div>
+          {settings.showKridaBadge && member.krida && <div className="absolute right-[4%] bottom-[5%] px-2 py-1 rounded-full bg-amber-400 text-slate-950 text-[7px] font-black uppercase">{member.krida}</div>}
+        </div>
 
-  if (!member) return null;
-
-  const nta = member.nationalMemberNumber || member.id;
-  // Gunakan barcode custom jika diisi oleh Super Admin, jika tidak gunakan nomor NTA anggota
-  const barcodeValue = settings.barcodeCustomValue?.trim() || nta;
-
-  // Pastikan URL foto yang diupload anggota diproses secara benar
-  const memberPhoto = formatDriveImageUrl(member.avatarUrl) || member.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80';
-
-  return (
-    <div className="flex flex-col items-center space-y-4 select-none">
-      {/* Container Kartu KTA 3D Flip */}
-      <div 
-        className="w-[340px] sm:w-[380px] h-[215px] sm:h-[240px] perspective-1000 cursor-pointer"
-        onClick={() => setIsFlipped(!isFlipped)}
-      >
-        <div className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${isFlipped ? 'rotate-y-180' : ''}`} style={{ transformStyle: 'preserve-3d' }}>
-          
-          {/* SISI DEPAN KTA */}
-          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-slate-900 via-purple-950 to-slate-950 rounded-2xl p-4 text-white shadow-2xl border border-purple-800/40 backface-hidden flex flex-col justify-between overflow-hidden">
-            {/* Latar Belakang Logo Lambang Saka */}
-            <div 
-              className="absolute inset-0 w-full h-full pointer-events-none z-0 flex items-center justify-center overflow-hidden"
-              style={{ opacity: settings.bgOpacity ?? 0.10 }}
-            >
-              <SakaLogo size={280} />
-            </div>
-
-            {/* Header Depan */}
-            <div className="flex items-center justify-between z-10 pb-2 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <SakaLogo size={34} />
-                <div>
-                  <h4 className="font-extrabold text-[11px] sm:text-xs tracking-wider font-heading leading-tight uppercase text-amber-300">
-                    Saka Pariwisata
-                  </h4>
-                  <p className="text-[8px] sm:text-[9px] text-purple-200 tracking-wider uppercase font-semibold">
-                    Gerakan Pramuka Indonesia
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="px-2 py-0.5 bg-amber-400 text-slate-950 text-[8px] font-black rounded-full uppercase tracking-widest">
-                  KTA DIGITAL
-                </span>
-              </div>
-            </div>
-
-            {/* Konten Tengah Depan (Pas Foto Asli + Data Anggota + QR Code) */}
-            <div className="grid grid-cols-12 gap-3 items-center z-10 my-auto">
-              {/* Pas Foto yang diupload pengguna */}
-              <div className="col-span-3 flex flex-col items-center">
-                <div className="w-16 h-20 sm:w-18 sm:h-22 rounded-xl overflow-hidden border-2 border-amber-400 shadow-md bg-slate-800">
-                  <img 
-                    src={memberPhoto} 
-                    alt={member.fullName}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-
-              {/* Data Diri Anggota */}
-              <div className="col-span-6 space-y-1 truncate pr-1">
-                <h3 className="font-extrabold text-xs sm:text-sm text-white truncate font-heading">
-                  {member.fullName}
-                </h3>
-                <p className="font-mono text-[9px] sm:text-[10px] text-amber-300 font-bold truncate">
-                  NTA: {nta}
-                </p>
-                <div className="text-[8.5px] sm:text-[9.5px] text-slate-300 space-y-0.5">
-                  <p className="truncate font-semibold text-emerald-400">{member.krida}</p>
-                  <p className="truncate">{member.gugusDepan || 'Gugus Depan'}</p>
-                  <p className="truncate text-slate-400">Kwarcab {member.regencyName}</p>
-                </div>
-              </div>
-
-              {/* QR Code Khusus Anggota */}
-              <div className="col-span-3 flex justify-end">
-                <KtaQrCode 
-                  member={member} 
-                  size={54} 
-                  showLabel={true}
-                  interactive={false}
-                />
-              </div>
-            </div>
-
-            {/* Footer Depan */}
-            <div className="flex items-center justify-between text-[8px] text-purple-300/80 z-10 pt-1.5 border-t border-white/10 font-mono">
-              <span>{settings.frontValidityText || 'Masa Berlaku: Selama Menjadi Anggota'}</span>
-              <span className="text-amber-300 flex items-center gap-1">
-                <RotateCw className="w-2.5 h-2.5" /> Putar Kartu
-              </span>
-            </div>
-          </div>
-
-          {/* SISI BELAKANG KTA */}
-          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950 rounded-2xl p-4 text-white shadow-2xl border border-purple-900/50 backface-hidden rotate-y-180 flex flex-col justify-between overflow-hidden">
-            
-            {/* Ketentuan Resmi KTA */}
-            <div className="space-y-1 text-[7.5px] sm:text-[8px] text-slate-300 leading-tight">
-              <p className="font-bold text-amber-300 uppercase tracking-wider text-[8px]">
-                Ketentuan KTA Digital Saka Pariwisata:
-              </p>
-              <ol className="list-decimal pl-3 space-y-0.5 text-slate-400">
-                <li>Kartu ini merupakan tanda pengenal sah anggota Satuan Karya Pramuka Pariwisata.</li>
-                <li>Keaslian data dapat diverifikasi langsung melalui pemindaian QR Code di bagian depan.</li>
-                <li>Anggota wajib menjunjung tinggi Tri Satya, Dasa Darma, dan Sapta Pesona Pariwisata.</li>
-                <li>Apabila kartu ini ditemukan, harap diserahkan ke Sekretariat Kwartir terdekat.</li>
-              </ol>
-            </div>
-
-            {/* Bagian Bawah: Penandatanganan & Barcode */}
-            <div className="flex items-end justify-between pt-2 border-t border-white/10">
-              <div className="space-y-1">
-                <span className="text-[7.5px] text-slate-400 font-mono">ID Anggota: {member.id}</span>
-                <p className="text-[7px] text-slate-500">Terdaftar sejak: {new Date(member.registeredAt).toLocaleDateString('id-ID')}</p>
-                <div className="inline-flex items-center gap-1 text-[7.5px] text-emerald-400 font-semibold">
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>Sistem Otorisasi KTA Nasional</span>
-                </div>
-              </div>
-
-              {/* Tanggal, Barcode, dan Tanda Tangan */}
-              <div className="flex flex-col items-center text-center">
-                <p className="text-[8px] text-amber-200 font-semibold mb-0.5">
-                  {settings.issueLocationDate || 'Jakarta, 14 Agustus 2026'}
-                </p>
-
-                {/* Komponen Barcode */}
-                <div className="bg-white px-2 py-0.5 rounded shadow-xs">
-                  <Barcode 
-                    value={barcodeValue} 
-                    width={100} 
-                    height={22} 
-                    barColor="#000000"
-                    showText={false}
-                  />
-                </div>
-
-                <p className="text-[8px] font-bold text-white mt-0.5 font-heading">
-                  {settings.signerName || 'Reza Pahlevi'}
-                </p>
-                <p className="text-[6.5px] text-purple-300">
-                  {settings.signerTitle || 'Ketua Pimpinan Saka Pariwisata Nasional'}
-                </p>
-              </div>
-            </div>
-
-          </div>
-
+        <div className="absolute inset-0 overflow-hidden shadow-2xl border border-white/20 text-white p-4" style={{...bgStyle(bgBack,settings.customBackgroundColorBack),borderRadius:radius,backfaceVisibility:'hidden',transform:'rotateY(180deg)'}}>
+          {renderLogos(backLogos)}
+          <div className="absolute left-[5%] top-[6%] right-[5%] font-bold text-[11px] uppercase">{settings.backHeaderTitle}</div>
+          <div className="absolute left-[5%] top-[14%] right-[5%] text-[8px] opacity-70">{settings.backHeaderSubtitle}</div>
+          <div className="absolute left-[5%] top-[25%] right-[5%] text-[7px] leading-relaxed opacity-85">{settings.terms.map((t,i)=><div key={i} className="mb-1">{i+1}. {t}</div>)}</div>
+          {backFields.map(renderField)}{backTexts.map(renderText)}
+          <div className="absolute left-[5%] bottom-[5%] text-[7px] opacity-80"><div>{settings.issueLocationDate}</div><div className="font-bold text-[9px]">{settings.signerName}</div><div>{settings.signerTitle}</div></div>
+          <div className="absolute right-[5%] bottom-[5%] flex flex-col items-center gap-1"><div className="bg-white rounded p-1"><Barcode value={settings.barcodeCustomValue?.trim()||member.nationalMemberNumber||member.id} width={80} height={18} barColor="#000" showText={false}/></div><div className="text-[6px] flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5"/>VERIFIKASI</div></div>
         </div>
       </div>
-
-      {/* Kontrol Cepat Di Bawah Kartu */}
-      {showControls && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsFlipped(!isFlipped)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <RotateCw className="w-3.5 h-3.5 text-amber-300" />
-            <span>Lihat {isFlipped ? 'Bagian Depan' : 'Bagian Belakang'}</span>
-          </button>
-
-          {onPrintPdf && (
-            <button
-              type="button"
-              onClick={() => onPrintPdf(member)}
-              className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
-            >
-              <FileDown className="w-3.5 h-3.5" />
-              <span>Cetak / Unduh PDF</span>
-            </button>
-          )}
-
-          {allowAdminEdit && onEditCard && (
-            <button
-              type="button"
-              onClick={onEditCard}
-              className="px-3 py-1.5 bg-purple-800 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Sliders className="w-3.5 h-3.5 text-purple-300" />
-              <span>Atur Desain</span>
-            </button>
-          )}
-        </div>
-      )}
     </div>
-  );
+
+    {showControls && <div className="flex items-center gap-2"><button type="button" onClick={()=>setFlipped(v=>!v)} className="px-3 py-1.5 bg-slate-800 text-white rounded-xl text-xs font-semibold"><RotateCw className="inline w-3.5 h-3.5 mr-1"/>Lihat {flipped?'Depan':'Belakang'}</button>{onPrintPdf&&<button type="button" onClick={()=>onPrintPdf(member)} className="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-semibold"><FileDown className="inline w-3.5 h-3.5 mr-1"/>PDF</button>}{allowAdminEdit&&onEditCard&&<button type="button" onClick={onEditCard} className="px-3 py-1.5 bg-purple-800 text-white rounded-xl text-xs font-semibold"><Sliders className="inline w-3.5 h-3.5 mr-1"/>Atur Desain</button>}</div>}
+  </div>;
 };
