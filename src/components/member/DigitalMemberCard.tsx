@@ -61,7 +61,7 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
   const renderField = (f:KtaDataFieldConfig) => {
     const raw=valueOf(member,f.field); const text=f.textTransform==='uppercase'?raw.toUpperCase():raw;
     return <div key={f.id} className="absolute overflow-hidden" style={{left:`${f.x}%`,top:`${f.y}%`,width:`${f.width}%`,fontSize:`${f.fontSize}px`,fontWeight:weight(f.fontWeight),color:f.color,textAlign:f.align||'left',lineHeight:1.15,whiteSpace:'nowrap',textOverflow:'ellipsis'}} title={text}>
-      {f.label && <span style={{opacity:.75,marginRight:5,fontSize:Math.max(7,f.fontSize*.68)}}>{f.label}:</span>}{text || '—'}
+      {f.showLabel && f.label && <span style={{opacity:.75,marginRight:5,fontSize:Math.max(7,f.fontSize*.68)}}>{f.label}:</span>}{text || '—'}
     </div>;
   };
   const renderText=(t:any)=><div key={t.id} className="absolute overflow-hidden" style={{left:`${t.x}%`,top:`${t.y}%`,width:`${t.width}%`,fontSize:`${t.fontSize}px`,fontWeight:weight(t.fontWeight),color:t.color,textAlign:t.align||'left',whiteSpace:'nowrap',textTransform:t.textTransform||'none'}}>{t.text}</div>;
@@ -76,10 +76,10 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
           <div className="absolute inset-0 bg-black/10" style={{opacity:settings.bgOpacity??.1}}/>
           {renderLogos(frontLogos)}
           {!frontLogos.length && <div className="absolute left-[4%] top-[5%]"><SakaLogo size={38}/></div>}
-          <div className="absolute left-[15%] top-[6%] right-[5%] font-bold text-[11px] uppercase tracking-wider">{settings.frontOrganizationTitle}</div>
-          <div className="absolute left-[15%] top-[12%] right-[5%] text-[8px] opacity-80">{settings.frontOrganizationSubtitle}</div>
+          <div className="absolute overflow-hidden" style={{left:`${settings.frontOrganizationTitleX ?? 15}%`,top:`${settings.frontOrganizationTitleY ?? 6}%`,width:`${settings.frontOrganizationTitleWidth ?? 65}%`,fontSize:`${settings.frontOrganizationTitleFontSize ?? 11}px`,fontWeight:weight(settings.frontOrganizationTitleFontWeight ?? 'bold'),color:settings.frontOrganizationTitleColor ?? '#fff',textAlign:settings.frontOrganizationTitleAlign ?? 'left',textTransform:'none',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{settings.frontOrganizationTitle}</div>
+          <div className="absolute overflow-hidden" style={{left:`${settings.frontOrganizationSubtitleX ?? 15}%`,top:`${settings.frontOrganizationSubtitleY ?? 12}%`,width:`${settings.frontOrganizationSubtitleWidth ?? 70}%`,fontSize:`${settings.frontOrganizationSubtitleFontSize ?? 8}px`,fontWeight:weight(settings.frontOrganizationSubtitleFontWeight ?? 'normal'),color:settings.frontOrganizationSubtitleColor ?? '#e5e7eb',textAlign:settings.frontOrganizationSubtitleAlign ?? 'left',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{settings.frontOrganizationSubtitle}</div>
           {settings.showPhoto && <div className="absolute left-[4%] top-[27%] w-[22%] h-[48%] rounded-xl overflow-hidden border-2 border-amber-300 bg-slate-800"><img src={photo} alt={member.fullName} className="w-full h-full object-cover"/></div>}
-          {settings.showQrCode && <div className="absolute right-[4%] top-[30%]"><KtaQrCode member={member} size={Math.round(Math.min(widthPx,heightPx)*.22)} showLabel={false} interactive={false}/></div>}
+          {settings.showQrCode && <div className="absolute" style={{left:`${settings.qrX ?? 78}%`,top:`${settings.qrY ?? 30}%`}}><KtaQrCode member={member} size={Math.max(28, Math.round(Math.min(widthPx,heightPx)*(settings.qrSize ?? 22)/100))} showLabel={false} interactive={false}/></div>}
           {frontFields.map(renderField)}{frontTexts.map(renderText)}
           <div className="absolute left-[4%] right-[4%] bottom-[4%] border-t border-white/20 pt-1 text-[7px] opacity-80">{settings.frontValidityText}</div>
           {settings.showKridaBadge && member.krida && <div className="absolute right-[4%] bottom-[5%] px-2 py-1 rounded-full bg-amber-400 text-slate-950 text-[7px] font-black uppercase">{member.krida}</div>}
@@ -92,7 +92,7 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
           <div className="absolute left-[5%] top-[25%] right-[5%] text-[7px] leading-relaxed opacity-85">{settings.terms.map((t,i)=><div key={i} className="mb-1">{i+1}. {t}</div>)}</div>
           {backFields.map(renderField)}{backTexts.map(renderText)}
           <div className="absolute left-[5%] bottom-[5%] text-[7px] opacity-80"><div>{settings.issueLocationDate}</div><div className="font-bold text-[9px]">{settings.signerName}</div><div>{settings.signerTitle}</div></div>
-          <div className="absolute right-[5%] bottom-[5%] flex flex-col items-center gap-1"><div className="bg-white rounded p-1"><Barcode value={settings.barcodeCustomValue?.trim()||member.nationalMemberNumber||member.id} width={80} height={18} barColor="#000" showText={false}/></div><div className="text-[6px] flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5"/>VERIFIKASI</div></div>
+          {settings.showBarcode !== false && <div className="absolute flex flex-col items-center gap-1" style={{left:`${settings.barcodeX ?? 68}%`,top:`${settings.barcodeY ?? 70}%`,width:`${settings.barcodeWidth ?? 27}%`}}><div className="bg-white rounded p-1 w-full flex items-center justify-center overflow-hidden"><Barcode value={settings.barcodeCustomValue?.trim()||member.nationalMemberNumber||member.id} width={Math.max(40, Math.round(widthPx*(settings.barcodeWidth ?? 27)/100))} height={Math.max(12, Math.round(heightPx*(settings.barcodeHeight ?? 9)/100))} barColor="#000" showText={settings.barcodeShowText ?? false}/></div><div className="text-[6px] flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5"/>VERIFIKASI</div></div>}
         </div>
       </div>
     </div>
