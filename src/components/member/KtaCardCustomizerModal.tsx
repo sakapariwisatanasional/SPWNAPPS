@@ -29,17 +29,20 @@ const PRESETS: Record<KtaCardPreset, { label:string; width:number; height:number
 
 const clone = <T,>(v:T):T => JSON.parse(JSON.stringify(v));
 
-// Konfigurasi KTA lama/hasil sinkronisasi spreadsheet dapat berupa object parsial.
-// Normalisasi collection wajib dilakukan SEBELUM useMemo dijalankan karena modal
-// tetap dirender oleh App walaupun isOpen=false.
-const normalizeKtaSettings = (value: KtaCardSettings): KtaCardSettings => ({
-  ...clone(DEFAULT_KTA_SETTINGS),
-  ...value,
-  dataFields: Array.isArray((value as any)?.dataFields) ? (value as any).dataFields : [],
-  textElements: Array.isArray((value as any)?.textElements) ? (value as any).textElements : [],
-  logos: Array.isArray((value as any)?.logos) ? (value as any).logos : [],
-  terms: Array.isArray((value as any)?.terms) ? (value as any).terms : [],
-});
+const normalizeKtaSettings = (value?: Partial<KtaCardSettings> | null): KtaCardSettings => {
+  const merged = {
+    ...clone(DEFAULT_KTA_SETTINGS),
+    ...(value && typeof value === 'object' ? value : {})
+  } as KtaCardSettings;
+
+  return {
+    ...merged,
+    logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
+    dataFields: Array.isArray((merged as any).dataFields) ? (merged as any).dataFields : [],
+    textElements: Array.isArray((merged as any).textElements) ? (merged as any).textElements : [],
+    terms: Array.isArray((merged as any).terms) ? (merged as any).terms : []
+  };
+};
 
 export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
   const [settings, setSettings] = useState<KtaCardSettings>(() => normalizeKtaSettings(DEFAULT_KTA_SETTINGS));
@@ -73,13 +76,12 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
     }).finally(() => setLoadingRemote(false));
   }, [isOpen]);
 
-  const safeDataFields = Array.isArray(settings?.dataFields) ? settings.dataFields : [];
-  const safeTextElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
-  const safeLogos = Array.isArray(settings?.logos) ? settings.logos : [];
-
-  const sideFields = useMemo(() => safeDataFields.filter(f => f.side === side), [safeDataFields, side]);
-  const sideTexts = useMemo(() => safeTextElements.filter(t => t.side === side), [safeTextElements, side]);
-  const sideLogos = useMemo(() => safeLogos.filter(l => l.side === side), [safeLogos, side]);
+  const dataFields = Array.isArray(settings?.dataFields) ? settings.dataFields : [];
+  const textElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
+  const logos = Array.isArray(settings?.logos) ? settings.logos : [];
+  const sideFields = useMemo(() => dataFields.filter(f => f.side === side), [dataFields, side]);
+  const sideTexts = useMemo(() => textElements.filter(t => t.side === side), [textElements, side]);
+  const sideLogos = useMemo(() => logos.filter(l => l.side === side), [logos, side]);
 
   if (!isOpen) return null;
 
