@@ -284,6 +284,10 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const currentBranch = branches.find(b => b.id === selectedBranchId);
 
   const handleGenerateNewNta = () => {
+    if (currentUser.role !== 'SUPER_ADMIN') {
+      alert('Nomor KTA/NTA hanya dapat dibuat atau dikoreksi oleh Super Admin.');
+      return;
+    }
     if (currentProvince && currentRegency && currentDistrict) {
       const newNta = storage.generateNationalMemberNumber(
         currentProvince.code,
@@ -385,8 +389,8 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
     try {
       // Determine final NTA
-      let finalNta = nationalMemberNumber;
-      if (autoRegenerateNta && currentProvince && currentRegency && currentDistrict) {
+      let finalNta = currentUser.role === 'SUPER_ADMIN' ? nationalMemberNumber : (member.nationalMemberNumber || '');
+      if (currentUser.role === 'SUPER_ADMIN' && autoRegenerateNta && currentProvince && currentRegency && currentDistrict) {
         finalNta = storage.generateNationalMemberNumber(
           currentProvince.code,
           currentRegency.code,
@@ -425,7 +429,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         districtId: selectedDistrictId,
         districtName: currentDistrict?.name || member.districtName,
         branchId: selectedBranchId || member.branchId,
-        branchName: currentBranch?.name || `Kwarran ${currentDistrict?.name || 'Pariwisata'}`,
+        branchName: currentBranch?.name || member.branchName || '',
 
         gugusDepan: gugusDepan.trim(),
         krida,
@@ -1155,9 +1159,18 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                 </div>
 
                 {/* Nomor Anggota Nasional (NTA) */}
-                <div className="md:col-span-2 pt-2 border-t border-slate-200">
+                <div className="md:col-span-2 pt-2 border-t border-slate-200 space-y-3">
+                  <div>
+                    <label className="block font-bold text-slate-800 mb-1">ID Anggota Sistem</label>
+                    <div className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-purple-950 font-mono font-bold text-sm">
+                      {member.id}
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">ID sistem bersifat permanen dan tidak dapat diedit.</p>
+                  </div>
+                  <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="font-bold text-slate-800">Nomor Tanda Anggota (NTA)</label>
+                    <label className="font-bold text-slate-800">Nomor KTA / NTA</label>
+                    {currentUser.role === 'SUPER_ADMIN' && (
                     <button
                       type="button"
                       onClick={handleGenerateNewNta}
@@ -1166,17 +1179,20 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                       <RefreshCw className="w-3 h-3" />
                       <span>Generate Sesuai Kode Wilayah Terpilih</span>
                     </button>
+                    )}
                   </div>
                   <input
                     type="text"
                     value={nationalMemberNumber}
+                    disabled={currentUser.role !== 'SUPER_ADMIN'}
                     onChange={(e) => setNationalMemberNumber(e.target.value)}
                     placeholder="Contoh: 32.06.12.000001"
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-purple-950 font-mono font-bold text-sm tracking-wider"
                   />
                   <p className="text-[10px] text-slate-500 mt-1">
-                    Format Standar Nasional: [Kode Prov].[Kode Kab/Kota].[Kode Kec].[Urutan 6 Digit]
+                    Format Standar Nasional: [Kode Prov].[Kode Kab/Kota].[Kode Kec].[Urutan 6 Digit]. Hanya Super Admin yang dapat mengubah nomor KTA/NTA.
                   </p>
+                  </div>
                 </div>
               </div>
             </div>
