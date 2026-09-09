@@ -76,13 +76,25 @@ const STORAGE_KEYS = {
  * DEFAULT_KTA_SETTINGS
  */
 export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
-  issueLocationDate: 'Jakarta, 14 Agustus 2026',
-  signerName: 'Reza Pahlevi',
-  signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
-  barcodeCustomValue: '',
-  frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota',
-  bgOpacity: 0.10,
-  bgImageUrl: ''
+  preset: 'CR80_KTA', widthMm: 85.60, heightMm: 53.98, cornerRadiusMm: 3.18,
+  cardTheme: 'purple_saka',
+  customBackgroundColorFront: '#24105b', customBackgroundColorBack: '#111827',
+  frontBackgroundUrl: '', backBackgroundUrl: '', bgImageUrl: '', bgOpacity: 0.10,
+  frontLogoUrl: '', backLogoUrl: '', logos: [],
+  dataFields: [
+    { id:'field-name', field:'fullName', label:'NAMA', side:'FRONT', visible:true, x:34, y:51, width:46, fontSize:16, fontWeight:'bold', color:'#ffffff', textTransform:'uppercase', align:'left' },
+    { id:'field-member-id', field:'id', label:'NO. ANGGOTA', side:'FRONT', visible:true, x:34, y:62, width:46, fontSize:9, fontWeight:'bold', color:'#fbbf24', align:'left' },
+    { id:'field-position', field:'currentPosition', label:'JABATAN', side:'FRONT', visible:true, x:34, y:70, width:46, fontSize:9, fontWeight:'bold', color:'#a7f3d0', align:'left' },
+    { id:'field-kwartir', field:'provinceName', label:'KWARTIR', side:'FRONT', visible:true, x:34, y:78, width:46, fontSize:8, fontWeight:'medium', color:'#e2e8f0', align:'left' },
+  ],
+  textElements: [],
+  frontOrganizationTitle: 'Saka Pariwisata', frontOrganizationSubtitle: 'Gerakan Pramuka Indonesia',
+  frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota', watermarkOpacity: 0.10, showKridaBadge: true,
+  backHeaderTitle: 'KTA SAKA PARIWISATA', backHeaderSubtitle: 'Sistem Otorisasi KTA Nasional',
+  terms: ['Kartu ini merupakan tanda pengenal sah anggota Satuan Karya Pramuka Pariwisata.','Keaslian data dapat diverifikasi melalui QR Code.','Anggota wajib menjunjung Tri Satya, Dasa Darma, dan Sapta Pesona Pariwisata.'],
+  issueLocationDate: 'Jakarta, 14 Agustus 2026', barcodeType: 'CODE128', barcodeCustomValue: '',
+  signerName: 'Reza Pahlevi', signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional', signerSubtitle: '', showStamp: false,
+  showPhoto: true, showQrCode: true
 };
 
 class StorageService {
