@@ -833,7 +833,7 @@ async function renderBackCardCanvas(
 
 function drawKtaConfiguredElements(ctx: CanvasRenderingContext2D, member: Member, settings: KtaCardSettings, side: 'FRONT' | 'BACK', logoImages: Array<{ cfg: any; img: HTMLImageElement }>) {
   const valueOf = (field: any): string => {
-    const v: Record<string, any> = { fullName:member.fullName, id:member.id, nationalMemberNumber:member.nationalMemberNumber, currentPosition:member.currentPosition, provinceName:member.provinceName, regencyName:member.regencyName, districtName:member.districtName, branchName:member.branchName, gugusDepan:member.gugusDepan, krida:member.krida, phone:member.phone, email:member.email, joinYear:member.joinYear, status:member.status };
+    const v: Record<string, any> = { fullName:member.fullName, id:member.id, nationalMemberNumber:member.nationalMemberNumber, currentPosition:member.currentPosition, provinceName:member.provinceName, regencyName:member.regencyName, districtName:member.districtName, krida:member.krida, phone:member.phone, email:member.email, joinYear:member.joinYear, status:member.status };
     return String(v[field] ?? '');
   };
   const fontWeight = (w:string) => ({normal:'400',medium:'500',bold:'700',black:'900'} as any)[w] || '400';
@@ -963,7 +963,7 @@ export async function generateKtaPdf({
     doc.setFont('helvetica', 'bold');
     doc.text(`Nama Anggota: ${member.fullName.toUpperCase()}`, 15, 33);
     doc.text(`NTA: ${member.nationalMemberNumber || '-'}`, 15, 39);
-    doc.text(`Wilayah: ${member.provinceName} / ${member.branchName}`, 15, 45);
+    doc.text(`Wilayah: ${member.provinceName} / ${member.districtName}`, 15, 45);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
