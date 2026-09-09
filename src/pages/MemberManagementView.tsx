@@ -78,8 +78,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
   const [showClearAllModal, setShowClearAllModal] = useState(false);
 
   // Filter logic
+  const safeMembers = Array.isArray(members) ? members : [];
+
   const filteredMembers = useMemo(() => {
-    return members.filter((m) => {
+    return safeMembers.filter((m) => {
       // Role-based scoping
       if (currentUser.role === 'ADMIN_PROVINCE' && currentUser.jurisdictionId && m.provinceId !== currentUser.jurisdictionId) {
         return false;
