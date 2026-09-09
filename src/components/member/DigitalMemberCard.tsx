@@ -48,12 +48,18 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
   const widthPx = 380;
   const heightPx = widthPx / ratio;
   const photo = formatDriveImageUrl(member.avatarUrl) || member.avatarUrl;
-  const frontFields = settings.dataFields.filter(f=>f.side==='FRONT' && f.visible);
-  const backFields = settings.dataFields.filter(f=>f.side==='BACK' && f.visible);
-  const frontTexts = settings.textElements.filter(t=>t.side==='FRONT');
-  const backTexts = settings.textElements.filter(t=>t.side==='BACK');
-  const frontLogos = settings.logos.filter(l=>l.side==='FRONT' && l.url);
-  const backLogos = settings.logos.filter(l=>l.side==='BACK' && l.url);
+  // Defensive normalization: settings lama / remote yang parsial tidak boleh
+  // membuat dashboard whitescreen hanya karena collection belum tersedia.
+  const dataFields = Array.isArray(settings?.dataFields) ? settings.dataFields : [];
+  const textElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
+  const logos = Array.isArray(settings?.logos) ? settings.logos : [];
+
+  const frontFields = dataFields.filter(f=>f.side==='FRONT' && f.visible);
+  const backFields = dataFields.filter(f=>f.side==='BACK' && f.visible);
+  const frontTexts = textElements.filter(t=>t.side==='FRONT');
+  const backTexts = textElements.filter(t=>t.side==='BACK');
+  const frontLogos = logos.filter(l=>l.side==='FRONT' && l.url);
+  const backLogos = logos.filter(l=>l.side==='BACK' && l.url);
   const bgFront = settings.frontBackgroundUrl || settings.bgImageUrl;
   const bgBack = settings.backBackgroundUrl || settings.bgImageUrl;
   const radius = Math.max(8, settings.cornerRadiusMm * 3);
