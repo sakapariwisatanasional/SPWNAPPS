@@ -586,16 +586,16 @@ class SpreadsheetService {
       else if (cleanProv.includes('bali') || cleanProv.includes('denpasar')) foundProv = PROVINCES_DATA.find(p => p.id === '51');
     }
 
-    const provinceId = foundProv ? foundProv.id : '32';
-    const provinceName = foundProv ? foundProv.name : (rawProvince || 'Jawa Barat');
+    const provinceId = foundProv ? foundProv.id : '00';
+    const provinceName = foundProv ? foundProv.name : (rawProvince || 'Kwartir Nasional');
 
     let foundReg = REGENCIES_DATA.find(r => 
       (r.provinceId === provinceId || !foundProv) && 
       (r.name.toLowerCase() === cleanReg || r.name.toLowerCase().includes(cleanReg) || cleanReg.includes(r.name.toLowerCase()))
     );
 
-    const regencyId = foundReg ? foundReg.id : `${provinceId}.01`;
-    const regencyName = foundReg ? foundReg.name : (rawRegency || `Kwartir Cabang ${provinceName}`);
+    const regencyId = foundReg ? foundReg.id : (provinceId === '00' ? '00.00' : `${provinceId}.00`);
+    const regencyName = foundReg ? foundReg.name : (rawRegency || (provinceId === '00' ? 'Pusat Nasional' : 'Kabupaten/Kota belum ditentukan'));
 
     return {
       provinceId,
@@ -656,34 +656,40 @@ class SpreadsheetService {
         const importedMembers: Member[] = rows.map((row, idx) => {
           const fullName = this.getRowValue(row, [
             'Nama Lengkap', 'nama_lengkap', 'Nama Lengkap (dengan Gelar)', 'Nama Lengkap & Gelar',
-            'Nama Anggota', 'Nama Peserta', 'Nama', 'nama', 'Full Name', 'fullname', 'Name', 'col_1'
+            'Nama Anggota', 'Nama Peserta', 'Nama', 'nama', 'Full Name', 'fullname', 'Name', 'col_2'
           ]) || `Anggota ${idx + 1}`;
           
           const kta = this.getRowValue(row, [
             'Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA',
-            'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_2', 'col_0'
+            'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_1', 'col_0'
           ]);
           
           const rawProv = this.getRowValue(row, [
             'Kwartir Daerah (Provinsi)', 'Kwartir Daerah', 'Kwarda', 'Provinsi', 'provinsi',
-            'Daerah', 'Province', 'col_3'
-          ]) || 'Jawa Barat';
+            'Daerah', 'Province', 'col_5'
+          ]);
           
           const rawReg = this.getRowValue(row, [
             'Kwartir Cabang (Kab/Kota)', 'Kwartir Cabang', 'Kwarcab', 'Kabupaten/Kota', 'kabupaten',
-            'Kabupaten', 'Kota', 'col_4'
-          ]) || 'Kota Bandung';
-          
-          const territory = this.resolveTerritory(rawProv, rawReg);
+            'Kabupaten', 'Kota', 'col_6'
+          ]);
+
+          const isNationalRow = /^(00|nasional|tingkat nasional|kwartir nasional|kwar?nas|pimpinan nasional)$/i.test(
+            String(rawProv || '').trim()
+          ) || /kwartir\s+nasional|tingkat\s+nasional|pusat\s+nasional/i.test(String(rawReg || ''));
+
+          const territory = isNationalRow
+            ? { provinceId: '00', provinceName: 'Kwartir Nasional', regencyId: '00.00', regencyName: 'Pusat Nasional' }
+            : this.resolveTerritory(rawProv, rawReg);
 
           const rawDistrict = this.getRowValue(row, [
             'Kwartir Ranting (Kecamatan)', 'Kwartir Ranting', 'Kwarran', 'Kwarran/Kecamatan',
-            'kecamatan_ranting', 'Kecamatan', 'Ranting', 'col_5'
+            'kecamatan_ranting', 'Kecamatan', 'Ranting', 'col_7'
           ]) || '';
-          
+
           const kridaRaw = this.getRowValue(row, [
             'Peminatan Krida Saka Pariwisata', 'Pilihan Krida', 'Krida Saka', 'Krida',
-            'krida', 'Peminatan Krida', 'col_7'
+            'krida', 'Peminatan Krida', 'col_8'
           ]);
           
           let krida: any = 'Krida Pemandu';
@@ -692,16 +698,16 @@ class SpreadsheetService {
           else if (kridaRaw.toLowerCase().includes('kuliner') || kridaRaw.toLowerCase().includes('cinderamata') || kridaRaw.toLowerCase().includes('kriya')) krida = 'Krida Kuliner & Cinderamata';
           else if (kridaRaw.toLowerCase().includes('pemandu') || kridaRaw.toLowerCase().includes('guide')) krida = 'Krida Pemandu';
 
-          const statusRaw = (this.getRowValue(row, ['Status', 'status', 'Status Keanggotaan', 'col_8']) || 'ACTIVE').toUpperCase();
+          const statusRaw = (this.getRowValue(row, ['Status', 'status', 'Status Keanggotaan', 'col_9']) || 'ACTIVE').toUpperCase();
           const phone = this.normalizePhoneNumber(this.getRowValue(row, [
             'Nomor WhatsApp', 'No WhatsApp', 'Nomor WA', 'No. WhatsApp', 'Nomor WhatsApp / HP',
-            'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_9'
+            'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_4'
           ]));
           
-          const email = this.getRowValue(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_10']) || `member${idx + 1}@pramuka.id`;
+          const email = this.getRowValue(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']) || `member${idx + 1}@pramuka.id`;
           const rawPhoto = this.getRowValue(row, [
             'Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Pas Foto Resmi (KTA Digital)',
-            'Photo', 'Avatar', 'Link Foto', 'Upload Foto', 'col_11'
+            'Photo', 'Avatar', 'Link Foto', 'Upload Foto', 'col_10'
           ]);
           const avatarUrl = this.cleanDriveImageUrl(rawPhoto) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
           const roleRaw = this.getRowValue(row, ['Role', 'Peran', 'Jabatan', 'Hak Akses', 'Wewenang', 'Posisi']);
@@ -766,8 +772,8 @@ class SpreadsheetService {
             provinceName: territory.provinceName,
             regencyId: territory.regencyId,
             regencyName: territory.regencyName,
-            districtId: `${territory.regencyId}.01`,
-            districtName: rawDistrict || territory.regencyName,
+            districtId: isNationalRow ? '00.00.00' : (this.getRowValue(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || `${territory.regencyId}.01`),
+            districtName: isNationalRow ? 'Nasional' : (rawDistrict || territory.regencyName),
             currentPosition: role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
             krida,
             joinYear: new Date().getFullYear(),
@@ -775,7 +781,7 @@ class SpreadsheetService {
             occupation: 'Anggota Pramuka',
             bio: `Anggota resmi Saka Pariwisata ${territory.provinceName}. Terdata langsung dari Google Spreadsheet.`,
             status: statusRaw === 'ACTIVE' || statusRaw === 'PENDING' ? statusRaw : 'ACTIVE',
-            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_13']) || new Date().toISOString(),
+            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_11']) || new Date().toISOString(),
             verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
             isOperator: role !== 'MEMBER',
             operatorRole: role !== 'MEMBER' ? role : undefined,
