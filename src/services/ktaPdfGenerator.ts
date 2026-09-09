@@ -431,22 +431,23 @@ async function renderFrontCardCanvas(
     drawFitImage(ctx, logoImg, 48, 30, 78, 80);
   }
 
-  // 5b. Header Titles
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 25px "Inter", -apple-system, BlinkMacSystemFont, sans-serif';
-  ctx.textAlign = 'left';
+  // 5b. Header Titles — configurable by Super Admin
+  ctx.textAlign = settings.frontOrganizationTitleAlign || 'left';
+  ctx.fillStyle = settings.frontOrganizationTitleColor || '#ffffff';
+  ctx.font = `${({'normal':'400','medium':'500','bold':'700','black':'900'} as any)[settings.frontOrganizationTitleFontWeight || 'bold'] || '700'} ${(settings.frontOrganizationTitleFontSize || 11) * 2.63}px "Inter", sans-serif`;
   ctx.fillText(
     (settings.frontOrganizationTitle || 'SAKA PARIWISATA').toUpperCase(),
-    140,
-    64
+    CANVAS_WIDTH * (settings.frontOrganizationTitleX ?? 15) / 100,
+    CANVAS_HEIGHT * (settings.frontOrganizationTitleY ?? 6) / 100 + (settings.frontOrganizationTitleFontSize || 11) * 2.63
   );
 
-  ctx.fillStyle = theme.accent;
-  ctx.font = 'bold 16px "Inter", -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = settings.frontOrganizationSubtitleAlign || 'left';
+  ctx.fillStyle = settings.frontOrganizationSubtitleColor || theme.accent;
+  ctx.font = `${({'normal':'400','medium':'500','bold':'700','black':'900'} as any)[settings.frontOrganizationSubtitleFontWeight || 'normal'] || '400'} ${(settings.frontOrganizationSubtitleFontSize || 8) * 2.63}px "Inter", sans-serif`;
   ctx.fillText(
     (settings.frontOrganizationSubtitle || 'GERAKAN PRAMUKA INDONESIA').toUpperCase(),
-    140,
-    92
+    CANVAS_WIDTH * (settings.frontOrganizationSubtitleX ?? 15) / 100,
+    CANVAS_HEIGHT * (settings.frontOrganizationSubtitleY ?? 12) / 100 + (settings.frontOrganizationSubtitleFontSize || 8) * 2.63
   );
 
   // 5c. Status Badge (Right side)
@@ -521,10 +522,11 @@ async function renderFrontCardCanvas(
   ctx.fillText('✓', checkX, checkY + 5);
 
   // 7b. QR Code Box (Right Side: 172 x 214)
-  const qrBoxW = 172;
-  const qrBoxH = 214;
-  const qrBoxX = CANVAS_WIDTH - 48 - qrBoxW;
-  const qrBoxY = Math.round(bodyCenterY - qrBoxH / 2); // 236
+  const qrSize = Math.max(72, Math.round(Math.min(CANVAS_WIDTH, CANVAS_HEIGHT) * (settings.qrSize ?? 22) / 100));
+  const qrBoxW = qrSize + 26;
+  const qrBoxH = qrSize + 68;
+  const qrBoxX = Math.min(CANVAS_WIDTH - qrBoxW - 20, Math.max(20, CANVAS_WIDTH * (settings.qrX ?? 78) / 100));
+  const qrBoxY = Math.min(CANVAS_HEIGHT - qrBoxH - 20, Math.max(20, CANVAS_HEIGHT * (settings.qrY ?? 30) / 100));
 
   ctx.fillStyle = '#ffffff';
   roundRect(ctx, qrBoxX, qrBoxY, qrBoxW, qrBoxH, 18);
@@ -534,13 +536,13 @@ async function renderFrontCardCanvas(
   ctx.stroke();
 
   if (qrImg.complete && qrImg.width > 0) {
-    ctx.drawImage(qrImg, qrBoxX + 13, qrBoxY + 12, 146, 146);
+    ctx.drawImage(qrImg, qrBoxX + 13, qrBoxY + 12, qrSize, qrSize);
   }
 
   ctx.fillStyle = '#1e0842';
   ctx.font = 'bold 11px "Inter", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('PINDAI VERIFIKASI', qrBoxX + qrBoxW / 2, qrBoxY + 188);
+  ctx.fillText('PINDAI VERIFIKASI', qrBoxX + qrBoxW / 2, qrBoxY + qrSize + 34);
 
   // 7c. Legacy Identity & Member Data.
   // Jika Super Admin sudah mengatur dataFields, renderer menggunakan konfigurasi tersebut.
@@ -800,15 +802,17 @@ async function renderBackCardCanvas(
     480
   );
 
-  // Barcode Box
-  drawBarcode(
-    ctx,
-    rightBoxX,
-    492,
-    rightBoxW,
-    46,
-    settings.barcodeCustomValue || member.nationalMemberNumber || member.id
-  );
+  // Barcode — posisi dan ukuran dikendalikan Super Admin
+  if (settings.showBarcode !== false) {
+    const bx = CANVAS_WIDTH * (settings.barcodeX ?? 68) / 100;
+    const by = CANVAS_HEIGHT * (settings.barcodeY ?? 70) / 100;
+    const bw = CANVAS_WIDTH * (settings.barcodeWidth ?? 27) / 100;
+    const bh = CANVAS_HEIGHT * (settings.barcodeHeight ?? 9) / 100;
+    drawBarcode(
+      ctx, bx, by, bw, bh,
+      settings.barcodeCustomValue || member.nationalMemberNumber || member.id
+    );
+  }
 
   // Signer Name & Title
   ctx.fillStyle = '#ffffff';
@@ -837,7 +841,7 @@ function drawKtaConfiguredElements(ctx: CanvasRenderingContext2D, member: Member
     const raw=valueOf(f.field); const text=f.textTransform==='uppercase'?raw.toUpperCase():raw;
     const x=CANVAS_WIDTH*f.x/100, y=CANVAS_HEIGHT*f.y/100, maxW=CANVAS_WIDTH*f.width/100;
     ctx.save(); ctx.fillStyle=f.color||'#fff'; ctx.textAlign=f.align||'left'; ctx.font=`${fontWeight(f.fontWeight)} ${Math.max(8,f.fontSize||10)}px Arial, sans-serif`;
-    const label=f.label ? `${f.label}: ` : ''; ctx.fillText(label+text, x, y, maxW); ctx.restore();
+    const label=f.showLabel && f.label ? `${f.label}: ` : ''; ctx.fillText(label+text, x, y, maxW); ctx.restore();
   });
   (settings.textElements || []).filter((t:any)=>t.side===side).forEach((t:any)=>{
     ctx.save(); ctx.fillStyle=t.color||'#fff'; ctx.textAlign=t.align||'left'; ctx.font=`${fontWeight(t.fontWeight)} ${Math.max(7,t.fontSize||9)}px Arial, sans-serif`;
