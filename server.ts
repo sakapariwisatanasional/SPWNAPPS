@@ -838,10 +838,19 @@ app.post('/api/config', (req, res) => {
 });
 
 // Central Data GET with strict Privacy and Role Enforcement
-app.get('/api/data', (req, res) => {
+app.get('/api/data', async (req, res) => {
   const session = getSessionUser(req);
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
   const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+
+  // Hydrate cache server dari Google Spreadsheet ketika instance baru belum
+  // memiliki data anggota. Ini penting untuk cold-start/serverless.
+  if (db.members.length === 0) {
+    const syncResult = await syncFromGoogleSpreadsheet();
+    if (!syncResult.success) {
+      console.warn('[Data] Initial Spreadsheet hydration gagal:', syncResult.message);
+    }
+  }
 
   // Mask member data for public viewers to prevent data leaks
   const sanitizedMembers = db.members.map(m => {
@@ -1105,10 +1114,30 @@ app.post('/api/mutate', async (req, res) => {
           member
         });
       } else if (action === 'UPDATE' || action === 'STATUS' || action === 'PHOTO_UPDATE') {
-        const idx = db.members.findIndex(m => m.id === member.id);
-        const existingMember = idx !== -1 ? db.members[idx] : null;
+        let idx = db.members.findIndex(m => m.id === member.id);
+        let existingMember = idx !== -1 ? db.members[idx] : null;
+
+        // Lazy-sync mencegah 404 ketika instance server baru belum memiliki
+        // anggota yang sudah tersedia di Google Spreadsheet. Pencarian juga
+        // memakai Nomor KTA/NTA dan email karena ID dapat dinormalisasi saat sync.
+        if (!existingMember && member?.id) {
+          const syncResult = await syncFromGoogleSpreadsheet();
+          if (syncResult.success) {
+            idx = db.members.findIndex(m =>
+              m.id === member.id ||
+              (!!member.nationalMemberNumber && String(m.nationalMemberNumber || '') === String(member.nationalMemberNumber)) ||
+              (!!member.email && String(m.email || '').toLowerCase() === String(member.email).toLowerCase())
+            );
+            existingMember = idx !== -1 ? db.members[idx] : null;
+          }
+        }
+
         if (!existingMember) {
-          return res.status(404).json({ success: false, message: 'Anggota yang akan diperbarui tidak ditemukan di database server.' });
+          return res.status(404).json({
+            success: false,
+            code: 'MEMBER_NOT_FOUND_AFTER_SYNC',
+            message: 'Anggota tidak ditemukan pada database server maupun hasil sinkronisasi Google Spreadsheet. Pastikan ID, Nomor KTA/NTA, atau email anggota sesuai dengan data pada sheet Anggota.'
+          });
         }
         if (!canEditMemberInJurisdiction(existingMember, member)) {
           return res.status(403).json({ success: false, message: 'Anda tidak memiliki kewenangan wilayah untuk mengubah data anggota ini atau memindahkannya ke wilayah lain.' });
