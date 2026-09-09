@@ -649,30 +649,16 @@ class StorageService {
     let maxNumber = 0;
 
     members.forEach(existingMember => {
-      if (
-        existingMember?.id &&
-        typeof existingMember.id === 'string' &&
-        existingMember.id.startsWith('member-')
-      ) {
-        const numPart = parseInt(
-          existingMember.id.replace('member-', ''),
-          10
-        );
-
-        if (
-          !isNaN(numPart) &&
-          numPart > maxNumber
-        ) {
-          maxNumber = numPart;
-        }
+      const existingId = String(existingMember?.id || '').trim();
+      const match = existingId.match(/^SPW-(\d+)$/i);
+      if (match) {
+        const numPart = parseInt(match[1], 10);
+        if (!Number.isNaN(numPart) && numPart > maxNumber) maxNumber = numPart;
       }
     });
 
     const nextNumber = maxNumber + 1;
-
-    const formattedId = `member-${String(
-      nextNumber
-    ).padStart(2, '0')}`;
+    const formattedId = `SPW-${String(nextNumber).padStart(6, '0')}`;
 
     const newMember: Member = {
       ...payload,
