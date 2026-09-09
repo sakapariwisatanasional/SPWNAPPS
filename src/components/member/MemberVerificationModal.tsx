@@ -162,13 +162,10 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kwartir Ranting</p>
-                  <p className="font-bold text-slate-800 mt-0.5 truncate">{member.branchName}</p>
+                  <p className="font-bold text-slate-800 mt-0.5 truncate">{member.districtName}</p>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gugus Depan</p>
-                  <p className="font-bold text-slate-800 mt-0.5 truncate">{member.gugusDepan}</p>
-                </div>
+                
               </div>
 
               {/* Skills & Competencies */}
