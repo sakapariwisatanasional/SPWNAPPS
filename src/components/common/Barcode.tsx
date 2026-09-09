@@ -1,4 +1,3 @@
-```tsx
 import React, { useMemo } from 'react';
 
 interface BarcodeProps {
@@ -242,4 +241,3 @@ export const Barcode: React.FC<BarcodeProps> = ({
 };
 
 export default Barcode;
-```
