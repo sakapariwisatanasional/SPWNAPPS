@@ -1,4 +1,4 @@
-import { Member, TourPackage, CulinarySouvenirItem, Activity, CurrentUser, UserRole, Certification, MemberSkill, KtaCardSettings } from '../types';
+import { Member, TourPackage, CulinarySouvenirItem, Activity, CurrentUser, UserRole, Certification, MemberSkill } from '../types';
 import { storage } from './storage';
 import { PROVINCES_DATA, REGENCIES_DATA } from '../data/indonesiaTerritories';
 import { MASTER_SKILLS } from '../data/initialData';
@@ -1432,6 +1432,12 @@ class SpreadsheetService {
       sheet: 'Anggota',
       memberId: member.id,
       secondaryId: member.nationalMemberNumber || '',
+      // Object member adalah sumber data utama agar seluruh perubahan profil
+      // Admin (bukan hanya 14 kolom lama) ikut tersimpan di Spreadsheet.
+      member: {
+        ...member,
+        verificationLink
+      },
       rowData
     };
 
@@ -1848,51 +1854,6 @@ class SpreadsheetService {
   /**
    * Inisialisasi struktur subfolder di Google Drive folder 16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh
    */
-  public async refreshKtaSettings(): Promise<KtaCardSettings | null> {
-    const token = storage.getAuthToken();
-    if (!token) return null;
-    try {
-      const response = await fetch('/api/kta-settings', {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: 'include',
-        cache: 'no-store'
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.success || !data?.settings) return null;
-      storage.saveKtaSettings(data.settings);
-      return data.settings as KtaCardSettings;
-    } catch (error) {
-      console.warn('Gagal memuat pengaturan KTA pusat:', error);
-      return null;
-    }
-  }
-
-  public async saveKtaSettings(settings: KtaCardSettings): Promise<{ success: boolean; message: string }> {
-    const token = storage.getAuthToken();
-    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
-    if (!token) return { success: false, message: 'Sesi Super Admin tidak ditemukan.' };
-    if (!scriptUrl) return { success: false, message: 'URL Google Apps Script belum diisi melalui Dashboard.' };
-    try {
-      const response = await fetch('/api/kta-settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        credentials: 'include',
-        cache: 'no-store',
-        body: JSON.stringify({ settings, scriptUrl })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.success) throw new Error(data?.message || `Gagal menyimpan pengaturan KTA (HTTP ${response.status}).`);
-      storage.saveKtaSettings(settings);
-      return { success: true, message: 'Pengaturan KTA tersimpan di Google Spreadsheet.' };
-    } catch (error: any) {
-      return { success: false, message: error?.message || 'Gagal menyimpan pengaturan KTA.' };
-    }
-  }
-
   public async setupDriveFolders(): Promise<{ success: boolean; directActionUrl?: string; message: string }> {
     const scriptUrl = this.config.scriptUrl;
     if (!scriptUrl) {
