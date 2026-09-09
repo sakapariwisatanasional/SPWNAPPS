@@ -176,15 +176,8 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
           )}
 
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="bg-white rounded-full shadow-xs border border-purple-100 flex items-center justify-center"
-              style={{
-                width: Math.max(14, Math.round(size * 0.18)),
-                height: Math.max(14, Math.round(size * 0.18)),
-                padding: Math.max(2, Math.round(size * 0.025))
-              }}
-            >
-              <SakaLogo size={Math.max(9, Math.round(size * 0.13))} />
+            <div className="bg-white rounded-full shadow-xs border border-purple-100 flex items-center justify-center" style={{ width: Math.max(12, Math.min(16, Math.round(size * 0.16))), height: Math.max(12, Math.min(16, Math.round(size * 0.16))), padding: 2 }}>
+              <SakaLogo size={Math.max(8, Math.min(12, Math.round(size * 0.12)))} />
             </div>
           </div>
         </div>
