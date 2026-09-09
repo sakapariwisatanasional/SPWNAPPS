@@ -1102,10 +1102,20 @@ app.post('/api/config', (req, res) => {
 });
 
 // Central Data GET with strict Privacy and Role Enforcement
-app.get('/api/data', (req, res) => {
+app.get('/api/data', async (req, res) => {
   const session = getSessionUser(req);
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
   const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+
+  // Pada Vercel, instance serverless baru tidak menjalankan interval sync.
+  // Hydrate database dari Spreadsheet saat cache server masih kosong agar
+  // Dashboard Super Admin tidak hanya bergantung pada data file lokal.
+  if (db.members.length === 0) {
+    const syncResult = await syncFromGoogleSpreadsheet();
+    if (!syncResult.success) {
+      console.warn('[Data] Initial Spreadsheet hydration gagal:', syncResult.message);
+    }
+  }
 
   // Mask member data for public viewers to prevent data leaks
   const sanitizedMembers = db.members.map(m => {
@@ -1290,11 +1300,31 @@ app.post('/api/mutate', async (req, res) => {
         }
         await forwardMutation(spreadsheetMemberPayload(member));
       } else if (action === 'UPDATE' || action === 'STATUS' || action === 'PHOTO_UPDATE') {
-        const idx = db.members.findIndex(m => m.id === member.id);
-        const existingMember = idx !== -1 ? db.members[idx] : null;
+        let idx = db.members.findIndex(m => m.id === member.id);
+        let existingMember = idx !== -1 ? db.members[idx] : null;
+
+        // Serverless instances (terutama Vercel) memiliki cache database in-memory
+        // yang dapat masih kosong ketika browser sudah memiliki data hasil sinkronisasi
+        // Spreadsheet. Jangan langsung mengembalikan 404. Lakukan lazy-sync dari
+        // Spreadsheet, lalu cari ulang berdasarkan ID, Nomor KTA/NTA, atau email.
+        if (!existingMember && member?.id) {
+          const syncResult = await syncFromGoogleSpreadsheet();
+          if (syncResult.success) {
+            idx = db.members.findIndex(m =>
+              m.id === member.id ||
+              (!!member.nationalMemberNumber && String(m.nationalMemberNumber || '') === String(member.nationalMemberNumber)) ||
+              (!!member.email && String(m.email || '').toLowerCase() === String(member.email).toLowerCase())
+            );
+            existingMember = idx !== -1 ? db.members[idx] : null;
+          }
+        }
 
         if (!existingMember) {
-          return res.status(404).json({ success: false, message: 'Anggota yang akan diperbarui tidak ditemukan di database server.' });
+          return res.status(404).json({
+            success: false,
+            code: 'MEMBER_NOT_FOUND_AFTER_SYNC',
+            message: 'Anggota tidak ditemukan pada database server maupun hasil sinkronisasi Google Spreadsheet. Pastikan ID, Nomor KTA/NTA, atau email anggota sesuai dengan data pada sheet Anggota.'
+          });
         }
         if (!canEditMemberInJurisdiction(existingMember, member)) {
           return res.status(403).json({ success: false, message: 'Anda tidak memiliki kewenangan wilayah untuk mengubah data anggota ini atau memindahkannya ke wilayah lain.' });
