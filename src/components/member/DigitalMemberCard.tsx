@@ -30,16 +30,32 @@ const valueOf = (member: Member, field: KtaDataFieldConfig['field']): string => 
 
 const weight = (w: KtaDataFieldConfig['fontWeight'] | string) => ({ normal:400, medium:500, bold:700, black:900 } as any)[w] || 400;
 
+const normalizeKtaSettings = (value?: Partial<KtaCardSettings> | null): KtaCardSettings => {
+  const base = storage.getKtaSettings();
+  const merged = {
+    ...base,
+    ...(value && typeof value === 'object' ? value : {})
+  } as KtaCardSettings;
+
+  return {
+    ...merged,
+    logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
+    dataFields: Array.isArray((merged as any).dataFields) ? (merged as any).dataFields : [],
+    textElements: Array.isArray((merged as any).textElements) ? (merged as any).textElements : [],
+    terms: Array.isArray((merged as any).terms) ? (merged as any).terms : []
+  };
+};
+
 export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrintPdf, showControls=true, allowAdminEdit=false, previewSettings }) => {
-  const [settings, setSettings] = useState<KtaCardSettings>(previewSettings || storage.getKtaSettings());
+  const [settings, setSettings] = useState<KtaCardSettings>(() => normalizeKtaSettings(previewSettings));
   const [flipped, setFlipped] = useState(false);
 
   useEffect(() => {
-    if (previewSettings) { setSettings(previewSettings); return; }
-    const refresh=()=>setSettings(storage.getKtaSettings());
+    if (previewSettings) { setSettings(normalizeKtaSettings(previewSettings)); return; }
+    const refresh=()=>setSettings(normalizeKtaSettings(storage.getKtaSettings()));
     const unsub=storage.subscribe(refresh);
-    void import('../../services/spreadsheetService').then(({ spreadsheetService }) => spreadsheetService.refreshKtaSettings().then(remote => { if (remote) setSettings(remote); }));
-    const evt=(e:any)=>e.detail&&setSettings(e.detail);
+    void import('../../services/spreadsheetService').then(({ spreadsheetService }) => spreadsheetService.refreshKtaSettings().then(remote => { if (remote) setSettings(normalizeKtaSettings(remote)); }));
+    const evt=(e:any)=>e.detail&&setSettings(normalizeKtaSettings(e.detail));
     window.addEventListener('saka:kta-settings-updated',evt);
     return ()=>{unsub();window.removeEventListener('saka:kta-settings-updated',evt);};
   },[previewSettings]);
@@ -48,11 +64,10 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
   const widthPx = 380;
   const heightPx = widthPx / ratio;
   const photo = formatDriveImageUrl(member.avatarUrl) || member.avatarUrl;
-  // Defensive normalization: settings lama / remote yang parsial tidak boleh
-  // membuat dashboard whitescreen hanya karena collection belum tersedia.
   const dataFields = Array.isArray(settings?.dataFields) ? settings.dataFields : [];
   const textElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
   const logos = Array.isArray(settings?.logos) ? settings.logos : [];
+  const terms = Array.isArray(settings?.terms) ? settings.terms : [];
 
   const frontFields = dataFields.filter(f=>f.side==='FRONT' && f.visible);
   const backFields = dataFields.filter(f=>f.side==='BACK' && f.visible);
@@ -95,7 +110,7 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
           {renderLogos(backLogos)}
           <div className="absolute left-[5%] top-[6%] right-[5%] font-bold text-[11px] uppercase">{settings.backHeaderTitle}</div>
           <div className="absolute left-[5%] top-[14%] right-[5%] text-[8px] opacity-70">{settings.backHeaderSubtitle}</div>
-          <div className="absolute left-[5%] top-[25%] right-[5%] text-[7px] leading-relaxed opacity-85">{settings.terms.map((t,i)=><div key={i} className="mb-1">{i+1}. {t}</div>)}</div>
+          <div className="absolute left-[5%] top-[25%] right-[5%] text-[7px] leading-relaxed opacity-85">{terms.map((t,i)=><div key={i} className="mb-1">{i+1}. {t}</div>)}</div>
           {backFields.map(renderField)}{backTexts.map(renderText)}
           <div className="absolute left-[5%] bottom-[5%] text-[7px] opacity-80"><div>{settings.issueLocationDate}</div><div className="font-bold text-[9px]">{settings.signerName}</div><div>{settings.signerTitle}</div></div>
           {settings.showBarcode !== false && <div className="absolute flex flex-col items-center gap-1" style={{left:`${settings.barcodeX ?? 68}%`,top:`${settings.barcodeY ?? 70}%`,width:`${settings.barcodeWidth ?? 27}%`}}><div className="bg-white rounded p-1 w-full flex items-center justify-center overflow-hidden"><Barcode value={settings.barcodeCustomValue?.trim()||member.nationalMemberNumber||member.id} width={Math.max(40, Math.round(widthPx*(settings.barcodeWidth ?? 27)/100))} height={Math.max(12, Math.round(heightPx*(settings.barcodeHeight ?? 9)/100))} barColor="#000" showText={settings.barcodeShowText ?? false}/></div><div className="text-[6px] flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5"/>VERIFIKASI</div></div>}
