@@ -311,60 +311,43 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
     if (memberRows && memberRows.length > 0) {
       const importedMembers = memberRows.map((row, idx) => {
         const fullName = getColVal(row, ['Nama Lengkap', 'Nama', 'Full Name', 'col_2']) || `Anggota ${idx + 1}`;
-        const kta = getColVal(row, ['Nomor KTA', 'Nomor Anggota', 'NTA', 'KTA', 'No KTA', 'col_1']);
-        const prov = getColVal(row, ['Provinsi', 'Kwartir Daerah', 'col_5']) || 'Jawa Barat';
-        const reg = getColVal(row, ['Kabupaten/Kota', 'Kwarcab', 'col_6']) || 'Kota Bandung';
-        const branch = getColVal(row, ['Kwarran/Kecamatan', 'Kwartir Ranting', 'col_7']) || 'Ranting Saka';
-        const gudep = getColVal(row, ['Gudep', 'Gugus Depan', 'col_8']) || 'Gudep Saka Pariwisata';
-        const krida = getColVal(row, ['Krida', 'Peminatan Krida', 'col_9']) || 'Krida Pemandu';
-        const status = (getColVal(row, ['Status', 'col_10']) || 'ACTIVE').toUpperCase();
-        const photo = cleanDriveUrl(getColVal(row, ['Foto URL', 'Foto', 'col_11'])) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
-        const email = getColVal(row, ['Email', 'col_3']) || `member${idx + 1}@pramuka.id`;
-        const phone = getColVal(row, ['Nomor WA', 'Telepon', 'col_4']) || '081234567890';
-        const id = getColVal(row, ['ID', 'id', 'col_0']) || `member-${idx + 1}`;
-        const registeredAt = getColVal(row, ['Tanggal Daftar', 'col_12']) || new Date().toISOString();
-
-        const canonicalId = /^SPW-\d+$/i.test(id) ? id : (kta && /\.(\d{6})$/.test(kta) ? `SPW-${kta.match(/\.(\d{6})$/)![1]}` : id);
+        const kta = getColVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'NTA', 'KTA', 'No KTA', 'col_1']);
+        const rawProv = getColVal(row, ['Kwartir Daerah (Provinsi)', 'Kwartir Daerah', 'Kwarda', 'Provinsi', 'province', 'col_5']);
+        const rawReg = getColVal(row, ['Kwartir Cabang (Kab/Kota)', 'Kwartir Cabang', 'Kwarcab', 'Kabupaten/Kota', 'Kabupaten', 'Kota', 'regency', 'col_6']);
+        const rawDistrict = getColVal(row, ['Kecamatan', 'Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'Ranting', 'districtName', 'col_7']);
+        const isNational = /^(00|nasional|tingkat nasional|kwartir nasional|kwar?nas|pimpinan nasional)$/i.test(String(rawProv || '').trim()) || /kwartir\s+nasional|tingkat\s+nasional|pusat\s+nasional/i.test(String(rawReg || ''));
+        const provinceId = getColVal(row, ['ID Provinsi', 'provinceId']) || (isNational ? '00' : '');
+        const provinceName = isNational ? 'Kwartir Nasional' : rawProv;
+        const regencyId = getColVal(row, ['ID Kwarcab', 'regencyId']) || (isNational ? '00.00' : '');
+        const regencyName = isNational ? 'Pusat Nasional' : rawReg;
+        const districtId = getColVal(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || (isNational ? '00.00.00' : '');
+        const districtName = isNational ? 'Nasional' : rawDistrict;
+        const krida = getColVal(row, ['Krida', 'Peminatan Krida', 'Peminatan Krida Saka Pariwisata', 'col_8']) || 'Krida Pemandu';
+        const status = (getColVal(row, ['Status', 'Status Keanggotaan', 'status', 'col_9']) || 'ACTIVE').toUpperCase();
+        const photo = cleanDriveUrl(getColVal(row, ['Foto URL', 'Foto', 'Avatar', 'Link Foto', 'col_10'])) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
+        const email = getColVal(row, ['Email', 'email', 'E-mail', 'col_3']) || `member${idx + 1}@pramuka.id`;
+        const phone = getColVal(row, ['Nomor WA', 'Nomor WhatsApp', 'Telepon', 'Phone', 'col_4']) || '081234567890';
+        const id = getColVal(row, ['ID', 'id', 'member_id', 'Nomor ID', 'col_0']) || `sheet-member-${idx + 1}`;
+        const registeredAt = getColVal(row, ['Tanggal Daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_11']) || new Date().toISOString();
         let parsedSkills: any[] = [];
         let parsedCertifications: any[] = [];
         try { parsedSkills = JSON.parse(getColVal(row, ['Keahlian JSON']) || '[]'); } catch {}
         try { parsedCertifications = JSON.parse(getColVal(row, ['Sertifikasi JSON']) || '[]'); } catch {}
-
         return {
-          id: canonicalId,
-          userId: getColVal(row, ['User ID']) || `user-${canonicalId}`,
-          nationalMemberNumber: kta || undefined,
-          fullName,
-          nikMasked: getColVal(row, ['NIK Tersamar']) || '3201**********01',
-          avatarUrl: photo,
-          gender: (getColVal(row, ['Jenis Kelamin']) || 'LAKI_LAKI').toUpperCase().startsWith('P') ? 'PEREMPUAN' : 'LAKI_LAKI',
-          birthPlace: getColVal(row, ['Tempat Lahir']) || 'Indonesia',
-          birthDate: getColVal(row, ['Tanggal Lahir']) || '2000-01-01',
-          email,
-          phone,
-          address: getColVal(row, ['Alamat']) || `${branch}, ${reg}, ${prov}`,
-          provinceId: getColVal(row, ['ID Provinsi']) || '32',
-          provinceName: prov,
-          regencyId: getColVal(row, ['ID Kwarcab']) || '32.73',
-          regencyName: reg,
-          districtId: getColVal(row, ['ID Kwarran']) || '32.73.01',
-          districtName: branch,
-          branchId: getColVal(row, ['ID Pangkalan']) || `branch-${idx + 1}`,
-          branchName: getColVal(row, ['Gugus Depan / Pangkalan']) || gudep,
-          gugusDepan: gudep,
-          currentPosition: getColVal(row, ['Jabatan']) || `Anggota ${krida}`,
-          krida,
-          joinYear: Number(getColVal(row, ['Tahun Bergabung'])) || 2024,
-          educationLevel: getColVal(row, ['Pendidikan']) || 'SMA/SMK',
-          occupation: getColVal(row, ['Pekerjaan']) || 'Anggota Pramuka',
-          bio: getColVal(row, ['Bio']) || `Anggota resmi Saka Pariwisata ${prov}.`,
-          status: status === 'ACTIVE' || status === 'PENDING' || status === 'SUSPENDED' ? status : 'ACTIVE',
-          registeredAt,
-          verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : canonicalId}`,
-          isOperator: false,
-          skills: parsedSkills,
-          certifications: parsedCertifications,
-          locationHistory: []
+          id, userId: getColVal(row, ['User ID']) || `user-${id}`, nationalMemberNumber: kta || undefined, fullName,
+          nikMasked: getColVal(row, ['NIK Tersamar']) || '3201**********01', avatarUrl: photo,
+          gender: (getColVal(row, ['Jenis Kelamin', 'Gender']) || 'LAKI_LAKI').toUpperCase().startsWith('P') ? 'PEREMPUAN' : 'LAKI_LAKI',
+          birthPlace: getColVal(row, ['Tempat Lahir']) || 'Indonesia', birthDate: getColVal(row, ['Tanggal Lahir']) || '2000-01-01',
+          email, phone, address: getColVal(row, ['Alamat']) || `${districtName || regencyName}, ${regencyName}, ${provinceName}`,
+          provinceId, provinceName, regencyId, regencyName, districtId, districtName,
+          currentPosition: isNational ? 'Ketua Pimpinan Saka Pariwisata Nasional' : getColVal(row, ['Jabatan']) || `Anggota ${krida}`,
+          krida, joinYear: Number(getColVal(row, ['Tahun Bergabung'])) || new Date().getFullYear(),
+          educationLevel: getColVal(row, ['Pendidikan']) || 'SMA/SMK', occupation: getColVal(row, ['Pekerjaan']) || 'Anggota Pramuka',
+          bio: getColVal(row, ['Bio']) || `Anggota resmi Saka Pariwisata ${provinceName || 'Indonesia'}.`,
+          status: status === 'ACTIVE' || status === 'PENDING' || status === 'SUSPENDED' ? status : 'ACTIVE', registeredAt,
+          verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : id}`, isOperator: false,
+          operatorRole: isNational ? 'SUPER_ADMIN' : undefined, operatorJurisdictionName: isNational ? 'Kwartir Nasional' : undefined,
+          skills: parsedSkills, certifications: parsedCertifications, locationHistory: []
         };
       });
 
@@ -616,8 +599,8 @@ app.post('/api/auth/login', (req, res) => {
         email: member.email,
         name: member.fullName,
         role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
-        jurisdictionName: `${member.branchName || ''}, ${member.regencyName || ''}`,
-        jurisdictionId: member.regencyId,
+        jurisdictionName: member.provinceId === '00' ? 'Kwartir Nasional' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
+        jurisdictionId: member.provinceId === '00' ? '00' : member.regencyId,
         avatarUrl: member.avatarUrl,
         memberId: member.id,
         passwordHash: member.passwordHash
@@ -768,13 +751,12 @@ app.post('/api/auth/register', (req, res) => {
       newMember.phone || '',
       newMember.provinceName || '',
       newMember.regencyName || '',
-      newMember.branchName || '',
-      newMember.gugusDepan || '',
+      newMember.districtName || '',
       newMember.krida || '',
       'PENDING',
       newMember.avatarUrl || '',
       newMember.registeredAt,
-      `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.id}`
+      `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.nationalMemberNumber || newMember.id}`
     ]
   });
 
@@ -867,8 +849,10 @@ app.get('/api/data', async (req, res) => {
       gender: m.gender,
       provinceName: m.provinceName,
       regencyName: m.regencyName,
-      branchName: m.branchName,
-      gugusDepan: m.gugusDepan,
+      districtName: m.districtName,
+      provinceId: m.provinceId,
+      regencyId: m.regencyId,
+      districtId: m.districtId,
       krida: m.krida,
       currentPosition: m.currentPosition,
       joinYear: m.joinYear,
@@ -1077,7 +1061,7 @@ app.post('/api/mutate', async (req, res) => {
     if (!allowed) return false;
     if (session.role === 'ADMIN_PROVINCE') return String(current.provinceId || '').trim() === allowed && String(next.provinceId || current.provinceId || '').trim() === allowed;
     if (session.role === 'ADMIN_REGENCY') return String(current.regencyId || '').trim() === allowed && String(next.regencyId || current.regencyId || '').trim() === allowed;
-    if (session.role === 'ADMIN_BRANCH') return String(current.branchId || '').trim() === allowed && String(next.branchId || current.branchId || '').trim() === allowed;
+    if (session.role === 'ADMIN_BRANCH') return String(current.districtId || '').trim() === allowed && String(next.districtId || current.districtId || '').trim() === allowed;
     return false;
   };
 
@@ -1147,7 +1131,12 @@ app.post('/api/mutate', async (req, res) => {
         }
         const updatedMember = { ...existingMember, ...member, id: existingMember.id, userId: member.userId || existingMember.userId };
         db.members[idx] = updatedMember;
-        await forwardToGoogleAppsScript({ action: 'UPSERT_MEMBER', sheet: 'Anggota', memberId: updatedMember.id, member: updatedMember });
+        await forwardToGoogleAppsScript({
+          action: 'UPSERT_MEMBER',
+          sheet: 'Anggota',
+          memberId: updatedMember.id,
+          rowData: [updatedMember.id || '', updatedMember.nationalMemberNumber || '', updatedMember.fullName || '', updatedMember.email || '', updatedMember.phone || '', updatedMember.provinceName || '', updatedMember.regencyName || '', updatedMember.districtName || '', updatedMember.krida || '', updatedMember.status || 'PENDING', updatedMember.avatarUrl || '', updatedMember.registeredAt || new Date().toISOString(), `https://sakapariwisata-nasional.vercel.app/?verifyId=${encodeURIComponent(updatedMember.nationalMemberNumber || updatedMember.id)}`]
+        });
       } else if (action === 'DELETE') {
         const memberId = payload.id || payload.memberId;
         db.members = db.members.filter(m => m.id !== memberId);
