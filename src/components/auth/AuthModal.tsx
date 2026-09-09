@@ -52,7 +52,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [regenciesList, setRegenciesList] = useState<Regency[]>([]);
   const [districtsList, setDistrictsList] = useState<District[]>([]);
 
-  const [regGudep, setRegGudep] = useState('');
   const [regKrida, setRegKrida] = useState<KridaType>('Krida Pemandu');
   const [regEducationLevel, setRegEducationLevel] = useState('SMA / SMK / Sederajat');
   const [regOccupation, setRegOccupation] = useState('Pelajar / Mahasiswa');
@@ -240,7 +239,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setRegError('');
     setRegSuccessMsg('');
 
-    if (!regFullName || !regEmail || !regPhone || !regPassword || !regGudep) {
+    if (!regFullName || !regEmail || !regPhone || !regPassword) {
       setRegError('Harap lengkapi semua kolom yang wajib diisi (*).');
       return;
     }
@@ -288,11 +287,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       const memberData = {
         id: newMemberId, userId: newUserId, fullName: regFullName, nikMasked: generatedNikMasked, avatarUrl: finalAvatarUrl, gender: regGender,
-        birthPlace: regBirthPlace || regName, birthDate: regBirthDate, phone: regPhone, email: regEmail, address: `Pangkalan ${regGudep}, ${distName}`,
+        birthPlace: regBirthPlace || regName, birthDate: regBirthDate, phone: regPhone, email: regEmail, address: `${distName}, ${regName}`,
         provinceId: isNasional ? '00' : regProvinceId, provinceName: provName, regencyId: isNasional ? '00.00' : regRegencyId, regencyName: regName,
         districtId: isNasional ? '00.00.00' : (regDistrictId || `${regRegencyId}.01`), districtName: distName,
-        branchId: isNasional ? 'branch-nasional' : `kwarran-${regRegencyId}`, branchName: isNasional ? 'Pimpinan Saka Tingkat Nasional' : `Kwarran ${distName}`,
-        gugusDepan: regGudep, joinYear: new Date().getFullYear(), currentPosition: `Calon Anggota ${regKrida}`, krida: regKrida,
+        joinYear: new Date().getFullYear(), currentPosition: `Calon Anggota ${regKrida}`, krida: regKrida,
         educationLevel: regEducationLevel, occupation: regOccupation, bio: regBio || 'Calon anggota Saka Pariwisata yang siap memajukan pariwisata nusantara.', skills: [], certifications: []
       };
 
@@ -774,7 +772,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     }`}
                   >
                     <MapPin className="w-3.5 h-3.5" />
-                    <span>Kwarda / Kwarcab / Kwarran</span>
+                    <span>Kwarda / Kwarcab / Kecamatan</span>
                   </button>
                   <button
                     type="button"
@@ -821,7 +819,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       </select>
                     </div>
                     <div>
-                      <label className="block font-semibold text-slate-700 mb-1">3. Kwarran (Kecamatan) *</label>
+                      <label className="block font-semibold text-slate-700 mb-1">3. Kecamatan *</label>
                       <select
                         value={regDistrictId}
                         onChange={(e) => setRegDistrictId(e.target.value)}
@@ -844,17 +842,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Gugus Depan / Pangkalan Asal *</label>
-                    <input
-                      type="text"
-                      required
-                      value={regGudep}
-                      onChange={(e) => setRegGudep(e.target.value)}
-                      placeholder="Contoh: SMA Negeri 1..."
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                    />
-                  </div>
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Pilihan Krida *</label>
                     <select
