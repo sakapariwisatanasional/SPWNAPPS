@@ -268,9 +268,8 @@ class StorageService {
         STORAGE_KEYS.MEMBERS
       );
 
-      return data
-        ? JSON.parse(data)
-        : INITIAL_MEMBERS;
+      const parsed = data ? JSON.parse(data) : INITIAL_MEMBERS;
+      return Array.isArray(parsed) ? parsed : INITIAL_MEMBERS;
     } catch (error) {
       console.error(
         'Gagal membaca data anggota:',
@@ -433,11 +432,7 @@ class StorageService {
         body: JSON.stringify({
           type: 'MEMBER',
           action: 'UPDATE',
-          payload: {
-            ...updatedMember,
-            updatedAt: new Date().toISOString(),
-            updatedBy: actor?.name || actor?.id || 'Administrator'
-          },
+          payload: updatedMember,
           reason: reason || 'Pembaruan profil anggota',
           scriptUrl: getManualAppsScriptUrl()
         })
@@ -877,9 +872,8 @@ class StorageService {
         STORAGE_KEYS.TOURS
       );
 
-      return data
-        ? JSON.parse(data)
-        : INITIAL_TOUR_PACKAGES;
+      const parsed = data ? JSON.parse(data) : INITIAL_TOUR_PACKAGES;
+      return Array.isArray(parsed) ? parsed : INITIAL_TOUR_PACKAGES;
     } catch (error) {
       console.error(
         'Gagal membaca paket wisata:',
@@ -964,9 +958,8 @@ class StorageService {
         STORAGE_KEYS.ACTIVITIES
       );
 
-      return data
-        ? JSON.parse(data)
-        : INITIAL_ACTIVITIES;
+      const parsed = data ? JSON.parse(data) : INITIAL_ACTIVITIES;
+      return Array.isArray(parsed) ? parsed : INITIAL_ACTIVITIES;
     } catch (error) {
       console.error(
         'Gagal membaca kegiatan:',
@@ -1052,9 +1045,8 @@ class StorageService {
         STORAGE_KEYS.CULINARY_SOUVENIRS
       );
 
-      return data
-        ? JSON.parse(data)
-        : INITIAL_CULINARY_SOUVENIRS;
+      const parsed = data ? JSON.parse(data) : INITIAL_CULINARY_SOUVENIRS;
+      return Array.isArray(parsed) ? parsed : INITIAL_CULINARY_SOUVENIRS;
     } catch (error) {
       console.error(
         'Gagal membaca data kuliner dan cinderamata:',
