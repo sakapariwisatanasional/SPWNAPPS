@@ -63,9 +63,11 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
   const radius = Math.max(8, settings.cornerRadiusMm * 3);
 
   const renderField = (f:KtaDataFieldConfig) => {
-    const raw=valueOf(member,f.field); const text=f.textTransform==='uppercase'?raw.toUpperCase():raw;
+    const raw=valueOf(member,f.field);
+    const text=f.textTransform==='uppercase'?raw.toUpperCase():raw;
+    const showLabel = f.showLabel === true;
     return <div key={f.id} className="absolute overflow-hidden" style={{left:`${f.x}%`,top:`${f.y}%`,width:`${f.width}%`,fontSize:`${f.fontSize}px`,fontWeight:weight(f.fontWeight),color:f.color,textAlign:f.align||'left',lineHeight:1.15,whiteSpace:'nowrap',textOverflow:'ellipsis'}} title={text}>
-      {f.label && <span style={{opacity:.75,marginRight:5,fontSize:Math.max(7,f.fontSize*.68)}}>{f.label}:</span>}{text || '—'}
+      {showLabel && f.label && <span style={{opacity:.75,marginRight:5,fontSize:Math.max(7,f.fontSize*.68)}}>{f.label}:</span>}{text || '—'}
     </div>;
   };
   const renderText=(t:any)=><div key={t.id} className="absolute overflow-hidden" style={{left:`${t.x}%`,top:`${t.y}%`,width:`${t.width}%`,fontSize:`${t.fontSize}px`,fontWeight:weight(t.fontWeight),color:t.color,textAlign:t.align||'left',whiteSpace:'nowrap',textTransform:t.textTransform||'none'}}>{t.text}</div>;
@@ -91,12 +93,12 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
 
         <div className="absolute inset-0 overflow-hidden shadow-2xl border border-white/20 text-white p-4" style={{...bgStyle(bgBack,settings.customBackgroundColorBack),borderRadius:radius,backfaceVisibility:'hidden',transform:'rotateY(180deg)'}}>
           {renderLogos(backLogos)}
-          <div className="absolute left-[5%] top-[6%] right-[5%] font-bold text-[11px] uppercase">{settings.backHeaderTitle}</div>
-          <div className="absolute left-[5%] top-[14%] right-[5%] text-[8px] opacity-70">{settings.backHeaderSubtitle}</div>
-          <div className="absolute left-[5%] top-[25%] right-[5%] text-[7px] leading-relaxed opacity-85">{terms.map((t,i)=><div key={i} className="mb-1">{i+1}. {t}</div>)}</div>
+          <div className="absolute overflow-hidden" style={{left:`${(settings as any).backHeaderTitleX ?? 5}%`,top:`${(settings as any).backHeaderTitleY ?? 6}%`,width:`${(settings as any).backHeaderTitleWidth ?? 90}%`,fontSize:`${(settings as any).backHeaderTitleFontSize ?? 11}px`,fontWeight:weight((settings as any).backHeaderTitleFontWeight ?? 'bold'),color:(settings as any).backHeaderTitleColor ?? '#ffffff',textAlign:(settings as any).backHeaderTitleAlign ?? 'left',whiteSpace:'nowrap',textTransform:'uppercase'}}>{settings.backHeaderTitle}</div>
+          <div className="absolute overflow-hidden" style={{left:`${(settings as any).backHeaderSubtitleX ?? 5}%`,top:`${(settings as any).backHeaderSubtitleY ?? 14}%`,width:`${(settings as any).backHeaderSubtitleWidth ?? 90}%`,fontSize:`${(settings as any).backHeaderSubtitleFontSize ?? 8}px`,fontWeight:weight((settings as any).backHeaderSubtitleFontWeight ?? 'normal'),color:(settings as any).backHeaderSubtitleColor ?? '#e5e7eb',textAlign:(settings as any).backHeaderSubtitleAlign ?? 'left',whiteSpace:'nowrap'}}>{settings.backHeaderSubtitle}</div>
+          <div className="absolute overflow-hidden" style={{left:`${(settings as any).termsX ?? 5}%`,top:`${(settings as any).termsY ?? 25}%`,width:`${(settings as any).termsWidth ?? 90}%`,fontSize:`${(settings as any).termsFontSize ?? 7}px`,fontWeight:weight((settings as any).termsFontWeight ?? 'normal'),color:(settings as any).termsColor ?? '#ffffff',textAlign:(settings as any).termsAlign ?? 'left',lineHeight:1.35}}>{terms.map((t,i)=><div key={i} className="mb-1">{i+1}. {t}</div>)}</div>
           {backFields.map(renderField)}{backTexts.map(renderText)}
-          <div className="absolute left-[5%] bottom-[5%] text-[7px] opacity-80"><div>{settings.issueLocationDate}</div><div className="font-bold text-[9px]">{settings.signerName}</div><div>{settings.signerTitle}</div></div>
-          <div className="absolute right-[5%] bottom-[5%] flex flex-col items-center gap-1"><div className="bg-white rounded p-1"><Barcode value={settings.barcodeCustomValue?.trim()||member.nationalMemberNumber||member.id} width={80} height={18} barColor="#000" showText={false}/></div><div className="text-[6px] flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5"/>VERIFIKASI</div></div>
+          <div className="absolute overflow-hidden" style={{left:`${(settings as any).signerX ?? 5}%`,top:`${(settings as any).signerY ?? 78}%`,width:`${(settings as any).signerWidth ?? 55}%`,color:(settings as any).signerColor ?? '#ffffff',textAlign:(settings as any).signerAlign ?? 'left'}}><div style={{fontSize:`${(settings as any).issueLocationDateFontSize ?? 7}px`}}>{settings.issueLocationDate}</div><div style={{fontSize:`${(settings as any).signerNameFontSize ?? 9}px`,fontWeight:700}}>{settings.signerName}</div><div style={{fontSize:`${(settings as any).signerTitleFontSize ?? 7}px`}}>{settings.signerTitle}</div><div style={{fontSize:`${(settings as any).signerSubtitleFontSize ?? 6}px`}}>{settings.signerSubtitle}</div></div>
+          {settings.showBarcode !== false && <div className="absolute flex flex-col items-center gap-1" style={{left:`${(settings as any).barcodeX ?? 68}%`,top:`${(settings as any).barcodeY ?? 70}%`,width:`${(settings as any).barcodeWidth ?? 27}%`}}><div className="bg-white rounded p-1 w-full"><Barcode value={settings.barcodeCustomValue?.trim()||member.nationalMemberNumber||member.id} width={Math.max(40,Math.round(widthPx*.22))} height={Math.max(12,Math.round(heightPx*.08))} barColor="#000" showText={settings.barcodeShowText === true}/></div><div className="text-[6px] flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5"/>{(settings as any).barcodeCaption || 'VERIFIKASI'}</div></div>}
         </div>
       </div>
     </div>
