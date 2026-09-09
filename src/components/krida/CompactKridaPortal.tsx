@@ -46,18 +46,20 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
   variant = 'dark',
   initialKridaId = 'pemandu'
 }) => {
+  const safeModules = Array.isArray(modules) ? modules : [];
+
   const [selectedKridaId, setSelectedKridaId] = useState<KridaId>(initialKridaId);
   const [isInternalReaderOpen, setIsInternalReaderOpen] = useState(false);
   const [readerModuleId, setReaderModuleId] = useState<string | undefined>();
   
   // Filter modules by category
   const categoryModules = useMemo(() => {
-    return modules.filter(m => m.kridaId === selectedKridaId);
-  }, [modules, selectedKridaId]);
+    return safeModules.filter(m => m.kridaId === selectedKridaId);
+  }, [safeModules, selectedKridaId]);
 
   // Selected module state (default to first module in category)
   const [selectedModuleId, setSelectedModuleId] = useState<string>(() => {
-    return categoryModules[0]?.id || modules[0]?.id || '';
+    return categoryModules[0]?.id || safeModules[0]?.id || '';
   });
 
   const handleTriggerFullScreenReader = (modId?: string) => {
@@ -87,13 +89,13 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
   const currentModule = useMemo(() => {
     const found = categoryModules.find(m => m.id === selectedModuleId);
     if (found) return found;
-    return categoryModules[0] || modules[0];
-  }, [categoryModules, selectedModuleId, modules]);
+    return categoryModules[0] || safeModules[0];
+  }, [categoryModules, selectedModuleId, safeModules]);
 
   // Switch category
   const handleSelectCategory = (kId: KridaId) => {
     setSelectedKridaId(kId);
-    const firstInCat = modules.find(m => m.kridaId === kId);
+    const firstInCat = safeModules.find(m => m.kridaId === kId);
     if (firstInCat) {
       setSelectedModuleId(firstInCat.id);
     }
@@ -972,7 +974,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
       <KridaFullScreenReaderModal
         isOpen={isInternalReaderOpen}
         onClose={() => setIsInternalReaderOpen(false)}
-        modules={modules}
+        modules={safeModules}
         initialModuleId={readerModuleId || selectedModuleId}
       />
     </div>
