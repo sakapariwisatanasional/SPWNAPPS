@@ -77,45 +77,54 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const isOperator = safeCurrentUser.role === 'ADMIN_PROVINCE' || safeCurrentUser.role === 'ADMIN_REGENCY' || safeCurrentUser.role === 'ADMIN_BRANCH';
   const isAdmin = isSuperAdmin || isOperator;
 
+  // Normalisasi semua koleksi sebelum dipakai oleh Dashboard dan child components.
+  // Data lama/hasil sync yang bukan array tidak boleh menyebabkan render crash.
+  const safeMembers = Array.isArray(members) ? members : [];
+  const safeTours = Array.isArray(tours) ? tours : [];
+  const safeProvinces = Array.isArray(provinces) ? provinces : [];
+  const safeCulinaryItems = Array.isArray(culinaryItems)
+    ? culinaryItems
+    : (Array.isArray(storage.getCulinarySouvenirs()) ? storage.getCulinarySouvenirs() : []);
+
   const ktaSettings = storage.getKtaSettings();
   const currentOpacityPct = Math.round((ktaSettings?.bgOpacity ?? 0.10) * 100);
-  const liveCulinaryItems = culinaryItems || storage.getCulinarySouvenirs() || [];
+  const liveCulinaryItems = safeCulinaryItems;
 
   const scopedMembers = isSuperAdmin 
-    ? (members || [])
+    ? safeMembers
     : safeCurrentUser.role === 'ADMIN_PROVINCE' 
-      ? (members || []).filter(m => m.provinceId === safeCurrentUser.jurisdictionId)
+      ? safeMembers.filter(m => m.provinceId === safeCurrentUser.jurisdictionId)
       : safeCurrentUser.role === 'ADMIN_REGENCY' 
-        ? (members || []).filter(m => m.regencyId === safeCurrentUser.jurisdictionId)
+        ? safeMembers.filter(m => m.regencyId === safeCurrentUser.jurisdictionId)
         : safeCurrentUser.role === 'ADMIN_BRANCH' 
-          ? (members || []).filter(m => m.branchId === safeCurrentUser.jurisdictionId)
+          ? safeMembers.filter(m => m.branchId === safeCurrentUser.jurisdictionId)
           : [];
 
   const scopedTours = isSuperAdmin
-    ? (tours || [])
+    ? safeTours
     : safeCurrentUser.role === 'ADMIN_PROVINCE'
-      ? (tours || []).filter(t => t.provinceId === safeCurrentUser.jurisdictionId)
+      ? safeTours.filter(t => t.provinceId === safeCurrentUser.jurisdictionId)
       : safeCurrentUser.role === 'ADMIN_REGENCY'
-        ? (tours || []).filter(t => t.regencyId === safeCurrentUser.jurisdictionId)
-        : (tours || []);
+        ? safeTours.filter(t => t.regencyId === safeCurrentUser.jurisdictionId)
+        : safeTours;
 
   const activeMembersCount = isSuperAdmin 
-    ? (members || []).filter(m => m?.status === 'ACTIVE').length 
+    ? safeMembers.filter(m => m?.status === 'ACTIVE').length 
     : scopedMembers.filter(m => m?.status === 'ACTIVE').length;
 
   const pendingMembers = isSuperAdmin 
-    ? (members || []).filter(m => m?.status === 'PENDING') 
+    ? safeMembers.filter(m => m?.status === 'PENDING') 
     : scopedMembers.filter(m => m?.status === 'PENDING');
 
   const publishedTours = isSuperAdmin 
-    ? (tours || []).filter(t => t?.status === 'APPROVED_PUBLISHED' || (t as any)?.status === 'PUBLISHED') 
+    ? safeTours.filter(t => t?.status === 'APPROVED_PUBLISHED' || (t as any)?.status === 'PUBLISHED') 
     : scopedTours.filter(t => t?.status === 'APPROVED_PUBLISHED' || (t as any)?.status === 'PUBLISHED');
 
   const activeMemberForCard = 
     scopedMembers.find(m => m.id === safeCurrentUser.memberId) ||
     scopedMembers.find(m => m.status === 'ACTIVE') || 
-    members.find(m => m.status === 'ACTIVE') || 
-    members[0];
+    safeMembers.find(m => m.status === 'ACTIVE') || 
+    safeMembers[0];
 
   // 1. TAMPILAN DASHBOARD PUBLIK
   if (isPublic) {
@@ -146,9 +155,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <IntegratedTourismShowcaseGallery
-          tours={tours}
+          tours={safeTours}
           products={liveCulinaryItems}
-          members={members}
+          members={safeMembers}
           currentUser={safeCurrentUser}
           onViewTourDetail={onViewTourDetail}
           onSelectCulinaryDetail={onSelectCulinaryDetail}
@@ -156,8 +165,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         />
 
         <NationalMapVisual
-          provinces={provinces}
-          members={members}
+          provinces={safeProvinces}
+          members={safeMembers}
           onSelectProvince={() => onSelectTab('members')}
         />
       </div>
@@ -395,9 +404,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Galeri Terpadu */}
       <IntegratedTourismShowcaseGallery
-        tours={tours}
+        tours={safeTours}
         products={liveCulinaryItems}
-        members={members}
+        members={safeMembers}
         currentUser={safeCurrentUser}
         onViewTourDetail={onViewTourDetail}
         onSelectCulinaryDetail={onSelectCulinaryDetail}
@@ -406,8 +415,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Peta Wilayah */}
       <NationalMapVisual
-        provinces={provinces}
-        members={members}
+        provinces={safeProvinces}
+        members={safeMembers}
         onSelectProvince={() => onSelectTab('members')}
       />
     </div>
