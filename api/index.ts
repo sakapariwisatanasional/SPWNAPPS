@@ -1092,6 +1092,46 @@ app.post('/api/config', (req, res) => {
   res.json({ success: true, config: db.config });
 });
 
+// KTA DESIGN SETTINGS (CENTRAL / GOOGLE APPS SCRIPT)
+app.get('/api/kta-settings', async (req, res) => {
+  const session = getSessionUser(req);
+  if (!session) {
+    return res.status(401).json({ success: false, message: 'Sesi login diperlukan.' });
+  }
+  try {
+    const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+    if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard.');
+    const url = scriptUrl.includes('?') ? `${scriptUrl}&action=GET_KTA_SETTINGS` : `${scriptUrl}?action=GET_KTA_SETTINGS`;
+    const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.success === false) throw new Error(data?.message || `Gagal membaca pengaturan KTA (HTTP ${response.status}).`);
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(502).json({ success: false, message: error?.message || 'Gagal membaca pengaturan KTA.' });
+  }
+});
+
+app.put('/api/kta-settings', async (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Wewenang Super Admin diperlukan.' });
+  }
+  try {
+    const settings = req.body?.settings;
+    if (!settings || typeof settings !== 'object') throw new Error('Pengaturan KTA tidak valid.');
+    const scriptUrl = normalizeManualAppsScriptUrl(req.body?.scriptUrl || db.config.scriptUrl);
+    if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard.');
+    const result = await forwardToGoogleAppsScript({
+      action: 'UPSERT_KTA_SETTINGS',
+      settings,
+      updatedBy: session.name || session.username || 'Super Admin'
+    }, scriptUrl);
+    return res.json({ success: true, ...result });
+  } catch (error: any) {
+    return res.status(502).json({ success: false, message: error?.message || 'Gagal menyimpan pengaturan KTA.' });
+  }
+});
+
 // Central Data GET with strict Privacy and Role Enforcement
 app.get('/api/data', (req, res) => {
   const session = getSessionUser(req);
