@@ -25,7 +25,6 @@ import { TourPackageCarouselSection } from '../components/dashboard/TourPackageC
 import { CulinarySouvenirGallerySection } from '../components/dashboard/CulinarySouvenirGallerySection';
 import { IntegratedTourismShowcaseGallery } from '../components/dashboard/IntegratedTourismShowcaseGallery';
 import { CompactKridaPortal } from '../components/krida/CompactKridaPortal';
-import { INITIAL_KRIDA_MODULES } from '../data/kridaData';
 
 export interface DashboardViewProps {
   currentUser?: any;
@@ -35,8 +34,6 @@ export interface DashboardViewProps {
   culinaryItems?: any[];
   auditLogs?: any[];
   onNavigate?: (view: string) => void;
-  // Backward-compatible alias used by older callers.
-  onSelectTab?: (view: string) => void;
   onVerifyMember?: (id: string) => void;
   [key: string]: any;
 }
@@ -49,7 +46,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   culinaryItems = [],
   auditLogs = [],
   onNavigate,
-  onSelectTab,
   onVerifyMember,
 }) => {
   const [searchPending, setSearchPending] = useState('');
@@ -133,7 +129,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const name = (m.name || m.fullName || '').toLowerCase();
       const nta = (m.ktaNumber || m.ktaId || '').toLowerCase();
       const kwarcab = (m.kwarcab || '').toLowerCase();
-      const kwarda = String(m.kwarda || '').trim();
+      const kwarda = m.kwarda || '';
 
       const matchesQuery = !query || name.includes(query) || nta.includes(query) || kwarcab.includes(query);
       const matchesKwarda = selectedKwardaFilter === 'ALL' || kwarda === selectedKwardaFilter;
@@ -157,11 +153,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const handleNavigate = (view: string) => {
     if (typeof onNavigate === 'function') {
       onNavigate(view);
-      return;
-    }
-
-    if (typeof onSelectTab === 'function') {
-      onSelectTab(view);
     }
   };
 
@@ -297,7 +288,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <tr>
                   <th className="py-3 px-4 rounded-l-xl">Nama & NTA</th>
                   <th className="py-3 px-4">Kwarda / Kwarcab</th>
-                  <th className="py-3 px-4">Pangkalan / Gudep</th>
                   <th className="py-3 px-4">Pilihan Krida</th>
                   <th className="py-3 px-4 text-right rounded-r-xl">Aksi</th>
                 </tr>
@@ -316,9 +306,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <td className="py-3.5 px-4 text-xs">
                       <div className="font-medium text-slate-700">{m?.kwarcab || '—'}</div>
                       <div className="text-slate-400">{m?.kwarda || '—'}</div>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-slate-600">
-                      {m?.pangkalan || m?.gudep || '—'}
                     </td>
                     <td className="py-3.5 px-4 text-xs">
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-100">
@@ -379,7 +366,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => handleNavigate('territories')}
+              onClick={() => handleNavigate('territory')}
               className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
             >
               Detail Wilayah
@@ -440,25 +427,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Portal Krida Saka Pariwisata */}
       <div className="space-y-3">
-        <CompactKridaPortal
-          modules={INITIAL_KRIDA_MODULES}
-          currentUser={currentUser}
-          onOpenFullExplorer={(kridaId) => handleNavigate('krida')}
-          variant="light"
-        />
+        <CompactKridaPortal onSelectKrida={() => handleNavigate('krida')} />
       </div>
 
       {/* Galeri Showcase Potensi Wisata & Kuliner */}
       <div className="space-y-6">
-        <IntegratedTourismShowcaseGallery
-          tours={safeTourPackages}
-          products={safeCulinaryItems}
-          members={safeMembers}
-          activities={safeActivities}
-          currentUser={currentUser}
-          onSelectTab={handleNavigate}
-          onViewTourDetail={() => handleNavigate('tours')}
-        />
+        <IntegratedTourismShowcaseGallery />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
