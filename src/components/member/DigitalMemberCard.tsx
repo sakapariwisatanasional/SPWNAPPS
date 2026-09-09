@@ -38,7 +38,6 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
     if (previewSettings) { setSettings(previewSettings); return; }
     const refresh=()=>setSettings(storage.getKtaSettings());
     const unsub=storage.subscribe(refresh);
-    void import('../../services/spreadsheetService').then(({ spreadsheetService }) => spreadsheetService.refreshKtaSettings().then(remote => { if (remote) setSettings(remote); }));
     const evt=(e:any)=>e.detail&&setSettings(e.detail);
     window.addEventListener('saka:kta-settings-updated',evt);
     return ()=>{unsub();window.removeEventListener('saka:kta-settings-updated',evt);};
