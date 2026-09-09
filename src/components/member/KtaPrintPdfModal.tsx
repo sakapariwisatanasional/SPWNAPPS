@@ -114,7 +114,7 @@ export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
                   Pratinjau KTA 3D
                 </span>
                 <span className="text-[10px] bg-purple-100 text-purple-900 px-2 py-0.5 rounded-full font-bold">
-                  {CR80_WIDTH_MM} × {CR80_HEIGHT_MM} mm
+                  {currentSettings.widthMm || CR80_WIDTH_MM} × {currentSettings.heightMm || CR80_HEIGHT_MM} mm
                 </span>
               </div>
 
@@ -134,8 +134,8 @@ export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
                   <span className="font-mono text-purple-800">ISO/IEC 7810 ID-1 (CR80)</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-purple-900/80 pt-1 border-t border-purple-200/40">
-                  <div>• Panjang: <strong>85.60 mm</strong></div>
-                  <div>• Lebar: <strong>53.98 mm</strong></div>
+                  <div>• Panjang: <strong>{currentSettings.widthMm || CR80_WIDTH_MM} mm</strong></div>
+                  <div>• Lebar: <strong>{currentSettings.heightMm || CR80_HEIGHT_MM} mm</strong></div>
                   <div>• Radius Sudut: <strong>3.18 mm</strong></div>
                   <div>• Resolusi: <strong>300+ DPI Crisp</strong></div>
                 </div>
