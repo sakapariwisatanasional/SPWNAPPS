@@ -72,23 +72,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     ? currentUser 
     : DEFAULT_PUBLIC_USER;
 
+  // Dashboard harus tahan terhadap state null/undefined saat live-sync berjalan.
+  const safeMembers = Array.isArray(members) ? members : [];
+  const safeTours = Array.isArray(tours) ? tours : [];
+  const safeProvinces = Array.isArray(provinces) ? provinces : [];
+  const safeCulinaryItems = Array.isArray(culinaryItems) ? culinaryItems : [];
+
   const isPublic = safeCurrentUser.role === 'PUBLIC';
   const isSuperAdmin = safeCurrentUser.role === 'SUPER_ADMIN';
   const isOperator = safeCurrentUser.role === 'ADMIN_PROVINCE' || safeCurrentUser.role === 'ADMIN_REGENCY' || safeCurrentUser.role === 'ADMIN_BRANCH';
   const isAdmin = isSuperAdmin || isOperator;
 
-  // Normalisasi semua koleksi sebelum dipakai oleh Dashboard dan child components.
-  // Data lama/hasil sync yang bukan array tidak boleh menyebabkan render crash.
-  const safeMembers = Array.isArray(members) ? members : [];
-  const safeTours = Array.isArray(tours) ? tours : [];
-  const safeProvinces = Array.isArray(provinces) ? provinces : [];
-  const safeCulinaryItems = Array.isArray(culinaryItems)
-    ? culinaryItems
-    : (Array.isArray(storage.getCulinarySouvenirs()) ? storage.getCulinarySouvenirs() : []);
-
   const ktaSettings = storage.getKtaSettings();
   const currentOpacityPct = Math.round((ktaSettings?.bgOpacity ?? 0.10) * 100);
-  const liveCulinaryItems = safeCulinaryItems;
+  const liveCulinaryItems = safeCulinaryItems.length > 0 ? safeCulinaryItems : storage.getCulinarySouvenirs();
+  const normalizedCulinaryItems = Array.isArray(liveCulinaryItems) ? liveCulinaryItems : [];
 
   const scopedMembers = isSuperAdmin 
     ? safeMembers
@@ -156,7 +154,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         <IntegratedTourismShowcaseGallery
           tours={safeTours}
-          products={liveCulinaryItems}
+          products={normalizedCulinaryItems}
           members={safeMembers}
           currentUser={safeCurrentUser}
           onViewTourDetail={onViewTourDetail}
@@ -310,7 +308,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-              {liveCulinaryItems.length.toLocaleString('id-ID')}
+              {normalizedCulinaryItems.length.toLocaleString('id-ID')}
             </span>
             <span className="text-xs font-bold text-purple-600">UMKM</span>
           </div>
@@ -405,7 +403,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Galeri Terpadu */}
       <IntegratedTourismShowcaseGallery
         tours={safeTours}
-        products={liveCulinaryItems}
+        products={normalizedCulinaryItems}
         members={safeMembers}
         currentUser={safeCurrentUser}
         onViewTourDetail={onViewTourDetail}
