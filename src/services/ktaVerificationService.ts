@@ -206,7 +206,6 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
       const prov = getVal(row, ['Provinsi', 'Kwarda', 'provinsi', 'col_3']) || 'Tingkat Nasional';
       const kab = getVal(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'col_4']) || 'Kwartir Nasional';
       const kec = getVal(row, ['Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'kecamatan_ranting', 'col_5']) || 'Pimpinan Nasional';
-      const gudep = getVal(row, ['Gugus Depan', 'Gudep', 'gudep', 'col_6']) || 'Gudep Saka Pariwisata';
       const krida = getVal(row, ['Krida', 'krida', 'col_7']) || 'Krida Pemandu';
       const roleStr = getVal(row, ['Role', 'Peran', 'Jabatan', 'Posisi']);
       const role = parseRole(roleStr);
@@ -232,9 +231,6 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
         regencyName: kab,
         districtId: '00.00.00',
         districtName: kec,
-        branchId: `branch-${idx}`,
-        branchName: kec,
-        gugusDepan: gudep,
         currentPosition: role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
         krida: (krida || 'Krida Pemandu') as any,
         joinYear: new Date().getFullYear(),
