@@ -857,9 +857,20 @@ class StorageService {
       if (data) {
         const parsedData = JSON.parse(data);
 
-        return {
+        const merged: KtaCardSettings = {
           ...DEFAULT_KTA_SETTINGS,
-          ...parsedData
+          ...(parsedData && typeof parsedData === 'object' ? parsedData : {})
+        };
+
+        // Data KTA lama/parsial dari localStorage tidak boleh mengembalikan
+        // collection sebagai undefined/null karena komponen kartu melakukan
+        // filter/map terhadap collection tersebut.
+        return {
+          ...merged,
+          logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
+          dataFields: Array.isArray((merged as any).dataFields) ? (merged as any).dataFields : [],
+          textElements: Array.isArray((merged as any).textElements) ? (merged as any).textElements : [],
+          terms: Array.isArray((merged as any).terms) ? (merged as any).terms : []
         };
       }
     } catch (error) {
@@ -880,9 +891,17 @@ class StorageService {
     }
 
     try {
-      const updatedSettings: KtaCardSettings = {
+      const merged: KtaCardSettings = {
         ...DEFAULT_KTA_SETTINGS,
-        ...settings
+        ...(settings && typeof settings === 'object' ? settings : {})
+      };
+
+      const updatedSettings: KtaCardSettings = {
+        ...merged,
+        logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
+        dataFields: Array.isArray((merged as any).dataFields) ? (merged as any).dataFields : [],
+        textElements: Array.isArray((merged as any).textElements) ? (merged as any).textElements : [],
+        terms: Array.isArray((merged as any).terms) ? (merged as any).terms : []
       };
 
       localStorage.setItem(
