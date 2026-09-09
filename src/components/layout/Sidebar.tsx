@@ -125,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="flex-1 truncate">
               {isSuperAdmin ? 'Dashboard Super Admin' : 
                currentUser.role === 'ADMIN_PROVINCE' ? 'Dashboard Kwarda' :
-               currentUser.role === 'ADMIN_REGENCY' ? 'Dashboard Kwarcab' : 'Dashboard Kwarran'}
+               currentUser.role === 'ADMIN_REGENCY' ? 'Dashboard Kwarcab' : 'Dashboard Kecamatan'}
             </span>
             {currentTab === 'dashboard' && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />}
           </button>
