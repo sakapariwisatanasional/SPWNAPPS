@@ -1,5 +1,20 @@
-// Service penyimpanan data lokal dengan validasi tipe data mutlak
-import initialData from '../data/initialData';
+// Service penyimpanan data lokal Saka Pariwisata
+import * as initialDataModule from '../data/initialData';
+
+// Deteksi struktur data bawaan secara fleksibel (baik default maupun named export)
+const rawInitial: any =
+  (initialDataModule as any).default ||
+  (initialDataModule as any).initialData ||
+  initialDataModule ||
+  {};
+
+const getFallbackList = (key: string, altKey?: string): any[] => {
+  if (Array.isArray(rawInitial[key])) return rawInitial[key];
+  if (altKey && Array.isArray(rawInitial[altKey])) return rawInitial[altKey];
+  if (Array.isArray((initialDataModule as any)[key])) return (initialDataModule as any)[key];
+  if (altKey && Array.isArray((initialDataModule as any)[altKey])) return (initialDataModule as any)[altKey];
+  return [];
+};
 
 export const getStorageItem = <T>(key: string, fallback: T): T => {
   try {
@@ -23,9 +38,9 @@ export const setStorageItem = <T>(key: string, value: T): void => {
   }
 };
 
-// Anggota (Members)
+// 1. Data Anggota (Members)
 export const getMembers = (): any[] => {
-  const fallback = Array.isArray(initialData?.members) ? initialData.members : [];
+  const fallback = getFallbackList('members', 'initialMembers');
   const stored = getStorageItem<any[]>('saka_members', fallback);
   return Array.isArray(stored) ? stored : fallback;
 };
@@ -34,9 +49,9 @@ export const saveMembers = (members: any[]): void => {
   setStorageItem('saka_members', Array.isArray(members) ? members : []);
 };
 
-// Kegiatan (Activities)
+// 2. Data Kegiatan (Activities)
 export const getActivities = (): any[] => {
-  const fallback = Array.isArray(initialData?.activities) ? initialData.activities : [];
+  const fallback = getFallbackList('activities', 'initialActivities');
   const stored = getStorageItem<any[]>('saka_activities', fallback);
   return Array.isArray(stored) ? stored : fallback;
 };
@@ -45,9 +60,9 @@ export const saveActivities = (activities: any[]): void => {
   setStorageItem('saka_activities', Array.isArray(activities) ? activities : []);
 };
 
-// Paket Wisata (Tour Packages)
+// 3. Paket Wisata (Tour Packages)
 export const getTourPackages = (): any[] => {
-  const fallback = Array.isArray(initialData?.tourPackages) ? initialData.tourPackages : [];
+  const fallback = getFallbackList('tourPackages', 'initialTourPackages');
   const stored = getStorageItem<any[]>('saka_tour_packages', fallback);
   return Array.isArray(stored) ? stored : fallback;
 };
@@ -56,9 +71,9 @@ export const saveTourPackages = (packages: any[]): void => {
   setStorageItem('saka_tour_packages', Array.isArray(packages) ? packages : []);
 };
 
-// Sentra Kuliner & Suvenir (Culinary Items)
+// 4. Sentra Kuliner & Cendera Mata (Culinary Items)
 export const getCulinaryItems = (): any[] => {
-  const fallback = Array.isArray(initialData?.culinaryItems) ? initialData.culinaryItems : [];
+  const fallback = getFallbackList('culinaryItems', 'initialCulinaryItems');
   const stored = getStorageItem<any[]>('saka_culinary_items', fallback);
   return Array.isArray(stored) ? stored : fallback;
 };
@@ -67,7 +82,7 @@ export const saveCulinaryItems = (items: any[]): void => {
   setStorageItem('saka_culinary_items', Array.isArray(items) ? items : []);
 };
 
-// Log Audit Sistem (Audit Logs)
+// 5. Log Audit Sistem (Audit Logs)
 export const getAuditLogs = (): any[] => {
   const stored = getStorageItem<any[]>('saka_audit_logs', []);
   return Array.isArray(stored) ? stored : [];
@@ -90,7 +105,7 @@ export const addAuditLog = (action: string, performedBy?: string, details?: any)
   saveAuditLogs([newLog, ...logs]);
 };
 
-// Sesi Pengguna Aktif (Current User)
+// 6. Sesi Pengguna Aktif (Current User)
 export const getCurrentUser = (): any | null => {
   return getStorageItem<any | null>('saka_current_user', null);
 };
@@ -115,7 +130,7 @@ export const clearStorage = (): void => {
   }
 };
 
-export default {
+const storage = {
   getMembers,
   saveMembers,
   getActivities,
@@ -132,3 +147,5 @@ export default {
   removeCurrentUser,
   clearStorage,
 };
+
+export default storage;
