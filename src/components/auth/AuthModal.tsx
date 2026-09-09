@@ -231,62 +231,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       console.warn('[Auth] Mode offline/fallback:', apiErr);
     }
 
-    const lowerIdent = ident.toLowerCase();
-
-    if ((lowerIdent === 'admin_saka' || lowerIdent === 'admin@sakapariwisata.id') && pass === 'SakaPariwisata#2026!') {
-      const fallbackAdmin: CurrentUser = {
-        id: 'user-superadmin-nasional',
-        username: 'admin_saka',
-        name: 'Super Admin Kwartir Nasional',
-        fullName: 'Super Admin Kwartir Nasional',
-        email: 'admin@sakapariwisata.id',
-        role: 'SUPER_ADMIN',
-        jurisdictionName: 'Kwartir Nasional (Pusat)',
-        jurisdictionId: '00',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-      };
-      storage.setAuthToken('offline-session-' + Date.now());
-      storage.setCurrentUser(fallbackAdmin);
-      onLoginSuccess(fallbackAdmin);
-      setIsLoading(false);
-      onClose();
-      return;
-    }
-
-    // Jangan autentikasi anggota menggunakan password plaintext/LocalStorage.
-    // Akun anggota harus diverifikasi oleh API -> Sheet Users.
-
-    const members = storage.getMembers();
-    const matchedMember = members.find(m => 
-      (m.nationalMemberNumber && m.nationalMemberNumber.trim() === ident) ||
-      (m.email && m.email.toLowerCase() === lowerIdent) ||
-      (m.phone && m.phone === ident)
-    );
-
-    if (matchedMember) {
-      const memberUser: CurrentUser = {
-        id: matchedMember.userId || `user-${matchedMember.id}`,
-        username: matchedMember.nationalMemberNumber || matchedMember.email.split('@')[0],
-        name: matchedMember.fullName,
-        fullName: matchedMember.fullName,
-        email: matchedMember.email,
-        role: 'MEMBER',
-        memberId: matchedMember.id,
-        avatarUrl: matchedMember.avatarUrl,
-        jurisdictionName: matchedMember.regencyName,
-        jurisdictionId: matchedMember.regencyId
-      };
-
-      storage.setAuthToken('member-session-' + Date.now());
-      storage.setCurrentUser(memberUser);
-      onLoginSuccess(memberUser);
-      setIsLoading(false);
-      onClose();
-      return;
-    }
-
     setIsLoading(false);
-    setLoginError('Kombinasi nama pengguna/email/KTA atau kata sandi tidak sesuai.');
+    setLoginError('Kombinasi nama pengguna/email/KTA atau kata sandi tidak sesuai. Pastikan koneksi Google Spreadsheet aktif.');
   };
 
   const handleRegister = async (e: React.FormEvent) => {
