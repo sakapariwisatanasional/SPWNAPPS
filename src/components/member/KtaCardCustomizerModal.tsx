@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import { KtaCardSettings, KtaCardPreset, KtaCardSide, KtaDataFieldConfig, KtaMemberFieldKey, KtaLogoElement, KtaTextElement, Member } from '../../types';
 import { storage, DEFAULT_KTA_SETTINGS } from '../../services/storage';
-import { spreadsheetService } from '../../services/spreadsheetService';
 import { DigitalMemberCard } from './DigitalMemberCard';
 
 interface Props { isOpen: boolean; onClose: () => void; onSuccess?: () => void; }
@@ -55,10 +54,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
     if (!isOpen) return;
     setSettings(clone(storage.getKtaSettings()));
     setMessage('');
-    setLoadingRemote(true);
-    spreadsheetService.refreshKtaSettings().then(remote => {
-      if (remote) setSettings(clone(remote));
-    }).finally(() => setLoadingRemote(false));
+    setLoadingRemote(false);
   }, [isOpen]);
 
   const dataFields = Array.isArray(settings?.dataFields) ? settings.dataFields : [];
@@ -104,10 +100,16 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
   const handleSave = async () => {
     setIsSaving(true); setMessage('Menyimpan pengaturan KTA pusat...');
     const next={...settings,lastUpdated:new Date().toISOString()};
-    const result=await spreadsheetService.saveKtaSettings(next);
-    if(result.success){ setSettings(next); setMessage('Pengaturan KTA berhasil disimpan ke Google Spreadsheet.'); setTimeout(()=>{onSuccess?.(); onClose();},900); }
-    else setMessage(result.message);
-    setIsSaving(false);
+    try {
+      storage.saveKtaSettings(next);
+      setSettings(clone(next));
+      setMessage('Pengaturan KTA berhasil disimpan.');
+      setTimeout(()=>{onSuccess?.(); onClose();},900);
+    } catch (error:any) {
+      setMessage(error?.message || 'Gagal menyimpan pengaturan KTA.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => { if(confirm('Reset seluruh desain KTA ke standar nasional?')) setSettings(clone(DEFAULT_KTA_SETTINGS)); };
