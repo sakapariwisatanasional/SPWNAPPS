@@ -376,41 +376,46 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
         const id = getColVal(row, ['ID', 'id', 'col_0']) || `member-${idx + 1}`;
         const registeredAt = getColVal(row, ['Tanggal Daftar', 'col_12']) || new Date().toISOString();
 
+        const canonicalId = /^SPW-\d+$/i.test(id) ? id : (kta && /\.(\d{6})$/.test(kta) ? `SPW-${kta.match(/\.(\d{6})$/)![1]}` : id);
+        let parsedSkills: any[] = [];
+        let parsedCertifications: any[] = [];
+        try { parsedSkills = JSON.parse(getColVal(row, ['Keahlian JSON']) || '[]'); } catch {}
+        try { parsedCertifications = JSON.parse(getColVal(row, ['Sertifikasi JSON']) || '[]'); } catch {}
+
         return {
-          id,
-          userId: `user-${id}`,
+          id: canonicalId,
+          userId: getColVal(row, ['User ID']) || `user-${canonicalId}`,
           nationalMemberNumber: kta || undefined,
           fullName,
-          nikMasked: '3201**********01',
+          nikMasked: getColVal(row, ['NIK Tersamar']) || '3201**********01',
           avatarUrl: photo,
-          gender: 'LAKI_LAKI',
-          birthPlace: 'Indonesia',
-          birthDate: '2000-01-01',
+          gender: (getColVal(row, ['Jenis Kelamin']) || 'LAKI_LAKI').toUpperCase().startsWith('P') ? 'PEREMPUAN' : 'LAKI_LAKI',
+          birthPlace: getColVal(row, ['Tempat Lahir']) || 'Indonesia',
+          birthDate: getColVal(row, ['Tanggal Lahir']) || '2000-01-01',
           email,
           phone,
-          address: `${branch}, ${reg}, ${prov}`,
-          provinceId: '32',
+          address: getColVal(row, ['Alamat']) || `${branch}, ${reg}, ${prov}`,
+          provinceId: getColVal(row, ['ID Provinsi']) || '32',
           provinceName: prov,
-          regencyId: '32.73',
+          regencyId: getColVal(row, ['ID Kwarcab']) || '32.73',
           regencyName: reg,
-          districtId: '32.73.01',
+          districtId: getColVal(row, ['ID Kwarran']) || '32.73.01',
           districtName: branch,
-          branchId: `branch-${idx + 1}`,
-          branchName: branch,
+          branchId: getColVal(row, ['ID Pangkalan']) || `branch-${idx + 1}`,
+          branchName: getColVal(row, ['Gugus Depan / Pangkalan']) || gudep,
           gugusDepan: gudep,
-          currentPosition: fullName.includes('Rohadi') ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
+          currentPosition: getColVal(row, ['Jabatan']) || `Anggota ${krida}`,
           krida,
-          joinYear: 2024,
-          educationLevel: 'SMA/SMK',
-          occupation: 'Anggota Pramuka',
-          bio: `Anggota resmi Saka Pariwisata ${prov}. Terdata langsung dari Google Spreadsheet.`,
-          status: status === 'ACTIVE' || status === 'PENDING' ? status : 'ACTIVE',
+          joinYear: Number(getColVal(row, ['Tahun Bergabung'])) || 2024,
+          educationLevel: getColVal(row, ['Pendidikan']) || 'SMA/SMK',
+          occupation: getColVal(row, ['Pekerjaan']) || 'Anggota Pramuka',
+          bio: getColVal(row, ['Bio']) || `Anggota resmi Saka Pariwisata ${prov}.`,
+          status: status === 'ACTIVE' || status === 'PENDING' || status === 'SUSPENDED' ? status : 'ACTIVE',
           registeredAt,
-          verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : id}`,
-          isOperator: fullName.includes('Rohadi'),
-          operatorRole: fullName.includes('Rohadi') ? 'SUPER_ADMIN' : undefined,
-          skills: [],
-          certifications: [],
+          verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : canonicalId}`,
+          isOperator: false,
+          skills: parsedSkills,
+          certifications: parsedCertifications,
           locationHistory: []
         };
       });
@@ -418,7 +423,11 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
       // Deduplicate and merge members
       const existing = [...db.members];
       importedMembers.forEach(im => {
-        const idx = existing.findIndex(e => e.id === im.id || (e.nationalMemberNumber && e.nationalMemberNumber === im.nationalMemberNumber));
+        const idx = existing.findIndex(e =>
+          e.id === im.id ||
+          (e.nationalMemberNumber && im.nationalMemberNumber && e.nationalMemberNumber === im.nationalMemberNumber) ||
+          (e.email && im.email && e.email.toLowerCase() === im.email.toLowerCase())
+        );
         if (idx !== -1) {
           existing[idx] = { ...existing[idx], ...im };
         } else {
@@ -1092,46 +1101,6 @@ app.post('/api/config', (req, res) => {
   res.json({ success: true, config: db.config });
 });
 
-// KTA DESIGN SETTINGS (CENTRAL / GOOGLE APPS SCRIPT)
-app.get('/api/kta-settings', async (req, res) => {
-  const session = getSessionUser(req);
-  if (!session) {
-    return res.status(401).json({ success: false, message: 'Sesi login diperlukan.' });
-  }
-  try {
-    const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
-    if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard.');
-    const url = scriptUrl.includes('?') ? `${scriptUrl}&action=GET_KTA_SETTINGS` : `${scriptUrl}?action=GET_KTA_SETTINGS`;
-    const response = await fetch(url, { method: 'GET', cache: 'no-store' });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data?.success === false) throw new Error(data?.message || `Gagal membaca pengaturan KTA (HTTP ${response.status}).`);
-    return res.json(data);
-  } catch (error: any) {
-    return res.status(502).json({ success: false, message: error?.message || 'Gagal membaca pengaturan KTA.' });
-  }
-});
-
-app.put('/api/kta-settings', async (req, res) => {
-  const session = getSessionUser(req);
-  if (session?.role !== 'SUPER_ADMIN') {
-    return res.status(403).json({ success: false, message: 'Wewenang Super Admin diperlukan.' });
-  }
-  try {
-    const settings = req.body?.settings;
-    if (!settings || typeof settings !== 'object') throw new Error('Pengaturan KTA tidak valid.');
-    const scriptUrl = normalizeManualAppsScriptUrl(req.body?.scriptUrl || db.config.scriptUrl);
-    if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard.');
-    const result = await forwardToGoogleAppsScript({
-      action: 'UPSERT_KTA_SETTINGS',
-      settings,
-      updatedBy: session.name || session.username || 'Super Admin'
-    }, scriptUrl);
-    return res.json({ success: true, ...result });
-  } catch (error: any) {
-    return res.status(502).json({ success: false, message: error?.message || 'Gagal menyimpan pengaturan KTA.' });
-  }
-});
-
 // Central Data GET with strict Privacy and Role Enforcement
 app.get('/api/data', (req, res) => {
   const session = getSessionUser(req);
@@ -1265,6 +1234,34 @@ app.post('/api/mutate', async (req, res) => {
   const forwardMutation = (gasPayload: any) =>
     forwardToGoogleAppsScript(gasPayload, requestScriptUrl);
 
+  // Validasi kewenangan wilayah dilakukan di server, bukan hanya di browser.
+  const canEditMemberInJurisdiction = (target: any, incoming: any): boolean => {
+    if (isSuperAdmin) return true;
+    if (!isOperator || !session) return false;
+    const current = target || {};
+    const next = incoming || {};
+    if (session.role === 'ADMIN_PROVINCE') {
+      const allowed = String(session.jurisdictionId || '').trim();
+      return !!allowed && String(current.provinceId || '').trim() === allowed && String(next.provinceId || current.provinceId || '').trim() === allowed;
+    }
+    if (session.role === 'ADMIN_REGENCY') {
+      const allowed = String(session.jurisdictionId || '').trim();
+      return !!allowed && String(current.regencyId || '').trim() === allowed && String(next.regencyId || current.regencyId || '').trim() === allowed;
+    }
+    if (session.role === 'ADMIN_BRANCH') {
+      const allowed = String(session.jurisdictionId || '').trim();
+      return !!allowed && String(current.branchId || '').trim() === allowed && String(next.branchId || current.branchId || '').trim() === allowed;
+    }
+    return false;
+  };
+
+  const spreadsheetMemberPayload = (member: any) => ({
+    action: 'UPSERT_MEMBER',
+    sheet: 'Anggota',
+    memberId: member.id,
+    member
+  });
+
   // Audit Logging
   db.auditLogs.unshift({
     id: `log-${Date.now()}`,
@@ -1291,55 +1288,27 @@ app.post('/api/mutate', async (req, res) => {
         } else {
           db.members.unshift(member);
         }
-        await forwardMutation({
-          action: 'UPSERT_MEMBER',
-          sheet: 'Anggota',
-          memberId: member.id,
-          rowData: [
-            member.id,
-            member.nationalMemberNumber || '',
-            member.fullName,
-            member.email,
-            member.phone,
-            member.provinceName,
-            member.regencyName,
-            member.branchName,
-            member.gugusDepan,
-            member.krida || '',
-            member.status,
-            member.avatarUrl,
-            member.registeredAt,
-            `https://sakapariwisata-nasional.vercel.app/?verifyId=${member.nationalMemberNumber || member.id}`
-          ]
-        });
+        await forwardMutation(spreadsheetMemberPayload(member));
       } else if (action === 'UPDATE' || action === 'STATUS' || action === 'PHOTO_UPDATE') {
         const idx = db.members.findIndex(m => m.id === member.id);
-        if (idx !== -1) {
-          db.members[idx] = { ...db.members[idx], ...member };
-        } else {
-          db.members.unshift(member);
+        const existingMember = idx !== -1 ? db.members[idx] : null;
+
+        if (!existingMember) {
+          return res.status(404).json({ success: false, message: 'Anggota yang akan diperbarui tidak ditemukan di database server.' });
         }
-        await forwardMutation({
-          action: 'UPSERT_MEMBER',
-          sheet: 'Anggota',
-          memberId: member.id,
-          rowData: [
-            member.id,
-            member.nationalMemberNumber || '',
-            member.fullName,
-            member.email,
-            member.phone,
-            member.provinceName,
-            member.regencyName,
-            member.branchName,
-            member.gugusDepan,
-            member.krida || '',
-            member.status,
-            member.avatarUrl,
-            member.registeredAt,
-            `https://sakapariwisata-nasional.vercel.app/?verifyId=${member.nationalMemberNumber || member.id}`
-          ]
-        });
+        if (!canEditMemberInJurisdiction(existingMember, member)) {
+          return res.status(403).json({ success: false, message: 'Anda tidak memiliki kewenangan wilayah untuk mengubah data anggota ini atau memindahkannya ke wilayah lain.' });
+        }
+
+        // Operator wilayah tidak boleh mengubah Nomor KTA/NTA yang sudah diterbitkan.
+        if (!isSuperAdmin && String(member.nationalMemberNumber || '') !== String(existingMember.nationalMemberNumber || '')) {
+          return res.status(403).json({ success: false, message: 'Nomor KTA/NTA hanya dapat dikoreksi oleh Super Admin.' });
+        }
+
+        const updatedMember = { ...existingMember, ...member, id: existingMember.id, userId: member.userId || existingMember.userId };
+        db.members[idx] = updatedMember;
+
+        await forwardMutation(spreadsheetMemberPayload(updatedMember));
         if ((action === 'STATUS' || action === 'UPDATE') && member.id && member.status) {
           await forwardMutation({
             action: 'UPDATE_AUTH_STATUS',
