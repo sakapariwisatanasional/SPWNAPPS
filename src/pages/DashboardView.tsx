@@ -19,12 +19,12 @@ import {
   ShoppingBag
 } from 'lucide-react';
 
-import { DashboardWidget } from '../components/dashboard/DashboardWidget';
 import { NationalMapVisual } from '../components/dashboard/NationalMapVisual';
 import { TourPackageCarouselSection } from '../components/dashboard/TourPackageCarouselSection';
 import { CulinarySouvenirGallerySection } from '../components/dashboard/CulinarySouvenirGallerySection';
 import { IntegratedTourismShowcaseGallery } from '../components/dashboard/IntegratedTourismShowcaseGallery';
 import { CompactKridaPortal } from '../components/krida/CompactKridaPortal';
+import { OFFICIAL_2026_KRIDA_MODULES } from '../data/kridaModules2026';
 
 export interface DashboardViewProps {
   currentUser?: any;
@@ -37,6 +37,73 @@ export interface DashboardViewProps {
   onVerifyMember?: (id: string) => void;
   [key: string]: any;
 }
+
+interface MetricCardProps {
+  title: string;
+  value: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  color: 'emerald' | 'teal' | 'amber' | 'indigo';
+  badge?: string;
+  onClick?: () => void;
+}
+
+const MetricCard: React.FC<MetricCardProps> = ({
+  title,
+  value,
+  subtitle,
+  icon,
+  color,
+  badge,
+  onClick
+}) => {
+  const colorMap = {
+    emerald: {
+      iconBg: 'bg-emerald-50',
+      value: 'text-emerald-700',
+      border: 'hover:border-emerald-200'
+    },
+    teal: {
+      iconBg: 'bg-teal-50',
+      value: 'text-teal-700',
+      border: 'hover:border-teal-200'
+    },
+    amber: {
+      iconBg: 'bg-amber-50',
+      value: 'text-amber-700',
+      border: 'hover:border-amber-200'
+    },
+    indigo: {
+      iconBg: 'bg-indigo-50',
+      value: 'text-indigo-700',
+      border: 'hover:border-indigo-200'
+    }
+  }[color];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative text-left w-full bg-white rounded-2xl p-5 border border-slate-200 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${colorMap.border}`}
+    >
+      {badge && (
+        <span className="absolute top-4 right-4 px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-bold">
+          {badge}
+        </span>
+      )}
+      <div className="flex items-start justify-between gap-3">
+        <div className={`w-11 h-11 rounded-xl ${colorMap.iconBg} flex items-center justify-center shrink-0`}>
+          {icon}
+        </div>
+      </div>
+      <div className="mt-4">
+        <p className="text-xs font-semibold text-slate-500">{title}</p>
+        <p className={`mt-1 text-2xl font-extrabold tracking-tight ${colorMap.value}`}>{value}</p>
+        <p className="mt-1 text-[11px] text-slate-400">{subtitle}</p>
+      </div>
+    </button>
+  );
+};
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser = null,
@@ -206,7 +273,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Kartu Metrik Utama */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <DashboardWidget
+        <MetricCard
           title="Total Anggota"
           value={scopedMembers.length.toLocaleString('id-ID')}
           subtitle={isSuperAdmin ? 'Cakupan Seluruh Indonesia' : 'Wilayah Terdaftar'}
@@ -214,7 +281,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           color="emerald"
           onClick={() => handleNavigate('members')}
         />
-        <DashboardWidget
+        <MetricCard
           title="Anggota Terverifikasi"
           value={verifiedMembers.length.toLocaleString('id-ID')}
           subtitle={`${scopedMembers.length > 0 ? Math.round((verifiedMembers.length / scopedMembers.length) * 100) : 0}% KTA Aktif`}
@@ -222,7 +289,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           color="teal"
           onClick={() => handleNavigate('members')}
         />
-        <DashboardWidget
+        <MetricCard
           title="Menunggu Verifikasi"
           value={pendingMembers.length.toLocaleString('id-ID')}
           subtitle="Menunggu Validasi Admin"
@@ -234,7 +301,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             if (el) el.scrollIntoView({ behavior: 'smooth' });
           }}
         />
-        <DashboardWidget
+        <MetricCard
           title="Kegiatan & Bhakti"
           value={safeActivities.length.toLocaleString('id-ID')}
           subtitle="Pelatihan & Agenda Saka"
@@ -427,12 +494,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Portal Krida Saka Pariwisata */}
       <div className="space-y-3">
-        <CompactKridaPortal onSelectKrida={() => handleNavigate('krida')} />
+        <CompactKridaPortal
+          modules={OFFICIAL_2026_KRIDA_MODULES}
+          currentUser={currentUser}
+          onOpenFullExplorer={() => handleNavigate('krida')}
+        />
       </div>
 
       {/* Galeri Showcase Potensi Wisata & Kuliner */}
       <div className="space-y-6">
-        <IntegratedTourismShowcaseGallery />
+        <IntegratedTourismShowcaseGallery
+          tours={safeTourPackages}
+          products={safeCulinaryItems}
+          members={safeMembers}
+          activities={safeActivities}
+          currentUser={currentUser || ({} as any)}
+          onSelectTab={handleNavigate}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
