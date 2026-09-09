@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   X, Sliders, Check, Save, RotateCcw, Sparkles, Upload, Plus, Trash2,
-  LayoutTemplate, Type, Image as ImageIcon, Eye, MapPin, RefreshCw
+  LayoutTemplate, Type, Image as ImageIcon, Eye, MapPin, RefreshCw, QrCode
 } from 'lucide-react';
 import { KtaCardSettings, KtaCardPreset, KtaCardSide, KtaDataFieldConfig, KtaMemberFieldKey, KtaLogoElement, KtaTextElement, Member } from '../../types';
 import { storage, DEFAULT_KTA_SETTINGS } from '../../services/storage';
@@ -150,31 +150,48 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
           {side==='FRONT' && <>
           <section className="p-4 rounded-2xl border border-purple-200 bg-purple-50/40 space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-bold text-purple-950"><Eye/><span>4. QR Code Profil + Logo Saka</span></div>
+              <div className="flex items-center gap-2 font-bold text-purple-950"><QrCode/><span>4. QR Code Profil + Logo Saka</span></div>
               <label className="text-xs font-bold flex items-center gap-2">
-                <input type="checkbox" checked={settings.showQrCode !== false} onChange={e=>setSettings(s=>({...s,showQrCode:e.target.checked}))}/>
-                Tampilkan QR
+                <input
+                  type="checkbox"
+                  checked={settings.showQrCode !== false}
+                  onChange={e=>setSettings(s=>({...s,showQrCode:e.target.checked}))}
+                />
+                Tampilkan QR Code
               </label>
             </div>
-            <p className="text-[10px] text-slate-600">Atur posisi dan ukuran QR Code yang berisi logo Saka di tengahnya. X/Y adalah posisi dari sudut kiri atas kartu, sedangkan ukuran adalah persentase dari sisi kartu yang lebih pendek.</p>
+            <p className="text-[10px] text-slate-600">
+              Atur posisi QR Code profil anggota yang memiliki logo Saka di tengah. X menggeser kiri/kanan, Y menggeser atas/bawah, dan Ukuran mengatur besar-kecil QR Code.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <label className="text-[9px] font-bold">
+                Posisi X (%)
+                {numberInput(settings.qrX ?? 78,v=>setSettings(s=>({...s,qrX:v})))}
+              </label>
+              <label className="text-[9px] font-bold">
+                Posisi Y (%)
+                {numberInput(settings.qrY ?? 30,v=>setSettings(s=>({...s,qrY:v})))}
+              </label>
+              <label className="text-[9px] font-bold">
+                Ukuran QR (%)
+                {numberInput(settings.qrSize ?? 22,v=>setSettings(s=>({...s,qrSize:v})))}
+              </label>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              <label className="text-[9px] font-bold">X{numberInput(settings.qrX ?? 78,v=>setSettings(s=>({...s,qrX:v})))}</label>
-              <label className="text-[9px] font-bold">Y{numberInput(settings.qrY ?? 30,v=>setSettings(s=>({...s,qrY:v})))}</label>
-              <label className="text-[9px] font-bold">Ukuran QR{numberInput(settings.qrSize ?? 22,v=>setSettings(s=>({...s,qrSize:v})))}</label>
+              <button
+                type="button"
+                onClick={()=>setSettings(s=>({...s,qrX:78,qrY:30,qrSize:22,showQrCode:true}))}
+                className="px-3 py-2 rounded-lg bg-purple-900 text-white text-xs font-bold hover:bg-purple-800"
+              >
+                Reset QR
+              </button>
+              <div className="px-3 py-2 rounded-lg bg-white border border-purple-100 text-[10px] text-slate-600 flex items-center">
+                <span><b>X:</b> 0 = paling kiri • 100 = paling kanan</span>
+              </div>
+              <div className="px-3 py-2 rounded-lg bg-white border border-purple-100 text-[10px] text-slate-600 flex items-center">
+                <span><b>Y:</b> 0 = paling atas • 100 = paling bawah</span>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[10px] text-slate-500">
-              <div><b>X:</b> 0 = kiri, 100 = kanan</div>
-              <div><b>Y:</b> 0 = atas, 100 = bawah</div>
-              <div><b>Ukuran:</b> persen dari sisi terpendek</div>
-            </div>
-          </section>
-          <section className="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 space-y-3">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold text-blue-950"><Eye/><span>4. Barcode Sisi Depan</span></div><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={(settings as any).showBarcodeFront!==false} onChange={e=>setSettings(s=>({...s,showBarcodeFront:e.target.checked}))}/> Tampilkan Barcode</label></div>
-            <p className="text-[10px] text-slate-600">X/Y mengatur posisi pada kartu. Lebar/Tinggi mengatur area Barcode secara langsung.</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2"><label className="text-[9px] font-bold">X{numberInput((settings as any).barcodeFrontX??4,v=>setSettings(s=>({...s,barcodeFrontX:v})))} </label><label className="text-[9px] font-bold">Y{numberInput((settings as any).barcodeFrontY??77,v=>setSettings(s=>({...s,barcodeFrontY:v})))} </label><label className="text-[9px] font-bold">Lebar{numberInput((settings as any).barcodeFrontWidth??32,v=>setSettings(s=>({...s,barcodeFrontWidth:v})))} </label><label className="text-[9px] font-bold">Tinggi{numberInput((settings as any).barcodeFrontHeight??9,v=>setSettings(s=>({...s,barcodeFrontHeight:v})))} </label></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2"><label className="text-[10px] font-bold">Nilai Barcode<input value={(settings as any).barcodeFrontCustomValue||''} onChange={e=>setSettings(s=>({...s,barcodeFrontCustomValue:e.target.value}))} className={input} placeholder="Kosong = NTA / No. Anggota"/></label><label className="text-[10px] font-bold">Caption Barcode<input value={(settings as any).barcodeFrontCaption||''} onChange={e=>setSettings(s=>({...s,barcodeFrontCaption:e.target.value}))} className={input} placeholder="Opsional"/></label></div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2"><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={(settings as any).barcodeFrontShowText===true} onChange={e=>setSettings(s=>({...s,barcodeFrontShowText:e.target.checked}))}/> Tampilkan angka</label><label className="text-[9px] font-bold">Font Caption{numberInput((settings as any).barcodeFrontCaptionFontSize??6,v=>setSettings(s=>({...s,barcodeFrontCaptionFontSize:v})))} </label><label className="text-[9px] font-bold">Spasi Baris{numberInput((settings as any).barcodeFrontCaptionLineHeight??1.1,v=>setSettings(s=>({...s,barcodeFrontCaptionLineHeight:v})))} </label><label className="text-[9px] font-bold">Jarak Huruf{numberInput((settings as any).barcodeFrontCaptionLetterSpacing??0,v=>setSettings(s=>({...s,barcodeFrontCaptionLetterSpacing:v})))} </label></div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2"><select value={(settings as any).barcodeFrontCaptionFontWeight??'normal'} onChange={e=>setSettings(s=>({...s,barcodeFrontCaptionFontWeight:e.target.value}))} className={input}><option value="normal">Caption Normal</option><option value="medium">Caption Medium</option><option value="bold">Caption Bold</option><option value="black">Caption Black</option></select><input type="color" value={(settings as any).barcodeFrontCaptionColor||'#ffffff'} onChange={e=>setSettings(s=>({...s,barcodeFrontCaptionColor:e.target.value}))} className="h-9 rounded"/><select value={(settings as any).barcodeFrontCaptionAlign??'center'} onChange={e=>setSettings(s=>({...s,barcodeFrontCaptionAlign:e.target.value}))} className={input}><option value="left">Caption Kiri</option><option value="center">Caption Tengah</option><option value="right">Caption Kanan</option></select></div>
           </section>
           <section className="p-4 rounded-2xl border border-rose-200 bg-rose-50/40 space-y-3">
             <div className="flex items-center gap-2 font-bold text-rose-950"><ImageIcon/><span>5. Foto Anggota Sisi Depan</span></div>
