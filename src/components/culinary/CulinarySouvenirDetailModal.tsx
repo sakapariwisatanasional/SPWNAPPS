@@ -380,7 +380,7 @@ export const CulinarySouvenirDetailModal: React.FC<CulinarySouvenirDetailModalPr
                 <span>Kwartir Asal Pendataan</span>
               </div>
               <p className="text-xs font-bold text-slate-800">{item.districtName}</p>
-              <p className="text-[11px] text-slate-500">{item.gudepOrPangkalan || 'Pangkalan Saka Pariwisata'}</p>
+              <p className="text-[11px] text-slate-500">{item.umkmName || item.districtName || 'Wilayah Saka Pariwisata'}</p>
             </div>
           </div>
 
