@@ -1243,7 +1243,8 @@ class StorageService {
       return [];
     }
 
-    return getDistrictsForRegency(regencyId);
+    const regency = REGENCIES_DATA.find(r => r.id === regencyId);
+    return getDistrictsForRegency(regencyId, regency?.name);
   }
 
   public getBranches(
