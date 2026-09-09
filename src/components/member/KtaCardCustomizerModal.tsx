@@ -29,9 +29,15 @@ const PRESETS: Record<KtaCardPreset, { label:string; width:number; height:number
 
 const clone = <T,>(v:T):T => JSON.parse(JSON.stringify(v));
 
+// Konfigurasi KTA dapat berasal dari localStorage/Spreadsheet versi lama
+// yang belum memiliki collection lengkap. Normalisasi dilakukan sebelum
+// collection dipakai oleh useMemo/render agar Dashboard tidak crash.
 const normalizeKtaSettings = (value?: Partial<KtaCardSettings> | null): KtaCardSettings => {
-  const source = value && typeof value === 'object' ? value : {};
-  const merged = { ...DEFAULT_KTA_SETTINGS, ...source } as KtaCardSettings;
+  const merged = {
+    ...clone(DEFAULT_KTA_SETTINGS),
+    ...(value && typeof value === 'object' ? value : {})
+  } as KtaCardSettings;
+
   return {
     ...merged,
     logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
@@ -76,6 +82,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
   const dataFields = Array.isArray(settings?.dataFields) ? settings.dataFields : [];
   const textElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
   const logos = Array.isArray(settings?.logos) ? settings.logos : [];
+
   const sideFields = useMemo(() => dataFields.filter(f => f.side === side), [dataFields, side]);
   const sideTexts = useMemo(() => textElements.filter(t => t.side === side), [textElements, side]);
   const sideLogos = useMemo(() => logos.filter(l => l.side === side), [logos, side]);
