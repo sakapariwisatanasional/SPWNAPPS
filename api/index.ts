@@ -709,8 +709,8 @@ app.get('/api/health', (req, res) => {
 // ------------------------------------------
 
 // POST /api/auth/login
-app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body || {};
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password, scriptUrl } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Nama pengguna dan kata sandi wajib diisi.' });
   }
@@ -718,21 +718,47 @@ app.post('/api/auth/login', (req, res) => {
   const cleanUser = String(username).trim().toLowerCase();
   const rawPass = String(password);
 
-  // Find user in db.users
-  let matchedUser = db.users.find(u => 
-    (u.username && u.username.toLowerCase() === cleanUser) ||
-    (u.email && u.email.toLowerCase() === cleanUser)
+  // 1. Coba cache/server DB terlebih dahulu.
+  let matchedUser: any = db.users.find(u =>
+    (u.username && String(u.username).toLowerCase() === cleanUser) ||
+    (u.email && String(u.email).toLowerCase() === cleanUser)
   );
 
-  // Check if member with operator credentials in db.members
+  // 2. Sumber autentikasi utama adalah Sheet Users.
+  // Ini membuat login tetap bekerja setelah logout/cold start Vercel,
+  // karena akun tidak bergantung pada LocalStorage atau memory server.
   if (!matchedUser) {
-    const member = db.members.find(m => 
-      (m.email && m.email.toLowerCase() === cleanUser) ||
-      (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === cleanUser)
+    try {
+      const gasResult = await forwardToGoogleAppsScript({
+        action: 'AUTH_GET_USER',
+        identifier: cleanUser
+      }, scriptUrl);
+
+      if (gasResult?.found && gasResult?.user) {
+        matchedUser = gasResult.user;
+        // Cache hanya setelah akun berhasil ditemukan di Spreadsheet.
+        const existingIndex = db.users.findIndex(u =>
+          String(u.id || '') === String(matchedUser.id || '')
+        );
+        if (existingIndex >= 0) db.users[existingIndex] = matchedUser;
+        else db.users.push(matchedUser);
+        saveDatabase();
+      }
+    } catch (gasError) {
+      console.warn('[Auth] Gagal membaca Users dari Google Spreadsheet:', gasError);
+    }
+  }
+
+  // Kompatibilitas data lama yang menyimpan kredensial pada member cache.
+  // Tetap hanya menerima passwordHash, bukan password plaintext.
+  if (!matchedUser) {
+    const member = db.members.find(m =>
+      (m.email && String(m.email).toLowerCase() === cleanUser) ||
+      (m.nationalMemberNumber && String(m.nationalMemberNumber).toLowerCase() === cleanUser)
     );
     if (member && member.passwordHash) {
       matchedUser = {
-        id: member.userId || `user-${member.id}`,
+        id: member.userId || `USER-${String(member.id || '').replace(/^SPW-/, '')}`,
         username: member.email.split('@')[0],
         email: member.email,
         name: member.fullName,
@@ -746,14 +772,13 @@ app.post('/api/auth/login', (req, res) => {
     }
   }
 
-  if (!matchedUser || !matchedUser.passwordHash || !verifyPassword(rawPass, matchedUser.passwordHash)) {
+  if (!matchedUser || !matchedUser.passwordHash || !verifyPassword(rawPass, String(matchedUser.passwordHash))) {
     console.warn(`[Auth] Failed login attempt for user: ${cleanUser}`);
     return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid.' });
   }
 
   const token = createSession(matchedUser);
 
-  // Audit log entry
   db.auditLogs.unshift({
     id: `log-${Date.now()}`,
     userId: matchedUser.id,
@@ -780,11 +805,7 @@ app.post('/api/auth/login', (req, res) => {
     memberId: matchedUser.memberId
   };
 
-  res.json({
-    success: true,
-    token,
-    user: sanitizedUser
-  });
+  res.json({ success: true, token, user: sanitizedUser });
 });
 
 // GET /api/auth/me - Verify current session token
@@ -842,8 +863,9 @@ app.post('/api/auth/change-password', (req, res) => {
 });
 
 // POST /api/auth/register - Public new member registration
-app.post('/api/auth/register', (req, res) => {
-  const { memberData, password } = req.body || {};
+app.post('/api/auth/register', async (req, res) => {
+  const { memberData, password, scriptUrl } = req.body || {};
+  const registrationScriptUrl = normalizeManualAppsScriptUrl(scriptUrl);
 
   if (!memberData || !memberData.fullName) {
     return res.status(400).json({ success: false, message: 'Data anggota wajib dilengkapi.' });
@@ -884,8 +906,10 @@ app.post('/api/auth/register', (req, res) => {
 
   // Preserve a client-generated ID when supplied so the frontend/local cache,
   // server DB and Spreadsheet row refer to the same member.
-  const memberId = String(memberData.id || `member-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`);
-  const userId = String(memberData.userId || `user-${memberId}`);
+  const generatedMemberNumber = String(Date.now()).slice(-6).padStart(6, '0');
+  const suppliedMemberId = String(memberData.id || '').trim();
+  const memberId = suppliedMemberId.startsWith('SPW-') ? suppliedMemberId : `SPW-${generatedMemberNumber}`;
+  const userId = String(memberData.userId || `USER-${Date.now().toString().slice(-10)}`);
   const registeredAt = new Date().toISOString();
   const passHash = hashPassword(rawPassword);
 
@@ -913,6 +937,67 @@ app.post('/api/auth/register', (req, res) => {
     createdAt: registeredAt
   };
 
+  if (!registrationScriptUrl) {
+    return res.status(400).json({
+      success: false,
+      message: 'Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API sebelum pendaftaran.'
+    });
+  }
+
+  // Jangan menganggap pendaftaran berhasil hanya karena data masuk ke memory server.
+  // Spreadsheet harus berhasil menerima MEMBER dan USER terlebih dahulu.
+  try {
+    await forwardToGoogleAppsScript({
+      action: 'UPSERT_MEMBER',
+      sheet: 'Anggota',
+      memberId: newMember.id,
+      rowData: [
+        newMember.id,
+        newMember.nationalMemberNumber || '',
+        newMember.fullName || '',
+        newMember.email || '',
+        newMember.phone || '',
+        newMember.provinceName || '',
+        newMember.regencyName || '',
+        newMember.districtName || newMember.branchName || '',
+        newMember.gugusDepan || '',
+        newMember.krida || '',
+        'PENDING',
+        newMember.avatarUrl || '',
+        newMember.registeredAt,
+        `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.nationalMemberNumber || newMember.id}`
+      ]
+    }, registrationScriptUrl);
+
+    const userResult = await forwardToGoogleAppsScript({
+      action: 'UPSERT_USER',
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        passwordHash: newUser.passwordHash,
+        name: newUser.name,
+        role: newUser.role,
+        jurisdictionName: newUser.jurisdictionName,
+        jurisdictionId: newUser.jurisdictionId,
+        avatarUrl: newUser.avatarUrl || '',
+        memberId: newUser.memberId,
+        createdAt: newUser.createdAt,
+        status: 'ACTIVE'
+      }
+    }, registrationScriptUrl);
+
+    if (!userResult || !userResult.user || String(userResult.user.memberId || '') !== String(newUser.memberId)) {
+      throw new Error('Google Apps Script tidak mengembalikan akun Users yang tersimpan dan terverifikasi.');
+    }
+  } catch (syncError: any) {
+    console.error('[Register] Google Spreadsheet sync failed:', syncError);
+    return res.status(502).json({
+      success: false,
+      message: `Pendaftaran dibatalkan karena data belum berhasil disimpan ke Google Spreadsheet: ${syncError?.message || String(syncError)}`
+    });
+  }
+
   db.members.unshift(newMember);
   db.users.push(newUser);
 
@@ -929,29 +1014,6 @@ app.post('/api/auth/register', (req, res) => {
   });
   if (db.auditLogs.length > 500) db.auditLogs.pop();
   saveDatabase();
-
-  // Do not block account creation on Google Apps Script availability.
-  void forwardToGoogleAppsScript({
-    action: 'UPSERT_MEMBER',
-    sheet: 'Anggota',
-    memberId: newMember.id,
-    rowData: [
-      newMember.id,
-      newMember.nationalMemberNumber || '',
-      newMember.fullName,
-      newMember.email || '',
-      newMember.phone || '',
-      newMember.provinceName || '',
-      newMember.regencyName || '',
-      newMember.districtName || newMember.branchName || '',
-      newMember.gugusDepan || '',
-      newMember.krida || '',
-      'PENDING',
-      newMember.avatarUrl || '',
-      newMember.registeredAt,
-      `https://sakapariwisata-nasional.vercel.app/?verifyId=${newMember.nationalMemberNumber || newMember.id}`
-    ]
-  });
 
   // Registration creates a real server account and immediately establishes
   // a stateless session, so the newly registered user is already logged in.
@@ -1248,7 +1310,7 @@ app.post('/api/mutate', async (req, res) => {
       } else if (action === 'DELETE') {
         const memberId = payload.id || payload.memberId;
         db.members = db.members.filter(m => m.id !== memberId);
-        await forwardMutation({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Anggota',
           id: memberId,
@@ -1285,7 +1347,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.tours = db.tours.filter(t => t.id !== payload.id);
-        await forwardMutation({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Paket_Wisata',
           id: payload.id
@@ -1321,7 +1383,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.culinaryItems = db.culinaryItems.filter(c => c.id !== payload.id);
-        await forwardMutation({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Kuliner_Cinderamata',
           id: payload.id
@@ -1359,7 +1421,7 @@ app.post('/api/mutate', async (req, res) => {
         });
       } else if (action === 'DELETE') {
         db.activities = db.activities.filter(a => a.id !== payload.id);
-        await forwardMutation({
+        forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Agenda_Kegiatan',
           id: payload.id
