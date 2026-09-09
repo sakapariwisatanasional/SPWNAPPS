@@ -253,23 +253,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    const localUsers = storage.getUsers();
-    const matchedUser = localUsers.find(u => 
-      (u.username && u.username.toLowerCase() === lowerIdent) ||
-      (u.email && u.email.toLowerCase() === lowerIdent)
-    );
-
-    if (matchedUser) {
-      const expectedPassword = (matchedUser as any).password || 'password123';
-      if (pass === expectedPassword || pass === 'password123') {
-        storage.setAuthToken('local-session-' + Date.now());
-        storage.setCurrentUser(matchedUser);
-        onLoginSuccess(matchedUser);
-        setIsLoading(false);
-        onClose();
-        return;
-      }
-    }
+    // Jangan autentikasi anggota menggunakan password plaintext/LocalStorage.
+    // Akun anggota harus diverifikasi oleh API -> Sheet Users.
 
     const members = storage.getMembers();
     const matchedMember = members.find(m => 
@@ -338,8 +323,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const cleanPhone = regPhone.replace(/\D/g, '');
     const generatedNikMasked = '3200******' + (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
 
-    const newMemberId = `mem-${Date.now()}`;
-    const newUserId = `user-${Date.now()}`;
+    const newMemberId = `SPW-${Date.now().toString().slice(-6).padStart(6, '0')}`;
+    const newUserId = `USER-${Date.now().toString().slice(-10)}`;
 
     try {
       let finalAvatarUrl = regAvatarUrl;
