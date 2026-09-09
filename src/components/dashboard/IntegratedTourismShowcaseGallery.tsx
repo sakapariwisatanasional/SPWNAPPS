@@ -72,12 +72,11 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   onSelectMember,
   onSelectTab
 }) => {
-  // Defensive normalization: Dashboard/public portal data may arrive before sync completes.
-  // Never allow an undefined/non-array collection to reach a filter/map useMemo.
   const safeTours = Array.isArray(tours) ? tours : [];
   const safeProducts = Array.isArray(products) ? products : [];
   const safeMembers = Array.isArray(members) ? members : [];
-  const safeInitialActivities = Array.isArray(initialActivities) ? initialActivities : null;
+  const safeInitialActivities = Array.isArray(initialActivities) ? initialActivities : [];
+
   // Main Tab Navigation: 'DESTINATIONS' | 'KRIDA_PRODUCTS' | 'AGENDA_ACTIVITIES' | 'RECOMMENDED_MEMBERS'
   const [activeMainTab, setActiveMainTab] = useState<'DESTINATIONS' | 'KRIDA_PRODUCTS' | 'AGENDA_ACTIVITIES' | 'RECOMMENDED_MEMBERS'>('DESTINATIONS');
 
@@ -95,7 +94,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   const [productSearchQuery, setProductSearchQuery] = useState<string>('');
 
   // Filters for Agenda Kegiatan Saka
-  const [activitiesList, setActivitiesList] = useState<Activity[]>(safeInitialActivities || storage.getActivities());
+  const [activitiesList, setActivitiesList] = useState<Activity[]>(safeInitialActivities.length > 0 ? safeInitialActivities : (Array.isArray(storage.getActivities()) ? storage.getActivities() : []));
   const [activityCategoryFilter, setActivityCategoryFilter] = useState<string>('ALL');
   const [activityLevelFilter, setActivityLevelFilter] = useState<string>('ALL');
   const [activitySearchQuery, setActivitySearchQuery] = useState<string>('');
@@ -117,12 +116,12 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   };
 
   useEffect(() => {
-    if (safeInitialActivities) {
-      setActivitiesList(safeInitialActivities);
+    if (Array.isArray(initialActivities)) {
+      setActivitiesList(initialActivities);
     } else {
       setActivitiesList(storage.getActivities());
     }
-  }, [safeInitialActivities]);
+  }, [initialActivities]);
 
   // Subscribe to Location updates
   useEffect(() => {
@@ -265,8 +264,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
       regencyName: userLocation.city,
       city: userLocation.city
     };
-    const scoredRaw = ipLocationService.getRecommendedMembers(safeMembers, targetLoc, selectedTourForMatching);
-    const scored = Array.isArray(scoredRaw) ? scoredRaw : [];
+    const scored = ipLocationService.getRecommendedMembers(safeMembers, targetLoc, selectedTourForMatching);
     
     if (memberSkillCategoryFilter === 'ALL') {
       return scored;
