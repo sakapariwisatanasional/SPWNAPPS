@@ -1,422 +1,454 @@
-import React, { useState } from 'react';
-import { 
-  Users, 
-  Compass, 
-  Clock, 
-  MapPin, 
-  Award, 
-  CheckCircle2, 
-  ShieldCheck, 
-  ArrowUpRight, 
-  UserPlus, 
-  ExternalLink,
-  Sparkles,
-  ChevronRight,
+import React, { useState, useMemo } from 'react';
+import {
+  Users,
+  UserCheck,
+  Clock,
+  ShieldCheck,
+  ShieldAlert,
+  MapPin,
+  Calendar,
+  Compass,
+  Award,
   TrendingUp,
+  Search,
+  Filter,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  ChevronRight,
+  Database,
+  RefreshCw,
+  Eye,
   FileSpreadsheet,
-  FolderOpen,
-  Sliders
+  Activity as ActivityIcon,
+  Sparkles,
+  Layers,
+  Map,
+  ShoppingBag,
+  UtensilsCrossed,
+  ArrowUpRight,
+  UserCog,
+  FileText,
+  Building2,
+  Check
 } from 'lucide-react';
-import { Member, TourPackage, CurrentUser, Province, CulinarySouvenirItem } from '../types';
-import { DigitalMemberCard } from '../components/member/DigitalMemberCard';
+
+// Subkomponen dashboard internal
+import { DashboardWidget } from '../components/dashboard/DashboardWidget';
 import { NationalMapVisual } from '../components/dashboard/NationalMapVisual';
+import { TourPackageCarouselSection } from '../components/dashboard/TourPackageCarouselSection';
 import { CulinarySouvenirGallerySection } from '../components/dashboard/CulinarySouvenirGallerySection';
 import { IntegratedTourismShowcaseGallery } from '../components/dashboard/IntegratedTourismShowcaseGallery';
-import { DashboardWidget } from '../components/dashboard/DashboardWidget';
-import { SakaLogo } from '../components/common/SakaLogo';
-import { storage } from '../services/storage';
-import { DEFAULT_PUBLIC_USER } from '../data/initialData';
+import { CompactKridaPortal } from '../components/krida/CompactKridaPortal';
 
 interface DashboardViewProps {
-  currentUser: CurrentUser;
-  members: Member[];
-  tours: TourPackage[];
-  provinces: Province[];
-  culinaryItems?: CulinarySouvenirItem[];
-  onSelectTab: (tab: string) => void;
-  onOpenRegisterModal: () => void;
-  onVerifyMember: (member: Member) => void;
-  onApproveMemberQuick: (memberId: string) => void;
-  onViewTourDetail: (tour: TourPackage) => void;
-  onOpenEditCardModal?: () => void;
-  onOpenEditPhotoModal?: (member: Member) => void;
-  onOpenEditMemberModal?: (member: Member) => void;
-  onOpenPrintPdfModal?: (member: Member) => void;
-  onOpenCulinaryFormModal?: (item?: CulinarySouvenirItem) => void;
-  onSelectCulinaryDetail?: (item: CulinarySouvenirItem) => void;
-  onOpenSpreadsheetModal?: () => void;
-  onOpenDriveModal?: () => void;
+  currentUser?: any;
+  members?: any[];
+  activities?: any[];
+  tourPackages?: any[];
+  culinaryItems?: any[];
+  auditLogs?: any[];
+  onNavigate?: (view: string) => void;
+  onVerifyMember?: (id: string) => void;
+  [key: string]: any;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   members = [],
-  tours = [],
-  provinces = [],
-  culinaryItems,
-  onSelectTab,
-  onOpenRegisterModal,
+  activities = [],
+  tourPackages = [],
+  culinaryItems = [],
+  auditLogs = [],
+  onNavigate,
   onVerifyMember,
-  onApproveMemberQuick,
-  onViewTourDetail,
-  onOpenEditCardModal,
-  onOpenEditPhotoModal,
-  onOpenEditMemberModal,
-  onOpenPrintPdfModal,
-  onOpenCulinaryFormModal,
-  onSelectCulinaryDetail,
-  onOpenSpreadsheetModal,
-  onOpenDriveModal
 }) => {
-  const safeCurrentUser: CurrentUser = (currentUser && currentUser.role) 
-    ? currentUser 
-    : DEFAULT_PUBLIC_USER;
+  const [searchPending, setSearchPending] = useState('');
+  const [selectedKwardaFilter, setSelectedKwardaFilter] = useState('ALL');
 
-  // Dashboard harus tahan terhadap state null/undefined saat live-sync berjalan.
-  const safeMembers = Array.isArray(members) ? members : [];
-  const safeTours = Array.isArray(tours) ? tours : [];
-  const safeProvinces = Array.isArray(provinces) ? provinces : [];
-  const safeCulinaryItems = Array.isArray(culinaryItems) ? culinaryItems : [];
+  // ==========================================
+  // SAFE DATA NORMALIZATION (Pencegah Crash)
+  // ==========================================
+  const safeMembers = useMemo(() => (Array.isArray(members) ? members : []), [members]);
+  const safeActivities = useMemo(() => (Array.isArray(activities) ? activities : []), [activities]);
+  const safeTourPackages = useMemo(() => (Array.isArray(tourPackages) ? tourPackages : []), [tourPackages]);
+  const safeCulinaryItems = useMemo(() => (Array.isArray(culinaryItems) ? culinaryItems : []), [culinaryItems]);
+  const safeAuditLogs = useMemo(() => (Array.isArray(auditLogs) ? auditLogs : []), [auditLogs]);
 
-  const isPublic = safeCurrentUser.role === 'PUBLIC';
-  const isSuperAdmin = safeCurrentUser.role === 'SUPER_ADMIN';
-  const isOperator = safeCurrentUser.role === 'ADMIN_PROVINCE' || safeCurrentUser.role === 'ADMIN_REGENCY' || safeCurrentUser.role === 'ADMIN_BRANCH';
-  const isAdmin = isSuperAdmin || isOperator;
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin';
 
-  const ktaSettings = storage.getKtaSettings();
-  const currentOpacityPct = Math.round((ktaSettings?.bgOpacity ?? 0.10) * 100);
-  const liveCulinaryItems = safeCulinaryItems.length > 0 ? safeCulinaryItems : storage.getCulinarySouvenirs();
-  const normalizedCulinaryItems = Array.isArray(liveCulinaryItems) ? liveCulinaryItems : [];
+  // Anggota sesuai hak akses wilayah (Super Admin melihat seluruh Indonesia)
+  const scopedMembers = useMemo(() => {
+    if (isSuperAdmin) return safeMembers;
+    if (currentUser?.kwarda && !currentUser?.kwarcab) {
+      return safeMembers.filter(
+        (m) => m?.kwarda?.toLowerCase() === currentUser.kwarda.toLowerCase()
+      );
+    }
+    if (currentUser?.kwarcab) {
+      return safeMembers.filter(
+        (m) => m?.kwarcab?.toLowerCase() === currentUser.kwarcab.toLowerCase()
+      );
+    }
+    return safeMembers;
+  }, [safeMembers, isSuperAdmin, currentUser]);
 
-  const scopedMembers = isSuperAdmin 
-    ? safeMembers
-    : safeCurrentUser.role === 'ADMIN_PROVINCE' 
-      ? safeMembers.filter(m => m.provinceId === safeCurrentUser.jurisdictionId)
-      : safeCurrentUser.role === 'ADMIN_REGENCY' 
-        ? safeMembers.filter(m => m.regencyId === safeCurrentUser.jurisdictionId)
-        : safeCurrentUser.role === 'ADMIN_BRANCH' 
-          ? safeMembers.filter(m => m.branchId === safeCurrentUser.jurisdictionId)
-          : [];
-
-  const scopedTours = isSuperAdmin
-    ? safeTours
-    : safeCurrentUser.role === 'ADMIN_PROVINCE'
-      ? safeTours.filter(t => t.provinceId === safeCurrentUser.jurisdictionId)
-      : safeCurrentUser.role === 'ADMIN_REGENCY'
-        ? safeTours.filter(t => t.regencyId === safeCurrentUser.jurisdictionId)
-        : safeTours;
-
-  const activeMembersCount = isSuperAdmin 
-    ? safeMembers.filter(m => m?.status === 'ACTIVE').length 
-    : scopedMembers.filter(m => m?.status === 'ACTIVE').length;
-
-  const pendingMembers = isSuperAdmin 
-    ? safeMembers.filter(m => m?.status === 'PENDING') 
-    : scopedMembers.filter(m => m?.status === 'PENDING');
-
-  const publishedTours = isSuperAdmin 
-    ? safeTours.filter(t => t?.status === 'APPROVED_PUBLISHED' || (t as any)?.status === 'PUBLISHED') 
-    : scopedTours.filter(t => t?.status === 'APPROVED_PUBLISHED' || (t as any)?.status === 'PUBLISHED');
-
-  const activeMemberForCard = 
-    scopedMembers.find(m => m.id === safeCurrentUser.memberId) ||
-    scopedMembers.find(m => m.status === 'ACTIVE') || 
-    safeMembers.find(m => m.status === 'ACTIVE') || 
-    safeMembers[0];
-
-  // 1. TAMPILAN DASHBOARD PUBLIK
-  if (isPublic) {
-    return (
-      <div className="space-y-6 sm:space-y-8 pb-16">
-        <div className="bg-gradient-to-r from-slate-950 via-purple-950 to-slate-900 rounded-2xl sm:rounded-3xl p-5 sm:p-10 text-white shadow-xl border border-purple-900/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative overflow-hidden">
-          <div className="flex items-center gap-4 z-10 max-w-2xl">
-            <SakaLogo size={60} id="public-dashboard-logo" className="hidden sm:inline-flex flex-shrink-0" />
-            <div className="space-y-1.5 sm:space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/20 border border-purple-400/40 rounded-full text-purple-200 text-xs font-semibold">
-                <Sparkles className="w-3.5 h-3.5 text-purple-300" />
-                <span>Portal Eksplorasi Saka Pariwisata Indonesia</span>
-              </div>
-              <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight">
-                Jelajahi Pesona Nusantara Bersama Saka Pariwisata
-              </h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 z-10">
-            <button
-              onClick={onOpenRegisterModal}
-              className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl text-xs shadow-lg flex items-center gap-2 cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Daftar Anggota Baru</span>
-            </button>
-          </div>
-        </div>
-
-        <IntegratedTourismShowcaseGallery
-          tours={safeTours}
-          products={normalizedCulinaryItems}
-          members={safeMembers}
-          currentUser={safeCurrentUser}
-          onViewTourDetail={onViewTourDetail}
-          onSelectCulinaryDetail={onSelectCulinaryDetail}
-          onSelectTab={onSelectTab}
-        />
-
-        <NationalMapVisual
-          provinces={safeProvinces}
-          members={safeMembers}
-          onSelectProvince={() => onSelectTab('members')}
-        />
-      </div>
+  // Statistik Anggota
+  const verifiedMembers = useMemo(() => {
+    return scopedMembers.filter(
+      (m) =>
+        m?.verificationStatus === 'verified' ||
+        m?.status === 'Aktif' ||
+        m?.status === 'active'
     );
-  }
+  }, [scopedMembers]);
 
-  // 2. TAMPILAN DASHBOARD ADMIN & SUPER ADMIN (RESPONSIF & FLEKSIBEL)
+  const pendingMembers = useMemo(() => {
+    return scopedMembers.filter(
+      (m) =>
+        m?.verificationStatus === 'pending' ||
+        m?.status === 'Menunggu Verifikasi' ||
+        m?.status === 'pending'
+    );
+  }, [scopedMembers]);
+
+  // Antrean Verifikasi Cepat (dengan fitur pencarian)
+  const filteredPendingList = useMemo(() => {
+    return pendingMembers.filter((m) => {
+      const q = searchPending.toLowerCase();
+      const matchSearch =
+        !q ||
+        (m?.name || m?.fullName || '').toLowerCase().includes(q) ||
+        (m?.ktaNumber || m?.ktaId || '').toLowerCase().includes(q) ||
+        (m?.kwarcab || '').toLowerCase().includes(q);
+
+      const matchKwarda =
+        selectedKwardaFilter === 'ALL' || m?.kwarda === selectedKwardaFilter;
+
+      return matchSearch && matchKwarda;
+    });
+  }, [pendingMembers, searchPending, selectedKwardaFilter]);
+
+  // Log Aktivitas Audit Terbaru (Khusus Super Admin)
+  const recentAuditLogs = useMemo(() => {
+    return [...safeAuditLogs]
+      .filter((log) => Boolean(log))
+      .sort((a, b) => {
+        const timeA = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const timeB = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return timeB - timeA;
+      })
+      .slice(0, 6);
+  }, [safeAuditLogs]);
+
+  // Persebaran Wilayah Kwarda
+  const kwardaStats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    safeMembers.forEach((m) => {
+      const region = m?.kwarda || 'Belum Terdata';
+      counts[region] = (counts[region] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [safeMembers]);
+
+  const handleNavigate = (view: string) => {
+    if (typeof onNavigate === 'function') {
+      onNavigate(view);
+    }
+  };
+
   return (
-    <div className="space-y-6 pb-16">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative overflow-hidden">
-        <div className="space-y-2 z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-400/30 rounded-full text-emerald-300 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>{isSuperAdmin ? 'Kwartir Nasional Super Admin' : isOperator ? safeCurrentUser.jurisdictionName : 'Dashboard Anggota'}</span>
+    <div className="min-h-screen bg-slate-50/50 pb-20 pt-4 px-4 sm:px-6 lg:px-8 space-y-8">
+      {/* ================= HEADER SECTION ================= */}
+      <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-900/10 relative overflow-hidden">
+        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                {isSuperAdmin
+                  ? 'SUPER ADMIN - KWARTIR NASIONAL'
+                  : `ADMINISTRATOR - ${currentUser?.kwarcab || currentUser?.kwarda || 'REGIONAL'}`}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-emerald-100">
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                Saka Pariwisata
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              Pusat Kendali & Informasi Nasional
+            </h1>
+            <p className="text-emerald-100/80 text-sm max-w-2xl">
+              Monitoring pendaftaran anggota Saka Pariwisata, verifikasi digital, persebaran krida, dan kegiatan pariwisata se-Indonesia.
+            </p>
           </div>
-          <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight">
-            Selamat Datang, {safeCurrentUser.fullName || safeCurrentUser.name || 'Kader Saka'}
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300">
-            Sistem Informasi Registrasi & Manajemen Saka Pariwisata Nasional
-          </p>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 z-10 w-full sm:w-auto">
-          {isSuperAdmin && onOpenSpreadsheetModal && (
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={onOpenSpreadsheetModal}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
+              onClick={() => handleNavigate('audit-logs')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition backdrop-blur-sm border border-white/10"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
-              <span>Database Spreadsheet</span>
+              <FileText className="w-4 h-4" />
+              Log Audit
             </button>
-          )}
-          {isSuperAdmin && onOpenDriveModal && (
             <button
-              onClick={onOpenDriveModal}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-purple-800 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
+              onClick={() => handleNavigate('members')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
             >
-              <FolderOpen className="w-4 h-4 text-purple-300" />
-              <span>Media Drive</span>
-            </button>
-          )}
-          {isSuperAdmin && onOpenEditCardModal && (
-            <button
-              onClick={onOpenEditCardModal}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700 cursor-pointer transition-all"
-            >
-              <Sliders className="w-4 h-4 text-emerald-400" />
-              <span>Desain KTA ({currentOpacityPct}%)</span>
-            </button>
-          )}
-          <button
-            onClick={onOpenRegisterModal}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Pendaftaran Baru</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 4 KARTU STATISTIK RINGKAS (FLEKSIBEL: 1 Kolom di HP Kecil, 2 di Tablet, 4 di Laptop/PC) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Kartu 1: Anggota Aktif */}
-        <div 
-          onClick={() => onSelectTab('members')}
-          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {isSuperAdmin ? 'Total Anggota' : 'Anggota Wilayah'}
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
               <Users className="w-4 h-4" />
-            </div>
+              Kelola Anggota
+            </button>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-              {activeMembersCount.toLocaleString('id-ID')}
-            </span>
-            <span className="text-xs font-bold text-emerald-600 flex items-center gap-0.5">
-              <TrendingUp className="w-3.5 h-3.5" /> Aktif
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Kader Terverifikasi Resmi</p>
-        </div>
-
-        {/* Kartu 2: Menunggu Validasi */}
-        <div 
-          onClick={() => onSelectTab('members')}
-          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Menunggu Validasi</span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl sm:text-3xl font-extrabold text-amber-600">
-              {pendingMembers.length.toLocaleString('id-ID')}
-            </span>
-            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-bold">
-              Review
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Perlu Tindakan Persetujuan</p>
-        </div>
-
-        {/* Kartu 3: Paket Wisata */}
-        <div 
-          onClick={() => onSelectTab('tours')}
-          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Paket Wisata</span>
-            <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Compass className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-              {publishedTours.length.toLocaleString('id-ID')}
-            </span>
-            <span className="text-xs font-bold text-teal-600">Terbit</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Destinasi & Edukasi Saka</p>
-        </div>
-
-        {/* Kartu 4: Produk & Kuliner */}
-        <div 
-          onClick={() => onSelectTab('culinary-souvenirs')}
-          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Produk & Kuliner</span>
-            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Award className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-              {normalizedCulinaryItems.length.toLocaleString('id-ID')}
-            </span>
-            <span className="text-xs font-bold text-purple-600">UMKM</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Karya Krida Kader Saka</p>
         </div>
       </div>
 
-      {/* SATU PANEL PENUH: Visualisasi Pertumbuhan Anggota Dinamis (Tidak lagi bertumpuk atau terhimpit) */}
-      <div className="w-full overflow-hidden">
-        <DashboardWidget 
-          members={scopedMembers}
-          title={isSuperAdmin ? "Visualisasi Pertumbuhan Anggota Nasional" : `Statistik Anggota Wilayah ${safeCurrentUser.jurisdictionName}`}
-          subtitle="Analisis dinamika registrasi, kader aktif terverifikasi, dan tren penambahan berkala"
+      {/* ================= METRIC CARDS / WIDGETS ================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <DashboardWidget
+          title="Total Anggota Terdaftar"
+          value={scopedMembers.length.toLocaleString('id-ID')}
+          subtitle={isSuperAdmin ? 'Seluruh Indonesia' : 'Wilayah Anda'}
+          icon={<Users className="w-6 h-6 text-emerald-600" />}
+          color="emerald"
+          onClick={() => handleNavigate('members')}
+        />
+        <DashboardWidget
+          title="Anggota Terverifikasi"
+          value={verifiedMembers.length.toLocaleString('id-ID')}
+          subtitle={`${scopedMembers.length > 0 ? Math.round((verifiedMembers.length / scopedMembers.length) * 100) : 0}% KTA Aktif`}
+          icon={<UserCheck className="w-6 h-6 text-teal-600" />}
+          color="teal"
+          onClick={() => handleNavigate('members')}
+        />
+        <DashboardWidget
+          title="Menunggu Verifikasi"
+          value={pendingMembers.length.toLocaleString('id-ID')}
+          subtitle="Perlu Tindakan Admin"
+          icon={<Clock className="w-6 h-6 text-amber-600" />}
+          color="amber"
+          badge={pendingMembers.length > 0 ? `${pendingMembers.length} Antrean` : undefined}
+          onClick={() => {
+            const el = document.getElementById('pending-verification-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}
+        />
+        <DashboardWidget
+          title="Kegiatan & Event Saka"
+          value={safeActivities.length.toLocaleString('id-ID')}
+          subtitle="Pelatihan & Bhakti"
+          icon={<Calendar className="w-6 h-6 text-indigo-600" />}
+          color="indigo"
+          onClick={() => handleNavigate('activities')}
         />
       </div>
 
-      {/* Grid: Antrean Pendaftaran & Preview KTA Digital */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Kolom Kiri: Antrean Pendaftaran */}
-        <div className="lg:col-span-7 bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div>
-              <h3 className="font-bold text-sm sm:text-base text-slate-900">
-                Pendaftaran Anggota Terbaru {isOperator && `(${safeCurrentUser.jurisdictionName})`}
-              </h3>
-              <p className="text-xs text-slate-500">Daftar calon anggota yang masuk dan menunggu verifikasi</p>
+      {/* ================= ANTREAN VERIFIKASI CEPAT ================= */}
+      <div id="pending-verification-section" className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+              <h2 className="text-lg font-bold text-slate-800">
+                Antrean Verifikasi Anggota Baru
+              </h2>
             </div>
-            <button
-              onClick={() => onSelectTab('members')}
-              className="text-xs font-bold text-emerald-600 hover:underline cursor-pointer"
-            >
-              Lihat Semua
-            </button>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Calon anggota yang telah mendaftar dan menunggu validasi data KTA
+            </p>
           </div>
 
-          <div className="space-y-2.5">
-            {pendingMembers.slice(0, 5).map(m => (
-              <div key={m.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <img src={m.avatarUrl} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-slate-200" />
-                  <div className="truncate">
-                    <p className="font-bold text-xs text-slate-900 truncate">{m.fullName}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{m.krida} • {m.regencyName}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => onApproveMemberQuick(m.id)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg flex-shrink-0 cursor-pointer transition-colors"
-                >
-                  Setujui
-                </button>
-              </div>
-            ))}
-            {pendingMembers.length === 0 && (
-              <div className="py-8 text-center text-slate-400 space-y-1">
-                <CheckCircle2 className="w-7 h-7 text-slate-300 mx-auto" />
-                <p className="text-xs">Semua calon anggota telah diverifikasi.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Kolom Kanan: Preview KTA Digital */}
-        <div className="lg:col-span-5 bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <h3 className="font-bold text-sm sm:text-base text-slate-900">Preview KTA Digital Resmi</h3>
-            {isSuperAdmin && onOpenEditCardModal && (
-              <button
-                onClick={onOpenEditCardModal}
-                className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>Ubah Desain</span>
-              </button>
-            )}
-          </div>
-
-          {activeMemberForCard ? (
-            <div className="flex justify-center overflow-x-auto py-2">
-              <DigitalMemberCard
-                member={activeMemberForCard}
-                onPrint={() => onOpenPrintPdfModal && onOpenPrintPdfModal(activeMemberForCard)}
-                onEditPhoto={() => onOpenEditPhotoModal && onOpenEditPhotoModal(activeMemberForCard)}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Cari nama / NTA / Kwarcab..."
+                value={searchPending}
+                onChange={(e) => setSearchPending(e.target.value)}
+                className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-52 sm:w-64"
               />
             </div>
+            <button
+              onClick={() => handleNavigate('members')}
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+            >
+              Lihat Semua
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          {filteredPendingList.length > 0 ? (
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-50/80 text-xs font-semibold text-slate-500 uppercase">
+                <tr>
+                  <th className="py-3 px-4 rounded-l-xl">Nama & NTA</th>
+                  <th className="py-3 px-4">Kwarda / Kwarcab</th>
+                  <th className="py-3 px-4">Pangkalan / Gugus Depan</th>
+                  <th className="py-3 px-4">Pilihan Krida</th>
+                  <th className="py-3 px-4 text-right rounded-r-xl">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredPendingList.slice(0, 5).map((m, idx) => (
+                  <tr key={m?.id || idx} className="hover:bg-slate-50/50 transition">
+                    <td className="py-3.5 px-4">
+                      <div className="font-semibold text-slate-800">
+                        {m?.name || m?.fullName || 'Anggota Tanpa Nama'}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {m?.ktaNumber || m?.ktaId || 'NTA Belum Diterbitkan'}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-xs">
+                      <div className="font-medium text-slate-700">{m?.kwarcab || '-'}</div>
+                      <div className="text-slate-400">{m?.kwarda || '-'}</div>
+                    </td>
+                    <td className="py-3.5 px-4 text-xs text-slate-600">
+                      {m?.pangkalan || m?.gudep || '-'}
+                    </td>
+                    <td className="py-3.5 px-4 text-xs">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-100">
+                        {m?.krida || 'Umum'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {typeof onVerifyMember === 'function' && (
+                          <button
+                            onClick={() => onVerifyMember(m.id)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Verifikasi
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleNavigate('members')}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs transition"
+                        >
+                          Detail
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
-            <p className="text-xs text-slate-400 text-center py-10">Belum ada anggota terdaftar untuk dipratinjau.</p>
+            <div className="py-10 text-center space-y-2">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto opacity-70" />
+              <p className="text-sm font-semibold text-slate-700">
+                Tidak ada antrean verifikasi saat ini
+              </p>
+              <p className="text-xs text-slate-400">
+                Semua data anggota telah terverifikasi secara lengkap.
+              </p>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Galeri Terpadu */}
-      <IntegratedTourismShowcaseGallery
-        tours={safeTours}
-        products={normalizedCulinaryItems}
-        members={safeMembers}
-        currentUser={safeCurrentUser}
-        onViewTourDetail={onViewTourDetail}
-        onSelectCulinaryDetail={onSelectCulinaryDetail}
-        onSelectTab={onSelectTab}
-      />
+      {/* ================= SEKSI PETA & LOG AUDIT ================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Peta Persebaran Anggota */}
+        <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <Map className="w-4 h-4 text-emerald-600" />
+                Persebaran Saka Pariwisata Nasional
+              </h2>
+              <p className="text-xs text-slate-400">
+                Distribusi anggota berdasarkan wilayah Kwarda & Kwarcab
+              </p>
+            </div>
+            <button
+              onClick={() => handleNavigate('territory')}
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+            >
+              Detail Wilayah
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="min-h-[280px]">
+            <NationalMapVisual members={safeMembers} />
+          </div>
+        </div>
 
-      {/* Peta Wilayah */}
-      <NationalMapVisual
-        provinces={safeProvinces}
-        members={safeMembers}
-        onSelectProvince={() => onSelectTab('members')}
-      />
+        {/* Log Audit Terkini */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <ActivityIcon className="w-4 h-4 text-teal-600" />
+              Aktivitas Sistem
+            </h2>
+            <button
+              onClick={() => handleNavigate('audit-logs')}
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+            >
+              Semua Log
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {recentAuditLogs.length > 0 ? (
+              recentAuditLogs.map((log, idx) => (
+                <div
+                  key={log?.id || idx}
+                  className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 transition flex items-start gap-3 border border-slate-100"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100/80 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                    <FileText className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-slate-800 line-clamp-1">
+                      {log?.action || 'Aktivitas Sistem'}
+                    </p>
+                    <p className="text-[11px] text-slate-500 line-clamp-1">
+                      {log?.userName || log?.performedBy || 'Operator Sistem'}
+                    </p>
+                    <span className="text-[10px] text-slate-400">
+                      {log?.timestamp ? new Date(log.timestamp).toLocaleString('id-ID') : '-'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-8 text-center text-xs text-slate-400">
+                Belum ada aktivitas yang tercatat.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ================= PORTAL KRIDA SAKA ================= */}
+      <div className="space-y-3">
+        <CompactKridaPortal
+          onSelectKrida={() => handleNavigate('krida')}
+        />
+      </div>
+
+      {/* ================= SHOWCASE POTENSI WISATA & KULINER ================= */}
+      <div className="space-y-6">
+        <IntegratedTourismShowcaseGallery />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
+            <TourPackageCarouselSection packages={safeTourPackages} />
+          </div>
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
+            <CulinarySouvenirGallerySection items={safeCulinaryItems} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
+
+export default DashboardView;
