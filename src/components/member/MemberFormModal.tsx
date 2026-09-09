@@ -198,25 +198,38 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   }, [currentUser, isOpen]);
 
   useEffect(() => {
-    if (selectedProvinceId) {
-      // If role is ADMIN_REGENCY, keep regencies filtered to their jurisdiction or loaded
-      const regs = storage.getRegencies(selectedProvinceId);
-      setRegencies(regs);
-      if (currentUser?.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId) {
-        setSelectedRegencyId(currentUser.jurisdictionId);
-      } else if (regs.length > 0 && !regs.some(r => r.id === selectedRegencyId)) {
-        setSelectedRegencyId(regs[0].id);
-      }
+    if (!selectedProvinceId) {
+      setRegencies([]);
+      setSelectedRegencyId('');
+      return;
     }
-  }, [selectedProvinceId]);
+
+    const regs = storage.getRegencies(selectedProvinceId);
+    setRegencies(regs);
+
+    if (currentUser?.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId) {
+      const ownRegency = regs.find(r => r.id === currentUser.jurisdictionId);
+      setSelectedRegencyId(ownRegency?.id || '');
+    } else if (regs.length > 0 && !regs.some(r => r.id === selectedRegencyId)) {
+      setSelectedRegencyId(regs[0].id);
+    } else if (regs.length === 0) {
+      setSelectedRegencyId('');
+    }
+  }, [selectedProvinceId, currentUser]);
 
   useEffect(() => {
-    if (selectedRegencyId) {
-      const dists = storage.getDistricts(selectedRegencyId);
-      setDistricts(dists);
-      if (dists.length > 0 && !dists.some(d => d.id === selectedDistrictId)) {
-        setSelectedDistrictId(dists[0].id);
-      }
+    if (!selectedRegencyId) {
+      setDistricts([]);
+      setSelectedDistrictId('');
+      return;
+    }
+
+    const dists = storage.getDistricts(selectedRegencyId);
+    setDistricts(dists);
+    if (dists.length > 0 && !dists.some(d => d.id === selectedDistrictId)) {
+      setSelectedDistrictId(dists[0].id);
+    } else if (dists.length === 0) {
+      setSelectedDistrictId('');
     }
   }, [selectedRegencyId]);
 
