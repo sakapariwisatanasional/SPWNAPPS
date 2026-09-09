@@ -43,6 +43,8 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
   onOpenFormModal,
   onSelectItemDetail
 }) => {
+  const safeItems = Array.isArray(items) ? items : [];
+
   // Tabs: 'PUBLISHED' | 'PENDING' | 'MY_ITEMS'
   const [activeTab, setActiveTab] = useState<'PUBLISHED' | 'PENDING' | 'MY_ITEMS'>('PUBLISHED');
   
@@ -90,23 +92,23 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
 
   // Extract unique provinces
   const provinces = useMemo(() => {
-    return Array.from(new Set(items.map(i => i.provinceName).filter(Boolean)));
-  }, [items]);
+    return Array.from(new Set(safeItems.map(i => i.provinceName).filter(Boolean)));
+  }, [safeItems]);
 
   // Counts
-  const publishedCount = useMemo(() => items.filter(i => (i.status || 'APPROVED') === 'APPROVED').length, [items]);
-  const pendingCount = useMemo(() => items.filter(i => i.status === 'PENDING_APPROVAL').length, [items]);
+  const publishedCount = useMemo(() => safeItems.filter(i => (i.status || 'APPROVED') === 'APPROVED').length, [safeItems]);
+  const pendingCount = useMemo(() => safeItems.filter(i => i.status === 'PENDING_APPROVAL').length, [safeItems]);
   const myItemsCount = useMemo(() => {
-    return items.filter(i => 
+    return safeItems.filter(i => 
       i.authorMemberId === currentUser.memberId || 
       i.authorMemberId === currentUser.id || 
       i.authorName === currentUser.name
     ).length;
-  }, [items, currentUser]);
+  }, [safeItems, currentUser]);
 
   // Filter items
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
+    return safeItems.filter(item => {
       const itemStatus: ProductModerationStatus = item.status || 'APPROVED';
 
       // Tab filter
@@ -151,7 +153,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
 
       return true;
     });
-  }, [items, activeTab, selectedKrida, selectedProvince, searchQuery, currentUser]);
+  }, [safeItems, activeTab, selectedKrida, selectedProvince, searchQuery, currentUser]);
 
   const getKridaIcon = (krida?: KridaType) => {
     switch (krida) {
