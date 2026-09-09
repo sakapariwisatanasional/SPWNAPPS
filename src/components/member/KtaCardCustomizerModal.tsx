@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   X, Sliders, Check, Save, RotateCcw, Sparkles, Upload, Plus, Trash2,
   LayoutTemplate, Type, Image as ImageIcon, Eye, MapPin, RefreshCw
@@ -14,7 +14,8 @@ const FIELD_OPTIONS: Array<{ value: KtaMemberFieldKey; label: string }> = [
   { value:'fullName', label:'Nama Lengkap' }, { value:'id', label:'No. Anggota (SPW)' },
   { value:'nationalMemberNumber', label:'Nomor KTA / NTA' }, { value:'currentPosition', label:'Jabatan' },
   { value:'provinceName', label:'Kwartir / Provinsi' }, { value:'regencyName', label:'Kwarcab / Kabupaten' },
-  { value:'districtName', label:'Kecamatan' }, { value:'krida', label:'Krida' },
+  { value:'districtName', label:'Kwarran / Kecamatan' }, { value:'branchName', label:'Gugus / Pangkalan' },
+  { value:'gugusDepan', label:'Gugus Depan' }, { value:'krida', label:'Krida' },
   { value:'phone', label:'WhatsApp' }, { value:'email', label:'Email' },
   { value:'joinYear', label:'Tahun Bergabung' }, { value:'status', label:'Status' }
 ];
@@ -28,36 +29,8 @@ const PRESETS: Record<KtaCardPreset, { label:string; width:number; height:number
 
 const clone = <T,>(v:T):T => JSON.parse(JSON.stringify(v));
 
-// Konfigurasi KTA dapat berasal dari localStorage/Spreadsheet versi lama
-// yang belum memiliki collection lengkap. Normalisasi dilakukan sebelum
-// collection dipakai oleh useMemo/render agar Dashboard tidak crash.
-const normalizeKtaSettings = (value?: Partial<KtaCardSettings> | null): KtaCardSettings => {
-  const merged = {
-    ...clone(DEFAULT_KTA_SETTINGS),
-    ...(value && typeof value === 'object' ? value : {})
-  } as KtaCardSettings;
-
-  // Bersihkan konfigurasi KTA lama agar hanya memakai data wilayah resmi.
-  const allowedFields = new Set<KtaMemberFieldKey>([
-    'fullName', 'id', 'nationalMemberNumber', 'currentPosition',
-    'provinceName', 'regencyName', 'districtName', 'krida',
-    'phone', 'email', 'joinYear', 'status'
-  ]);
-  merged.dataFields = Array.isArray((merged as any).dataFields)
-    ? (merged as any).dataFields.filter((field: any) => allowedFields.has(field?.field))
-    : [];
-
-  return {
-    ...merged,
-    logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
-    dataFields: Array.isArray((merged as any).dataFields) ? (merged as any).dataFields : [],
-    textElements: Array.isArray((merged as any).textElements) ? (merged as any).textElements : [],
-    terms: Array.isArray((merged as any).terms) ? (merged as any).terms : []
-  };
-};
-
 export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
-  const [settings, setSettings] = useState<KtaCardSettings>(() => normalizeKtaSettings(DEFAULT_KTA_SETTINGS));
+  const [settings, setSettings] = useState<KtaCardSettings>(clone(DEFAULT_KTA_SETTINGS));
   const [side, setSide] = useState<KtaCardSide>('FRONT');
   const [isSaving, setIsSaving] = useState(false);
   const [loadingRemote, setLoadingRemote] = useState(false);
@@ -75,26 +48,25 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
   const previewMember: Member = members[0] || ({
     id:'SPW-000001', userId:'user-01', nationalMemberNumber:'00.00.00.000001', fullName:'Rohadi Wijaya', nikMasked:'',
     avatarUrl:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300', gender:'LAKI_LAKI', birthPlace:'Jakarta', birthDate:'2000-08-14', phone:'081234567890', email:'admin@sakapariwisata.id', address:'',
-    provinceId:'00', provinceName:'Kwartir Nasional', regencyId:'00.00', regencyName:'Kwartir Nasional (Pusat)', districtId:'00.00.00', districtName:'Nasional', joinYear:2024, currentPosition:'Andalan Nasional', krida:'Krida Mice & Event', status:'ACTIVE', educationLevel:'S1', occupation:'Pimpinan Saka', bio:'', skills:[], certifications:[], locationHistory:[], registeredAt:new Date().toISOString(), verificationToken:'preview'
+    provinceId:'00', provinceName:'Kwartir Nasional', regencyId:'00.00', regencyName:'Kwartir Nasional (Pusat)', districtId:'00.00.00', districtName:'Nasional', branchId:'branch-nasional', branchName:'PANDU NUSANTARA', gugusDepan:'PANDU NUSANTARA', joinYear:2024, currentPosition:'Andalan Nasional', krida:'Krida Mice & Event', status:'ACTIVE', educationLevel:'S1', occupation:'Pimpinan Saka', bio:'', skills:[], certifications:[], locationHistory:[], registeredAt:new Date().toISOString(), verificationToken:'preview'
   } as Member);
 
   useEffect(() => {
     if (!isOpen) return;
-    setSettings(normalizeKtaSettings(storage.getKtaSettings()));
+    setSettings(clone(storage.getKtaSettings()));
     setMessage('');
     setLoadingRemote(true);
     spreadsheetService.refreshKtaSettings().then(remote => {
-      if (remote) setSettings(normalizeKtaSettings(remote));
+      if (remote) setSettings(clone(remote));
     }).finally(() => setLoadingRemote(false));
   }, [isOpen]);
 
   const dataFields = Array.isArray(settings?.dataFields) ? settings.dataFields : [];
   const textElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
   const logos = Array.isArray(settings?.logos) ? settings.logos : [];
-
-  const sideFields = dataFields.filter(f => f.side === side);
-  const sideTexts = textElements.filter(t => t.side === side);
-  const sideLogos = logos.filter(l => l.side === side);
+  const sideFields = useMemo(() => dataFields.filter(f => f.side === side), [dataFields, side]);
+  const sideTexts = useMemo(() => textElements.filter(t => t.side === side), [textElements, side]);
+  const sideLogos = useMemo(() => logos.filter(l => l.side === side), [logos, side]);
 
   if (!isOpen) return null;
 
@@ -102,9 +74,9 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
   const updateText = (id:string, patch:Partial<KtaTextElement>) => setSettings(s => ({ ...s, textElements:s.textElements.map(t => t.id===id ? {...t,...patch} : t) }));
   const updateLogo = (id:string, patch:Partial<KtaLogoElement>) => setSettings(s => ({ ...s, logos:s.logos.map(l => l.id===id ? {...l,...patch} : l) }));
 
-  const addField = () => setSettings(s => ({ ...s, dataFields:[...s.dataFields, { id:`field-${Date.now()}`, field:'fullName', label:'NAMA', side, visible:true, x:35, y:50 + s.dataFields.filter(f=>f.side===side).length*8, width:50, fontSize:11, fontWeight:'bold', color:'#ffffff', textTransform:'none', align:'left' }] }));
-  const addText = () => setSettings(s => ({ ...s, textElements:[...s.textElements, { id:`text-${Date.now()}`, text:'TEKS KUSTOM', side, x:5, y:88, width:90, fontSize:8, fontWeight:'bold', color:'#ffffff', align:'left', textTransform:'none' }] }));
-  const addLogo = () => setSettings(s => ({ ...s, logos:[...s.logos, { id:`logo-${Date.now()}`, name:'Logo Baru', url:'', side, x:70, y:6, width:22, height:22, opacity:1, objectFit:'contain' }] }));
+  const addField = () => setSettings(s => ({ ...s, dataFields:[... (Array.isArray(s.dataFields) ? s.dataFields : []), { id:`field-${Date.now()}`, field:'fullName', label:'NAMA', side, visible:true, x:35, y:50 + (Array.isArray(s.dataFields) ? s.dataFields : []).filter(f=>f.side===side).length*8, width:50, fontSize:11, fontWeight:'bold', color:'#ffffff', textTransform:'none', align:'left' }] }));
+  const addText = () => setSettings(s => ({ ...s, textElements:[... (Array.isArray(s.textElements) ? s.textElements : []), { id:`text-${Date.now()}`, text:'TEKS KUSTOM', side, x:5, y:88, width:90, fontSize:8, fontWeight:'bold', color:'#ffffff', align:'left', textTransform:'none' }] }));
+  const addLogo = () => setSettings(s => ({ ...s, logos:[... (Array.isArray(s.logos) ? s.logos : []), { id:`logo-${Date.now()}`, name:'Logo Baru', url:'', side, x:70, y:6, width:22, height:22, opacity:1, objectFit:'contain' }] }));
 
   const fileToDataUrl = (file:File) => new Promise<string>((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(String(r.result)); r.onerror=reject; r.readAsDataURL(file); });
   const uploadAsset = async (file:File, kind:'logo'|'background') => {
@@ -138,7 +110,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
     setIsSaving(false);
   };
 
-  const handleReset = () => { if(confirm('Reset seluruh desain KTA ke standar nasional?')) setSettings(normalizeKtaSettings(DEFAULT_KTA_SETTINGS)); };
+  const handleReset = () => { if(confirm('Reset seluruh desain KTA ke standar nasional?')) setSettings(clone(DEFAULT_KTA_SETTINGS)); };
   const handleGenerateByRegion = () => {
     if(!regionProvinceId) return alert('Pilih provinsi terlebih dahulu.');
     if(!confirm('Generate NTA untuk anggota yang belum memiliki nomor? Nomor yang sudah ada tidak diubah.')) return;
@@ -178,36 +150,18 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
             {sideLogos.map(l=><div key={l.id} className="grid grid-cols-12 gap-2 p-3 bg-slate-50 rounded-xl border"><div className="col-span-4"><input value={l.name} onChange={e=>updateLogo(l.id,{name:e.target.value})} className={input} placeholder="Nama logo"/><label className="block mt-2 text-[10px] text-purple-800 font-bold cursor-pointer"><Upload className="inline w-3 h-3 mr-1"/>Upload<input type="file" accept="image/*" className="hidden" onChange={e=>handleAssetUpload(e,'logo',l.id)}/></label><input value={l.url} onChange={e=>updateLogo(l.id,{url:e.target.value})} className={input+' mt-2'} placeholder="URL logo"/></div><div className="col-span-7 grid grid-cols-4 gap-2"><label className="text-[9px] font-bold">X{numberInput(l.x,v=>updateLogo(l.id,{x:v}))}</label><label className="text-[9px] font-bold">Y{numberInput(l.y,v=>updateLogo(l.id,{y:v}))}</label><label className="text-[9px] font-bold">Lebar{numberInput(l.width,v=>updateLogo(l.id,{width:v}))}</label><label className="text-[9px] font-bold">Tinggi{numberInput(l.height,v=>updateLogo(l.id,{height:v}))}</label></div><button onClick={()=>setSettings(s=>({...s,logos:s.logos.filter(x=>x.id!==l.id)}))} className="col-span-1 self-start p-2 text-red-600"><Trash2 className="w-4 h-4"/></button></div>)}
           </section>
 
-          {side==='FRONT' && <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center gap-2 font-bold"><Type/><span>5. Header Organisasi</span></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-slate-50 border space-y-2"><div className="text-[10px] font-black uppercase">SAKA PARIWISATA</div><input value={settings.frontOrganizationTitle} onChange={e=>setSettings(s=>({...s,frontOrganizationTitle:e.target.value}))} className={input} placeholder="Judul"/><div className="grid grid-cols-4 gap-2"><label className="text-[9px] font-bold">X{numberInput(settings.frontOrganizationTitleX??15,v=>setSettings(s=>({...s,frontOrganizationTitleX:v})))}</label><label className="text-[9px] font-bold">Y{numberInput(settings.frontOrganizationTitleY??6,v=>setSettings(s=>({...s,frontOrganizationTitleY:v})))}</label><label className="text-[9px] font-bold">Lebar{numberInput(settings.frontOrganizationTitleWidth??65,v=>setSettings(s=>({...s,frontOrganizationTitleWidth:v})))}</label><label className="text-[9px] font-bold">Font{numberInput(settings.frontOrganizationTitleFontSize??11,v=>setSettings(s=>({...s,frontOrganizationTitleFontSize:v})))}</label></div><div className="grid grid-cols-3 gap-2"><select value={settings.frontOrganizationTitleFontWeight??'bold'} onChange={e=>setSettings(s=>({...s,frontOrganizationTitleFontWeight:e.target.value as any}))} className={input}><option value="normal">Normal</option><option value="medium">Medium</option><option value="bold">Bold</option><option value="black">Black</option></select><select value={settings.frontOrganizationTitleAlign??'left'} onChange={e=>setSettings(s=>({...s,frontOrganizationTitleAlign:e.target.value as any}))} className={input}><option value="left">Kiri</option><option value="center">Tengah</option><option value="right">Kanan</option></select><input type="color" value={settings.frontOrganizationTitleColor??'#ffffff'} onChange={e=>setSettings(s=>({...s,frontOrganizationTitleColor:e.target.value}))} className="h-9 w-full rounded"/></div></div>
-              <div className="p-3 rounded-xl bg-slate-50 border space-y-2"><div className="text-[10px] font-black uppercase">GERAKAN PRAMUKA INDONESIA</div><input value={settings.frontOrganizationSubtitle} onChange={e=>setSettings(s=>({...s,frontOrganizationSubtitle:e.target.value}))} className={input} placeholder="Subjudul"/><div className="grid grid-cols-4 gap-2"><label className="text-[9px] font-bold">X{numberInput(settings.frontOrganizationSubtitleX??15,v=>setSettings(s=>({...s,frontOrganizationSubtitleX:v})))}</label><label className="text-[9px] font-bold">Y{numberInput(settings.frontOrganizationSubtitleY??12,v=>setSettings(s=>({...s,frontOrganizationSubtitleY:v})))}</label><label className="text-[9px] font-bold">Lebar{numberInput(settings.frontOrganizationSubtitleWidth??70,v=>setSettings(s=>({...s,frontOrganizationSubtitleWidth:v})))}</label><label className="text-[9px] font-bold">Font{numberInput(settings.frontOrganizationSubtitleFontSize??8,v=>setSettings(s=>({...s,frontOrganizationSubtitleFontSize:v})))}</label></div><div className="grid grid-cols-3 gap-2"><select value={settings.frontOrganizationSubtitleFontWeight??'normal'} onChange={e=>setSettings(s=>({...s,frontOrganizationSubtitleFontWeight:e.target.value as any}))} className={input}><option value="normal">Normal</option><option value="medium">Medium</option><option value="bold">Bold</option><option value="black">Black</option></select><select value={settings.frontOrganizationSubtitleAlign??'left'} onChange={e=>setSettings(s=>({...s,frontOrganizationSubtitleAlign:e.target.value as any}))} className={input}><option value="left">Kiri</option><option value="center">Tengah</option><option value="right">Kanan</option></select><input type="color" value={settings.frontOrganizationSubtitleColor??'#e5e7eb'} onChange={e=>setSettings(s=>({...s,frontOrganizationSubtitleColor:e.target.value}))} className="h-9 w-full rounded"/></div></div>
-            </div>
-          </section>}
-
-          {side==='FRONT' && <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold"><Eye/><span>6. QR / Barcode Depan</span></div><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={settings.showQrCode} onChange={e=>setSettings(s=>({...s,showQrCode:e.target.checked}))}/> Tampilkan QR</label></div>
-            <div className="grid grid-cols-3 gap-2"><label className="text-[9px] font-bold">X{numberInput(settings.qrX??78,v=>setSettings(s=>({...s,qrX:v})))}</label><label className="text-[9px] font-bold">Y{numberInput(settings.qrY??30,v=>setSettings(s=>({...s,qrY:v})))}</label><label className="text-[9px] font-bold">Ukuran{numberInput(settings.qrSize??22,v=>setSettings(s=>({...s,qrSize:v})))}</label></div>
-          </section>}
-
-          {side==='BACK' && <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold"><Eye/><span>5. QR / Barcode</span></div><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={settings.showBarcode!==false} onChange={e=>setSettings(s=>({...s,showBarcode:e.target.checked}))}/> Tampilkan Barcode</label></div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2"><label className="text-[9px] font-bold">X{numberInput(settings.barcodeX??68,v=>setSettings(s=>({...s,barcodeX:v})))}</label><label className="text-[9px] font-bold">Y{numberInput(settings.barcodeY??70,v=>setSettings(s=>({...s,barcodeY:v})))}</label><label className="text-[9px] font-bold">Lebar{numberInput(settings.barcodeWidth??27,v=>setSettings(s=>({...s,barcodeWidth:v})))}</label><label className="text-[9px] font-bold">Tinggi{numberInput(settings.barcodeHeight??9,v=>setSettings(s=>({...s,barcodeHeight:v})))}</label><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={settings.barcodeShowText??false} onChange={e=>setSettings(s=>({...s,barcodeShowText:e.target.checked}))}/> Teks</label></div>
-          </section>}
-
           <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold"><Type/><span>7. Data Anggota yang Ditampilkan</span></div><button onClick={addField} className="px-3 py-2 rounded-lg bg-emerald-700 text-white text-xs font-bold"><Plus className="inline w-3.5 h-3.5 mr-1"/> Tambah Data</button></div>
-            {sideFields.map(f=><div key={f.id} className="p-3 bg-slate-50 rounded-xl border space-y-2"><div className="grid grid-cols-2 md:grid-cols-5 gap-2"><select value={f.field} onChange={e=>updateField(f.id,{field:e.target.value as KtaMemberFieldKey,label:FIELD_OPTIONS.find(x=>x.value===e.target.value)?.label||f.label})} className={input}>{FIELD_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select><input value={f.label} onChange={e=>updateField(f.id,{label:e.target.value})} className={input}/><label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={f.visible} onChange={e=>updateField(f.id,{visible:e.target.checked})}/> Tampilkan</label><label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={f.showLabel??false} onChange={e=>updateField(f.id,{showLabel:e.target.checked})}/> Label</label><select value={f.fontWeight} onChange={e=>updateField(f.id,{fontWeight:e.target.value as any})} className={input}><option>normal</option><option>medium</option><option>bold</option><option>black</option></select><input type="color" value={f.color} onChange={e=>updateField(f.id,{color:e.target.value})} className="h-9 w-full rounded"/></div><div className="grid grid-cols-2 md:grid-cols-6 gap-2"><label className="text-[9px] font-bold">X{numberInput(f.x,v=>updateField(f.id,{x:v}))}</label><label className="text-[9px] font-bold">Y{numberInput(f.y,v=>updateField(f.id,{y:v}))}</label><label className="text-[9px] font-bold">Lebar{numberInput(f.width,v=>updateField(f.id,{width:v}))}</label><label className="text-[9px] font-bold">Font{numberInput(f.fontSize,v=>updateField(f.id,{fontSize:v}))}</label><select value={f.align||'left'} onChange={e=>updateField(f.id,{align:e.target.value as any})} className={input}><option value="left">Kiri</option><option value="center">Tengah</option><option value="right">Kanan</option></select><button onClick={()=>setSettings(s=>({...s,dataFields:s.dataFields.filter(x=>x.id!==f.id)}))} className="text-red-600 text-xs font-bold"><Trash2 className="inline w-4 h-4 mr-1"/>Hapus</button></div></div>)}
+            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold"><Type/><span>5. Data Anggota yang Ditampilkan</span></div><button onClick={addField} className="px-3 py-2 rounded-lg bg-emerald-700 text-white text-xs font-bold"><Plus className="inline w-3.5 h-3.5 mr-1"/> Tambah Data</button></div>
+            {sideFields.map(f=><div key={f.id} className="p-3 bg-slate-50 rounded-xl border space-y-2"><div className="grid grid-cols-2 md:grid-cols-5 gap-2"><select value={f.field} onChange={e=>updateField(f.id,{field:e.target.value as KtaMemberFieldKey,label:FIELD_OPTIONS.find(x=>x.value===e.target.value)?.label||f.label})} className={input}>{FIELD_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select><input value={f.label} onChange={e=>updateField(f.id,{label:e.target.value})} className={input}/><label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={f.visible} onChange={e=>updateField(f.id,{visible:e.target.checked})}/> Tampilkan</label><select value={f.fontWeight} onChange={e=>updateField(f.id,{fontWeight:e.target.value as any})} className={input}><option>normal</option><option>medium</option><option>bold</option><option>black</option></select><input type="color" value={f.color} onChange={e=>updateField(f.id,{color:e.target.value})} className="h-9 w-full rounded"/></div><div className="grid grid-cols-2 md:grid-cols-6 gap-2"><label className="text-[9px] font-bold">X{numberInput(f.x,v=>updateField(f.id,{x:v}))}</label><label className="text-[9px] font-bold">Y{numberInput(f.y,v=>updateField(f.id,{y:v}))}</label><label className="text-[9px] font-bold">Lebar{numberInput(f.width,v=>updateField(f.id,{width:v}))}</label><label className="text-[9px] font-bold">Font{numberInput(f.fontSize,v=>updateField(f.id,{fontSize:v}))}</label><select value={f.align||'left'} onChange={e=>updateField(f.id,{align:e.target.value as any})} className={input}><option value="left">Kiri</option><option value="center">Tengah</option><option value="right">Kanan</option></select><button onClick={()=>setSettings(s=>({...s,dataFields:s.dataFields.filter(x=>x.id!==f.id)}))} className="text-red-600 text-xs font-bold"><Trash2 className="inline w-4 h-4 mr-1"/>Hapus</button></div></div>)}
           </section>
 
           <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold"><Type/><span>8. Teks Kustom</span></div><button onClick={addText} className="px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold"><Plus className="inline w-3.5 h-3.5 mr-1"/> Tambah Teks</button></div>
+            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold"><Type/><span>6. Teks Kustom</span></div><button onClick={addText} className="px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold"><Plus className="inline w-3.5 h-3.5 mr-1"/> Tambah Teks</button></div>
             {sideTexts.map(t=><div key={t.id} className="grid grid-cols-12 gap-2 p-3 bg-slate-50 rounded-xl border"><input value={t.text} onChange={e=>updateText(t.id,{text:e.target.value})} className={input+' col-span-5'} placeholder="Teks pada kartu"/><label className="text-[9px] font-bold">X{numberInput(t.x,v=>updateText(t.id,{x:v}))}</label><label className="text-[9px] font-bold">Y{numberInput(t.y,v=>updateText(t.id,{y:v}))}</label><label className="text-[9px] font-bold">Lebar{numberInput(t.width,v=>updateText(t.id,{width:v}))}</label><label className="text-[9px] font-bold">Font{numberInput(t.fontSize,v=>updateText(t.id,{fontSize:v}))}</label><input type="color" value={t.color} onChange={e=>updateText(t.id,{color:e.target.value})} className="h-9 rounded"/><button onClick={()=>setSettings(s=>({...s,textElements:s.textElements.filter(x=>x.id!==t.id)}))} className="text-red-600"><Trash2 className="w-4 h-4"/></button></div>)}
           </section>
 
           <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center gap-2 font-bold"><Type/><span>9. Teks Sistem Kartu</span></div>
+            <div className="flex items-center gap-2 font-bold"><Type/><span>7. Teks Sistem Kartu</span></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2"><label className="text-[10px] font-bold">Judul Organisasi<input value={settings.frontOrganizationTitle} onChange={e=>setSettings(s=>({...s,frontOrganizationTitle:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Subjudul<input value={settings.frontOrganizationSubtitle} onChange={e=>setSettings(s=>({...s,frontOrganizationSubtitle:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Masa Berlaku<input value={settings.frontValidityText} onChange={e=>setSettings(s=>({...s,frontValidityText:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Header Belakang<input value={settings.backHeaderTitle} onChange={e=>setSettings(s=>({...s,backHeaderTitle:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Nama Penandatangan<input value={settings.signerName} onChange={e=>setSettings(s=>({...s,signerName:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Jabatan Penandatangan<input value={settings.signerTitle} onChange={e=>setSettings(s=>({...s,signerTitle:e.target.value}))} className={input}/></label></div>
             <label className="text-[10px] font-bold">Ketentuan Belakang<textarea value={settings.terms.join('\n')} onChange={e=>setSettings(s=>({...s,terms:e.target.value.split('\n')}))} className={input+' min-h-24'}/></label>
           </section>
