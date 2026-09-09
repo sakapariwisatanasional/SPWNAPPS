@@ -1083,6 +1083,105 @@ app.post('/api/config', (req, res) => {
   res.json({ success: true, config: db.config });
 });
 
+
+// =========================================================
+// KTA DESIGN SETTINGS — CENTRAL SOURCE OF TRUTH
+// =========================================================
+// GET is intentionally available to authenticated and public/member browsers:
+// KTA layout is presentation configuration, not private member data.
+// The actual source of truth remains the Google Spreadsheet via Apps Script.
+app.get('/api/kta-settings', async (req, res) => {
+  try {
+    const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+    if (!scriptUrl) {
+      return res.status(503).json({
+        success: false,
+        message: 'Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.'
+      });
+    }
+
+    const url = scriptUrl.includes('?')
+      ? `${scriptUrl}&action=GET_KTA_SETTINGS&_t=${Date.now()}`
+      : `${scriptUrl}?action=GET_KTA_SETTINGS&_t=${Date.now()}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || data?.status === 'error' || data?.success === false) {
+      throw new Error(data?.message || `Gagal membaca pengaturan KTA (HTTP ${response.status}).`);
+    }
+
+    return res.json({
+      success: true,
+      status: 'success',
+      action: 'GET_KTA_SETTINGS',
+      settings: data.settings || null,
+      updatedAt: data.updatedAt || null,
+      updatedBy: data.updatedBy || null
+    });
+  } catch (error: any) {
+    console.error('[KTA Settings] GET error:', error);
+    return res.status(502).json({
+      success: false,
+      status: 'error',
+      message: error?.message || 'Gagal membaca pengaturan KTA pusat.'
+    });
+  }
+});
+
+// Only Super Admin may publish a new KTA layout.
+app.put('/api/kta-settings', async (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Wewenang Super Admin diperlukan.' });
+  }
+
+  try {
+    const settings = req.body?.settings;
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      return res.status(400).json({ success: false, message: 'Pengaturan KTA tidak valid.' });
+    }
+
+    const scriptUrl = normalizeManualAppsScriptUrl(req.body?.scriptUrl || db.config.scriptUrl);
+    if (!scriptUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.'
+      });
+    }
+
+    const result = await forwardToGoogleAppsScript({
+      action: 'UPSERT_KTA_SETTINGS',
+      settings,
+      updatedBy: session.name || session.username || 'Super Admin'
+    }, scriptUrl);
+
+    return res.json({
+      success: true,
+      status: 'success',
+      action: 'UPSERT_KTA_SETTINGS',
+      settings: result?.settings || settings,
+      updatedAt: result?.updatedAt || new Date().toISOString(),
+      updatedBy: result?.updatedBy || session.name || session.username || 'Super Admin',
+      message: result?.message || 'Pengaturan KTA tersimpan di Google Spreadsheet.'
+    });
+  } catch (error: any) {
+    console.error('[KTA Settings] PUT error:', error);
+    const message = error?.message || 'Gagal menyimpan pengaturan KTA pusat.';
+    const statusMatch = message.match(/HTTP (\d{3})/i);
+    const upstreamStatus = statusMatch ? Number(statusMatch[1]) : 502;
+    return res.status(upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 502).json({
+      success: false,
+      status: 'error',
+      message
+    });
+  }
+});
+
 // Central Data GET with strict Privacy and Role Enforcement
 app.get('/api/data', async (req, res) => {
   const session = getSessionUser(req);
