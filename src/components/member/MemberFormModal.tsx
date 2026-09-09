@@ -18,7 +18,7 @@ import {
 import { storage } from '../../services/storage';
 import { spreadsheetService } from '../../services/spreadsheetService';
 import { formatGoogleDriveUrl } from '../../services/driveRepository';
-import { Province, Regency, District, Branch, Skill, MemberSkill, SkillProficiency, KridaType, CurrentUser } from '../../types';
+import { Province, Regency, District, Skill, MemberSkill, SkillProficiency, KridaType, CurrentUser } from '../../types';
 
 interface MemberFormModalProps {
   isOpen: boolean;
@@ -36,7 +36,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [regencies, setRegencies] = useState<Regency[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [skillsList, setSkillsList] = useState<Skill[]>([]);
 
   // Form State
@@ -52,9 +51,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [selectedProvinceId, setSelectedProvinceId] = useState('32');
   const [selectedRegencyId, setSelectedRegencyId] = useState('32.06');
   const [selectedDistrictId, setSelectedDistrictId] = useState('32.06.12');
-  const [selectedBranchId, setSelectedBranchId] = useState('');
   
-  const [gugusDepan, setGugusDepan] = useState('');
   const [krida, setKrida] = useState<KridaType>('Krida Pemandu');
   const [joinYear, setJoinYear] = useState(2024);
   const [educationLevel, setEducationLevel] = useState('SMA / SMK / Sederajat');
@@ -146,7 +143,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
     if (currentUser) {
       if (currentUser.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId) {
-        // Operator Cabang: Find province that contains this regency
+        // Operator Kabupaten/Kota: Find province that contains this regency
         const regencyId = currentUser.jurisdictionId;
         const allRegs = storage.getRegencies();
         const targetReg = allRegs.find(r => r.id === regencyId);
@@ -159,9 +156,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         setDistricts(dists);
         if (dists.length > 0) {
           setSelectedDistrictId(dists[0].id);
-          const brs = storage.getBranches(dists[0].id);
-          setBranches(brs);
-          if (brs.length > 0) setSelectedBranchId(brs[0].id);
         }
       } else if (currentUser.role === 'ADMIN_PROVINCE' && currentUser.jurisdictionId) {
         setSelectedProvinceId(currentUser.jurisdictionId);
@@ -173,9 +167,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
           setDistricts(dists);
           if (dists.length > 0) {
             setSelectedDistrictId(dists[0].id);
-            const brs = storage.getBranches(dists[0].id);
-            setBranches(brs);
-            if (brs.length > 0) setSelectedBranchId(brs[0].id);
           }
         }
       } else if (currentUser.role === 'ADMIN_BRANCH' && currentUser.jurisdictionId) {
@@ -189,61 +180,33 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
           }
           setSelectedRegencyId(targetDist.regencyId);
           setSelectedDistrictId(targetDist.id);
-          const brs = storage.getBranches(targetDist.id);
-          setBranches(brs);
-          if (brs.length > 0) setSelectedBranchId(brs[0].id);
         }
       }
     }
   }, [currentUser, isOpen]);
 
   useEffect(() => {
-    if (!selectedProvinceId) {
-      setRegencies([]);
-      setSelectedRegencyId('');
-      return;
-    }
-
-    const regs = storage.getRegencies(selectedProvinceId);
-    setRegencies(regs);
-
-    if (currentUser?.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId) {
-      const ownRegency = regs.find(r => r.id === currentUser.jurisdictionId);
-      setSelectedRegencyId(ownRegency?.id || '');
-    } else if (regs.length > 0 && !regs.some(r => r.id === selectedRegencyId)) {
-      setSelectedRegencyId(regs[0].id);
-    } else if (regs.length === 0) {
-      setSelectedRegencyId('');
-    }
-  }, [selectedProvinceId, currentUser]);
-
-  useEffect(() => {
-    if (!selectedRegencyId) {
-      setDistricts([]);
-      setSelectedDistrictId('');
-      return;
-    }
-
-    const dists = storage.getDistricts(selectedRegencyId);
-    setDistricts(dists);
-    if (dists.length > 0 && !dists.some(d => d.id === selectedDistrictId)) {
-      setSelectedDistrictId(dists[0].id);
-    } else if (dists.length === 0) {
-      setSelectedDistrictId('');
-    }
-  }, [selectedRegencyId]);
-
-  useEffect(() => {
-    if (selectedDistrictId) {
-      const brs = storage.getBranches(selectedDistrictId);
-      setBranches(brs);
-      if (brs.length > 0 && !brs.some(b => b.id === selectedBranchId)) {
-        setSelectedBranchId(brs[0].id);
-      } else if (brs.length === 0) {
-        setSelectedBranchId('');
+    if (selectedProvinceId) {
+      // If role is ADMIN_REGENCY, keep regencies filtered to their jurisdiction or loaded
+      const regs = storage.getRegencies(selectedProvinceId);
+      setRegencies(regs);
+      if (currentUser?.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId) {
+        setSelectedRegencyId(currentUser.jurisdictionId);
+      } else if (regs.length > 0 && !regs.some(r => r.id === selectedRegencyId)) {
+        setSelectedRegencyId(regs[0].id);
       }
     }
-  }, [selectedDistrictId]);
+  }, [selectedProvinceId]);
+
+  useEffect(() => {
+    if (selectedRegencyId) {
+      const dists = storage.getDistricts(selectedRegencyId);
+      setDistricts(dists);
+      if (dists.length > 0 && !dists.some(d => d.id === selectedDistrictId)) {
+        setSelectedDistrictId(dists[0].id);
+      }
+    }
+  }, [selectedRegencyId]);
 
   if (!isOpen) return null;
 
@@ -256,14 +219,14 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
     if (isSubmitting) return;
 
-    if (!fullName || !nik || !email || !phone || !gugusDepan) {
+    if (!fullName || !nik || !email || !phone) {
       alert('Harap lengkapi semua data wajib yang ditandai bintang (*)');
       return;
     }
 
-    // Strict validation for Operator Cabang
+    // Strict validation for Operator Kabupaten/Kota
     if (isRegencyOperator && currentUser?.jurisdictionId && selectedRegencyId !== currentUser.jurisdictionId) {
-      alert(`Peringatan Akses: Anda hanya diizinkan mendaftarkan anggota pada Kwartir Cabang Anda (${currentUser.jurisdictionName}).`);
+      alert(`Peringatan Akses: Anda hanya diizinkan mendaftarkan anggota pada Kabupaten/Kota Anda (${currentUser.jurisdictionName}).`);
       return;
     }
 
@@ -272,7 +235,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     const currentProvince = provinces.find(p => p.id === selectedProvinceId);
     const currentRegency = regencies.find(r => r.id === selectedRegencyId);
     const currentDistrict = districts.find(d => d.id === selectedDistrictId);
-    const currentBranch = branches.find(b => b.id === selectedBranchId);
 
     // Mask NIK for security
     const maskedNik = nik.length >= 10 
@@ -344,10 +306,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         regencyName: currentRegency?.name || 'Kwartir Cabang',
         districtId: selectedDistrictId,
         districtName: currentDistrict?.name || 'Kecamatan',
-        branchId: selectedBranchId || 'branch-default',
-        branchName: currentBranch?.name || `Kwarran ${currentDistrict?.name || 'Pariwisata'}`,
-        
-        gugusDepan,
         joinYear,
         currentPosition: `Calon Anggota ${krida}`,
         krida,
@@ -409,7 +367,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
           </button>
         </div>
 
-        {/* Operator Cabang Isolation Notice */}
+        {/* Operator Kabupaten/Kota Isolation Notice */}
         {isRegencyOperator && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center gap-2.5 text-amber-900 text-xs">
             <Lock className="w-4 h-4 text-amber-700 flex-shrink-0" />
@@ -746,7 +704,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Kecamatan (Kwarran) *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Kecamatan *</label>
                 <select
                   value={selectedDistrictId}
                   onChange={(e) => setSelectedDistrictId(e.target.value)}
@@ -758,22 +716,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                 </select>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Pangkalan Saka / Ranting *</label>
-                <select
-                  value={selectedBranchId}
-                  onChange={(e) => setSelectedBranchId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold text-emerald-900"
-                >
-                  {branches.length > 0 ? (
-                    branches.map((b) => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
-                    ))
-                  ) : (
-                    <option value="">Ranting Umum Kecamatan Terkait</option>
-                  )}
-                </select>
-              </div>
             </div>
           </div>
 
@@ -785,18 +727,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Nama Gugus Depan Asal *</label>
-                <input
-                  type="text"
-                  required
-                  value={gugusDepan}
-                  onChange={(e) => setGugusDepan(e.target.value)}
-                  placeholder="Contoh: Gudep 06.121 SMKN 1 Pariwisata"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                />
-              </div>
-
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Pilihan Krida Utama *</label>
                 <select
