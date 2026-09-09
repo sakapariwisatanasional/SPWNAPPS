@@ -87,7 +87,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       if (currentUser.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId && m.regencyId !== currentUser.jurisdictionId) {
         return false;
       }
-      if (currentUser.role === 'ADMIN_BRANCH' && currentUser.jurisdictionId && m.branchId !== currentUser.jurisdictionId) {
+      if (currentUser.role === 'ADMIN_BRANCH' && currentUser.jurisdictionId && m.districtId !== currentUser.jurisdictionId) {
         return false;
       }
 
@@ -96,8 +96,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       const matchSearch = 
         (m.fullName || '').toLowerCase().includes(q) ||
         (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase().includes(q)) ||
-        (m.gugusDepan || '').toLowerCase().includes(q) ||
-        (m.branchName || '').toLowerCase().includes(q) ||
+        (m.districtName || '').toLowerCase().includes(q) ||
         (m.regencyName || '').toLowerCase().includes(q) ||
         (m.provinceName || '').toLowerCase().includes(q) ||
         (m.operatorJurisdictionName && m.operatorJurisdictionName.toLowerCase().includes(q));
@@ -124,14 +123,13 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
   }, [members, searchQuery, selectedStatus, selectedProvinceId, selectedKrida, currentUser]);
 
   const handleExportCSV = () => {
-    const headers = ['Nomor Anggota', 'Nama Lengkap', 'Provinsi', 'Kabupaten/Kota', 'Ranting', 'Gudep', 'Krida', 'Status', 'Terdaftar'];
+    const headers = ['Nomor Anggota', 'Nama Lengkap', 'Provinsi', 'Kabupaten/Kota', 'Kecamatan', 'Krida', 'Status', 'Terdaftar'];
     const rows = filteredMembers.map(m => [
       m.nationalMemberNumber || '-',
       `"${m.fullName}"`,
       `"${m.provinceName}"`,
       `"${m.regencyName}"`,
-      `"${m.branchName}"`,
-      `"${m.gugusDepan}"`,
+      `"${m.districtName}"`,
       `"${m.krida || '-'}"`,
       m.status,
       new Date(m.registeredAt).toLocaleDateString('id-ID')
@@ -218,7 +216,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama, No KTA, gudep..."
+              placeholder="Cari nama, No KTA, wilayah..."
               className="bg-transparent outline-none w-full text-slate-800"
             />
           </div>
@@ -296,7 +294,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 <th className="py-3.5 px-4">Identitas Anggota</th>
                 <th className="py-3.5 px-4">No. Anggota Nasional</th>
                 <th className="py-3.5 px-4">Wilayah & Kwartir</th>
-                <th className="py-3.5 px-4">Krida & Gudep</th>
+                <th className="py-3.5 px-4">Krida</th>
                 <th className="py-3.5 px-4">Status</th>
                 <th className="py-3.5 px-4 text-right">Aksi & Administrasi</th>
               </tr>
@@ -347,7 +345,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             {m.isOperator && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300 font-extrabold text-[9px] shadow-xs">
                                 <ShieldCheck className="w-3 h-3 text-purple-700" />
-                                <span>{m.operatorRole === 'ADMIN_REGENCY' ? 'Kwarcab' : m.operatorRole === 'ADMIN_PROVINCE' ? 'Kwarda' : 'Kwarran'}</span>
+                                <span>{m.operatorRole === 'ADMIN_REGENCY' ? 'Kwarcab' : m.operatorRole === 'ADMIN_PROVINCE' ? 'Kwarda' : 'Kecamatan'}</span>
                               </span>
                             )}
                           </div>
@@ -374,14 +372,14 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                     {/* Territory */}
                     <td className="py-3.5 px-4">
                       <p className="font-bold text-slate-800 truncate max-w-[160px]">{m.regencyName}</p>
-                      <p className="text-[10px] text-emerald-700 font-medium truncate">{m.branchName}</p>
+                      <p className="text-[10px] text-emerald-700 font-medium truncate">{m.districtName}</p>
                       <p className="text-[10px] text-slate-400 truncate">{m.provinceName}</p>
                     </td>
 
-                    {/* Krida & Gudep */}
+                    {/* Krida */}
                     <td className="py-3.5 px-4">
                       <p className="font-semibold text-slate-800 truncate">{m.krida || 'Pramuka Saka'}</p>
-                      <p className="text-[10px] text-slate-500 truncate">{m.gugusDepan}</p>
+                      <p className="text-[10px] text-slate-500 truncate"></p>
                     </td>
 
                     {/* Status Badge */}
@@ -737,7 +735,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                   <p className="text-[11px] text-purple-700 font-mono font-semibold">
                     {memberToDelete.nationalMemberNumber || 'Belum ada NTA'}
                   </p>
-                  <p className="text-slate-500">{memberToDelete.branchName}, {memberToDelete.regencyName}</p>
+                  <p className="text-slate-500">{memberToDelete.districtName}, {memberToDelete.regencyName}</p>
                 </div>
               </div>
               <p className="text-slate-600 pt-1 border-t border-slate-200 text-[11px]">
