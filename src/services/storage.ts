@@ -76,13 +76,74 @@ const STORAGE_KEYS = {
  * DEFAULT_KTA_SETTINGS
  */
 export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
+  preset: 'CR80_KTA',
+  widthMm: 85.60,
+  heightMm: 53.98,
+  cornerRadiusMm: 3.18,
+  cardTheme: 'purple_saka',
+  bgImageUrl: '',
+  frontBackgroundUrl: '',
+  backBackgroundUrl: '',
+  customBackgroundColorFront: '#24105b',
+  customBackgroundColorBack: '#111827',
+  bgOpacity: 0.10,
+  frontLogoUrl: '',
+  backLogoUrl: '',
+  logos: [],
+  dataFields: [],
+  textElements: [],
+  frontOrganizationTitle: 'SAKA PARIWISATA',
+  frontOrganizationSubtitle: 'GERAKAN PRAMUKA INDONESIA',
+  frontOrganizationTitleX: 15,
+  frontOrganizationTitleY: 6,
+  frontOrganizationTitleWidth: 65,
+  frontOrganizationTitleFontSize: 11,
+  frontOrganizationTitleFontWeight: 'bold',
+  frontOrganizationTitleColor: '#ffffff',
+  frontOrganizationTitleAlign: 'left',
+  frontOrganizationSubtitleX: 15,
+  frontOrganizationSubtitleY: 12,
+  frontOrganizationSubtitleWidth: 70,
+  frontOrganizationSubtitleFontSize: 8,
+  frontOrganizationSubtitleFontWeight: 'normal',
+  frontOrganizationSubtitleColor: '#e5e7eb',
+  frontOrganizationSubtitleAlign: 'left',
+  frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota',
+  watermarkOpacity: 0.10,
+  showKridaBadge: true,
+  showPhoto: true,
+  showQrCode: false,
+  qrX: 78,
+  qrY: 30,
+  qrSize: 22,
+  backHeaderTitle: 'KARTU TANDA ANGGOTA',
+  backHeaderSubtitle: 'SAKA PARIWISATA — KWARTIR NASIONAL',
+  terms: [],
   issueLocationDate: 'Jakarta, 14 Agustus 2026',
+  barcodeType: 'CODE128',
+  barcodeCustomValue: '',
+  showBarcode: true,
+  barcodeX: 68,
+  barcodeY: 70,
+  barcodeWidth: 27,
+  barcodeHeight: 9,
+  barcodeShowText: false,
   signerName: 'Reza Pahlevi',
   signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
-  barcodeCustomValue: '',
-  frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota',
-  bgOpacity: 0.10,
-  bgImageUrl: ''
+  signerSubtitle: '',
+  showStamp: false
+};
+
+const normalizeKtaSettings = (value?: Partial<KtaCardSettings> | null): KtaCardSettings => {
+  const source = value && typeof value === 'object' ? value : {};
+  const merged = { ...DEFAULT_KTA_SETTINGS, ...source } as KtaCardSettings;
+  return {
+    ...merged,
+    logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
+    dataFields: Array.isArray((merged as any).dataFields) ? (merged as any).dataFields : [],
+    textElements: Array.isArray((merged as any).textElements) ? (merged as any).textElements : [],
+    terms: Array.isArray((merged as any).terms) ? (merged as any).terms : []
+  };
 };
 
 class StorageService {
@@ -108,7 +169,7 @@ class StorageService {
       if (!localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS)) {
         localStorage.setItem(
           STORAGE_KEYS.KTA_SETTINGS,
-          JSON.stringify(DEFAULT_KTA_SETTINGS)
+          JSON.stringify(normalizeKtaSettings(DEFAULT_KTA_SETTINGS))
         );
       }
     } catch (error) {
@@ -846,7 +907,7 @@ class StorageService {
 
   public getKtaSettings(): KtaCardSettings {
     if (typeof window === 'undefined') {
-      return DEFAULT_KTA_SETTINGS;
+      return normalizeKtaSettings(DEFAULT_KTA_SETTINGS);
     }
 
     try {
@@ -857,21 +918,7 @@ class StorageService {
       if (data) {
         const parsedData = JSON.parse(data);
 
-        const merged: KtaCardSettings = {
-          ...DEFAULT_KTA_SETTINGS,
-          ...(parsedData && typeof parsedData === 'object' ? parsedData : {})
-        };
-
-        // Data KTA lama/parsial dari localStorage tidak boleh mengembalikan
-        // collection sebagai undefined/null karena komponen kartu melakukan
-        // filter/map terhadap collection tersebut.
-        return {
-          ...merged,
-          logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
-          dataFields: Array.isArray((merged as any).dataFields) ? (merged as any).dataFields : [],
-          textElements: Array.isArray((merged as any).textElements) ? (merged as any).textElements : [],
-          terms: Array.isArray((merged as any).terms) ? (merged as any).terms : []
-        };
+        return normalizeKtaSettings(parsedData);
       }
     } catch (error) {
       console.error(
@@ -880,7 +927,7 @@ class StorageService {
       );
     }
 
-    return DEFAULT_KTA_SETTINGS;
+    return normalizeKtaSettings(DEFAULT_KTA_SETTINGS);
   }
 
   public saveKtaSettings(
@@ -891,18 +938,7 @@ class StorageService {
     }
 
     try {
-      const merged: KtaCardSettings = {
-        ...DEFAULT_KTA_SETTINGS,
-        ...(settings && typeof settings === 'object' ? settings : {})
-      };
-
-      const updatedSettings: KtaCardSettings = {
-        ...merged,
-        logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
-        dataFields: Array.isArray((merged as any).dataFields) ? (merged as any).dataFields : [],
-        textElements: Array.isArray((merged as any).textElements) ? (merged as any).textElements : [],
-        terms: Array.isArray((merged as any).terms) ? (merged as any).terms : []
-      };
+      const updatedSettings: KtaCardSettings = normalizeKtaSettings(settings);
 
       localStorage.setItem(
         STORAGE_KEYS.KTA_SETTINGS,
