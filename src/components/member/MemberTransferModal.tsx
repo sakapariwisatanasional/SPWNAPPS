@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ArrowRightLeft, MapPin, ShieldAlert, CheckCircle2 } from 'lucide-react';
-import { Member, Province, Regency, District, Branch, CurrentUser } from '../../types';
+import { Member, Province, Regency, District, CurrentUser } from '../../types';
 import { storage } from '../../services/storage';
 
 interface MemberTransferModalProps {
@@ -19,12 +19,10 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [regencies, setRegencies] = useState<Regency[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
 
   const [targetProvinceId, setTargetProvinceId] = useState('32');
   const [targetRegencyId, setTargetRegencyId] = useState('32.01');
   const [targetDistrictId, setTargetDistrictId] = useState('32.01.24');
-  const [targetBranchId, setTargetBranchId] = useState('branch-32-01-24');
   const [reason, setReason] = useState('');
 
   useEffect(() => {
@@ -47,14 +45,7 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
     }
   }, [targetRegencyId]);
 
-  useEffect(() => {
-    if (targetDistrictId) {
-      const brs = storage.getBranches(targetDistrictId);
-      setBranches(brs);
-      if (brs.length > 0) setTargetBranchId(brs[0].id);
-      else setTargetBranchId('');
-    }
-  }, [targetDistrictId]);
+
 
   if (!member) return null;
 
@@ -68,22 +59,11 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
     const p = provinces.find(x => x.id === targetProvinceId);
     const r = regencies.find(x => x.id === targetRegencyId);
     const d = districts.find(x => x.id === targetDistrictId);
-    const b = branches.find(x => x.id === targetBranchId) || {
-      id: `branch-auto-${Date.now()}`,
-      name: `Kwarran ${d?.name || 'Wilayah Baru'}`,
-      code: '01',
-      districtId: targetDistrictId,
-      regencyId: targetRegencyId,
-      provinceId: targetProvinceId,
-      address: 'Wilayah Kwartir',
-      contactPerson: 'Pengurus Kwarran',
-      phone: '-'
-    };
+
 
     if (p && r && d) {
       storage.transferMemberLocation(
         member.id,
-        b,
         d,
         r,
         p,
@@ -123,7 +103,7 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
             <p className="text-sm font-bold text-slate-900 mt-0.5">{member.fullName}</p>
             <p className="font-mono text-emerald-700 font-bold">{member.nationalMemberNumber}</p>
             <p className="text-slate-600 mt-1">
-              <span className="font-medium">Lokasi Asal:</span> {member.branchName}, {member.regencyName}, {member.provinceName}
+              <span className="font-medium">Lokasi Asal:</span> {member.districtName}, {member.regencyName}, {member.provinceName}
             </p>
           </div>
 
@@ -174,18 +154,6 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
                 </select>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Pangkalan Ranting Baru *</label>
-                <select
-                  value={targetBranchId}
-                  onChange={(e) => setTargetBranchId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none font-bold text-emerald-900"
-                >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-              </div>
             </div>
 
             <div>
