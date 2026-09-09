@@ -1,4 +1,4 @@
-import { Province, Regency, District, Branch } from '../types';
+import { Province, Regency, District } from '../types';
 import { ALL_INDONESIA_DISTRICTS_MAP, getDistrictsForRegency } from './allDistrictsData';
 
 export const PROVINCES_DATA: Province[] = [
@@ -644,96 +644,5 @@ export const DISTRICTS_DATA: District[] = Object.keys(ALL_INDONESIA_DISTRICTS_MA
     name: d.name
   }))
 );
-
-export const BRANCHES_DATA: Branch[] = [
-  {
-    id: 'branch-00-00-00',
-    districtId: '00.00.00',
-    regencyId: '00.00',
-    provinceId: '00',
-    code: '00',
-    name: 'Pimpinan Saka Pariwisata Tingkat Nasional',
-    address: 'Kwartir Nasional Gerakan Pramuka, Jl. Medan Merdeka Timur No.6, Gambir, Jakarta Pusat',
-    contactPerson: 'Pimpinan Saka Nasional',
-    phone: '021-3507647'
-  },
-  {
-    id: 'branch-32-06-36',
-    districtId: '32.06.36',
-    regencyId: '32.06',
-    provinceId: '32',
-    code: '01',
-    name: 'Saka Pariwisata Kwarran Ciawi',
-    address: 'Jl. Raya Ciawi No. 45, Tasikmalaya Utara',
-    contactPerson: 'Kak Hendra Purnama, S.Par.',
-    phone: '0812-3456-7890'
-  },
-  {
-    id: 'branch-32-01-24',
-    districtId: '32.01.24',
-    regencyId: '32.01',
-    provinceId: '32',
-    code: '01',
-    name: 'Saka Pariwisata Kwarran Cisarua',
-    address: 'Jl. Raya Puncak KM 78, Bogor',
-    contactPerson: 'Kak Ridwan Hakim',
-    phone: '0813-9876-5432'
-  },
-  {
-    id: 'branch-32-73-02',
-    districtId: '32.73.02',
-    regencyId: '32.73',
-    provinceId: '32',
-    code: '01',
-    name: 'Saka Pariwisata Kwarran Coblong',
-    address: 'Jl. Ir. H. Juanda No. 120, Bandung',
-    contactPerson: 'Kak Nanda Pradita, M.Sc.',
-    phone: '0821-4433-2211'
-  },
-  {
-    id: 'branch-51-71-01',
-    districtId: '51.71.01',
-    regencyId: '51.71',
-    provinceId: '51',
-    code: '01',
-    name: 'Saka Pariwisata Kwarran Denpasar Selatan',
-    address: 'Jl. Hang Tuah No. 18, Sanur, Denpasar',
-    contactPerson: 'Kak I Wayan Sudarsana',
-    phone: '0819-8765-4321'
-  },
-  {
-    id: 'branch-35-10-24',
-    districtId: '35.10.24',
-    regencyId: '35.10',
-    provinceId: '35',
-    code: '01',
-    name: 'Saka Pariwisata Kwarran Licin Ijen',
-    address: 'Jl. Raya Kawah Ijen, Banyuwangi',
-    contactPerson: 'Kak Bagus Triyanto',
-    phone: '0852-3344-5566'
-  },
-  {
-    id: 'branch-64-03-05',
-    districtId: '64.03.05',
-    regencyId: '64.03',
-    provinceId: '64',
-    code: '01',
-    name: 'Saka Pariwisata Kwarran Kepulauan Derawan',
-    address: 'Pulau Derawan, Kab. Berau, Kaltim',
-    contactPerson: 'Kak Muhammad Syahrizal',
-    phone: '0812-5566-7788'
-  },
-  {
-    id: 'branch-96-04-11',
-    districtId: '96.04.11',
-    regencyId: '96.04',
-    provinceId: '96',
-    code: '01',
-    name: 'Saka Pariwisata Kwarran Raja Ampat (Meos Mansar)',
-    address: 'Waisai - Meos Mansar, Raja Ampat',
-    contactPerson: 'Kak Agustinus Mandacan',
-    phone: '0821-9988-7766'
-  }
-];
 
 export { getDistrictsForRegency };
