@@ -205,9 +205,9 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       setAvatarUrl(member.avatarUrl || '');
       setCustomPhotoUrl(member.avatarUrl?.startsWith('http') ? member.avatarUrl : '');
 
-      setSelectedProvinceId(member.provinceId || '32');
-      setSelectedRegencyId(member.regencyId || '32.06');
-      setSelectedDistrictId(member.districtId || '32.06.12');
+      setSelectedProvinceId(member.provinceId || '00');
+      setSelectedRegencyId(member.regencyId || '00.00');
+      setSelectedDistrictId(member.districtId || '00.00.00');
       setKrida(member.krida || 'Krida Pemandu');
       setCurrentPosition(member.currentPosition || 'Anggota Krida Pemandu');
       setJoinYear(member.joinYear || 2024);
