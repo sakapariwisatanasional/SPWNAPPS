@@ -29,8 +29,20 @@ const PRESETS: Record<KtaCardPreset, { label:string; width:number; height:number
 
 const clone = <T,>(v:T):T => JSON.parse(JSON.stringify(v));
 
+// Konfigurasi KTA lama/hasil sinkronisasi spreadsheet dapat berupa object parsial.
+// Normalisasi collection wajib dilakukan SEBELUM useMemo dijalankan karena modal
+// tetap dirender oleh App walaupun isOpen=false.
+const normalizeKtaSettings = (value: KtaCardSettings): KtaCardSettings => ({
+  ...clone(DEFAULT_KTA_SETTINGS),
+  ...value,
+  dataFields: Array.isArray((value as any)?.dataFields) ? (value as any).dataFields : [],
+  textElements: Array.isArray((value as any)?.textElements) ? (value as any).textElements : [],
+  logos: Array.isArray((value as any)?.logos) ? (value as any).logos : [],
+  terms: Array.isArray((value as any)?.terms) ? (value as any).terms : [],
+});
+
 export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
-  const [settings, setSettings] = useState<KtaCardSettings>(clone(DEFAULT_KTA_SETTINGS));
+  const [settings, setSettings] = useState<KtaCardSettings>(() => normalizeKtaSettings(DEFAULT_KTA_SETTINGS));
   const [side, setSide] = useState<KtaCardSide>('FRONT');
   const [isSaving, setIsSaving] = useState(false);
   const [loadingRemote, setLoadingRemote] = useState(false);
@@ -53,17 +65,21 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
 
   useEffect(() => {
     if (!isOpen) return;
-    setSettings(clone(storage.getKtaSettings()));
+    setSettings(normalizeKtaSettings(storage.getKtaSettings()));
     setMessage('');
     setLoadingRemote(true);
     spreadsheetService.refreshKtaSettings().then(remote => {
-      if (remote) setSettings(clone(remote));
+      if (remote) setSettings(normalizeKtaSettings(remote));
     }).finally(() => setLoadingRemote(false));
   }, [isOpen]);
 
-  const sideFields = useMemo(() => settings.dataFields.filter(f => f.side === side), [settings.dataFields, side]);
-  const sideTexts = useMemo(() => settings.textElements.filter(t => t.side === side), [settings.textElements, side]);
-  const sideLogos = useMemo(() => settings.logos.filter(l => l.side === side), [settings.logos, side]);
+  const safeDataFields = Array.isArray(settings?.dataFields) ? settings.dataFields : [];
+  const safeTextElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
+  const safeLogos = Array.isArray(settings?.logos) ? settings.logos : [];
+
+  const sideFields = useMemo(() => safeDataFields.filter(f => f.side === side), [safeDataFields, side]);
+  const sideTexts = useMemo(() => safeTextElements.filter(t => t.side === side), [safeTextElements, side]);
+  const sideLogos = useMemo(() => safeLogos.filter(l => l.side === side), [safeLogos, side]);
 
   if (!isOpen) return null;
 
@@ -107,7 +123,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
     setIsSaving(false);
   };
 
-  const handleReset = () => { if(confirm('Reset seluruh desain KTA ke standar nasional?')) setSettings(clone(DEFAULT_KTA_SETTINGS)); };
+  const handleReset = () => { if(confirm('Reset seluruh desain KTA ke standar nasional?')) setSettings(normalizeKtaSettings(DEFAULT_KTA_SETTINGS)); };
   const handleGenerateByRegion = () => {
     if(!regionProvinceId) return alert('Pilih provinsi terlebih dahulu.');
     if(!confirm('Generate NTA untuk anggota yang belum memiliki nomor? Nomor yang sudah ada tidak diubah.')) return;
