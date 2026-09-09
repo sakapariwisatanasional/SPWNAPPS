@@ -30,7 +30,6 @@ export interface SpreadsheetRowMember {
   provinsi?: string;
   kabupaten?: string;
   kecamatan_ranting?: string;
-  gudep?: string;
   krida?: string;
   tingkat_skk?: string;
   status?: string;
@@ -677,15 +676,10 @@ class SpreadsheetService {
           
           const territory = this.resolveTerritory(rawProv, rawReg);
 
-          const branch = this.getRowValue(row, [
+          const rawDistrict = this.getRowValue(row, [
             'Kwartir Ranting (Kecamatan)', 'Kwartir Ranting', 'Kwarran', 'Kwarran/Kecamatan',
             'kecamatan_ranting', 'Kecamatan', 'Ranting', 'col_5'
-          ]) || 'Ranting Saka';
-          
-          const gudep = this.getRowValue(row, [
-            'Gugus Depan / Pangkalan', 'Gugus Depan', 'Gudep', 'gudep', 'Pangkalan',
-            'Sekolah / Pangkalan', 'Gugusdepan', 'col_6'
-          ]) || 'Gudep Saka Pariwisata';
+          ]) || '';
           
           const kridaRaw = this.getRowValue(row, [
             'Peminatan Krida Saka Pariwisata', 'Pilihan Krida', 'Krida Saka', 'Krida',
@@ -767,16 +761,13 @@ class SpreadsheetService {
             birthDate: '2000-01-01',
             email,
             phone,
-            address: `${branch}, ${territory.regencyName}, ${territory.provinceName}`,
+            address: `${rawDistrict || territory.regencyName}, ${territory.regencyName}, ${territory.provinceName}`,
             provinceId: territory.provinceId,
             provinceName: territory.provinceName,
             regencyId: territory.regencyId,
             regencyName: territory.regencyName,
             districtId: `${territory.regencyId}.01`,
-            districtName: branch,
-            branchId: `branch-${idx + 1}`,
-            branchName: branch,
-            gugusDepan: gudep,
+            districtName: rawDistrict || territory.regencyName,
             currentPosition: role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
             krida,
             joinYear: new Date().getFullYear(),
@@ -788,7 +779,7 @@ class SpreadsheetService {
             verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
             isOperator: role !== 'MEMBER',
             operatorRole: role !== 'MEMBER' ? role : undefined,
-            operatorJurisdictionName: role === 'SUPER_ADMIN' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? branch : undefined,
+            operatorJurisdictionName: role === 'SUPER_ADMIN' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? (rawDistrict || territory.regencyName) : undefined,
             skills: memberSkills,
             certifications: memberCerts,
             locationHistory: []
@@ -848,7 +839,7 @@ class SpreadsheetService {
               email: newM.email,
               name: newM.fullName,
               role: parsedRole,
-              jurisdictionName: parsedRole === 'SUPER_ADMIN' ? 'Kwartir Nasional' : `${newM.branchName}, ${newM.regencyName}`,
+              jurisdictionName: parsedRole === 'SUPER_ADMIN' ? 'Kwartir Nasional' : `${newM.districtName}, ${newM.regencyName}`,
               jurisdictionId: newM.regencyId,
               avatarUrl: newM.avatarUrl,
               memberId: newM.id
@@ -867,7 +858,7 @@ class SpreadsheetService {
               storage.addNotification(
                 'user-superadmin-rohadi',
                 `Pendaftaran Anggota Baru (${nm.krida})`,
-                `Kak ${nm.fullName} (${nm.branchName || 'Kwarran'}, ${nm.regencyName}) baru saja mendaftar online. Data langsung sinkron secara real-time.`,
+                `Kak ${nm.fullName} (${nm.districtName || 'Kecamatan'}, ${nm.regencyName}) baru saja mendaftar online. Data langsung sinkron secara real-time.`,
                 'SUCCESS',
                 '/members'
               );
@@ -1292,8 +1283,7 @@ class SpreadsheetService {
       member.phone || '',
       member.provinceName || '',
       member.regencyName || '',
-      member.branchName || '',
-      member.gugusDepan || '',
+      member.districtName || '',
       member.krida || '',
       member.status || 'PENDING',
       member.avatarUrl || '',
@@ -1575,8 +1565,7 @@ class SpreadsheetService {
           m.phone,
           m.provinceName,
           m.regencyName,
-          m.branchName,
-          m.gugusDepan,
+          m.districtName,
           m.krida || '',
           m.status,
           m.avatarUrl,
@@ -2037,7 +2026,7 @@ function doPost(e) {
       // Tulis / Update (Upsert) ke masing-masing Sheet
       syncSheetData(ss, "Anggota", [
         "ID", "Nomor KTA", "Nama Lengkap", "Email", "Nomor WA", "Provinsi", "Kabupaten/Kota", 
-        "Kwarran/Kecamatan", "Gudep", "Krida", "Status", "Foto URL", "Tanggal Daftar", "Link Verifikasi"
+        "Kecamatan", "Krida", "Status", "Foto URL", "Tanggal Daftar", "Link Verifikasi"
       ], processedMembers);
 
       syncSheetData(ss, "Paket_Wisata", [
