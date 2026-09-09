@@ -29,7 +29,7 @@ export const NationalMapVisual: React.FC<NationalMapVisualProps> = ({
       const provName = m.provinceName ? m.provinceName.toLowerCase().trim() : '';
 
       // Cocokkan ke daftar 38 provinsi resmi
-      const matchedProv = provinces.find((p) => 
+      const matchedProv = safeProvinces.find((p) => 
         (provId && p.id === provId) ||
         (provName && p.name.toLowerCase().trim() === provName) ||
         (provName && (p.name.toLowerCase().includes(provName) || provName.includes(p.name.toLowerCase())))
