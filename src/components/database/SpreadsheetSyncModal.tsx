@@ -192,7 +192,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
 
   const handleDownloadCsv = () => {
     const members = storage.getMembers();
-    const headers = ['ID', 'Nomor Anggota', 'Nama Lengkap', 'NIK', 'Email', 'No WA', 'Provinsi', 'Kabupaten/Kota', 'Kecamatan/Kwarran', 'Gudep', 'Krida', 'Status', 'Tanggal Daftar', 'Foto URL'];
+    const headers = ['ID', 'Nomor Anggota', 'Nama Lengkap', 'NIK', 'Email', 'No WA', 'Provinsi', 'Kabupaten/Kota', 'Kecamatan', 'Krida', 'Status', 'Tanggal Daftar', 'Foto URL'];
     const rows = members.map(m => [
       m.id,
       m.nationalMemberNumber || '',
@@ -202,8 +202,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
       m.phone,
       `"${m.provinceName}"`,
       `"${m.regencyName}"`,
-      `"${m.branchName}"`,
-      `"${m.gugusDepan}"`,
+      `"${m.districtName}"`,
       `"${m.krida || ''}"`,
       m.status,
       m.registeredAt,
