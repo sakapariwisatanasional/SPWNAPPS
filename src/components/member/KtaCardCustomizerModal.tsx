@@ -30,11 +30,8 @@ const PRESETS: Record<KtaCardPreset, { label:string; width:number; height:number
 const clone = <T,>(v:T):T => JSON.parse(JSON.stringify(v));
 
 const normalizeKtaSettings = (value?: Partial<KtaCardSettings> | null): KtaCardSettings => {
-  const merged = {
-    ...clone(DEFAULT_KTA_SETTINGS),
-    ...(value && typeof value === 'object' ? value : {})
-  } as KtaCardSettings;
-
+  const source = value && typeof value === 'object' ? value : {};
+  const merged = { ...DEFAULT_KTA_SETTINGS, ...source } as KtaCardSettings;
   return {
     ...merged,
     logos: Array.isArray((merged as any).logos) ? (merged as any).logos : [],
