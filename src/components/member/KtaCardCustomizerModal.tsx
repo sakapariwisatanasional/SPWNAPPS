@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X, Sliders, Check, Save, RotateCcw, Sparkles, Upload, Plus, Trash2,
   LayoutTemplate, Type, Image as ImageIcon, Eye, MapPin, RefreshCw
@@ -83,9 +83,9 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
   const textElements = Array.isArray(settings?.textElements) ? settings.textElements : [];
   const logos = Array.isArray(settings?.logos) ? settings.logos : [];
 
-  const sideFields = useMemo(() => dataFields.filter(f => f.side === side), [dataFields, side]);
-  const sideTexts = useMemo(() => textElements.filter(t => t.side === side), [textElements, side]);
-  const sideLogos = useMemo(() => logos.filter(l => l.side === side), [logos, side]);
+  const sideFields = dataFields.filter(f => f.side === side);
+  const sideTexts = textElements.filter(t => t.side === side);
+  const sideLogos = logos.filter(l => l.side === side);
 
   if (!isOpen) return null;
 
