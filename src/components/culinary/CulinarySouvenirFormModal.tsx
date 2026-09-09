@@ -102,8 +102,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
   // Territory Selection
   const [provinceId, setProvinceId] = useState('32'); // Default Jawa Barat
   const [regencyId, setRegencyId] = useState('32.06'); // Default Kab. Tasikmalaya
-  const [districtId, setDistrictId] = useState('32.06.01'); // Default Kwarran Ciawi
-  const [gudepOrPangkalan, setGudepOrPangkalan] = useState('');
+  const [districtId, setDistrictId] = useState('32.06.01'); // Default kecamatan
 
   // Available Regencies & Districts
   const [availableRegencies, setAvailableRegencies] = useState<Regency[]>([]);
@@ -131,7 +130,6 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       setProvinceId(editItem.provinceId || '32');
       setRegencyId(editItem.regencyId || '32.06');
       setDistrictId(editItem.districtId || '32.06.01');
-      setGudepOrPangkalan(editItem.gudepOrPangkalan || '');
     } else {
       const memberKrida = currentMember?.krida || 'Krida Kuliner & Cinderamata';
       setSelectedKrida(memberKrida);
@@ -186,7 +184,6 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       setProvinceId(initProv);
       setRegencyId(initReg);
       setDistrictId(initDist);
-      setGudepOrPangkalan(currentMember?.gugusDepan || `Pangkalan Saka Pariwisata ${currentMember?.branchName || 'Kwarran Ciawi'}`);
     }
   }, [isOpen, editItem, currentMember, currentUser]);
 
@@ -256,8 +253,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       regencyId,
       regencyName: currentRegObj?.name || 'Kabupaten Tasikmalaya',
       districtId,
-      districtName: currentDistObj ? `Kwarran ${currentDistObj.name}` : (currentMember?.branchName || 'Kwarran Ciawi'),
-      gudepOrPangkalan: gudepOrPangkalan.trim() || undefined,
+      districtName: currentDistObj?.name || currentMember?.districtName || 'Kecamatan',
       authorMemberId: currentMember?.id || currentUser.memberId || currentUser.id,
       authorName: currentMember?.fullName || currentUser.name,
       authorNta: currentMember?.nationalMemberNumber || '00.00.00.000001',
@@ -491,29 +487,19 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Kwarran (Kecamatan)</label>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Kecamatan</label>
                 <select
                   value={districtId}
                   onChange={(e) => setDistrictId(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none"
                 >
                   {availableDistricts.map(d => (
-                    <option key={d.id} value={d.id}>Kwarran {d.name}</option>
+                    <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-1">Pangkalan / Gugus Depan Penginput</label>
-              <input
-                type="text"
-                value={gudepOrPangkalan}
-                onChange={(e) => setGudepOrPangkalan(e.target.value)}
-                placeholder="Contoh: Pangkalan Saka Pariwisata Kwarran Ciawi"
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none"
-              />
-            </div>
           </div>
 
           {/* 4. Foto Produk & Preset Cepat */}
@@ -612,7 +598,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
                 <Store className="w-3.5 h-3.5 text-slate-500" />
-                <span>Nama Sentra UMKM / Pangkalan Saka / Brand</span>
+                <span>Nama Sentra UMKM / Sentra UMKM / Brand</span>
               </label>
               <input
                 type="text"
