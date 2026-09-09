@@ -745,7 +745,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                     Jabatan: {searchedMember.currentPosition || 'Anggota Saka Pariwisata'}
                   </p>
                   <p className="text-xs text-slate-600">
-                    Pangkalan: <strong className="text-slate-800">{searchedMember.branchName}</strong>
+                    Kecamatan: <strong className="text-slate-800">{searchedMember.districtName}</strong>
                   </p>
                   <p className="text-xs text-slate-500">
                     {searchedMember.provinceId === '00' || searchedMember.provinceName?.toLowerCase().includes('nasional')
