@@ -297,7 +297,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {currentUser.role === 'SUPER_ADMIN' ? 'Super Admin' :
                    currentUser.role === 'ADMIN_PROVINCE' ? 'Kwarda' :
                    currentUser.role === 'ADMIN_REGENCY' ? 'Kwarcab' :
-                   currentUser.role === 'ADMIN_BRANCH' ? 'Kwarran' : 'Anggota'}
+                   currentUser.role === 'ADMIN_BRANCH' ? 'Kecamatan' : 'Anggota'}
                 </span>
               </div>
               <ChevronDown className="w-3 h-3 text-purple-600 flex-shrink-0" />
