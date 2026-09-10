@@ -2012,6 +2012,44 @@ function getActiveOrConfiguredSpreadsheet() {
   return ss;
 }
 
+
+/**
+ * KTA SETTINGS — satu sumber desain untuk seluruh anggota.
+ * Sheet: KTA_Settings
+ * A1=SETTINGS_JSON, B1=UPDATED_AT, C1=UPDATED_BY
+ */
+function getKtaSettingsSheet_() {
+  var ss = getActiveOrConfiguredSpreadsheet();
+  if (!ss) throw new Error('Spreadsheet tidak dapat dibuka.');
+  var sheet = ss.getSheetByName('KTA_Settings');
+  if (!sheet) {
+    sheet = ss.insertSheet('KTA_Settings');
+    sheet.getRange(1,1,1,3).setValues([["SETTINGS_JSON","UPDATED_AT","UPDATED_BY"]]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getKtaSettingsPayload_() {
+  var sheet = getKtaSettingsSheet_();
+  var row = sheet.getRange(2,1,1,3).getValues()[0];
+  var raw = row[0] ? String(row[0]) : '';
+  var settings = null;
+  if (raw) {
+    try { settings = JSON.parse(raw); } catch (err) { settings = null; }
+  }
+  return { status:'success', success:true, action:'GET_KTA_SETTINGS', settings:settings, updatedAt:row[1] ? String(row[1]) : null, updatedBy:row[2] ? String(row[2]) : null };
+}
+
+function saveKtaSettings_(settings, updatedBy) {
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) throw new Error('Pengaturan KTA tidak valid.');
+  var sheet = getKtaSettingsSheet_();
+  var now = new Date();
+  sheet.getRange(2,1,1,3).setValues([[JSON.stringify(settings), now, String(updatedBy || 'Super Admin')]]);
+  sheet.getRange(2,2).setNumberFormat('yyyy-mm-dd hh:mm:ss');
+  return { status:'success', success:true, action:'UPSERT_KTA_SETTINGS', settings:settings, updatedAt:now.toISOString(), updatedBy:String(updatedBy || 'Super Admin'), message:'Pengaturan KTA tersimpan di Google Spreadsheet dan menjadi desain pusat seluruh anggota.' };
+}
+
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "";
 
@@ -2030,6 +2068,13 @@ function doGet(e) {
       "<p><a class='btn' href='https://drive.google.com/drive/folders/16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh' target='_blank'>📂 Buka Folder di Google Drive</a></p>" +
       "<p style='font-size:12px;color:#64748b;margin-top:20px'>Anda sekarang dapat kembali ke aplikasi Saka Pariwisata dan mulai sinkronisasi data.</p></div></body></html>";
     return HtmlService.createHtmlOutput(htmlOutput);
+  }
+
+  // 1B. KTA DESIGN SETTINGS — CENTRAL SOURCE OF TRUTH
+  // Desain yang dipublikasikan Super Admin disimpan di sheet KTA_Settings.
+  if (action === "GET_KTA_SETTINGS") {
+    return ContentService.createTextOutput(JSON.stringify(getKtaSettingsPayload_()))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 
   // 2. Baca data Spreadsheet
@@ -2080,6 +2125,18 @@ function doPost(e) {
       body = JSON.parse(e.postData.contents);
     } catch (parseErr) {
       body = e.parameter || {};
+    }
+
+    // KTA_SETTINGS boleh dibaca/ditulis oleh aplikasi melalui endpoint terpusat.
+    if (body.action === "GET_KTA_SETTINGS") {
+      return ContentService.createTextOutput(JSON.stringify(getKtaSettingsPayload_()))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (body.action === "UPSERT_KTA_SETTINGS") {
+      var savedKta = saveKtaSettings_(body.settings, body.updatedBy || "Super Admin");
+      return ContentService.createTextOutput(JSON.stringify(savedKta))
+        .setMimeType(ContentService.MimeType.JSON);
     }
 
     var ss = getActiveOrConfiguredSpreadsheet();
