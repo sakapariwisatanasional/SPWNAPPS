@@ -175,36 +175,19 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Icon-first visitor controls: ringkas di desktop dan tidak memenuhi layar HP. */}
+        <div className="flex items-center gap-1.5">
           {currentUser && currentUser.role !== 'PUBLIC' ? (
-            <button
-              type="button"
-              onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-950/40 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <LayoutDashboard className="w-3.5 h-3.5 text-amber-300" />
-              <span>Panel {currentUser.role === 'MEMBER' ? 'KTA Anggota' : 'Dashboard'} ({currentUser.name.split(' ')[0]})</span>
-              <ChevronRight className="w-3.5 h-3.5" />
+            <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} title={currentUser.role === 'MEMBER' ? 'Buka KTA Anggota' : 'Buka Dashboard'} aria-label="Buka dashboard" className="w-10 h-10 rounded-xl bg-purple-600/90 hover:bg-purple-500 text-white border border-purple-400/30 flex items-center justify-center transition-all">
+              <LayoutDashboard className="w-4 h-4" />
             </button>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={onOpenLoginModal}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Lock className="w-3.5 h-3.5 text-purple-400" />
-                <span>Masuk / Login</span>
+              <button type="button" onClick={onOpenLoginModal} title="Masuk / Login" aria-label="Masuk" className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 flex items-center justify-center transition-all">
+                <Lock className="w-4 h-4 text-purple-300" />
               </button>
-
-              <button
-                type="button"
-                onClick={onOpenRegisterModal}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-950/40 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Daftar Anggota</span>
+              <button type="button" onClick={onOpenRegisterModal} title="Daftar Anggota" aria-label="Daftar anggota" className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white flex items-center justify-center shadow-md shadow-purple-950/40 transition-all">
+                <UserPlus className="w-4 h-4" />
               </button>
             </>
           )}
@@ -241,9 +224,22 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-950/70 border border-purple-800/80 text-amber-300 text-xs sm:text-sm font-bold tracking-wide shadow-md">
             <span>Terhubung • Berkarya • Berdaya • Mempromosikan Pariwisata Indonesia</span>
           </div>
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 max-w-xl mx-auto pt-2">
+            {[
+              { icon: ShieldCheck, label: 'Verifikasi', action: () => document.getElementById('landing-verification')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
+              { icon: Layers, label: 'Krida', action: () => document.getElementById('krida-learning-portal')?.scrollIntoView({ behavior: 'smooth' }) },
+              { icon: Compass, label: 'Wisata', action: () => document.getElementById('landing-gallery')?.scrollIntoView({ behavior: 'smooth' }) },
+              { icon: Calendar, label: 'Agenda', action: () => document.getElementById('landing-agenda-section')?.scrollIntoView({ behavior: 'smooth' }) }
+            ].map(({ icon: Icon, label, action }) => (
+              <button key={label} type="button" onClick={action} title={label} className="group rounded-2xl border border-slate-800 bg-slate-950/75 hover:bg-purple-950/80 hover:border-purple-600/60 p-3 flex flex-col items-center gap-1.5 transition-all">
+                <Icon className="w-5 h-5 text-purple-300 group-hover:text-amber-300" />
+                <span className="text-[10px] font-bold text-slate-300">{label}</span>
+              </button>
+            ))}
+          </div>
 
           {/* 3. QUICK VERIFICATION BOX */}
-          <div className="pt-8 max-w-2xl mx-auto">
+          <div id="landing-verification" className="pt-8 max-w-2xl mx-auto">
             <div className="bg-slate-950/90 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-3 text-left">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -381,7 +377,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       />
 
       {/* 8. PAKET WISATA & KULINER SPOTLIGHT */}
-      <section className="py-16 px-4 sm:px-8 max-w-7xl mx-auto space-y-8 border-t border-slate-800">
+      <section id="landing-gallery" className="py-16 px-4 sm:px-8 max-w-7xl mx-auto space-y-8 border-t border-slate-800">
         {/* Header & Controls */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-1.5">
