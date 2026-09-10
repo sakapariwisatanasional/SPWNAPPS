@@ -27,7 +27,6 @@ import {
   ShieldAlert,
   Trash2,
   AlertTriangle,
-  ChevronDown,
   MoreHorizontal
 } from 'lucide-react';
 import { Member, CurrentUser, Province, Regency } from '../types';
@@ -78,8 +77,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
   const [previewCardMember, setPreviewCardMember] = useState<Member | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
   const [showClearAllModal, setShowClearAllModal] = useState(false);
-  const [openActionId, setOpenActionId] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
 
   // Filter logic
   const safeMembers = Array.isArray(members) ? members : [];
@@ -171,26 +168,50 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <button onClick={onOpenRegisterModal} className="spwn-page-icon-action spwn-page-icon-action-primary" title="Tambah anggota baru" aria-label="Tambah anggota baru"><Plus className="w-4 h-4" /></button>
-          <div className="relative">
-            <button type="button" onClick={() => setOpenActionId(openActionId === '__page__' ? null : '__page__')} className="spwn-page-icon-action" title="Aksi manajemen anggota" aria-label="Aksi manajemen anggota" aria-expanded={openActionId === '__page__'}><MoreHorizontal className="w-4 h-4" /></button>
-            {openActionId === '__page__' && <div className="spwn-page-action-menu right-0">
-              {onOpenEditCardModal && <button type="button" onClick={() => { onOpenEditCardModal(); setOpenActionId(null); }}><Sliders /><span>Desain KTA</span></button>}
-              <button type="button" onClick={() => { handleExportCSV(); setOpenActionId(null); }}><Download /><span>Ekspor CSV</span></button>
-              {currentUser.role === 'SUPER_ADMIN' && onDeleteAllDummyMembers && <button type="button" className="danger" onClick={() => { setShowClearAllModal(true); setOpenActionId(null); }}><Trash2 /><span>Hapus data dummy</span></button>}
-            </div>}
-          </div>
+        <div className="flex items-center gap-2">
+          {onOpenEditCardModal && (
+            <button
+              onClick={onOpenEditCardModal}
+              className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+            >
+              <Sliders className="w-3.5 h-3.5 text-amber-700" />
+              <span className="sr-only">Edit Desain KTA</span>
+            </button>
+          )}
+
+          {/* Tombol Hapus Dummy untuk Super Admin */}
+          {currentUser.role === 'SUPER_ADMIN' && onDeleteAllDummyMembers && (
+            <button
+              onClick={() => setShowClearAllModal(true)}
+              className="p-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+              title="Hapus / Bersihkan semua data dummy dari aplikasi"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+              <span className="sr-only">Hapus Dummy</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleExportCSV}
+            className="p-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="sr-only">Ekspor CSV</span>
+          </button>
+
+          <button
+            onClick={onOpenRegisterModal}
+            className="p-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="sr-only">Tambah Anggota</span>
+          </button>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0"><Filter className="w-4 h-4 text-emerald-600 shrink-0" /><div className="min-w-0"><p className="text-xs font-black text-slate-800">Pencarian & Filter</p><p className="text-[10px] text-slate-400 truncate">Tampilkan hanya saat diperlukan.</p></div></div>
-          <button type="button" onClick={() => setShowFilters(v => !v)} className="spwn-compact-toggle">{showFilters ? 'Tutup' : 'Buka'} <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showFilters ? 'rotate-180' : ''}`} /></button>
-        </div>
-        {showFilters && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           {/* Search Box */}
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
             <Search className="w-4 h-4 text-slate-400" />
@@ -248,7 +269,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           </div>
         </div>
 
-        }
         {/* Filter Summary Tags */}
         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
           <span>Menampilkan <strong className="text-slate-900">{filteredMembers.length}</strong> dari total <strong className="text-slate-900">{members.length}</strong> anggota terdaftar.</span>
@@ -279,7 +299,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 <th className="py-3.5 px-4">Wilayah & Kwartir</th>
                 <th className="py-3.5 px-4">Krida</th>
                 <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4 text-right">Aksi & Administrasi</th>
+                <th className="py-3.5 px-4 text-right"><span className="sr-only">Aksi & Administrasi</span><MoreHorizontal className="w-4 h-4 ml-auto text-slate-400" /></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -384,20 +404,123 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <div className="relative inline-flex">
-                        <button type="button" onClick={() => setOpenActionId(openActionId === m.id ? null : m.id)} className="spwn-member-action-trigger" title={`Aksi untuk ${m.fullName}`} aria-label={`Aksi untuk ${m.fullName}`} aria-expanded={openActionId === m.id}><MoreHorizontal className="w-4 h-4" /><span>Aksi</span><ChevronDown className="w-3.5 h-3.5" /></button>
-                        {openActionId === m.id && <div className="spwn-page-action-menu right-0 top-full mt-1 z-50">
-                          <button type="button" onClick={() => { setPreviewCardMember(m); setOpenActionId(null); }}><CreditCard /><span>Lihat KTA Digital</span></button>
-                          {onOpenPrintPdfModal && <button type="button" onClick={() => { onOpenPrintPdfModal(m); setOpenActionId(null); }}><FileDown /><span>Cetak / PDF KTA</span></button>}
-                          {onOpenQuickShareModal && <button type="button" onClick={() => { onOpenQuickShareModal(m); setOpenActionId(null); }}><Share2 /><span>Quick Share</span></button>}
-                          {onOpenEditPhotoModal && <button type="button" onClick={() => { onOpenEditPhotoModal(m); setOpenActionId(null); }}><Camera /><span>Perbaiki Foto</span></button>}
-                          {onOpenEditMemberModal && <button type="button" onClick={() => { onOpenEditMemberModal(m); setOpenActionId(null); }}><Edit3 /><span>Koreksi Profil</span></button>}
-                          {currentUser.role === 'SUPER_ADMIN' && onOpenOperatorModal && <button type="button" onClick={() => { onOpenOperatorModal(m); setOpenActionId(null); }}><ShieldCheck /><span>{m.isOperator ? 'Kelola Operator' : 'Tetapkan Operator'}</span></button>}
-                          <button type="button" onClick={() => { onOpenVerifyModal(m); setOpenActionId(null); }}><Eye /><span>Verifikasi Publik</span></button>
-                          <button type="button" onClick={() => { onOpenTransferModal(m); setOpenActionId(null); }}><ArrowRightLeft /><span>Mutasi Wilayah</span></button>
-                          {currentUser.role === 'SUPER_ADMIN' && onDeleteMember && <button type="button" className="danger" onClick={() => { setMemberToDelete(m); setOpenActionId(null); }}><Trash2 /><span>Hapus Anggota</span></button>}
-                          {m.status === 'PENDING' && <button type="button" className="success" onClick={() => { onApproveMember(m.id); setOpenActionId(null); }}><CheckCircle2 /><span>Setujui & Terbitkan</span></button>}
-                        </div>}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Preview Digital KTA */}
+                        <button
+                          onClick={() => setPreviewCardMember(m)}
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                          title="Lihat KTA Digital"
+                        >
+                          <CreditCard className="w-4 h-4 text-emerald-700" />
+                        </button>
+
+                        {/* Cetak / Unduh PDF KTA */}
+                        {onOpenPrintPdfModal && (
+                          <button
+                            onClick={() => onOpenPrintPdfModal(m)}
+                            className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-lg transition-colors border border-purple-200/60"
+                            title="Cetak / Konversi KTA ke PDF (CR80 / A4)"
+                          >
+                            <FileDown className="w-4 h-4 text-purple-700" />
+                          </button>
+                        )}
+
+                        {/* Quick Share / Badge Networking Event */}
+                        {onOpenQuickShareModal && (
+                          <button
+                            onClick={() => onOpenQuickShareModal(m)}
+                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg transition-colors border border-amber-300/80 cursor-pointer"
+                            title="Quick Share: Badge Event & QR Portofolio Instan"
+                          >
+                            <Share2 className="w-4 h-4 text-amber-700" />
+                          </button>
+                        )}
+
+                        {/* Perbaiki Pas Foto KTA */}
+                        {onOpenEditPhotoModal && (
+                          <button
+                            onClick={() => onOpenEditPhotoModal(m)}
+                            className="p-1.5 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-800 rounded-lg transition-colors cursor-pointer"
+                            title="Perbaiki Pas Foto Resmi KTA & Profil"
+                          >
+                            <Camera className="w-4 h-4 text-slate-700" />
+                          </button>
+                        )}
+
+                        {/* Koreksi Profil, Nama, Gelar, & Domisili (Hak Admin) */}
+                        {onOpenEditMemberModal && (
+                          <button
+                            onClick={() => onOpenEditMemberModal(m)}
+                            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 rounded-lg transition-colors border border-indigo-200/60 cursor-pointer"
+                            title="Koreksi Nama, Gelar, Profil & Domisili (Hak Admin)"
+                          >
+                            <Edit3 className="w-4 h-4 text-indigo-700" />
+                          </button>
+                        )}
+
+                        {/* Kelola / Tetapkan / Batalkan Operator (Hak Khusus Super Admin) */}
+                        {currentUser.role === 'SUPER_ADMIN' && onOpenOperatorModal && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenOperatorModal(m)}
+                            className={`p-1.5 rounded-lg transition-colors border cursor-pointer ${
+                              m.isOperator
+                                ? 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300 shadow-xs'
+                                : 'bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-800 border-slate-200/80'
+                            }`}
+                            title={
+                              m.isOperator
+                                ? `Kelola / Batalkan Wewenang Operator (${m.operatorJurisdictionName || m.regencyName})`
+                                : `Tetapkan ${m.fullName} sebagai Operator Kwartir`
+                            }
+                          >
+                            {m.isOperator ? (
+                              <ShieldCheck className="w-4 h-4 text-purple-700" />
+                            ) : (
+                              <Shield className="w-4 h-4 text-slate-600 hover:text-purple-700" />
+                            )}
+                          </button>
+                        )}
+
+                        {/* Public Verifier Modal */}
+                        <button
+                          onClick={() => onOpenVerifyModal(m)}
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                          title="Verifikasi QR Publik"
+                        >
+                          <Eye className="w-4 h-4 text-slate-700" />
+                        </button>
+
+                        {/* Mutasi / Transfer Lokasi */}
+                        <button
+                          onClick={() => onOpenTransferModal(m)}
+                          className="p-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 rounded-lg transition-colors"
+                          title="Mutasi / Pindah Wilayah Kwartir"
+                        >
+                          <ArrowRightLeft className="w-4 h-4" />
+                        </button>
+
+                        {/* Hapus Anggota (Hak Super Admin) */}
+                        {currentUser.role === 'SUPER_ADMIN' && onDeleteMember && (
+                          <button
+                            onClick={() => setMemberToDelete(m)}
+                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 rounded-lg transition-colors border border-red-200 cursor-pointer"
+                            title="Hapus Data Anggota Ini (Super Admin)"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </button>
+                        )}
+
+                        {/* Approve Button for Pending */}
+                        {m.status === 'PENDING' && (
+                          <button
+                            onClick={() => onApproveMember(m.id)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                            title="Setujui dan terbitkan Nomor Anggota"
+                          >
+                            <span className="sr-only">Setujui</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
