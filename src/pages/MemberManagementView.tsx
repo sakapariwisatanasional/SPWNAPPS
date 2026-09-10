@@ -248,7 +248,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           </div>
         </div>
 
-        </div>}
+        }
         {/* Filter Summary Tags */}
         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
           <span>Menampilkan <strong className="text-slate-900">{filteredMembers.length}</strong> dari total <strong className="text-slate-900">{members.length}</strong> anggota terdaftar.</span>
