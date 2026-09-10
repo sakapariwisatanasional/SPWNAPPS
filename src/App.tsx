@@ -248,8 +248,13 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // Subscribe to storage changes
+  // Spreadsheet adalah sumber data utama. LocalStorage hanya dipakai sebagai
+  // cache/session, sehingga browser pengunjung tidak bergantung pada data lama
+  // saat pertama kali membuka landing page. Setelah konfigurasi pusat terbaca,
+  // tarik snapshot terbaru dari Google Spreadsheet lalu teruskan polling live.
   useEffect(() => {
+    let cancelled = false;
+
     const refreshAll = () => {
       setMembers(storage.getMembers() || []);
       setTours(storage.getTourPackages() || []);
@@ -258,16 +263,35 @@ export default function App() {
       setSkills(storage.getSkills() || []);
       setAuditLogs(storage.getAuditLogs() || []);
       setCulinaryItems(storage.getCulinarySouvenirs() || []);
-      
+
       const usr = storage.getCurrentUser();
-      if (usr && usr.role) {
-        setCurrentUser(usr);
+      if (usr && usr.role) setCurrentUser(usr);
+    };
+
+    const hydrateFromCloud = async () => {
+      refreshAll();
+      try {
+        await spreadsheetService.fetchServerConfig();
+        if (cancelled) return;
+        await spreadsheetService.syncFromSpreadsheet(true);
+        if (!cancelled) refreshAll();
+      } catch (error) {
+        console.warn('[App] Sinkronisasi awal Spreadsheet gagal:', error);
       }
     };
 
-    refreshAll();
+    void hydrateFromCloud();
     const unsubscribe = storage.subscribe(refreshAll);
-    return () => unsubscribe();
+    const handleCloudUpdate = () => {
+      if (!cancelled) refreshAll();
+    };
+    window.addEventListener('saka:cloud-data-updated', handleCloudUpdate as EventListener);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      window.removeEventListener('saka:cloud-data-updated', handleCloudUpdate as EventListener);
+    };
   }, []);
 
   // Listen to popstate for browser back/forward buttons
