@@ -144,22 +144,25 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
             borderStyle:'solid',
             borderColor:(settings as any).photoBorderColor ?? '#fcd34d'
           }}><img src={photo} alt={member.fullName} className="w-full h-full" style={{objectFit:(settings as any).photoObjectFit || 'cover'}}/></div>}
-          {settings.showQrCode && (
-            <div
-              className="absolute"
-              style={{
-                left: `${settings.qrX ?? 78}%`,
-                top: `${settings.qrY ?? 30}%`
-              }}
-            >
-              <KtaQrCode
-                member={member}
-                size={Math.max(36, Math.round(Math.min(widthPx, heightPx) * ((settings.qrSize ?? 22) / 100)))}
-                showLabel={false}
-                interactive={false}
-              />
-            </div>
-          )}
+          {settings.showQrCode && (() => {
+            const qrPercent = Math.max(5, Math.min(60, Number(settings.qrSize ?? 22)));
+            const qrX = Math.max(0, Math.min(100 - qrPercent, Number(settings.qrX ?? 78)));
+            const qrY = Math.max(0, Math.min(100 - qrPercent, Number(settings.qrY ?? 30)));
+            const qrPx = Math.max(36, Math.round(Math.min(widthPx, heightPx) * (qrPercent / 100)));
+            return (
+              <div
+                className="absolute"
+                style={{ left: `${qrX}%`, top: `${qrY}%`, width: `${qrPercent}%`, aspectRatio: '1 / 1' }}
+              >
+                <KtaQrCode
+                  member={member}
+                  size={qrPx}
+                  showLabel={false}
+                  interactive={false}
+                />
+              </div>
+            );
+          })()}
           {(settings as any).showBarcodeFront !== false && <div className="absolute flex flex-col items-center gap-1" style={{
             left:`${(settings as any).barcodeFrontX ?? 4}%`,
             top:`${(settings as any).barcodeFrontY ?? 77}%`,
