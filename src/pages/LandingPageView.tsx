@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Activity as ActivityIcon,
   ArrowRight,
   Award,
   CalendarDays,
@@ -64,6 +63,13 @@ const HOME_TOOLS: Array<{
   { id: 'kuliner', label: 'Kuliner', hint: 'Karya anggota', icon: Store, tone: 'from-rose-500/20 to-pink-500/5 text-rose-300 border-rose-500/20' },
   { id: 'anggota', label: 'Anggota', hint: 'Kompetensi', icon: Users, tone: 'from-cyan-500/20 to-teal-500/5 text-cyan-300 border-cyan-500/20' },
 ];
+
+const KRIDA_ICONS: Record<KridaId, React.ElementType> = {
+  pemandu: Compass,
+  penyuluh: ShieldCheck,
+  mice: CalendarDays,
+  kuliner: Store,
+};
 
 export const LandingPageView: React.FC<LandingPageViewProps> = ({
   currentUser,
@@ -167,7 +173,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </button>
 
           <div className="hidden sm:flex items-center gap-1">
-            <button type="button" onClick={() => openTool('verify')} className="spwn-home-header-btn" title="Verifikasi KTA"><QrCode className="w-4 h-4" /></button>
             <button type="button" onClick={() => openTool('krida')} className="spwn-home-header-btn" title="Krida & SKK"><Award className="w-4 h-4" /></button>
             {currentUser?.role !== 'PUBLIC' ? (
               <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="spwn-home-header-btn" title="Dashboard"><LayoutDashboard className="w-4 h-4" /></button>
@@ -240,9 +245,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <div className="flex items-end justify-between gap-4 mb-5"><div><div className="text-[10px] uppercase tracking-[.16em] text-purple-300 font-black">Pusat pembelajaran</div><h2 className="mt-1 text-2xl sm:text-3xl font-black">4 Krida & SKK</h2><p className="mt-1 text-xs sm:text-sm text-slate-500">Pilih Krida → pilih mata Krida → buka materi atau instrumen uji.</p></div><button type="button" onClick={() => openReader()} className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-purple-300 hover:text-white cursor-pointer">Baca layar penuh <ArrowRight className="w-3.5 h-3.5" /></button></div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {KRIDA_CATEGORIES.map(category => {
-                const Icon = category.icon;
+                const Icon = KRIDA_ICONS[category.id as KridaId] || Award;
                 const count = kridaModules.filter(m => m.kridaId === category.id).length;
-                return <button key={category.id} type="button" onClick={() => openKrida(category.id as KridaId)} className="text-left rounded-3xl border border-white/7 bg-white/[.025] hover:bg-white/[.05] hover:border-purple-500/30 p-4 sm:p-5 transition-all cursor-pointer group"><div className="flex items-start justify-between"><div className="w-11 h-11 rounded-2xl bg-purple-500/10 border border-purple-500/15 grid place-items-center"><Icon className="w-5 h-5 text-purple-300" /></div><ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-purple-300 transition-transform group-hover:translate-x-0.5" /></div><h3 className="mt-4 text-sm sm:text-base font-black">{category.name}</h3><p className="mt-1 text-[10px] sm:text-xs text-slate-500 line-clamp-2">{category.description}</p><div className="mt-4 text-[9px] font-bold text-purple-300">{count || category.topics.length} materi</div></button>;
+                return <button key={category.id} type="button" onClick={() => openKrida(category.id as KridaId)} className="text-left rounded-3xl border border-white/7 bg-white/[.025] hover:bg-white/[.05] hover:border-purple-500/30 p-4 sm:p-5 transition-all cursor-pointer group"><div className="flex items-start justify-between"><div className="w-11 h-11 rounded-2xl bg-purple-500/10 border border-purple-500/15 grid place-items-center"><Icon className="w-5 h-5 text-purple-300" /></div><ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-purple-300 transition-transform group-hover:translate-x-0.5" /></div><h3 className="mt-4 text-sm sm:text-base font-black">{category.name}</h3><p className="mt-1 text-[10px] sm:text-xs text-slate-500 line-clamp-2">{category.description}</p><div className="mt-4 text-[9px] font-bold text-purple-300">{count || category.topicsCount} materi</div></button>;
               })}
             </div>
           </div>
