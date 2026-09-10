@@ -54,7 +54,15 @@ export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
     setProgressStep('Mempersiapkan render KTA...');
 
     try {
-      await downloadKtaPdfFile(member, currentSettings, formatToDownload, (step) => {
+      let publishedSettings = currentSettings;
+      try {
+        const { spreadsheetService } = await import('../../services/spreadsheetService');
+        const remote = await spreadsheetService.refreshKtaSettings();
+        if (remote) publishedSettings = remote;
+      } catch (e) {
+        console.warn('[KTA Settings] Gagal refresh sebelum PDF, memakai konfigurasi cache terakhir.', e);
+      }
+      await downloadKtaPdfFile(member, publishedSettings, formatToDownload, (step) => {
         setProgressStep(step);
       });
       setDownloadSuccess(true);
