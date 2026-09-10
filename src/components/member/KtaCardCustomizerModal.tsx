@@ -162,8 +162,33 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
           </section>
 
           {side==='FRONT' && <>
+          <section className="p-4 rounded-2xl border border-violet-200 bg-violet-50/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-violet-950"><Sparkles/><span>4. QR Code Verifikasi</span></div>
+              <label className="text-xs font-bold flex items-center gap-2">
+                <input type="checkbox" checked={settings.showQrCode!==false} onChange={e=>setSettings(s=>({...s,showQrCode:e.target.checked}))}/> Tampilkan QR Code
+              </label>
+            </div>
+            <p className="text-[10px] text-slate-600">Atur posisi QR Code langsung melalui koordinat X/Y dan ukurannya. Nilai X/Y adalah persentase dari sisi kiri dan atas kartu. Pengaturan ini dipakai bersama oleh preview KTA, KTA digital, dan PDF.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label className="text-[9px] font-bold">Posisi X (%)
+                {numberInput(settings.qrX??78,v=>setSettings(s=>({...s,qrX:Math.max(0,Math.min(100,v))})))}
+              </label>
+              <label className="text-[9px] font-bold">Posisi Y (%)
+                {numberInput(settings.qrY??30,v=>setSettings(s=>({...s,qrY:Math.max(0,Math.min(100,v))})))}
+              </label>
+              <label className="text-[9px] font-bold">Ukuran QR (%)
+                {numberInput(settings.qrSize??22,v=>setSettings(s=>({...s,qrSize:Math.max(5,Math.min(60,v))})))}
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[9px] text-violet-900">
+              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">X lebih besar → QR ke kanan</span>
+              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">Y lebih besar → QR ke bawah</span>
+              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">Ukuran → besar/kecil QR</span>
+            </div>
+          </section>
           <section className="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 space-y-3">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold text-blue-950"><Eye/><span>4. Barcode Sisi Depan</span></div><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={(settings as any).showBarcodeFront!==false} onChange={e=>setSettings(s=>({...s,showBarcodeFront:e.target.checked}))}/> Tampilkan Barcode</label></div>
+            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold text-blue-950"><Eye/><span>5. Barcode Sisi Depan</span></div><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={(settings as any).showBarcodeFront!==false} onChange={e=>setSettings(s=>({...s,showBarcodeFront:e.target.checked}))}/> Tampilkan Barcode</label></div>
             <p className="text-[10px] text-slate-600">X/Y mengatur posisi pada kartu. Lebar/Tinggi mengatur area Barcode secara langsung.</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2"><label className="text-[9px] font-bold">X{numberInput((settings as any).barcodeFrontX??4,v=>setSettings(s=>({...s,barcodeFrontX:v})))} </label><label className="text-[9px] font-bold">Y{numberInput((settings as any).barcodeFrontY??77,v=>setSettings(s=>({...s,barcodeFrontY:v})))} </label><label className="text-[9px] font-bold">Lebar{numberInput((settings as any).barcodeFrontWidth??32,v=>setSettings(s=>({...s,barcodeFrontWidth:v})))} </label><label className="text-[9px] font-bold">Tinggi{numberInput((settings as any).barcodeFrontHeight??9,v=>setSettings(s=>({...s,barcodeFrontHeight:v})))} </label></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2"><label className="text-[10px] font-bold">Nilai Barcode<input value={(settings as any).barcodeFrontCustomValue||''} onChange={e=>setSettings(s=>({...s,barcodeFrontCustomValue:e.target.value}))} className={input} placeholder="Kosong = NTA / No. Anggota"/></label><label className="text-[10px] font-bold">Caption Barcode<input value={(settings as any).barcodeFrontCaption||''} onChange={e=>setSettings(s=>({...s,barcodeFrontCaption:e.target.value}))} className={input} placeholder="Opsional"/></label></div>
@@ -171,7 +196,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2"><select value={(settings as any).barcodeFrontCaptionFontWeight??'normal'} onChange={e=>setSettings(s=>({...s,barcodeFrontCaptionFontWeight:e.target.value}))} className={input}><option value="normal">Caption Normal</option><option value="medium">Caption Medium</option><option value="bold">Caption Bold</option><option value="black">Caption Black</option></select><input type="color" value={(settings as any).barcodeFrontCaptionColor||'#ffffff'} onChange={e=>setSettings(s=>({...s,barcodeFrontCaptionColor:e.target.value}))} className="h-9 rounded"/><select value={(settings as any).barcodeFrontCaptionAlign??'center'} onChange={e=>setSettings(s=>({...s,barcodeFrontCaptionAlign:e.target.value}))} className={input}><option value="left">Caption Kiri</option><option value="center">Caption Tengah</option><option value="right">Caption Kanan</option></select></div>
           </section>
           <section className="p-4 rounded-2xl border border-rose-200 bg-rose-50/40 space-y-3">
-            <div className="flex items-center gap-2 font-bold text-rose-950"><ImageIcon/><span>5. Foto Anggota Sisi Depan</span></div>
+            <div className="flex items-center gap-2 font-bold text-rose-950"><ImageIcon/><span>6. Foto Anggota Sisi Depan</span></div>
             <div className="flex items-center gap-2"><input type="checkbox" checked={settings.showPhoto!==false} onChange={e=>setSettings(s=>({...s,showPhoto:e.target.checked}))}/><span className="text-xs font-bold">Tampilkan Foto Anggota</span></div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2"><label className="text-[9px] font-bold">X{numberInput((settings as any).photoX??4,v=>setSettings(s=>({...s,photoX:v})))} </label><label className="text-[9px] font-bold">Y{numberInput((settings as any).photoY??27,v=>setSettings(s=>({...s,photoY:v})))} </label><label className="text-[9px] font-bold">Lebar{numberInput((settings as any).photoWidth??22,v=>setSettings(s=>({...s,photoWidth:v})))} </label><label className="text-[9px] font-bold">Tinggi{numberInput((settings as any).photoHeight??48,v=>setSettings(s=>({...s,photoHeight:v})))} </label></div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2"><label className="text-[9px] font-bold">Radius{numberInput((settings as any).photoRadius??12,v=>setSettings(s=>({...s,photoRadius:v})))} </label><label className="text-[9px] font-bold">Border{numberInput((settings as any).photoBorderWidth??2,v=>setSettings(s=>({...s,photoBorderWidth:v})))} </label><select value={(settings as any).photoObjectFit??'cover'} onChange={e=>setSettings(s=>({...s,photoObjectFit:e.target.value}))} className={input}><option value="cover">Foto memenuhi area</option><option value="contain">Foto utuh</option><option value="fill">Regangkan foto</option></select></div>
@@ -179,7 +204,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
           </section>
           </>}
           {side==='BACK' && <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold"><Eye/><span>4. Barcode Sisi Belakang</span></div><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={settings.showBarcode!==false} onChange={e=>setSettings(s=>({...s,showBarcode:e.target.checked}))}/> Tampilkan Barcode</label></div>
+            <div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold"><Eye/><span>5. Barcode Sisi Belakang</span></div><label className="text-xs font-bold flex items-center gap-2"><input type="checkbox" checked={settings.showBarcode!==false} onChange={e=>setSettings(s=>({...s,showBarcode:e.target.checked}))}/> Tampilkan Barcode</label></div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               <label className="text-[9px] font-bold">X{numberInput(settings.barcodeX??68,v=>setSettings(s=>({...s,barcodeX:v})))}</label>
               <label className="text-[9px] font-bold">Y{numberInput(settings.barcodeY??70,v=>setSettings(s=>({...s,barcodeY:v})))}</label>
