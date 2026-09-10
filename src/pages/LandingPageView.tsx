@@ -1,46 +1,28 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  ShieldCheck, 
-  Search, 
-  QrCode, 
-  Compass, 
-  Award, 
-  Users, 
-  Sparkles, 
-  ArrowRight, 
-  CheckCircle2, 
-  MapPin, 
-  Utensils, 
-  Calendar, 
-  Lock, 
-  UserPlus, 
-  FileSpreadsheet, 
-  FolderOpen,
-  ExternalLink,
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Activity as ActivityIcon,
+  ArrowRight,
+  Award,
+  CalendarDays,
+  ChevronDown,
   ChevronRight,
-  Eye,
-  Star,
-  Layers,
-  Heart,
-  Globe2,
-  Clock,
+  Compass,
   Gift,
-  TreePine,
-  ShoppingBag,
-  BadgeCheck,
-  Check,
   LayoutDashboard,
-  BookOpen,
-  Edit3,
-  Download,
-  FileText,
-  Video,
-  Table as TableIcon
+  LockKeyhole,
+  MapPin,
+  Menu,
+  QrCode,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  UserPlus,
+  Users,
+  X,
 } from 'lucide-react';
 import { Member, TourPackage, CulinarySouvenirItem, CurrentUser, Activity, KridaId, KridaModuleItem } from '../types';
 import { SakaLogo, formatDriveImageUrl } from '../components/common/SakaLogo';
-import { DEFAULT_SPREADSHEET_URL } from '../services/spreadsheetService';
-import { GOOGLE_DRIVE_MAIN_FOLDER } from '../services/driveRepository';
 import { CompetentGuidesSection } from '../components/common/CompetentGuidesSection';
 import { LandingActivitiesSection } from '../components/activities/LandingActivitiesSection';
 import { PROVINCES_DATA } from '../data/indonesiaTerritories';
@@ -48,7 +30,6 @@ import { KRIDA_CATEGORIES } from '../data/kridaData';
 import { storage } from '../services/storage';
 import { KridaExplorerModal } from '../components/krida/KridaExplorerModal';
 import { KridaMaterialEditorModal } from '../components/krida/KridaMaterialEditorModal';
-import { CompactKridaPortal } from '../components/krida/CompactKridaPortal';
 import { KridaFullScreenReaderModal } from '../components/krida/KridaFullScreenReaderModal';
 
 interface LandingPageViewProps {
@@ -67,6 +48,23 @@ interface LandingPageViewProps {
   onEnterDashboard: (tab?: string) => void;
 }
 
+type HomeTool = 'verify' | 'krida' | 'tour' | 'agenda' | 'kuliner' | 'anggota';
+
+const HOME_TOOLS: Array<{
+  id: HomeTool;
+  label: string;
+  hint: string;
+  icon: React.ElementType;
+  tone: string;
+}> = [
+  { id: 'verify', label: 'Verifikasi KTA', hint: 'Cek anggota', icon: ShieldCheck, tone: 'from-emerald-500/20 to-teal-500/5 text-emerald-300 border-emerald-500/20' },
+  { id: 'krida', label: 'Krida & SKK', hint: 'Materi & uji', icon: Award, tone: 'from-purple-500/20 to-indigo-500/5 text-purple-300 border-purple-500/20' },
+  { id: 'tour', label: 'Wisata', hint: 'Paket pilihan', icon: Compass, tone: 'from-amber-500/20 to-orange-500/5 text-amber-300 border-amber-500/20' },
+  { id: 'agenda', label: 'Agenda', hint: 'Kegiatan', icon: CalendarDays, tone: 'from-sky-500/20 to-blue-500/5 text-sky-300 border-sky-500/20' },
+  { id: 'kuliner', label: 'Kuliner', hint: 'Karya anggota', icon: Store, tone: 'from-rose-500/20 to-pink-500/5 text-rose-300 border-rose-500/20' },
+  { id: 'anggota', label: 'Anggota', hint: 'Kompetensi', icon: Users, tone: 'from-cyan-500/20 to-teal-500/5 text-cyan-300 border-cyan-500/20' },
+];
+
 export const LandingPageView: React.FC<LandingPageViewProps> = ({
   currentUser,
   members,
@@ -80,75 +78,74 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   onSelectCulinaryDetail,
   onViewActivityDetail,
   onOpenActivityForm,
-  onEnterDashboard
+  onEnterDashboard,
 }) => {
   const [quickVerifyTerm, setQuickVerifyTerm] = useState('');
   const [verifyError, setVerifyError] = useState('');
-
-  const [galleryTab, setGalleryTab] = useState<'ALL' | 'TOURS' | 'CULINARY' | 'SOUVENIR'>('ALL');
-  const activeMembersCount = members.filter(m => m.status === 'ACTIVE').length;
-  const publishedTours = tours.filter(t => t.status === 'APPROVED_PUBLISHED');
-  const approvedProducts = culinaryItems.filter(c => (c.status || 'APPROVED') === 'APPROVED');
-  const culinaryProducts = approvedProducts.filter(c => c.kind === 'KULINER');
-  const souvenirProducts = approvedProducts.filter(c => c.kind === 'CINDERAMATA');
-
-  // Fallback high-res tourism images
-  const DEFAULT_TOUR_IMG = 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80';
-  const DEFAULT_FOOD_IMG = 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80';
-  const DEFAULT_CRAFT_IMG = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80';
-
-  const handleQuickVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    setVerifyError('');
-
-    const term = quickVerifyTerm.trim().toLowerCase();
-    if (!term) return;
-
-    const found = members.find(m => 
-      (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === term) ||
-      (m.verificationToken && m.verificationToken.toLowerCase() === term) ||
-      m.id.toLowerCase() === term ||
-      m.fullName.toLowerCase().includes(term)
-    );
-
-    if (found) {
-      onOpenVerifyModal(found);
-    } else {
-      setVerifyError('Data anggota tidak ditemukan. Pastikan Nomor KTA atau Nama yang dimasukkan sudah benar.');
-    }
-  };
-
-  // Krida Folder & Modules state
+  const [activeTool, setActiveTool] = useState<HomeTool | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [kridaModules, setKridaModules] = useState<KridaModuleItem[]>(() => storage.getKridaModules());
   const [isKridaExplorerOpen, setIsKridaExplorerOpen] = useState(false);
   const [activeExplorerKrida, setActiveExplorerKrida] = useState<KridaId>('pemandu');
-  const [activeExplorerModuleId, setActiveExplorerModuleId] = useState<string | undefined>(undefined);
+  const [activeExplorerModuleId, setActiveExplorerModuleId] = useState<string | undefined>();
   const [isKridaEditorOpen, setIsKridaEditorOpen] = useState(false);
   const [editingKridaModule, setEditingKridaModule] = useState<KridaModuleItem | null>(null);
   const [isFullScreenReaderOpen, setIsFullScreenReaderOpen] = useState(false);
   const [readerModuleId, setReaderModuleId] = useState<string | undefined>();
 
-  const handleOpenFullScreenReader = (moduleId?: string) => {
-    setReaderModuleId(moduleId);
-    setIsFullScreenReaderOpen(true);
-  };
+  const activeMembersCount = useMemo(() => members.filter(m => m.status === 'ACTIVE').length, [members]);
+  const publishedTours = useMemo(() => tours.filter(t => t.status === 'APPROVED_PUBLISHED'), [tours]);
+  const approvedProducts = useMemo(() => culinaryItems.filter(c => (c.status || 'APPROVED') === 'APPROVED'), [culinaryItems]);
+  const upcomingActivities = useMemo(() => activities.slice(0, 3), [activities]);
 
-  // Cross-device sync listener
   useEffect(() => {
-    const unsub = storage.subscribe(() => {
-      setKridaModules(storage.getKridaModules());
-    });
+    const unsub = storage.subscribe(() => setKridaModules(storage.getKridaModules()));
     return () => unsub();
   }, []);
 
-  const handleOpenKridaFolder = (kridaId: KridaId, moduleId?: string) => {
+  const scrollTo = (id: string) => {
+    setMobileMenuOpen(false);
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
+  const openTool = (tool: HomeTool) => {
+    setActiveTool(prev => prev === tool ? null : tool);
+    if (tool === 'verify') scrollTo('landing-verification');
+    if (tool === 'krida') scrollTo('landing-krida');
+    if (tool === 'tour') scrollTo('landing-discover');
+    if (tool === 'agenda') scrollTo('landing-agenda');
+    if (tool === 'kuliner') scrollTo('landing-discover');
+    if (tool === 'anggota') scrollTo('landing-members');
+  };
+
+  const handleQuickVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    setVerifyError('');
+    const term = quickVerifyTerm.trim().toLowerCase();
+    if (!term) return;
+    const found = members.find(m =>
+      (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === term) ||
+      (m.verificationToken && m.verificationToken.toLowerCase() === term) ||
+      m.id.toLowerCase() === term ||
+      m.fullName.toLowerCase().includes(term)
+    );
+    if (found) onOpenVerifyModal(found);
+    else setVerifyError('Data anggota tidak ditemukan. Periksa Nomor Anggota atau Nama.');
+  };
+
+  const openKrida = (kridaId: KridaId, moduleId?: string) => {
     setActiveExplorerKrida(kridaId);
     setActiveExplorerModuleId(moduleId);
     setIsKridaExplorerOpen(true);
   };
 
-  const handleOpenEditor = (moduleItem: KridaModuleItem) => {
-    setEditingKridaModule(moduleItem);
+  const openReader = (moduleId?: string) => {
+    setReaderModuleId(moduleId || kridaModules[0]?.id);
+    setIsFullScreenReaderOpen(true);
+  };
+
+  const openEditor = (item: KridaModuleItem) => {
+    setEditingKridaModule(item);
     setIsKridaEditorOpen(true);
   };
 
@@ -158,641 +155,121 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-purple-600 selection:text-white">
-      
-      {/* 1. TOP NAVBAR */}
-      <nav className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <SakaLogo size={42} id="landing-saka-logo" />
-          <div>
-            <h1 className="text-base sm:text-lg font-extrabold font-heading tracking-wide uppercase text-white flex items-center gap-1.5">
-              <span>Saka</span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-amber-400">Pariwisata</span>
-            </h1>
-            <p className="text-[10px] text-purple-200/70 tracking-wider font-semibold uppercase">
-              Kwartir Nasional Gerakan Pramuka
-            </p>
-          </div>
-        </div>
-
-        {/* Icon-first visitor controls: ringkas di desktop dan tidak memenuhi layar HP. */}
-        <div className="flex items-center gap-1.5">
-          {currentUser && currentUser.role !== 'PUBLIC' ? (
-            <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} title={currentUser.role === 'MEMBER' ? 'Buka KTA Anggota' : 'Buka Dashboard'} aria-label="Buka dashboard" className="w-10 h-10 rounded-xl bg-purple-600/90 hover:bg-purple-500 text-white border border-purple-400/30 flex items-center justify-center transition-all">
-              <LayoutDashboard className="w-4 h-4" />
-            </button>
-          ) : (
-            <>
-              <button type="button" onClick={onOpenLoginModal} title="Masuk / Login" aria-label="Masuk" className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 flex items-center justify-center transition-all">
-                <Lock className="w-4 h-4 text-purple-300" />
-              </button>
-              <button type="button" onClick={onOpenRegisterModal} title="Daftar Anggota" aria-label="Daftar anggota" className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white flex items-center justify-center shadow-md shadow-purple-950/40 transition-all">
-                <UserPlus className="w-4 h-4" />
-              </button>
-            </>
-          )}
-        </div>
-      </nav>
-
-      {/* 2. HERO SECTION */}
-      <section className="relative pt-12 pb-20 px-4 sm:px-8 max-w-7xl mx-auto overflow-hidden">
-        {/* Ambient Glows */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 sm:w-[600px] h-96 sm:h-[600px] bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-1/3 right-10 w-72 h-72 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 text-center space-y-6 max-w-4xl mx-auto">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-950/80 border border-purple-800/80 text-purple-300 text-xs font-bold shadow-md">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Platform Digital Resmi Saka Pariwisata Indonesia</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          </div>
-
-          {/* Main Headline */}
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold font-heading text-white tracking-tight leading-tight">
-            Satu Keanggotaan, <br className="hidden sm:inline" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-amber-300 to-teal-300">
-              Satu Ekosistem Pariwisata Indonesia
-            </span>
-          </h1>
-
-          <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Platform keanggotaan nasional Saka Pariwisata yang menghubungkan Pramuka Saka Pariwisata dari seluruh Indonesia melalui KTA Digital berbasis QR Code, direktori keahlian, paket wisata komunitas, serta katalog kuliner dan cinderamata.
-          </p>
-
-          {/* Slogan / Tagline */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-950/70 border border-purple-800/80 text-amber-300 text-xs sm:text-sm font-bold tracking-wide shadow-md">
-            <span>Terhubung • Berkarya • Berdaya • Mempromosikan Pariwisata Indonesia</span>
-          </div>
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 max-w-xl mx-auto pt-2">
-            {[
-              { icon: ShieldCheck, label: 'Verifikasi', action: () => document.getElementById('landing-verification')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
-              { icon: Layers, label: 'Krida', action: () => document.getElementById('krida-learning-portal')?.scrollIntoView({ behavior: 'smooth' }) },
-              { icon: Compass, label: 'Wisata', action: () => document.getElementById('landing-gallery')?.scrollIntoView({ behavior: 'smooth' }) },
-              { icon: Calendar, label: 'Agenda', action: () => document.getElementById('landing-agenda-section')?.scrollIntoView({ behavior: 'smooth' }) }
-            ].map(({ icon: Icon, label, action }) => (
-              <button key={label} type="button" onClick={action} title={label} className="group rounded-2xl border border-slate-800 bg-slate-950/75 hover:bg-purple-950/80 hover:border-purple-600/60 p-3 flex flex-col items-center gap-1.5 transition-all">
-                <Icon className="w-5 h-5 text-purple-300 group-hover:text-amber-300" />
-                <span className="text-[10px] font-bold text-slate-300">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* 3. QUICK VERIFICATION BOX */}
-          <div id="landing-verification" className="pt-8 max-w-2xl mx-auto">
-            <div className="bg-slate-950/90 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-3 text-left">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <QrCode className="w-4 h-4 text-emerald-400" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 font-heading">
-                    Verifikasi Keaslian KTA & Nomor Anggota
-                  </h3>
-                </div>
-                <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                  Sistem Real-Time
-                </span>
-              </div>
-
-              <form onSubmit={handleQuickVerify} className="flex gap-2">
-                <div className="relative flex-1">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <Search className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    value={quickVerifyTerm}
-                    onChange={(e) => setQuickVerifyTerm(e.target.value)}
-                    placeholder="Masukkan No. Anggota (31.71.01.2025.0001) atau Nama Anggota..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm text-white placeholder:text-slate-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer flex items-center gap-1.5 flex-shrink-0"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Verifikasi</span>
-                </button>
-              </form>
-
-              {verifyError && (
-                <p className="text-xs text-amber-400 bg-amber-950/60 p-2.5 rounded-xl border border-amber-800/60">
-                  {verifyError}
-                </p>
-              )}
+    <div className="min-h-screen bg-[#080711] text-slate-100 font-sans selection:bg-purple-600 selection:text-white overflow-x-hidden">
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#080711]/90 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+          <button type="button" onClick={() => scrollTo('landing-top')} className="flex items-center gap-2.5 min-w-0 cursor-pointer">
+            <SakaLogo size={38} id="landing-saka-logo" />
+            <div className="text-left min-w-0">
+              <div className="font-black text-sm sm:text-base tracking-wide truncate">SAKA <span className="text-purple-400">PARIWISATA</span></div>
+              <div className="hidden sm:block text-[9px] uppercase tracking-[.16em] text-slate-500">Kwartir Nasional Gerakan Pramuka</div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. METRICS / STATS BAR */}
-      <section className="border-y border-slate-800 bg-slate-950/60 py-8 px-4 sm:px-8">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80">
-            <p className="text-2xl sm:text-3xl font-extrabold text-white font-heading">{activeMembersCount}</p>
-            <p className="text-xs text-slate-400 mt-1 font-medium">Anggota Terverifikasi</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80">
-            <p className="text-2xl sm:text-3xl font-extrabold text-amber-400 font-heading">{publishedTours.length}</p>
-            <p className="text-xs text-slate-400 mt-1 font-medium">Paket Wisata Komunitas</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80">
-            <p className="text-2xl sm:text-3xl font-extrabold text-teal-400 font-heading">{culinaryItems.length}</p>
-            <p className="text-xs text-slate-400 mt-1 font-medium">Kuliner & Cinderamata</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80">
-            <p className="text-2xl sm:text-3xl font-extrabold text-purple-400 font-heading">38 Kwarda</p>
-            <p className="text-xs text-slate-400 mt-1 font-medium">Cakupan Seluruh Indonesia</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. 4 KRIDA SAKA PARIWISATA: DRAFT 4 KRIDA DAN SKK (SIMPEL, RINGKAS, TANPA SCROLLING) */}
-      <section id="krida-learning-portal" className="py-14 px-4 sm:px-8 max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-800/60 text-purple-300 text-[11px] font-bold uppercase tracking-wider">
-              <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-              <span>Draft Materi Pembelajaran & Kurikulum SKK Resmi</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white font-heading">
-              Draft 4 Krida dan SKK
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Tampilan interaktif dan ringkas tanpa scrolling. Pilih folder krida untuk melihat mata krida, lalu klik untuk membuka naskah materi, silabus pelatihan, dan instrumen uji syarat kecakapan khusus (SKK).
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => handleOpenFullScreenReader(activeExplorerModuleId || kridaModules[0]?.id)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-950/90 hover:bg-purple-900 text-purple-200 hover:text-white border border-purple-700/60 text-xs font-bold transition-all shadow-md cursor-pointer"
-              title="Baca naskah materi & SKK dalam mode layar penuh (tanpa scrolling, kendali next >> dan back <<)"
-            >
-              <BookOpen className="w-4 h-4 text-amber-300" />
-              <span>Layar Penuh (Next &gt;&gt; / Back &lt;&lt;)</span>
-            </button>
-
-            <button
-              onClick={() => handleOpenKridaFolder('pemandu')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-purple-950/50 cursor-pointer"
-            >
-              <Layers className="w-4 h-4 text-purple-200" />
-              <span>Buka Penjelajah (23 SKK)</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* COMPACT KRIDA PORTAL: What user clicks is what they see, with on-demand material opening */}
-        <CompactKridaPortal
-          modules={kridaModules}
-          currentUser={currentUser}
-          onOpenFullExplorer={handleOpenKridaFolder}
-          onOpenFullScreenReader={handleOpenFullScreenReader}
-          onOpenEditor={handleOpenEditor}
-          variant="dark"
-          initialKridaId={activeExplorerKrida}
-        />
-      </section>
-
-      {/* 6. PREVIEW ANGGOTA BERKOMPETENSI & PEMANDU TERDEKAT */}
-      <CompetentGuidesSection
-        members={members}
-        provinces={PROVINCES_DATA}
-        onOpenVerifyModal={onOpenVerifyModal}
-        theme="dark"
-        title="Temukan Pemandu & Kader Saka Terdekat dengan Wilayah Anda"
-        subtitle="Hubungi langsung anggota dan pamong Saka Pariwisata yang memiliki lisensi BNSP, sertifikasi keahlian ekowisata, pemandu budaya, dan cinderamata di wilayah terdekat."
-      />
-
-      {/* 7. AGENDA KEGIATAN & EVENT SAKA PARIWISATA */}
-      <LandingActivitiesSection
-        activities={activities}
-        currentUser={currentUser}
-        onViewActivityDetail={onViewActivityDetail}
-        onOpenActivityForm={onOpenActivityForm}
-        onEnterDashboard={onEnterDashboard}
-      />
-
-      {/* 8. PAKET WISATA & KULINER SPOTLIGHT */}
-      <section id="landing-gallery" className="py-16 px-4 sm:px-8 max-w-7xl mx-auto space-y-8 border-t border-slate-800">
-        {/* Header & Controls */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-800/60 text-purple-300 text-[11px] font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Wisata & Karya 4 Krida Nusantara</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white font-heading">
-              Jelajahi Paket Wisata & Cinderamata Khas
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-2xl leading-relaxed">
-              Karya nyata kader Saka Pariwisata se-Indonesia: paket ekowisata terpandu, gastronomi khas daerah, serta suvenir ramah lingkungan siap dipesan.
-            </p>
-          </div>
-
-          {/* Action Links */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={() => setGalleryTab('TOURS')}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                galleryTab === 'TOURS'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-950/40'
-                  : 'bg-purple-900/60 hover:bg-purple-900 text-purple-200 border border-purple-700/60'
-              }`}
-            >
-              <span>Paket Wisata ({publishedTours.length})</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setGalleryTab('ALL')}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                galleryTab === 'ALL'
-                  ? 'bg-amber-600 text-white shadow-md'
-                  : 'bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-700/60'
-              }`}
-            >
-              <span>Galeri 4 Krida</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Interactive Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <button
-            onClick={() => setGalleryTab('ALL')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
-              galleryTab === 'ALL'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/50'
-                : 'bg-slate-950/80 hover:bg-slate-900 text-slate-400 border border-slate-800'
-            }`}
-          >
-            <span>Semua Rekomendasi</span>
-            <span className="px-1.5 py-0.2 bg-white/20 text-white rounded-md text-[10px] font-mono">
-              {publishedTours.length + approvedProducts.length}
-            </span>
           </button>
 
-          <button
-            onClick={() => setGalleryTab('TOURS')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
-              galleryTab === 'TOURS'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/50'
-                : 'bg-slate-950/80 hover:bg-slate-900 text-slate-400 border border-slate-800'
-            }`}
-          >
-            <TreePine className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Paket Wisata & Ekowisata</span>
-            <span className="px-1.5 py-0.2 bg-white/20 text-white rounded-md text-[10px] font-mono">
-              {publishedTours.length}
-            </span>
-          </button>
+          <div className="hidden sm:flex items-center gap-1">
+            <button type="button" onClick={() => openTool('verify')} className="spwn-home-header-btn" title="Verifikasi KTA"><QrCode className="w-4 h-4" /></button>
+            <button type="button" onClick={() => openTool('krida')} className="spwn-home-header-btn" title="Krida & SKK"><Award className="w-4 h-4" /></button>
+            {currentUser?.role !== 'PUBLIC' ? (
+              <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="spwn-home-header-btn" title="Dashboard"><LayoutDashboard className="w-4 h-4" /></button>
+            ) : (
+              <button type="button" onClick={onOpenLoginModal} className="spwn-home-header-btn" title="Masuk"><LockKeyhole className="w-4 h-4" /></button>
+            )}
+          </div>
 
-          <button
-            onClick={() => setGalleryTab('CULINARY')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
-              galleryTab === 'CULINARY'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/50'
-                : 'bg-slate-950/80 hover:bg-slate-900 text-slate-400 border border-slate-800'
-            }`}
-          >
-            <Utensils className="w-3.5 h-3.5 text-amber-400" />
-            <span>Kuliner Khas Daerah</span>
-            <span className="px-1.5 py-0.2 bg-white/20 text-white rounded-md text-[10px] font-mono">
-              {culinaryProducts.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setGalleryTab('SOUVENIR')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
-              galleryTab === 'SOUVENIR'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/50'
-                : 'bg-slate-950/80 hover:bg-slate-900 text-slate-400 border border-slate-800'
-            }`}
-          >
-            <Gift className="w-3.5 h-3.5 text-rose-400" />
-            <span>Kriya & Cinderamata</span>
-            <span className="px-1.5 py-0.2 bg-white/20 text-white rounded-md text-[10px] font-mono">
-              {souvenirProducts.length}
-            </span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            {currentUser?.role === 'PUBLIC' && (
+              <button type="button" onClick={onOpenRegisterModal} className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-extrabold cursor-pointer"><UserPlus className="w-3.5 h-3.5" /> Daftar</button>
+            )}
+            <button type="button" onClick={() => setMobileMenuOpen(v => !v)} className="spwn-home-header-btn sm:hidden" aria-label="Menu">{mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}</button>
+          </div>
         </div>
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t border-white/5 bg-[#0d0c18] px-4 py-3 grid grid-cols-3 gap-2">
+            {HOME_TOOLS.map(tool => {
+              const Icon = tool.icon;
+              return <button key={tool.id} type="button" onClick={() => openTool(tool.id)} className="rounded-2xl border border-white/5 bg-white/[.03] p-3 text-center cursor-pointer"><Icon className="w-5 h-5 mx-auto mb-1 text-purple-300" /><span className="text-[10px] font-bold">{tool.label}</span></button>;
+            })}
+            {currentUser?.role === 'PUBLIC' ? <button type="button" onClick={onOpenLoginModal} className="rounded-2xl border border-white/5 bg-white/[.03] p-3 text-center cursor-pointer"><LockKeyhole className="w-5 h-5 mx-auto mb-1 text-slate-300" /><span className="text-[10px] font-bold">Masuk</span></button> : <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="rounded-2xl border border-white/5 bg-white/[.03] p-3 text-center cursor-pointer"><LayoutDashboard className="w-5 h-5 mx-auto mb-1 text-slate-300" /><span className="text-[10px] font-bold">Panel</span></button>}
+          </div>
+        )}
+      </header>
 
-        {/* 1. TOURS GRID (When ALL or TOURS is active) */}
-        {(galleryTab === 'ALL' || galleryTab === 'TOURS') && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base sm:text-lg font-extrabold text-white font-heading flex items-center gap-2">
-                <TreePine className="w-4 h-4 text-emerald-400" />
-                <span>Paket Wisata & Destinasi Binaan Pramuka</span>
-              </h3>
-              <button
-                onClick={() => onEnterDashboard('tours')}
-                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
-              >
-                <span>Lihat Semua ({publishedTours.length})</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+      <main id="landing-top">
+        <section className="relative px-4 sm:px-6 pt-12 sm:pt-16 pb-10">
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,.20),transparent_42%)]" />
+          <div className="relative max-w-5xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1.5 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[.12em] text-purple-200"><Sparkles className="w-3.5 h-3.5 text-amber-300" /> Ekosistem Digital Saka Pariwisata</div>
+            <h1 className="mt-5 text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.04]">Kenali. Terhubung. <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-fuchsia-300 to-amber-300">Berdaya.</span></h1>
+            <p className="mt-4 max-w-2xl mx-auto text-sm sm:text-base text-slate-400 leading-relaxed">Semua layanan utama Saka Pariwisata dalam satu tempat. Pilih ikon yang Anda butuhkan — detail akan muncul saat diperlukan.</p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {(galleryTab === 'ALL' ? publishedTours.slice(0, 3) : publishedTours).map((tour) => {
-                const tourImgUrl = formatDriveImageUrl(tour.coverImage || (tour as any).coverImageUrl) || DEFAULT_TOUR_IMG;
-                const price = (tour as any).price ?? tour.pricePerPerson ?? 0;
-
-                return (
-                  <div
-                    key={tour.id}
-                    onClick={() => onViewTourDetail(tour)}
-                    className="bg-slate-950/90 border border-slate-800 rounded-3xl overflow-hidden hover:border-emerald-500/60 transition-all duration-300 cursor-pointer group shadow-xl hover:shadow-emerald-950/30 flex flex-col justify-between hover:-translate-y-1.5"
-                  >
-                    <div>
-                      {/* Image Container with high-res rendering */}
-                      <div className="relative h-52 sm:h-56 overflow-hidden bg-slate-900">
-                        <img
-                          src={tourImgUrl}
-                          alt={tour.title}
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = DEFAULT_TOUR_IMG;
-                          }}
-                          className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-black/30" />
-
-                        {/* Top Badges */}
-                        <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10">
-                          <span className="px-3 py-1 bg-slate-950/85 backdrop-blur-md text-emerald-300 text-xs font-extrabold rounded-xl border border-emerald-500/30 shadow-md flex items-center gap-1.5">
-                            <Compass className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>{tour.category}</span>
-                          </span>
-
-                          {tour.featured && (
-                            <span className="px-2.5 py-1 bg-amber-500 text-slate-950 text-[10px] font-extrabold rounded-lg shadow-md flex items-center gap-1">
-                              <Star className="w-3 h-3 fill-slate-950" />
-                              <span>Unggulan</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Bottom Overlay Info (Price & Duration) */}
-                        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between text-white z-10">
-                          <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
-                            <p className="text-[9px] text-slate-400 uppercase font-semibold">Mulai Dari</p>
-                            <p className="text-sm sm:text-base font-extrabold font-heading text-emerald-300 leading-tight">
-                              Rp {price.toLocaleString('id-ID')}
-                              <span className="text-[10px] font-normal text-slate-300"> / pax</span>
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-1 text-xs bg-slate-950/80 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/10 font-semibold text-slate-200">
-                            <Clock className="w-3.5 h-3.5 text-amber-400" />
-                            <span>{tour.durationDays} Hari</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Card Body */}
-                      <div className="p-5 space-y-3">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                          <MapPin className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
-                          <span className="truncate font-medium">{tour.regencyName}, {tour.provinceName}</span>
-                        </div>
-
-                        <h4 className="font-bold text-white text-base font-heading group-hover:text-emerald-300 transition-colors line-clamp-2 leading-snug">
-                          {tour.title}
-                        </h4>
-
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                          {tour.description}
-                        </p>
-
-                        {/* Highlights pills */}
-                        {tour.facilities && tour.facilities.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {tour.facilities.slice(0, 2).map((fac, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[10px] text-slate-300 font-medium truncate max-w-[150px]"
-                              >
-                                ✓ {fac}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Card Footer */}
-                    <div className="px-5 pb-5 pt-2 border-t border-slate-850 flex items-center justify-between text-xs text-slate-400">
-                      <span className="truncate text-[11px]">
-                        {tour.guideProvided ? '✓ Pemandu Lisensi HPI/Saka' : 'Pemandu Lokal'}
-                      </span>
-                      <span className="text-emerald-400 font-bold text-xs group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                        <span>Detail</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </span>
-                    </div>
-                  </div>
-                );
+            <div className="mt-8 grid grid-cols-3 sm:grid-cols-6 gap-2.5 sm:gap-3 max-w-4xl mx-auto">
+              {HOME_TOOLS.map(tool => {
+                const Icon = tool.icon;
+                const active = activeTool === tool.id;
+                return <button key={tool.id} type="button" onClick={() => openTool(tool.id)} className={`group rounded-2xl border bg-gradient-to-b p-3 sm:p-4 transition-all cursor-pointer hover:-translate-y-0.5 ${tool.tone} ${active ? 'ring-2 ring-purple-400/60 bg-white/[.07]' : 'bg-white/[.02]'}`}>
+                  <Icon className="w-6 h-6 sm:w-7 sm:h-7 mx-auto mb-2 transition-transform group-hover:scale-110" />
+                  <div className="text-[10px] sm:text-[11px] font-extrabold text-white">{tool.label}</div>
+                  <div className="hidden sm:block text-[9px] text-slate-500 mt-0.5">{tool.hint}</div>
+                </button>;
               })}
             </div>
           </div>
-        )}
+        </section>
 
-        {/* 2. CULINARY & SOUVENIR 4 KRIDA SHOWCASE (When ALL, CULINARY, or SOUVENIR is active) */}
-        {(galleryTab === 'ALL' || galleryTab === 'CULINARY' || galleryTab === 'SOUVENIR') && approvedProducts.length > 0 && (
-          <div className="space-y-4 pt-6 border-t border-slate-850">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base sm:text-lg font-extrabold text-white font-heading flex items-center gap-2">
-                <Gift className="w-4 h-4 text-amber-400" />
-                <span>
-                  {galleryTab === 'CULINARY' 
-                    ? 'Katalog Kuliner & Minuman Khas Daerah' 
-                    : galleryTab === 'SOUVENIR'
-                    ? 'Katalog Kriya & Cinderamata Kreatif'
-                    : 'Karya Produk, Kriya & Kuliner Binaan 4 Krida'}
-                </span>
-              </h3>
-              <button
-                onClick={() => onEnterDashboard('culinary-souvenirs')}
-                className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
-              >
-                <span>Buka Semua ({approvedProducts.length})</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+        <section id="landing-verification" className="scroll-mt-20 px-4 sm:px-6 pb-12">
+          <div className="max-w-3xl mx-auto rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[.08] via-[#0d1018] to-purple-500/[.06] p-4 sm:p-6 shadow-2xl shadow-black/20">
+            <div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 grid place-items-center"><ShieldCheck className="w-5 h-5 text-emerald-300" /></div><div className="text-left"><h2 className="text-sm sm:text-base font-black">Verifikasi KTA / Nomor Anggota</h2><p className="text-[10px] sm:text-xs text-slate-500">Cari berdasarkan nomor anggota, token verifikasi, atau nama.</p></div><span className="ml-auto hidden sm:inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-emerald-500/10 text-emerald-300 text-[9px] font-bold"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Data tersinkron</span></div>
+            <form onSubmit={handleQuickVerify} className="flex gap-2">
+              <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input value={quickVerifyTerm} onChange={e => setQuickVerifyTerm(e.target.value)} placeholder="Nomor anggota atau nama..." className="w-full h-11 pl-10 pr-3 rounded-xl bg-black/20 border border-white/10 outline-none text-xs sm:text-sm focus:border-purple-500/60" /></div>
+              <button type="submit" className="h-11 px-4 sm:px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"><ShieldCheck className="w-4 h-4" /><span className="hidden sm:inline">Verifikasi</span></button>
+            </form>
+            {verifyError && <div className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">{verifyError}</div>}
+          </div>
+        </section>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {(galleryTab === 'ALL'
-                ? approvedProducts.slice(0, 4)
-                : galleryTab === 'CULINARY'
-                ? culinaryProducts
-                : souvenirProducts
-              ).map((item) => {
-                const itemImgUrl = formatDriveImageUrl(item.imageUrl) || (item.kind === 'KULINER' ? DEFAULT_FOOD_IMG : DEFAULT_CRAFT_IMG);
+        <section className="px-4 sm:px-6 pb-12">
+          <div className="max-w-6xl mx-auto grid grid-cols-3 gap-2.5 sm:gap-4">
+            <div className="rounded-2xl border border-white/5 bg-white/[.025] p-3 sm:p-5 text-center"><Users className="w-4 h-4 mx-auto text-cyan-300 mb-2" /><div className="text-xl sm:text-3xl font-black">{activeMembersCount}</div><div className="text-[9px] sm:text-xs text-slate-500 mt-1">Anggota aktif</div></div>
+            <div className="rounded-2xl border border-white/5 bg-white/[.025] p-3 sm:p-5 text-center"><Compass className="w-4 h-4 mx-auto text-amber-300 mb-2" /><div className="text-xl sm:text-3xl font-black">{publishedTours.length}</div><div className="text-[9px] sm:text-xs text-slate-500 mt-1">Paket wisata</div></div>
+            <div className="rounded-2xl border border-white/5 bg-white/[.025] p-3 sm:p-5 text-center"><Gift className="w-4 h-4 mx-auto text-rose-300 mb-2" /><div className="text-xl sm:text-3xl font-black">{approvedProducts.length}</div><div className="text-[9px] sm:text-xs text-slate-500 mt-1">Karya produk</div></div>
+          </div>
+        </section>
 
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => onSelectCulinaryDetail(item)}
-                    className="bg-slate-950/90 border border-slate-800 hover:border-amber-500/60 rounded-3xl overflow-hidden transition-all duration-300 cursor-pointer group shadow-lg hover:shadow-amber-950/30 flex flex-col justify-between hover:-translate-y-1.5"
-                  >
-                    <div>
-                      {/* Image container */}
-                      <div className="relative h-48 overflow-hidden bg-slate-900">
-                        <img
-                          src={itemImgUrl}
-                          alt={item.name}
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = item.kind === 'KULINER' ? DEFAULT_FOOD_IMG : DEFAULT_CRAFT_IMG;
-                          }}
-                          className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-black/30" />
-
-                        {/* Top Badge */}
-                        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-10">
-                          <span className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg backdrop-blur-md shadow-md ${
-                            item.kind === 'KULINER'
-                              ? 'bg-amber-500/90 text-slate-950'
-                              : 'bg-rose-500/90 text-white'
-                          }`}>
-                            {item.krida || (item.kind === 'KULINER' ? 'Kuliner' : 'Cinderamata')}
-                          </span>
-
-                          <span className="px-2.5 py-1 bg-slate-950/85 backdrop-blur-md text-emerald-300 text-[11px] font-mono font-extrabold rounded-lg border border-emerald-500/30">
-                            Rp {(item.priceEstimate ?? 0).toLocaleString('id-ID')}
-                          </span>
-                        </div>
-
-                        {/* Bottom Tag */}
-                        <div className="absolute bottom-2.5 left-2.5 text-white z-10">
-                          <span className="text-[10px] text-slate-300 font-semibold px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-xs border border-white/10">
-                            {item.categoryLabel || item.kridaCategory || 'Karya Daerah'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Card Info */}
-                      <div className="p-4 space-y-2">
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                          <MapPin className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                          <span className="truncate">{item.districtName} • {item.regencyName}</span>
-                        </div>
-
-                        <h4 className="font-bold text-white text-xs sm:text-sm group-hover:text-amber-300 transition-colors line-clamp-2 leading-snug">
-                          {item.name}
-                        </h4>
-
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="px-4 pb-4 pt-2 border-t border-slate-850 flex items-center justify-between text-[11px] text-slate-400">
-                      <span className="truncate flex items-center gap-1">
-                        <BadgeCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                        <span className="truncate">{item.authorName}</span>
-                      </span>
-                      <span className="text-amber-400 font-bold text-[10px] group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
-                        <span>Pesan</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </span>
-                    </div>
-                  </div>
-                );
+        <section id="landing-krida" className="scroll-mt-20 px-4 sm:px-6 py-10 border-t border-white/5">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-end justify-between gap-4 mb-5"><div><div className="text-[10px] uppercase tracking-[.16em] text-purple-300 font-black">Pusat pembelajaran</div><h2 className="mt-1 text-2xl sm:text-3xl font-black">4 Krida & SKK</h2><p className="mt-1 text-xs sm:text-sm text-slate-500">Pilih Krida → pilih mata Krida → buka materi atau instrumen uji.</p></div><button type="button" onClick={() => openReader()} className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-purple-300 hover:text-white cursor-pointer">Baca layar penuh <ArrowRight className="w-3.5 h-3.5" /></button></div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {KRIDA_CATEGORIES.map(category => {
+                const Icon = category.icon;
+                const count = kridaModules.filter(m => m.kridaId === category.id).length;
+                return <button key={category.id} type="button" onClick={() => openKrida(category.id as KridaId)} className="text-left rounded-3xl border border-white/7 bg-white/[.025] hover:bg-white/[.05] hover:border-purple-500/30 p-4 sm:p-5 transition-all cursor-pointer group"><div className="flex items-start justify-between"><div className="w-11 h-11 rounded-2xl bg-purple-500/10 border border-purple-500/15 grid place-items-center"><Icon className="w-5 h-5 text-purple-300" /></div><ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-purple-300 transition-transform group-hover:translate-x-0.5" /></div><h3 className="mt-4 text-sm sm:text-base font-black">{category.name}</h3><p className="mt-1 text-[10px] sm:text-xs text-slate-500 line-clamp-2">{category.description}</p><div className="mt-4 text-[9px] font-bold text-purple-300">{count || category.topics.length} materi</div></button>;
               })}
             </div>
           </div>
-        )}
-      </section>
+        </section>
 
-      {/* 7. FOOTER & SPREADSHEET DATABASE BADGE */}
-      <footer className="border-t border-slate-800 bg-slate-950 py-12 px-4 sm:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-slate-400">
-          <div className="flex items-center gap-3">
-            <SakaLogo size={36} id="landing-footer-logo" />
-            <div>
-              <p className="font-bold text-white">Saka Pariwisata Indonesia</p>
-              <p className="text-[11px] text-slate-500">Kwartir Nasional Gerakan Pramuka</p>
-            </div>
+        <section id="landing-discover" className="scroll-mt-20 px-4 sm:px-6 py-10 border-t border-white/5">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-end justify-between mb-5"><div><div className="text-[10px] uppercase tracking-[.16em] text-amber-300 font-black">Karya & destinasi</div><h2 className="mt-1 text-2xl sm:text-3xl font-black">Yang sedang tersedia</h2></div><button type="button" onClick={() => onEnterDashboard('culinary-souvenirs')} className="text-xs font-bold text-amber-300 cursor-pointer">Lihat semua <ArrowRight className="inline w-3.5 h-3.5" /></button></div>
+            {publishedTours.length > 0 ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">{publishedTours.slice(0, 3).map(tour => <button key={tour.id} type="button" onClick={() => onViewTourDetail(tour)} className="text-left rounded-3xl overflow-hidden border border-white/7 bg-white/[.025] hover:border-amber-500/30 transition-all cursor-pointer group"><div className="h-40 bg-slate-900 overflow-hidden"><img src={formatDriveImageUrl(tour.imageUrl) || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1000&auto=format&fit=crop&q=80'} alt={tour.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" referrerPolicy="no-referrer" /></div><div className="p-4"><div className="flex items-center gap-1 text-[9px] text-slate-500"><MapPin className="w-3 h-3" /> {tour.regencyName}, {tour.provinceName}</div><h3 className="mt-2 text-sm font-black line-clamp-2">{tour.title}</h3></div></button>)}</div> : <div className="rounded-2xl border border-white/5 bg-white/[.02] p-5 text-xs text-slate-500 mb-6">Belum ada paket wisata yang dipublikasikan.</div>}
+            {approvedProducts.length > 0 && <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{approvedProducts.slice(0, 4).map(item => <button key={item.id} type="button" onClick={() => onSelectCulinaryDetail(item)} className="text-left rounded-2xl overflow-hidden border border-white/7 bg-white/[.025] hover:border-rose-500/30 cursor-pointer"><div className="h-28 sm:h-36 bg-slate-900"><img src={formatDriveImageUrl(item.imageUrl) || 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80'} alt={item.name} className="w-full h-full object-cover" loading="lazy" referrerPolicy="no-referrer" /></div><div className="p-3"><div className="text-[9px] text-rose-300 font-bold">{item.kind === 'KULINER' ? 'KULINER' : 'CINDERAMATA'}</div><h3 className="mt-1 text-xs font-bold line-clamp-2">{item.name}</h3></div></button>)}</div>}
           </div>
+        </section>
 
-          <div className="flex items-center gap-4 flex-wrap justify-center">
-            {currentUser && currentUser.role !== 'PUBLIC' ? (
-              <>
-                <button
-                  onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')}
-                  className="hover:text-white transition-colors cursor-pointer text-purple-300 font-semibold"
-                >
-                  Panel {currentUser.role === 'MEMBER' ? 'KTA Anggota' : 'Dashboard'}
-                </button>
-                <span className="text-slate-700">|</span>
-              </>
-            ) : null}
-            <button
-              onClick={onOpenLoginModal}
-              className="hover:text-white transition-colors cursor-pointer"
-            >
-              Masuk / Login
-            </button>
-            <span className="text-slate-700">|</span>
-            <button
-              onClick={onOpenRegisterModal}
-              className="hover:text-white transition-colors cursor-pointer"
-            >
-              Daftar Anggota Baru
-            </button>
-          </div>
+        <section id="landing-agenda" className="scroll-mt-20 px-4 sm:px-6 py-10 border-t border-white/5">
+          <div className="max-w-6xl mx-auto"><div className="flex items-end justify-between mb-5"><div><div className="text-[10px] uppercase tracking-[.16em] text-sky-300 font-black">Aktivitas</div><h2 className="mt-1 text-2xl sm:text-3xl font-black">Agenda Saka</h2></div><button type="button" onClick={() => onEnterDashboard('activities')} className="text-xs font-bold text-sky-300 cursor-pointer">Semua agenda <ArrowRight className="inline w-3.5 h-3.5" /></button></div><div className="rounded-3xl border border-white/5 bg-white/[.015] overflow-hidden"><LandingActivitiesSection activities={upcomingActivities} currentUser={currentUser} onViewActivityDetail={onViewActivityDetail} onOpenActivityForm={onOpenActivityForm} onEnterDashboard={onEnterDashboard} /></div></div>
+        </section>
 
-          <p className="text-slate-500 text-center md:text-right">
-            © {new Date().getFullYear()} Satuan Karya Pramuka Pariwisata Indonesia.
-          </p>
-        </div>
-      </footer>
+        <section id="landing-members" className="scroll-mt-20 px-4 sm:px-6 py-10 border-t border-white/5">
+          <div className="max-w-6xl mx-auto"><CompetentGuidesSection members={members} provinces={PROVINCES_DATA} onOpenVerifyModal={onOpenVerifyModal} theme="dark" title="Anggota & Kompetensi" subtitle="Temukan anggota Saka Pariwisata dan kompetensi yang tersedia di berbagai wilayah." /></div>
+        </section>
+      </main>
 
-      {/* 9. MODALS PEMBELAJARAN KRIDA & CMS SUPER ADMIN */}
-      <KridaExplorerModal
-        isOpen={isKridaExplorerOpen}
-        onClose={() => {
-          setIsKridaExplorerOpen(false);
-          setActiveExplorerModuleId(undefined);
-        }}
-        modules={kridaModules}
-        currentUser={currentUser}
-        initialKridaId={activeExplorerKrida}
-        initialModuleId={activeExplorerModuleId}
-        onOpenEditor={handleOpenEditor}
-      />
+      <footer className="border-t border-white/5 px-4 sm:px-6 py-8 bg-black/20"><div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4"><div className="flex items-center gap-2.5"><SakaLogo size={34} id="landing-footer-logo" /><div><div className="text-xs font-black">Saka Pariwisata Indonesia</div><div className="text-[9px] text-slate-600">Kwartir Nasional Gerakan Pramuka</div></div></div><div className="flex items-center gap-2"><button type="button" onClick={onOpenLoginModal} className="p-2.5 rounded-xl border border-white/5 text-slate-400 hover:text-white cursor-pointer" title="Masuk"><LockKeyhole className="w-4 h-4" /></button><button type="button" onClick={onOpenRegisterModal} className="p-2.5 rounded-xl border border-white/5 text-slate-400 hover:text-white cursor-pointer" title="Daftar"><UserPlus className="w-4 h-4" /></button></div></div></footer>
 
-      <KridaMaterialEditorModal
-        isOpen={isKridaEditorOpen}
-        onClose={() => {
-          setIsKridaEditorOpen(false);
-          setEditingKridaModule(null);
-        }}
-        moduleItem={editingKridaModule}
-        currentUser={currentUser}
-        onSave={handleSaveKridaModule}
-      />
-
-      {/* 10. FULLSCREEN READER (NO SCROLLING, NEXT >> & BACK << NAVIGATION) */}
-      <KridaFullScreenReaderModal
-        isOpen={isFullScreenReaderOpen}
-        onClose={() => setIsFullScreenReaderOpen(false)}
-        modules={kridaModules}
-        initialModuleId={readerModuleId}
-      />
+      {isKridaExplorerOpen && <KridaExplorerModal modules={kridaModules} kridaId={activeExplorerKrida} initialModuleId={activeExplorerModuleId} currentUser={currentUser} onClose={() => setIsKridaExplorerOpen(false)} onOpenEditor={currentUser?.role === 'SUPER_ADMIN' ? openEditor : undefined} />}
+      {isKridaEditorOpen && editingKridaModule && <KridaMaterialEditorModal module={editingKridaModule} onClose={() => setIsKridaEditorOpen(false)} onSave={handleSaveKridaModule} />}
+      {isFullScreenReaderOpen && <KridaFullScreenReaderModal modules={kridaModules} initialModuleId={readerModuleId} onClose={() => setIsFullScreenReaderOpen(false)} />}
     </div>
   );
 };
