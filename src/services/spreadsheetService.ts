@@ -14,7 +14,7 @@ export interface SpreadsheetConfig {
   scriptUrl?: string; // Optional Google Apps Script Web App URL for direct POST writes
   lastSyncedAt?: string;
   autoSync: boolean;
-  autoRefreshIntervalSeconds?: number; // Real-time polling frequency (default: 6 seconds)
+  autoRefreshIntervalSeconds?: number; // Real-time polling frequency (default: 5 seconds)
   status: 'CONNECTED' | 'SYNCING' | 'ERROR' | 'IDLE';
   lastError?: string;
 }
@@ -55,15 +55,15 @@ class SpreadsheetService {
     error: null as string | null,
     isLivePolling: true,
     lastLiveCheck: null as string | null,
-    pollingIntervalSeconds: 6
+    pollingIntervalSeconds: 5
   };
 
   constructor() {
     this.config = this.loadConfig();
-    this.syncState.pollingIntervalSeconds = this.config.autoRefreshIntervalSeconds || 6;
+    this.syncState.pollingIntervalSeconds = this.config.autoRefreshIntervalSeconds || 5;
     this.initBroadcastChannel();
     this.initAutoSync();
-    this.startLiveSyncEngine((this.config.autoRefreshIntervalSeconds || 6) * 1000); // Poll every 6 seconds for real-time cloud data
+    this.startLiveSyncEngine((this.config.autoRefreshIntervalSeconds || 5) * 1000); // Poll every 5 seconds for near-real-time cloud data
     this.fetchServerConfig().catch(() => {});
   }
 
@@ -129,7 +129,7 @@ class SpreadsheetService {
     }
   }
 
-  public startLiveSyncEngine(intervalMs: number = 6000) {
+  public startLiveSyncEngine(intervalMs: number = 5000) {
     if (this.liveSyncTimer) {
       clearInterval(this.liveSyncTimer);
       this.liveSyncTimer = null;
@@ -182,7 +182,7 @@ class SpreadsheetService {
         return {
           ...parsed,
           autoSync: parsed.autoSync !== undefined ? parsed.autoSync : true,
-          autoRefreshIntervalSeconds: parsed.autoRefreshIntervalSeconds || 6
+          autoRefreshIntervalSeconds: parsed.autoRefreshIntervalSeconds || 5
         };
       }
     } catch (e) {
@@ -194,7 +194,7 @@ class SpreadsheetService {
       spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
       scriptUrl: '',
       autoSync: true,
-      autoRefreshIntervalSeconds: 6,
+      autoRefreshIntervalSeconds: 5,
       status: 'CONNECTED'
     };
   }
@@ -613,6 +613,9 @@ class SpreadsheetService {
    * Tarik data dari Google Spreadsheet dan perbarui state aplikasi secara real-time
    */
   public async syncFromSpreadsheet(silent: boolean = false): Promise<{ success: boolean; count: number; message: string }> {
+    // IMPORTANT: Google Spreadsheet adalah sumber kebenaran data publik.
+    // Browser hanya menyimpan cache untuk rendering cepat; setiap refresh awal
+    // dan polling berikutnya mengambil snapshot terbaru dari Spreadsheet.
     if (this.isSyncing) {
       return { success: false, count: 0, message: 'Proses sinkronisasi sedang berjalan...' };
     }
@@ -796,9 +799,11 @@ class SpreadsheetService {
           };
         });
 
-        // Gabungkan dan perbarui anggota di database lokal
+        // Google Spreadsheet adalah source of truth. Snapshot yang berhasil
+        // dibaca menggantikan cache anggota, sehingga penghapusan/perubahan
+        // dari perangkat lain juga hilang dari browser pada polling berikutnya.
         if (importedMembers.length > 0) {
-          const merged = [...existingMembers];
+          const merged = [...importedMembers];
           const mergedUsers = [...existingUsers];
 
           importedMembers.forEach((newM, idx) => {
@@ -894,7 +899,7 @@ class SpreadsheetService {
         const tourRows = await this.fetchSheetRows('Paket_Wisata');
         if (tourRows && tourRows.length > 0) {
           const existingTours = storage.getTourPackages();
-          const mergedTours = [...existingTours];
+          const mergedTours: TourPackage[] = [];
 
           tourRows.forEach((row, idx) => {
             const tourId = this.getRowValue(row, ['ID', 'id', 'col_0']) || `tour-sheet-${idx}`;
@@ -966,7 +971,7 @@ class SpreadsheetService {
         const culinaryRows = await this.fetchSheetRows('Kuliner_Cinderamata');
         if (culinaryRows && culinaryRows.length > 0) {
           const existingCulinary = storage.getCulinarySouvenirs();
-          const mergedCulinary = [...existingCulinary];
+          const mergedCulinary: CulinarySouvenirItem[] = [];
 
           culinaryRows.forEach((row, idx) => {
             const itemId = this.getRowValue(row, ['ID', 'id', 'col_0']) || `prod-sheet-${idx}`;
@@ -1028,7 +1033,7 @@ class SpreadsheetService {
         const activityRows = await this.fetchSheetRows('Agenda_Kegiatan');
         if (activityRows && activityRows.length > 0) {
           const existingActivities = storage.getActivities();
-          const mergedActivities = [...existingActivities];
+          const mergedActivities: Activity[] = [];
 
           activityRows.forEach((row, idx) => {
             const actId = this.getRowValue(row, ['ID', 'id', 'col_0']) || `act-sheet-${idx + 1}`;
