@@ -162,7 +162,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
   return (
     <div className="spwn-wi-shell min-h-screen text-slate-100 font-sans selection:bg-purple-600 selection:text-white overflow-x-hidden">
-      <div className="spwn-wi-glow spwn-wi-glow-a" /><div className="spwn-wi-glow spwn-wi-glow-b" /><div className="spwn-wi-glow spwn-wi-glow-c" /><header className="sticky top-0 z-50 border-b border-white/5 bg-[#8f72cf]/65 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-white/15 bg-[#7137dc]/88 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
           <button type="button" onClick={() => scrollTo('landing-top')} className="flex items-center gap-2.5 min-w-0 cursor-pointer">
             <SakaLogo size={38} id="landing-saka-logo" />
@@ -189,7 +189,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
         </div>
         {mobileMenuOpen && (
-          <div className="sm:hidden border-t border-white/5 bg-[#8f72cf] px-4 py-3 grid grid-cols-3 gap-2">
+          <div className="sm:hidden border-t border-white/10 bg-[#7137dc] px-4 py-3 grid grid-cols-3 gap-2">
             {HOME_TOOLS.map(tool => {
               const Icon = tool.icon;
               return <button key={tool.id} type="button" onClick={() => openTool(tool.id)} className="rounded-2xl border border-white/5 bg-white/[.03] p-3 text-center cursor-pointer"><Icon className="w-5 h-5 mx-auto mb-1 text-purple-300" /><span className="text-[10px] font-bold">{tool.label}</span></button>;
@@ -201,9 +201,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
       <main id="landing-top">
         <section className="relative px-4 sm:px-6 pt-12 sm:pt-16 pb-12">
-          <div className="absolute inset-0 pointer-events-none overflow-hidden"><div className="spwn-wi-wing left-[4%] top-24" /><div className="spwn-wi-wing right-[0%] top-44 rotate-[18deg] opacity-50" /><div className="spwn-wi-orbit left-1/2 top-24 -translate-x-1/2" /></div>
+          
           <div className="relative max-w-5xl mx-auto text-center">
-            <div className="spwn-wi-shape inline-flex items-center gap-2 rounded-full border border-fuchsia-400/20 bg-gradient-to-r from-purple-500/12 via-fuchsia-500/10 to-cyan-400/8 px-3 py-1.5 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[.12em] text-purple-100"><Sparkles className="w-3.5 h-3.5 text-amber-300" /> Ekosistem Digital Saka Pariwisata</div>
+            <div className="spwn-home-kicker"><Sparkles className="w-3.5 h-3.5" /> Ekosistem Digital Saka Pariwisata</div>
             <h1 className="mt-5 text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.04] drop-shadow-[0_12px_35px_rgba(124,58,237,.18)]">Kenali. Terhubung. <span className="spwn-wi-gradient-text">Berdaya.</span></h1>
             <p className="mt-4 max-w-2xl mx-auto text-sm sm:text-base text-white/80 leading-relaxed">Semua layanan utama Saka Pariwisata dalam satu tempat. Pilih ikon yang Anda butuhkan — detail akan muncul saat diperlukan.</p>
 
@@ -222,10 +222,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </section>
 
         <section id="landing-verification" className="scroll-mt-20 relative px-4 sm:px-6 pb-12">
-          <div className="spwn-wi-card max-w-3xl mx-auto rounded-[30px] p-4 sm:p-6">
+          <div className="spwn-wi-card spwn-home-panel max-w-3xl mx-auto rounded-[28px] p-4 sm:p-6">
             <div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 grid place-items-center"><ShieldCheck className="w-5 h-5 text-emerald-300" /></div><div className="text-left"><h2 className="text-sm sm:text-base font-black">Verifikasi KTA / Nomor Anggota</h2><p className="text-[10px] sm:text-xs text-white/70">Cari berdasarkan nomor anggota, token verifikasi, atau nama.</p></div><span className="ml-auto hidden sm:inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-emerald-500/10 text-emerald-300 text-[9px] font-bold"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Data tersinkron</span></div>
             <form onSubmit={handleQuickVerify} className="flex gap-2">
-              <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/70" /><input value={quickVerifyTerm} onChange={e => setQuickVerifyTerm(e.target.value)} placeholder="Nomor anggota atau nama..." className="w-full h-11 pl-10 pr-3 rounded-xl bg-black/20 border border-white/10 outline-none text-xs sm:text-sm focus:border-purple-500/60" /></div>
+              <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7040b6]" /><input value={quickVerifyTerm} onChange={e => setQuickVerifyTerm(e.target.value)} placeholder="Nomor anggota atau nama..." className="w-full h-11 pl-10 pr-3 rounded-xl bg-white/95 border border-white outline-none text-xs sm:text-sm focus:border-[#e83e9f]" /></div>
               <button type="submit" className="spwn-wi-button h-11 px-4 sm:px-5 rounded-xl text-white text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"><ShieldCheck className="w-4 h-4" /><span className="hidden sm:inline">Verifikasi</span></button>
             </form>
             {verifyError && <div className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">{verifyError}</div>}
@@ -240,7 +240,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
         </section>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6"><div className="spwn-wi-divider" /></div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6"><div className="spwn-home-divider" /></div>
         <section id="landing-krida" className="scroll-mt-20 px-4 sm:px-6 py-12">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-end justify-between gap-4 mb-5"><div><div className="text-[10px] uppercase tracking-[.16em] text-purple-300 font-black">Pusat pembelajaran</div><h2 className="mt-1 text-2xl sm:text-3xl font-black">4 Krida & SKK</h2><p className="mt-1 text-xs sm:text-sm text-white/70">Pilih Krida → pilih mata Krida → buka materi atau instrumen uji.</p></div><button type="button" onClick={() => openReader()} className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-purple-300 hover:text-white cursor-pointer">Baca layar penuh <ArrowRight className="w-3.5 h-3.5" /></button></div>
@@ -254,7 +254,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
         </section>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6"><div className="spwn-wi-divider" /></div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6"><div className="spwn-home-divider" /></div>
         <section id="landing-discover" className="scroll-mt-20 px-4 sm:px-6 py-12">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-end justify-between mb-5"><div><div className="text-[10px] uppercase tracking-[.16em] text-amber-300 font-black">Karya & destinasi</div><h2 className="mt-1 text-2xl sm:text-3xl font-black">Yang sedang tersedia</h2></div><button type="button" onClick={() => onEnterDashboard('culinary-souvenirs')} className="text-xs font-bold text-amber-300 cursor-pointer">Lihat semua <ArrowRight className="inline w-3.5 h-3.5" /></button></div>
@@ -263,18 +263,18 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
         </section>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6"><div className="spwn-wi-divider" /></div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6"><div className="spwn-home-divider" /></div>
         <section id="landing-agenda" className="scroll-mt-20 px-4 sm:px-6 py-12">
           <div className="max-w-6xl mx-auto"><div className="flex items-end justify-between mb-5"><div><div className="text-[10px] uppercase tracking-[.16em] text-sky-300 font-black">Aktivitas</div><h2 className="mt-1 text-2xl sm:text-3xl font-black">Agenda Saka</h2></div><button type="button" onClick={() => onEnterDashboard('activities')} className="text-xs font-bold text-sky-300 cursor-pointer">Semua agenda <ArrowRight className="inline w-3.5 h-3.5" /></button></div><div className="spwn-wi-card rounded-[28px] overflow-hidden"><LandingActivitiesSection activities={upcomingActivities} currentUser={currentUser} onViewActivityDetail={onViewActivityDetail} onOpenActivityForm={onOpenActivityForm} onEnterDashboard={onEnterDashboard} /></div></div>
         </section>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6"><div className="spwn-wi-divider" /></div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6"><div className="spwn-home-divider" /></div>
         <section id="landing-members" className="scroll-mt-20 px-4 sm:px-6 py-12">
-          <div className="max-w-6xl mx-auto"><CompetentGuidesSection members={members} provinces={PROVINCES_DATA} onOpenVerifyModal={onOpenVerifyModal} theme="dark" title="Anggota & Kompetensi" subtitle="Temukan anggota Saka Pariwisata dan kompetensi yang tersedia di berbagai wilayah." /></div>
+          <div className="max-w-6xl mx-auto"><CompetentGuidesSection members={members} provinces={PROVINCES_DATA} onOpenVerifyModal={onOpenVerifyModal} theme="light" title="Anggota & Kompetensi" subtitle="Temukan anggota Saka Pariwisata dan kompetensi yang tersedia di berbagai wilayah." /></div>
         </section>
       </main>
 
-      <footer className="relative border-t border-white/5 px-4 sm:px-6 py-10 bg-black/20"><div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4"><div className="flex items-center gap-2.5"><SakaLogo size={34} id="landing-footer-logo" /><div><div className="text-xs font-black">Saka Pariwisata Indonesia</div><div className="text-[9px] text-white/60">Kwartir Nasional Gerakan Pramuka</div></div></div><div className="flex items-center gap-2"><button type="button" onClick={onOpenLoginModal} className="p-2.5 rounded-xl border border-white/5 text-white/80 hover:text-white cursor-pointer" title="Masuk"><LockKeyhole className="w-4 h-4" /></button><button type="button" onClick={onOpenRegisterModal} className="p-2.5 rounded-xl border border-white/5 text-white/80 hover:text-white cursor-pointer" title="Daftar"><UserPlus className="w-4 h-4" /></button></div></div></footer>
+      <footer className="relative border-t border-white/15 px-4 sm:px-6 py-10 bg-[#6c35d5]/70"><div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4"><div className="flex items-center gap-2.5"><SakaLogo size={34} id="landing-footer-logo" /><div><div className="text-xs font-black">Saka Pariwisata Indonesia</div><div className="text-[9px] text-white/60">Kwartir Nasional Gerakan Pramuka</div></div></div><div className="flex items-center gap-2"><button type="button" onClick={onOpenLoginModal} className="p-2.5 rounded-xl border border-white/5 text-white/80 hover:text-white cursor-pointer" title="Masuk"><LockKeyhole className="w-4 h-4" /></button><button type="button" onClick={onOpenRegisterModal} className="p-2.5 rounded-xl border border-white/5 text-white/80 hover:text-white cursor-pointer" title="Daftar"><UserPlus className="w-4 h-4" /></button></div></div></footer>
 
       {isKridaExplorerOpen && <KridaExplorerModal modules={kridaModules} kridaId={activeExplorerKrida} initialModuleId={activeExplorerModuleId} currentUser={currentUser} onClose={() => setIsKridaExplorerOpen(false)} onOpenEditor={currentUser?.role === 'SUPER_ADMIN' ? openEditor : undefined} />}
       {isKridaEditorOpen && editingKridaModule && <KridaMaterialEditorModal module={editingKridaModule} onClose={() => setIsKridaEditorOpen(false)} onSave={handleSaveKridaModule} />}
