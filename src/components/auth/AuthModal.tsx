@@ -518,7 +518,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           generatedNikMasked,
 
         avatarUrl:
-          finalAvatarUrl,
+          photoData || photoUrl,
 
         gender:
           regGender,
@@ -597,7 +597,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: memberData.email,
           scriptUrlConfigured: Boolean(scriptUrl),
           hasDrivePhoto:
-            Boolean(finalAvatarUrl)
+            Boolean(photoData || photoUrl)
         }
       );
 
