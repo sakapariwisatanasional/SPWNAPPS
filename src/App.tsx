@@ -12,7 +12,6 @@ import {
 import { storage } from './services/storage';
 import { DEFAULT_PUBLIC_USER } from './data/initialData';
 import { spreadsheetService } from './services/spreadsheetService';
-import { verifyMemberUniversal } from './services/ktaVerificationService';
 
 // Route Mappings for Full SPA Navigation
 const TAB_ROUTES: Record<string, string> = {
@@ -306,38 +305,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Listen to QR Code / Barcode verification URLs.
-  // verifyMemberUniversal is async, so the result must be awaited before
-  // reading result.member. This makes a scanned KTA link open the real member profile.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const params = new URLSearchParams(window.location.search);
-    const verifyId = params.get('verifyId') || params.get('verify') || params.get('id');
-    if (!verifyId) return;
-
-    let cancelled = false;
-
-    const resolveVerification = async () => {
-      try {
-        const result = await verifyMemberUniversal(verifyId, members, { authoritativeRemote: true });
-
-        if (!cancelled && result.found && result.member) {
-          setCurrentTab('verify-portal');
-          setVerifyingMember(result.member);
-        }
-      } catch (error) {
-        console.warn('KTA URL verification failed:', error);
-      }
-    };
-
-    void resolveVerification();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [members]);
-
+  // QR verification is handled by PublicPortalView on the dedicated /verify route.
   // Handle Approve / Reject Member
   // Status tidak lagi hanya diubah di localStorage. Proses menunggu sampai
   // /api/mutate berhasil menulis ke server dan Google Spreadsheet.
