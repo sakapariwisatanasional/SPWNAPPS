@@ -711,9 +711,8 @@ class SpreadsheetService {
             'kecamatan_ranting', 'Kecamatan', 'Ranting', 'col_7'
           ]) || '';
 
-          const rawGudep = this.getRowValue(row, [
-            'Gugus Depan / Pangkalan', 'Gugus Depan', 'Gudep', 'gudep', 'Pangkalan',
-            'Sekolah / Pangkalan', 'Gugusdepan', 'col_8'
+          const rawPosition = this.getRowValue(row, [
+            'Jabatan', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'currentPosition', 'current_position', 'col_8'
           ]) || '';
 
           const kridaRaw = this.getRowValue(row, [
@@ -793,7 +792,7 @@ class SpreadsheetService {
             : (rawDistrict || existingMember?.districtName || territory.regencyName);
 
           if (pendingMember) {
-            const pendingChecks = ['fullName', 'email', 'phone', 'provinceName', 'regencyName', 'branchName', 'gugusDepan', 'krida', 'status'];
+            const pendingChecks = ['fullName', 'email', 'phone', 'provinceName', 'regencyName', 'branchName', 'currentPosition', 'krida', 'status'];
             const confirmed = pendingChecks.every((key: string) => {
               const wanted = clean((pendingMember as any)[key]);
               if (!wanted) return true;
@@ -803,7 +802,7 @@ class SpreadsheetService {
                 : key === 'provinceName' ? rawProv
                 : key === 'regencyName' ? rawReg
                 : key === 'branchName' ? rawDistrict
-                : key === 'gugusDepan' ? rawGudep
+                : key === 'currentPosition' ? rawPosition
                 : key === 'krida' ? kridaRaw
                 : statusRaw;
               return clean(sheetValue) === wanted;
@@ -835,8 +834,7 @@ class SpreadsheetService {
             districtName: pendingMember?.districtName || resolvedDistrictName,
             branchId: pendingMember?.branchId || existingMember?.branchId || '',
             branchName: pendingMember?.branchName || existingMember?.branchName || resolvedDistrictName,
-            gugusDepan: pendingMember?.gugusDepan || rawGudep || existingMember?.gugusDepan || '',
-            currentPosition: pendingMember?.currentPosition || existingMember?.currentPosition || (role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`),
+            currentPosition: pendingMember?.currentPosition || rawPosition || existingMember?.currentPosition || (role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`),
             krida: pendingMember?.krida || (kridaRaw ? krida : (existingMember?.krida || 'Krida Pemandu')),
             joinYear: pendingMember?.joinYear || existingMember?.joinYear || new Date().getFullYear(),
             educationLevel: pendingMember?.educationLevel || existingMember?.educationLevel || 'SMA/SMK',
@@ -1392,7 +1390,7 @@ class SpreadsheetService {
 
     // Schema Anggota wajib 14 kolom. Urutan harus identik dengan Code.gs:
     // ID, Nomor KTA, Nama Lengkap, Email, Nomor WA, Provinsi,
-    // Kabupaten/Kota, Kecamatan, Gudep, Krida, Status, Foto URL,
+    // Kabupaten/Kota, Kecamatan, Jabatan, Krida, Status, Foto URL,
     // Tanggal Daftar, Link Verifikasi.
     const rowData = [
       member.id,
@@ -1403,13 +1401,33 @@ class SpreadsheetService {
       member.provinceName || '',
       member.regencyName || '',
       member.districtName || '',
-      member.gugusDepan || '',
+      member.currentPosition || '',
       member.krida || '',
       member.status || 'PENDING',
       /^data:image\//i.test(String(member.avatarUrl || '')) ? '' : (member.avatarUrl || ''),
       member.registeredAt || new Date().toISOString(),
       verificationLink
     ];
+
+    // Kirim juga object bernama agar Apps Script dapat membangun baris
+    // berdasarkan nama field, bukan posisi array. Ini menjadi pengaman utama
+    // terhadap frontend lama yang pernah menghasilkan offset kolom.
+    const memberData = {
+      id: member.id || '',
+      nationalMemberNumber: member.nationalMemberNumber || '',
+      fullName: member.fullName || '',
+      email: member.email || '',
+      phone: member.phone || '',
+      provinceName: member.provinceName || '',
+      regencyName: member.regencyName || '',
+      districtName: member.districtName || '',
+      currentPosition: member.currentPosition || '',
+      krida: member.krida || '',
+      status: member.status || 'PENDING',
+      avatarUrl: /^data:image\//i.test(String(member.avatarUrl || '')) ? '' : (member.avatarUrl || ''),
+      registeredAt: member.registeredAt || new Date().toISOString(),
+      verificationLink
+    };
 
     const payload = {
       action: 'UPSERT_MEMBER',
@@ -1418,7 +1436,8 @@ class SpreadsheetService {
       sheet: 'Anggota',
       memberId: member.id,
       secondaryId: member.nationalMemberNumber || '',
-      rowData
+      rowData,
+      memberData
     };
 
     this.syncState.isSaving = true;
