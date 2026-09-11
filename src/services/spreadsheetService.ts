@@ -694,9 +694,18 @@ class SpreadsheetService {
             'kecamatan_ranting', 'Kecamatan', 'Ranting', 'col_7'
           ]) || '';
 
+          // Schema Anggota canonical: A ID, B Nomor KTA, C Nama, D Email,
+          // E WA, F Provinsi, G Kabupaten/Kota, H Kecamatan, I Jabatan,
+          // J Krida, K Status, L Foto, M Tanggal Daftar, N Link Verifikasi.
+          const currentPosition = this.getRowValue(row, [
+            'Jabatan', 'Posisi / Jabatan Kepengurusan', 'Posisi/Jabatan Kepengurusan',
+            'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi', 'currentPosition',
+            'current_position', 'col_8'
+          ]);
+
           const kridaRaw = this.getRowValue(row, [
             'Peminatan Krida Saka Pariwisata', 'Pilihan Krida', 'Krida Saka', 'Krida',
-            'krida', 'Peminatan Krida', 'col_8'
+            'krida', 'Peminatan Krida', 'col_9'
           ]);
           
           let krida: any = 'Krida Pemandu';
@@ -705,7 +714,7 @@ class SpreadsheetService {
           else if (kridaRaw.toLowerCase().includes('kuliner') || kridaRaw.toLowerCase().includes('cinderamata') || kridaRaw.toLowerCase().includes('kriya')) krida = 'Krida Kuliner & Cinderamata';
           else if (kridaRaw.toLowerCase().includes('pemandu') || kridaRaw.toLowerCase().includes('guide')) krida = 'Krida Pemandu';
 
-          const statusRaw = (this.getRowValue(row, ['Status', 'status', 'Status Keanggotaan', 'col_9']) || 'ACTIVE').toUpperCase();
+          const statusRaw = (this.getRowValue(row, ['Status', 'status', 'Status Keanggotaan', 'col_10']) || 'ACTIVE').toUpperCase();
           const phone = this.normalizePhoneNumber(this.getRowValue(row, [
             'Nomor WhatsApp', 'No WhatsApp', 'Nomor WA', 'No. WhatsApp', 'Nomor WhatsApp / HP',
             'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_4'
@@ -714,7 +723,7 @@ class SpreadsheetService {
           const email = this.getRowValue(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']) || `member${idx + 1}@pramuka.id`;
           const rawPhoto = this.getRowValue(row, [
             'Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Pas Foto Resmi (KTA Digital)',
-            'Photo', 'Avatar', 'Link Foto', 'Upload Foto', 'col_10'
+            'Photo', 'Avatar', 'Link Foto', 'Upload Foto', 'col_11'
           ]);
           const avatarUrl = this.cleanDriveImageUrl(rawPhoto) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
           const roleRaw = this.getRowValue(row, ['Role', 'Peran', 'Jabatan', 'Hak Akses', 'Wewenang', 'Posisi']);
@@ -781,14 +790,14 @@ class SpreadsheetService {
             regencyName: territory.regencyName,
             districtId: isNationalRow ? '00.00.00' : (this.getRowValue(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || `${territory.regencyId}.01`),
             districtName: isNationalRow ? 'Nasional' : (rawDistrict || territory.regencyName),
-            currentPosition: role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
+            currentPosition: currentPosition || (role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`),
             krida,
             joinYear: new Date().getFullYear(),
             educationLevel: 'SMA/SMK',
             occupation: 'Anggota Pramuka',
             bio: `Anggota resmi Saka Pariwisata ${territory.provinceName}. Terdata langsung dari Google Spreadsheet.`,
             status: statusRaw === 'ACTIVE' || statusRaw === 'PENDING' ? statusRaw : 'ACTIVE',
-            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_11']) || new Date().toISOString(),
+            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_12']) || new Date().toISOString(),
             verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
             isOperator: role !== 'MEMBER',
             operatorRole: role !== 'MEMBER' ? role : undefined,
