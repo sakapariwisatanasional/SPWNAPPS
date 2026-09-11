@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { storage } from '../../services/storage';
 import { spreadsheetService } from '../../services/spreadsheetService';
-import { Member, CurrentUser, Province, Regency, District, KridaType, MemberStatus, MemberSkill, SkillProficiency, Skill } from '../../types';
+import { Member, CurrentUser, Province, Regency, District, Branch, KridaType, MemberStatus, MemberSkill, SkillProficiency, Skill } from '../../types';
 import { formatDriveImageUrl, getDriveDirectFallbackUrl, getValidAvatarUrl } from '../common/SakaLogo';
 import { GOOGLE_DRIVE_MAIN_FOLDER } from '../../services/driveRepository';
 
@@ -99,6 +99,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [regencies, setRegencies] = useState<Regency[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
   // Form States
   const [fullName, setFullName] = useState('');
@@ -114,6 +115,8 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const [selectedProvinceId, setSelectedProvinceId] = useState('');
   const [selectedRegencyId, setSelectedRegencyId] = useState('');
   const [selectedDistrictId, setSelectedDistrictId] = useState('');
+  const [selectedBranchId, setSelectedBranchId] = useState('');
+  const [gugusDepan, setGugusDepan] = useState('');
 
   // Saka Position & Status
   const [krida, setKrida] = useState<KridaType>('Krida Pemandu');
@@ -205,9 +208,29 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       setAvatarUrl(member.avatarUrl || '');
       setCustomPhotoUrl(member.avatarUrl?.startsWith('http') ? member.avatarUrl : '');
 
-      setSelectedProvinceId(member.provinceId || '00');
-      setSelectedRegencyId(member.regencyId || '00.00');
-      setSelectedDistrictId(member.districtId || '00.00.00');
+      // Selalu pulihkan hierarchy berdasarkan ID yang valid.
+      // Jika ID lama tidak tersedia, fallback ke nama wilayah yang tersimpan.
+      const allProvinces = storage.getProvinces();
+      const savedProvince = allProvinces.find(p => p.id === member.provinceId) ||
+        allProvinces.find(p => p.name.trim().toLowerCase() === (member.provinceName || '').trim().toLowerCase());
+      const provinceId = savedProvince?.id || member.provinceId || '32';
+
+      const provinceRegencies = storage.getRegencies(provinceId);
+      const savedRegency = provinceRegencies.find(r => r.id === member.regencyId) ||
+        provinceRegencies.find(r => r.name.trim().toLowerCase() === (member.regencyName || '').trim().toLowerCase());
+      const regencyId = savedRegency?.id || provinceRegencies[0]?.id || member.regencyId || '32.06';
+
+      const regencyDistricts = storage.getDistricts(regencyId);
+      const savedDistrict = regencyDistricts.find(d => d.id === member.districtId) ||
+        regencyDistricts.find(d => d.name.trim().toLowerCase() === (member.districtName || '').trim().toLowerCase());
+      const districtId = savedDistrict?.id || regencyDistricts[0]?.id || member.districtId || '';
+
+      setSelectedProvinceId(provinceId);
+      setSelectedRegencyId(regencyId);
+      setSelectedDistrictId(districtId);
+      setSelectedBranchId(member.branchId || '');
+
+      setGugusDepan(member.gugusDepan || '');
       setKrida(member.krida || 'Krida Pemandu');
       setCurrentPosition(member.currentPosition || 'Anggota Krida Pemandu');
       setJoinYear(member.joinYear || 2024);
@@ -228,26 +251,57 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
   // Load Regencies when Province changes
   useEffect(() => {
-    if (selectedProvinceId) {
-      const regs = storage.getRegencies(selectedProvinceId);
-      setRegencies(regs);
-      // Only reset if current selected regency doesn't belong to this province
-      if (regs.length > 0 && !regs.some(r => r.id === selectedRegencyId)) {
-        setSelectedRegencyId(regs[0].id);
-      }
+    if (!selectedProvinceId) {
+      setRegencies([]);
+      return;
+    }
+
+    const regs = storage.getRegencies(selectedProvinceId);
+    setRegencies(regs);
+
+    // Kabupaten/Kota WAJIB berasal dari provinsi yang sedang dipilih.
+    if (regs.length === 0) {
+      setSelectedRegencyId('');
+      return;
+    }
+
+    if (!regs.some(r => r.id === selectedRegencyId)) {
+      setSelectedRegencyId(regs[0].id);
     }
   }, [selectedProvinceId]);
 
   // Load Districts when Regency changes
   useEffect(() => {
-    if (selectedRegencyId) {
-      const dists = storage.getDistricts(selectedRegencyId);
-      setDistricts(dists);
-      if (dists.length > 0 && !dists.some(d => d.id === selectedDistrictId)) {
-        setSelectedDistrictId(dists[0].id);
-      }
+    if (!selectedRegencyId) {
+      setDistricts([]);
+      setSelectedDistrictId('');
+      return;
+    }
+
+    const dists = storage.getDistricts(selectedRegencyId);
+    setDistricts(dists);
+
+    // Kecamatan/kwarran WAJIB berasal dari Kabupaten/Kota yang dipilih.
+    if (dists.length === 0) {
+      setSelectedDistrictId('');
+      return;
+    }
+
+    if (!dists.some(d => d.id === selectedDistrictId)) {
+      setSelectedDistrictId(dists[0].id);
     }
   }, [selectedRegencyId]);
+
+  // Load Branches when District changes
+  useEffect(() => {
+    if (selectedDistrictId) {
+      const brs = storage.getBranches(selectedDistrictId);
+      setBranches(brs);
+      if (brs.length > 0 && !brs.some(b => b.id === selectedBranchId)) {
+        setSelectedBranchId(brs[0].id);
+      }
+    }
+  }, [selectedDistrictId]);
 
   if (!isOpen || !member) return null;
 
@@ -258,11 +312,13 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   // Check if this Operator has permission to edit this member
   const isDeniedForRegency = isRegencyOperator && currentUser.jurisdictionId && member.regencyId !== currentUser.jurisdictionId;
   const isDeniedForProvince = isProvinceAdmin && currentUser.jurisdictionId && member.provinceId !== currentUser.jurisdictionId;
-  const isUnauthorized = isDeniedForRegency || isDeniedForProvince;
+  const isDeniedForBranch = isBranchAdmin && currentUser.jurisdictionId && member.branchId !== currentUser.jurisdictionId;
+  const isUnauthorized = isDeniedForRegency || isDeniedForProvince || isDeniedForBranch;
 
   const currentProvince = provinces.find(p => p.id === selectedProvinceId);
   const currentRegency = regencies.find(r => r.id === selectedRegencyId);
   const currentDistrict = districts.find(d => d.id === selectedDistrictId);
+  const currentBranch = branches.find(b => b.id === selectedBranchId);
 
   const handleGenerateNewNta = () => {
     if (currentUser.role !== 'SUPER_ADMIN') {
@@ -366,6 +422,16 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       return;
     }
 
+    const validProvince = storage.getProvinces().find(p => p.id === selectedProvinceId);
+    const validRegency = storage.getRegencies(selectedProvinceId).find(r => r.id === selectedRegencyId);
+    const validDistrict = storage.getDistricts(selectedRegencyId).find(d => d.id === selectedDistrictId);
+
+    if (!validProvince || !validRegency || validRegency.provinceId !== validProvince.id ||
+        !validDistrict || validDistrict.regencyId !== validRegency.id) {
+      alert('Struktur wilayah tidak valid. Provinsi, Kabupaten/Kota, dan Kecamatan harus berasal dari hierarki wilayah yang sama.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -386,7 +452,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         const cleanName = fullName.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
         const filename = `KTA_${finalNta || member.nationalMemberNumber || member.id}_${cleanName}.jpg`;
         const uploaded = await spreadsheetService.uploadImageToDrive(finalAvatarUrl, filename, 'MEMBER_AVATAR');
-        finalAvatarUrl = uploaded.url;
+        finalAvatarUrl = uploaded.directUrl || uploaded.url || uploaded.viewUrl || '';
       }
 
       if (/^data:image\//i.test(finalAvatarUrl)) {
@@ -409,6 +475,10 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         regencyName: currentRegency?.name || member.regencyName,
         districtId: selectedDistrictId,
         districtName: currentDistrict?.name || member.districtName,
+        branchId: selectedBranchId || member.branchId,
+        branchName: currentBranch?.name || member.branchName || '',
+
+        gugusDepan: gugusDepan.trim(),
         krida,
         currentPosition: currentPosition.trim() || `Anggota ${krida}`,
         joinYear: Number(joinYear),
@@ -430,16 +500,40 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         updateReason.trim() || 'Perbaikan profil oleh Operator Kwartir'
       );
 
-      if (result) {
-        onSuccess(result);
-        onClose();
-        alert('Perubahan profil anggota berhasil disimpan.');
-      } else {
-        alert('Data anggota tidak ditemukan sehingga perubahan tidak dapat disimpan.');
+      if (!result) {
+        throw new Error('Data anggota tidak ditemukan sehingga perubahan tidak dapat disimpan.');
       }
-    } catch (err) {
+
+      // Simpan secara eksplisit ke Google Spreadsheet setelah state lokal berhasil diperbarui.
+      // Jangan hanya mengandalkan mutation listener karena autoSync dapat sedang nonaktif
+      // atau listener dapat berjalan setelah modal ditutup. saveMemberAndWaitForSync()
+      // menggunakan deduplikasi per member-ID sehingga aman bila autoSync juga berjalan.
+      const syncResult = await spreadsheetService.saveMemberAndWaitForSync(result);
+      if (!syncResult.success || !syncResult.synced) {
+        throw new Error(
+          syncResult.message ||
+          'Perubahan tersimpan di browser tetapi belum berhasil disinkronkan ke Google Spreadsheet.'
+        );
+      }
+
+      // onSuccess hanya bertugas memperbarui UI induk. Jika callback UI gagal,
+      // jangan menganggap transaksi penyimpanan gagal karena data sudah tersimpan.
+      try {
+        onSuccess(result);
+      } catch (callbackErr) {
+        console.warn('UI onSuccess callback error after member save:', callbackErr);
+      }
+
+      onClose();
+      alert(
+        syncResult.row
+          ? `Perubahan profil anggota berhasil disimpan dan diverifikasi di Google Spreadsheet (baris ${syncResult.row}).`
+          : 'Perubahan profil anggota berhasil disimpan dan diverifikasi di Google Spreadsheet.'
+      );
+    } catch (err: any) {
       console.error('Error updating member:', err);
-      alert('Terjadi kesalahan saat menyimpan perubahan profil anggota.');
+      const message = err?.message || String(err) || 'Kesalahan tidak diketahui.';
+      alert(`Gagal menyimpan perubahan profil anggota.\n\n${message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -497,11 +591,11 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-base font-heading">Koreksi & Pembaruan Profil Anggota</h3>
                 <span className="px-2 py-0.5 bg-purple-500/30 text-purple-200 border border-purple-400/30 rounded-md text-[10px] font-mono font-bold">
-                  {isRegencyOperator ? 'Operator Kecamatan' : 'Hak Akses Admin'}
+                  {isRegencyOperator ? 'Operator Cabang' : 'Hak Akses Admin'}
                 </span>
               </div>
               <p className="text-xs text-purple-200/80">
-                Ubah nama lengkap, gelar akademis/kepramukaan, kontak, peminatan krida, dan wilayah
+                Ubah nama lengkap, gelar akademis/kepramukaan, kontak, peminatan krida, dan gudep
               </p>
             </div>
           </div>
@@ -926,14 +1020,14 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                 <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-amber-900">
                   <Lock className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
                   <p className="text-[11px] leading-relaxed">
-                    <strong>Hak Khusus Operator Kecamatan ({currentUser.jurisdictionName}):</strong> Anda dapat mengelola data anggota dalam wilayah kecamatan ini. Pilihan Kabupaten/Kota dikunci.
+                    <strong>Hak Khusus Operator Cabang ({currentUser.jurisdictionName}):</strong> Anda dapat mengubah data kontak, alamat, gugus depan, dan ranting di dalam cabang ini. Pilihan Kwartir Cabang dikunci.
                   </p>
                 </div>
               ) : (
                 <div className="bg-purple-50 border border-purple-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-purple-900">
                   <MapPin className="w-4 h-4 text-purple-700 flex-shrink-0 mt-0.5" />
                   <p className="text-[11px] leading-relaxed">
-                    Perubahan domisili akan memindahkan keanggotaan ke wilayah Kwartir baru dan secara otomatis tercatat dalam <strong>Riwayat Mutasi / Lokasi Anggota</strong>.
+                    Perubahan domisili akan memindahkan keanggotaan ke Kwartir baru dan secara otomatis tercatat dalam <strong>Riwayat Mutasi / Lokasi Anggota</strong>.
                   </p>
                 </div>
               )}
@@ -1035,7 +1129,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-800 mb-1">Kecamatan</label>
+                    <label className="block font-bold text-slate-800 mb-1">Kecamatan (Distrik / Kwarran)</label>
                     <select
                       value={selectedDistrictId}
                       onChange={(e) => setSelectedDistrictId(e.target.value)}
@@ -1049,6 +1143,31 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                     </select>
                   </div>
 
+                  <div>
+                    <label className="block font-bold text-slate-800 mb-1">Pangkalan Saka / Kwarran</label>
+                    <select
+                      value={selectedBranchId}
+                      onChange={(e) => setSelectedBranchId(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800"
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block font-bold text-slate-800 mb-1">Gugus Depan (Gudep) & Pangkalan</label>
+                    <input
+                      type="text"
+                      value={gugusDepan}
+                      onChange={(e) => setGugusDepan(e.target.value)}
+                      placeholder="Contoh: 06.12.01-02 Pangkalan SMK Negeri 1 Pariwisata"
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
