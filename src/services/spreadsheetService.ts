@@ -635,9 +635,17 @@ class SpreadsheetService {
       if (rows && rows.length > 0) {
         const existingMembers = storage.getMembers();
         const existingUsers = storage.getUsers();
+        const clean = (value: any) => String(value ?? '').trim();
+        const nonEmpty = (value: any) => clean(value) !== '';
         const prevMemberIds = new Set(existingMembers.map(m => m.id));
         const prevMemberKta = new Set(existingMembers.map(m => m.nationalMemberNumber ? m.nationalMemberNumber.trim() : ''));
         const prevMemberEmails = new Set(existingMembers.map(m => m.email ? m.email.toLowerCase().trim() : ''));
+
+        let pendingMap: Record<string, any> = {};
+        try {
+          const rawPending = localStorage.getItem('saka_pending_member_writes_v1');
+          pendingMap = rawPending ? JSON.parse(rawPending) : {};
+        } catch {}
 
         const parseRole = (roleStr?: string, prov?: string, kab?: string): UserRole => {
           const r = (roleStr || '').toUpperCase().replace(/\s+/g, '_');
@@ -661,6 +669,15 @@ class SpreadsheetService {
 
         // Petakan baris spreadsheet ke model Member
         const importedMembers: Member[] = rows.map((row, idx) => {
+          const rowIdHint = this.getRowValue(row, ['ID', 'id', 'Id', 'member_id', 'Nomor ID', 'col_0']);
+          const rowKtaHint = this.getRowValue(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'col_1']);
+          const rowEmailHint = this.getRowValue(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']);
+          const existingMember = existingMembers.find(m =>
+            (rowIdHint && m.id === rowIdHint) ||
+            (rowKtaHint && m.nationalMemberNumber && m.nationalMemberNumber.trim() === rowKtaHint.trim()) ||
+            (rowEmailHint && m.email && m.email.toLowerCase().trim() === rowEmailHint.toLowerCase().trim())
+          );
+
           const fullName = this.getRowValue(row, [
             'Nama Lengkap', 'nama_lengkap', 'Nama Lengkap (dengan Gelar)', 'Nama Lengkap & Gelar',
             'Nama Anggota', 'Nama Peserta', 'Nama', 'nama', 'Full Name', 'fullname', 'Name', 'col_2'
@@ -694,9 +711,14 @@ class SpreadsheetService {
             'kecamatan_ranting', 'Kecamatan', 'Ranting', 'col_7'
           ]) || '';
 
+          const rawGudep = this.getRowValue(row, [
+            'Gugus Depan / Pangkalan', 'Gugus Depan', 'Gudep', 'gudep', 'Pangkalan',
+            'Sekolah / Pangkalan', 'Gugusdepan', 'col_8'
+          ]) || '';
+
           const kridaRaw = this.getRowValue(row, [
             'Peminatan Krida Saka Pariwisata', 'Pilihan Krida', 'Krida Saka', 'Krida',
-            'krida', 'Peminatan Krida', 'col_8'
+            'krida', 'Peminatan Krida', 'col_9'
           ]);
           
           let krida: any = 'Krida Pemandu';
@@ -705,7 +727,7 @@ class SpreadsheetService {
           else if (kridaRaw.toLowerCase().includes('kuliner') || kridaRaw.toLowerCase().includes('cinderamata') || kridaRaw.toLowerCase().includes('kriya')) krida = 'Krida Kuliner & Cinderamata';
           else if (kridaRaw.toLowerCase().includes('pemandu') || kridaRaw.toLowerCase().includes('guide')) krida = 'Krida Pemandu';
 
-          const statusRaw = (this.getRowValue(row, ['Status', 'status', 'Status Keanggotaan', 'col_9']) || 'ACTIVE').toUpperCase();
+          const statusRaw = (this.getRowValue(row, ['Status', 'status', 'Status Keanggotaan', 'Status Verifikasi', 'col_10']) || String(existingMember?.status || 'ACTIVE')).toUpperCase();
           const phone = this.normalizePhoneNumber(this.getRowValue(row, [
             'Nomor WhatsApp', 'No WhatsApp', 'Nomor WA', 'No. WhatsApp', 'Nomor WhatsApp / HP',
             'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_4'
@@ -714,12 +736,13 @@ class SpreadsheetService {
           const email = this.getRowValue(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']) || `member${idx + 1}@pramuka.id`;
           const rawPhoto = this.getRowValue(row, [
             'Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Pas Foto Resmi (KTA Digital)',
-            'Photo', 'Avatar', 'Link Foto', 'Upload Foto', 'col_10'
+            'Photo', 'Avatar', 'Link Foto', 'Upload Foto', 'col_11'
           ]);
           const avatarUrl = this.cleanDriveImageUrl(rawPhoto) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
           const roleRaw = this.getRowValue(row, ['Role', 'Peran', 'Jabatan', 'Hak Akses', 'Wewenang', 'Posisi']);
           const role = parseRole(roleRaw, rawProv, rawReg);
           const memberId = this.getRowValue(row, ['ID', 'id', 'Id', 'member_id', 'Nomor ID', 'col_0']) || `sheet-member-${idx + 1}`;
+          const pendingMember: Partial<Member> | undefined = pendingMap[memberId]?.member;
 
           // Ekstraksi Sertifikasi Kompetensi jika ada di spreadsheet
           const rawCertName = this.getRowValue(row, [
@@ -762,95 +785,128 @@ class SpreadsheetService {
           const rawGender = (this.getRowValue(row, ['Jenis Kelamin', 'Gender', 'JK', 'L/P']) || '').toUpperCase();
           const gender = rawGender.startsWith('P') || rawGender.includes('PEREMPUAN') || rawGender.includes('WANITA') ? 'PEREMPUAN' : 'LAKI_LAKI';
 
+          const resolvedDistrictId = isNationalRow
+            ? '00.00.00'
+            : (this.getRowValue(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || existingMember?.districtId || `${territory.regencyId}.01`);
+          const resolvedDistrictName = isNationalRow
+            ? 'Nasional'
+            : (rawDistrict || existingMember?.districtName || territory.regencyName);
+
+          if (pendingMember) {
+            const pendingChecks = ['fullName', 'email', 'phone', 'provinceName', 'regencyName', 'branchName', 'gugusDepan', 'krida', 'status'];
+            const confirmed = pendingChecks.every((key: string) => {
+              const wanted = clean((pendingMember as any)[key]);
+              if (!wanted) return true;
+              const sheetValue = key === 'fullName' ? fullName
+                : key === 'email' ? email
+                : key === 'phone' ? phone
+                : key === 'provinceName' ? rawProv
+                : key === 'regencyName' ? rawReg
+                : key === 'branchName' ? rawDistrict
+                : key === 'gugusDepan' ? rawGudep
+                : key === 'krida' ? kridaRaw
+                : statusRaw;
+              return clean(sheetValue) === wanted;
+            });
+            if (confirmed || Date.now() - Number(pendingMap[memberId]?.timestamp || 0) > 10 * 60 * 1000) {
+              delete pendingMap[memberId];
+            }
+          }
+
           return {
+            ...(existingMember || {} as Member),
             id: memberId,
-            userId: `user-${memberId}`,
-            nationalMemberNumber: kta || undefined,
-            fullName,
-            nikMasked: '3201**********01',
-            avatarUrl,
-            gender,
-            birthPlace: 'Indonesia',
-            birthDate: '2000-01-01',
-            email,
-            phone,
-            address: `${rawDistrict || territory.regencyName}, ${territory.regencyName}, ${territory.provinceName}`,
-            provinceId: territory.provinceId,
-            provinceName: territory.provinceName,
-            regencyId: territory.regencyId,
-            regencyName: territory.regencyName,
-            districtId: isNationalRow ? '00.00.00' : (this.getRowValue(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || `${territory.regencyId}.01`),
-            districtName: isNationalRow ? 'Nasional' : (rawDistrict || territory.regencyName),
-            currentPosition: role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
-            krida,
-            joinYear: new Date().getFullYear(),
-            educationLevel: 'SMA/SMK',
-            occupation: 'Anggota Pramuka',
-            bio: `Anggota resmi Saka Pariwisata ${territory.provinceName}. Terdata langsung dari Google Spreadsheet.`,
-            status: statusRaw === 'ACTIVE' || statusRaw === 'PENDING' ? statusRaw : 'ACTIVE',
-            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_11']) || new Date().toISOString(),
-            verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
-            isOperator: role !== 'MEMBER',
-            operatorRole: role !== 'MEMBER' ? role : undefined,
-            operatorJurisdictionName: role === 'SUPER_ADMIN' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? (rawDistrict || territory.regencyName) : undefined,
-            skills: memberSkills,
-            certifications: memberCerts,
-            locationHistory: []
+            userId: existingMember?.userId || `user-${memberId}`,
+            nationalMemberNumber: pendingMember?.nationalMemberNumber || kta || existingMember?.nationalMemberNumber || undefined,
+            fullName: pendingMember?.fullName || fullName || existingMember?.fullName || `Anggota ${idx + 1}`,
+            nikMasked: existingMember?.nikMasked || '3201**********01',
+            avatarUrl: pendingMember?.avatarUrl || (nonEmpty(rawPhoto) ? avatarUrl : (existingMember?.avatarUrl || '')),
+            gender: pendingMember?.gender || existingMember?.gender || gender,
+            birthPlace: pendingMember?.birthPlace || existingMember?.birthPlace || '',
+            birthDate: pendingMember?.birthDate || existingMember?.birthDate || '',
+            email: pendingMember?.email || email || existingMember?.email || '',
+            phone: pendingMember?.phone || phone || existingMember?.phone || '',
+            address: pendingMember?.address || existingMember?.address || `${resolvedDistrictName}, ${territory.regencyName}, ${territory.provinceName}`,
+            provinceId: pendingMember?.provinceId || territory.provinceId || existingMember?.provinceId || '',
+            provinceName: pendingMember?.provinceName || territory.provinceName || existingMember?.provinceName || '',
+            regencyId: pendingMember?.regencyId || territory.regencyId || existingMember?.regencyId || '',
+            regencyName: pendingMember?.regencyName || territory.regencyName || existingMember?.regencyName || '',
+            districtId: pendingMember?.districtId || resolvedDistrictId,
+            districtName: pendingMember?.districtName || resolvedDistrictName,
+            branchId: pendingMember?.branchId || existingMember?.branchId || '',
+            branchName: pendingMember?.branchName || existingMember?.branchName || resolvedDistrictName,
+            gugusDepan: pendingMember?.gugusDepan || rawGudep || existingMember?.gugusDepan || '',
+            currentPosition: pendingMember?.currentPosition || existingMember?.currentPosition || (role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`),
+            krida: pendingMember?.krida || (kridaRaw ? krida : (existingMember?.krida || 'Krida Pemandu')),
+            joinYear: pendingMember?.joinYear || existingMember?.joinYear || new Date().getFullYear(),
+            educationLevel: pendingMember?.educationLevel || existingMember?.educationLevel || 'SMA/SMK',
+            occupation: pendingMember?.occupation || existingMember?.occupation || 'Anggota Pramuka',
+            bio: pendingMember?.bio || existingMember?.bio || `Anggota resmi Saka Pariwisata ${territory.provinceName}.`,
+            status: pendingMember?.status || (statusRaw === 'ACTIVE' || statusRaw === 'PENDING' ? statusRaw : (existingMember?.status || 'ACTIVE')),
+            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_12']) || existingMember?.registeredAt || new Date().toISOString(),
+            verificationToken: existingMember?.verificationToken || `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
+            isOperator: existingMember?.isOperator ?? (role !== 'MEMBER'),
+            operatorRole: existingMember?.operatorRole || (role !== 'MEMBER' ? role : undefined),
+            operatorJurisdictionName: existingMember?.operatorJurisdictionName || (role === 'SUPER_ADMIN' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? resolvedDistrictName : undefined),
+            skills: memberSkills.length > 0 ? memberSkills : (existingMember?.skills || []),
+            certifications: memberCerts.length > 0 ? memberCerts : (existingMember?.certifications || []),
+            locationHistory: existingMember?.locationHistory || []
           };
         });
 
-        // Google Spreadsheet adalah source of truth. Snapshot yang berhasil
-        // dibaca menggantikan cache anggota, sehingga penghapusan/perubahan
-        // dari perangkat lain juga hilang dari browser pada polling berikutnya.
+        // Spreadsheet menjadi sumber data cloud untuk field yang memang ada di sheet.
+        // Field profil yang tidak tersedia di sheet tetap dipertahankan dari cache lokal.
         if (importedMembers.length > 0) {
-          const merged = [...importedMembers];
+          const merged = [...existingMembers];
           const mergedUsers = [...existingUsers];
 
           importedMembers.forEach((newM, idx) => {
             const rawRow = rows[idx] || {};
-            const password = this.getRowValue(rawRow, ['Password', 'Kata Sandi', 'Kata_Sandi', 'password']);
             const username = this.getRowValue(rawRow, ['Username', 'username']) || (newM.email ? newM.email.split('@')[0] : `user_${idx + 1}`);
             const parsedRole = newM.operatorRole || 'MEMBER';
 
-            // Cari apakah member sudah ada di database
-            const existingIdx = merged.findIndex(m => 
+            const existingIdx = merged.findIndex(m =>
               m.id === newM.id ||
               (newM.nationalMemberNumber && m.nationalMemberNumber && m.nationalMemberNumber.trim() === newM.nationalMemberNumber.trim()) ||
               (newM.email && m.email && m.email.toLowerCase().trim() === newM.email.toLowerCase().trim())
             );
 
-            const isNewMember = !prevMemberIds.has(newM.id) && 
+            const isNewMember = !prevMemberIds.has(newM.id) &&
               (!newM.nationalMemberNumber || !prevMemberKta.has(newM.nationalMemberNumber.trim())) &&
               (!newM.email || !prevMemberEmails.has(newM.email.toLowerCase().trim()));
 
-            if (isNewMember) {
-              newlyDiscoveredMembers.push(newM);
-            }
+            if (isNewMember) newlyDiscoveredMembers.push(newM);
 
             if (existingIdx !== -1) {
-              // Update in place
               merged[existingIdx] = {
                 ...merged[existingIdx],
                 ...newM,
-                skills: (merged[existingIdx].skills && merged[existingIdx].skills.length > 0) ? merged[existingIdx].skills : newM.skills,
-                certifications: (merged[existingIdx].certifications && merged[existingIdx].certifications.length > 0) ? merged[existingIdx].certifications : newM.certifications,
+                // Field yang tidak tersedia di sheet Anggota tetap dipertahankan.
+                address: merged[existingIdx].address || newM.address,
+                birthPlace: merged[existingIdx].birthPlace || newM.birthPlace,
+                birthDate: merged[existingIdx].birthDate || newM.birthDate,
+                educationLevel: merged[existingIdx].educationLevel || newM.educationLevel,
+                occupation: merged[existingIdx].occupation || newM.occupation,
+                bio: merged[existingIdx].bio || newM.bio,
+                currentPosition: merged[existingIdx].currentPosition || newM.currentPosition,
+                skills: merged[existingIdx].skills?.length ? merged[existingIdx].skills : (newM.skills || []),
+                certifications: merged[existingIdx].certifications?.length ? merged[existingIdx].certifications : (newM.certifications || []),
+                locationHistory: merged[existingIdx].locationHistory || []
               };
             } else {
-              // Tambahkan anggota baru
               merged.push(newM);
               addedMemberCount++;
             }
 
-            // Sync akun user untuk autentikasi
-            const userIdx = mergedUsers.findIndex(u => 
-              (newM.email && u.email && u.email.toLowerCase().trim() === newM.email.toLowerCase().trim()) || 
-              (u.memberId && u.memberId === newM.id) || 
+            const userIdx = mergedUsers.findIndex(u =>
+              (newM.email && u.email && u.email.toLowerCase().trim() === newM.email.toLowerCase().trim()) ||
+              (u.memberId && u.memberId === newM.id) ||
               (u.username && u.username.toLowerCase() === username.toLowerCase())
             );
 
             const userObj: CurrentUser = {
               id: newM.userId,
-              username: username,
+              username,
               email: newM.email,
               name: newM.fullName,
               role: parsedRole,
@@ -860,36 +916,34 @@ class SpreadsheetService {
               memberId: newM.id
             };
 
-            if (userIdx !== -1) {
-              mergedUsers[userIdx] = { ...mergedUsers[userIdx], ...userObj };
-            } else {
-              mergedUsers.push(userObj);
-            }
+            if (userIdx !== -1) mergedUsers[userIdx] = { ...mergedUsers[userIdx], ...userObj };
+            else mergedUsers.push(userObj);
           });
 
-          // Kirim notifikasi jika terdeteksi pendaftaran anggota baru dari perangkat lain
+          // Simpan hasil merge tanpa menghapus data profil lokal yang tidak
+          // direpresentasikan pada sheet Anggota.
+          try {
+            localStorage.setItem('saka_pending_member_writes_v1', JSON.stringify(pendingMap));
+          } catch {}
+          storage.setMembers(merged);
+          if (!silent) storage.setUsers(mergedUsers);
+
           if (this.lastKnownMemberCount > 0 && newlyDiscoveredMembers.length > 0) {
             newlyDiscoveredMembers.forEach(nm => {
-              storage.addNotification(
-                'user-superadmin-rohadi',
-                `Pendaftaran Anggota Baru (${nm.krida})`,
-                `Kak ${nm.fullName} (${nm.districtName || 'Kecamatan'}, ${nm.regencyName}) baru saja mendaftar online. Data langsung sinkron secara real-time.`,
-                'SUCCESS',
-                '/members'
-              );
+              storage.addNotification({
+                id: `notif-sheet-member-${nm.id}-${Date.now()}`,
+                userId: 'user-superadmin-rohadi',
+                title: `Pendaftaran Anggota Baru (${nm.krida})`,
+                message: `Kak ${nm.fullName} (${nm.districtName || 'Kecamatan'}, ${nm.regencyName}) baru saja mendaftar online. Data langsung sinkron secara real-time.`,
+                type: 'SUCCESS',
+                timestamp: new Date().toISOString(),
+                isRead: false,
+                link: '/members'
+              });
             });
           }
-          this.lastKnownMemberCount = importedMembers.length;
 
-          storage.setMembers(merged);
-          // Jangan mengubah registry USERS pada silent/live polling.
-          // Registry user berkaitan langsung dengan sesi login; menulis ulang
-          // daftar user setiap beberapa detik dapat memicu re-render/auth guard
-          // pada aplikasi utama. Sinkronisasi user hanya dilakukan saat sync
-          // manual (silent=false).
-          if (!silent) {
-            storage.setUsers(mergedUsers);
-          }
+          this.lastKnownMemberCount = importedMembers.length;
           memberCount = importedMembers.length;
         }
       }
@@ -1336,6 +1390,10 @@ class SpreadsheetService {
       ? `${window.location.origin}/?verifyId=${encodeURIComponent(member.nationalMemberNumber || member.id)}`
       : '';
 
+    // Schema Anggota wajib 14 kolom. Urutan harus identik dengan Code.gs:
+    // ID, Nomor KTA, Nama Lengkap, Email, Nomor WA, Provinsi,
+    // Kabupaten/Kota, Kecamatan, Gudep, Krida, Status, Foto URL,
+    // Tanggal Daftar, Link Verifikasi.
     const rowData = [
       member.id,
       member.nationalMemberNumber || '',
@@ -1345,9 +1403,10 @@ class SpreadsheetService {
       member.provinceName || '',
       member.regencyName || '',
       member.districtName || '',
+      member.gugusDepan || '',
       member.krida || '',
       member.status || 'PENDING',
-      member.avatarUrl || '',
+      /^data:image\//i.test(String(member.avatarUrl || '')) ? '' : (member.avatarUrl || ''),
       member.registeredAt || new Date().toISOString(),
       verificationLink
     ];
