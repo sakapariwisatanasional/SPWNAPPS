@@ -173,6 +173,25 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
       return 'MEMBER';
     };
 
+    const normalizeSpreadsheetDate = (raw: string): string => {
+      const value = String(raw || '').trim();
+      if (!value) return '';
+
+      // Google Sheets/Excel may expose a date as its serial number.
+      // Convert it to an ISO date so the verification card can display
+      // a real Indonesian calendar date instead of values such as "38724".
+      if (/^\d+(?:\.\d+)?$/.test(value)) {
+        const serial = Number(value);
+        if (Number.isFinite(serial) && serial > 20000 && serial < 100000) {
+          const date = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+          if (!Number.isNaN(date.getTime())) return date.toISOString();
+        }
+      }
+
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+    };
+
     const getVal = (row: Record<string, any>, aliases: string[]): string => {
       for (const a of aliases) {
         if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== '') {
@@ -245,7 +264,7 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
         occupation: 'Pramuka Pariwisata',
         bio: `Anggota resmi Saka Pariwisata. Terverifikasi dari database Google Spreadsheet.`,
         status: (getVal(row, ['Status', 'status', 'Status Keanggotaan', 'col_10']) || 'ACTIVE').toUpperCase() === 'PENDING' ? 'PENDING' : 'ACTIVE',
-        registeredAt: getVal(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_12']) || new Date().toISOString(),
+        registeredAt: normalizeSpreadsheetDate(getVal(row, ['Tanggal Aktif', 'Tanggal Daftar', 'tanggal_aktif', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_12'])) || new Date().toISOString(),
         // Token tetap dibuat untuk kompatibilitas QR lama, tetapi QR baru memakai NTA.
         verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
         isOperator: role !== 'MEMBER',
@@ -298,40 +317,6 @@ export async function verifyMemberUniversal(
   // Untuk halaman verifikasi/QR, Google Spreadsheet adalah sumber kebenaran.
   // Jangan mengembalikan record localStorage yang mungkin merupakan KTA lama.
   if (authoritativeRemote) {
-    // Jalur publik utama: server menjadi proxy ke Google Apps Script.
-    // Ini menghindari ketergantungan pada CORS dan konfigurasi localStorage
-    // browser pengunjung.
-    try {
-      const params = new URLSearchParams();
-      params.set('verifyId', cleanQuery || rawInput.trim());
-      const configuredScriptUrl = spreadsheetService.getConfig().scriptUrl?.trim();
-      if (configuredScriptUrl) params.set('scriptUrl', configuredScriptUrl);
-
-      const response = await fetch(`/api/verify-member?${params.toString()}`, {
-        method: 'GET',
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-
-      if (response.ok) {
-        const payload = await response.json();
-        if (payload?.found && payload.member) {
-          return {
-            found: true,
-            member: payload.member as Member,
-            source: 'GOOGLE_SPREADSHEET',
-            searchTerm: rawInput,
-            normalizedTerm: cleanQuery
-          };
-        }
-      } else {
-        console.warn('Public verification API returned HTTP', response.status);
-      }
-    } catch (e) {
-      console.warn('Public verification API failed:', e);
-    }
-
-    // Fallback hanya untuk kondisi API proxy gagal. Tetap remote, bukan localStorage.
     try {
       const remoteMatch = await searchMemberInRemoteSpreadsheet(rawInput);
       if (remoteMatch) {
