@@ -320,17 +320,16 @@ class StorageService {
       const parsed = data ? JSON.parse(data) : INITIAL_MEMBERS;
       if (!Array.isArray(parsed)) return INITIAL_MEMBERS;
 
-      // Reset aplikasi: data anggota tidak lagi memiliki lapisan Pangkalan/Gudep.
-      // Hapus field legacy agar data lama tidak pernah kembali ke UI/API.
+      // Bersihkan field legacy Gudep agar data lama tidak pernah kembali ke UI/API.
       const cleaned = parsed.map((member: any) => {
         if (!member || typeof member !== 'object') return member;
-        const { branchId, branchName, gugusDepan, ...cleanMember } = member;
+        const cleanMember = { ...member };
+        delete cleanMember.gugusDepan;
         return cleanMember as Member;
       });
 
       const hadLegacyFields = parsed.some((member: any) =>
-        member && typeof member === 'object' &&
-        ('branchId' in member || 'branchName' in member || 'gugusDepan' in member)
+        member && typeof member === 'object' && 'gugusDepan' in member
       );
       if (hadLegacyFields) {
         localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(cleaned));
@@ -404,7 +403,8 @@ class StorageService {
     try {
       const cleanedMembers = members.map((member: any) => {
         if (!member || typeof member !== 'object') return member;
-        const { branchId, branchName, gugusDepan, ...cleanMember } = member;
+        const cleanMember = { ...member };
+        delete cleanMember.gugusDepan;
         return cleanMember;
       });
       localStorage.setItem(
