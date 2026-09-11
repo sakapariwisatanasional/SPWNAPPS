@@ -1784,6 +1784,61 @@ class SpreadsheetService {
   }
 
   /**
+   * Registrasi anggota publik melalui endpoint server.
+   * Foto dikirim bersama data registrasi agar server dapat meneruskan satu
+   * transaksi REGISTER_MEMBER ke Google Apps Script (Drive + Anggota + Users).
+   */
+  public async registerMember(payload: {
+    memberData: Member;
+    password: string;
+    photoData?: string;
+    photoUrl?: string;
+    photoFileName?: string;
+  }): Promise<any> {
+    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
+    if (!scriptUrl) {
+      throw new Error('Google Apps Script Web App URL belum dipasang. Harap pasang URL /exec di Pengaturan API.');
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 90000);
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        cache: 'no-store',
+        signal: controller.signal,
+        body: JSON.stringify({
+          memberData: payload.memberData,
+          password: payload.password,
+          photoData: payload.photoData || '',
+          photoUrl: payload.photoUrl || '',
+          photoFileName: payload.photoFileName || `KTA_${payload.memberData.id}.jpg`,
+          scriptUrl
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success !== true) {
+        throw new Error(data?.message || `Pendaftaran gagal (HTTP ${response.status}).`);
+      }
+      if (!data.member || !data.user) {
+        throw new Error('Server tidak mengembalikan data anggota dan akun yang lengkap.');
+      }
+      return data;
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        throw new Error('Waktu tunggu pendaftaran habis. Periksa koneksi internet lalu coba lagi.');
+      }
+      throw err;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  /**
    * Upload gambar base64 langsung ke Google Drive melalui Apps Script Web App
    */
   public async uploadImageToDrive(
