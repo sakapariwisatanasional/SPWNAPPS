@@ -22,7 +22,9 @@ import {
   Square,
   Share2,
   Table as TableIcon,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  List
 } from 'lucide-react';
 import { KridaCategoryInfo, KridaId, KridaModuleItem, CurrentUser } from '../../types';
 import { KRIDA_CATEGORIES } from '../../data/kridaData';
@@ -53,7 +55,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
   const [checkedMadya, setCheckedMadya] = useState<Record<string, boolean>>({});
   const [checkedUtama, setCheckedUtama] = useState<Record<string, boolean>>({});
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isMobileListOpen, setIsMobileListOpen] = useState(false);
+  const [mobileMenu, setMobileMenu] = useState<'KRIDA' | 'SKK' | 'MATERI' | null>(null);
 
   // Filter modules by active category
   const categoryModules = useMemo(() => {
@@ -76,12 +78,27 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
 
   // Handle switching category
   const handleSelectCategory = (kId: KridaId) => {
+    setSearchQuery('');
     setSelectedKridaId(kId);
     const firstInCat = modules.find(m => m.kridaId === kId);
-    if (firstInCat) {
-      setSelectedModuleId(firstInCat.id);
-    }
-    setIsMobileListOpen(false);
+    if (firstInCat) setSelectedModuleId(firstInCat.id);
+    setActiveTab('CONTENT');
+    setMobileMenu(null);
+  };
+
+  const handleSelectModule = (moduleId: string) => {
+    const mod = modules.find(m => m.id === moduleId);
+    if (!mod) return;
+    setSelectedModuleId(moduleId);
+    setSelectedKridaId(mod.kridaId);
+    setSearchQuery('');
+    setActiveTab('CONTENT');
+    setMobileMenu(null);
+  };
+
+  const handleSelectMobileTab = (tab: 'CONTENT' | 'CURRICULUM' | 'TEST' | 'DOWNLOADS') => {
+    setActiveTab(tab);
+    setMobileMenu(null);
   };
 
   // Filtered list when searching across all or category
@@ -183,13 +200,13 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-0 sm:p-4 md:p-6 overflow-hidden">
-      <div className="relative w-full h-[100dvh] sm:h-auto sm:max-h-[95vh] max-w-6xl bg-slate-950 border border-slate-800 rounded-none sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 md:p-6 overflow-y-auto">
+      <div className="relative w-full max-w-6xl max-h-[95vh] bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* MODAL HEADER */}
-        <div className="px-4 py-3 sm:px-6 sm:py-5 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between gap-3 shrink-0">
+        <div className="px-3 py-3 sm:px-6 sm:py-5 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-br ${activeCategoryInfo.color} flex items-center justify-center text-white shadow-lg shrink-0`}>
+            <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${activeCategoryInfo.color} flex items-center justify-center text-white shadow-lg shrink-0`}>
               <FolderOpen className="w-5 h-5" />
             </div>
             <div>
@@ -211,7 +228,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
             {isSuperAdmin && currentModule && (
               <button
                 onClick={() => onOpenEditor(currentModule)}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
                 title="Super Admin: Edit naskah, gambar, tabel & link modul ini"
               >
                 <Edit3 className="w-3.5 h-3.5" />
@@ -229,150 +246,147 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
           </div>
         </div>
 
-        {/* 4 KRIDA CATEGORY PILLS */}
-        <div className="px-3 py-2.5 sm:px-5 sm:py-3 border-b border-slate-800/80 bg-slate-900/40 grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 shrink-0">
-          {KRIDA_CATEGORIES.map((cat, idx) => {
-            const isSelected = !searchQuery && selectedKridaId === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => {
-                  setSearchQuery('');
-                  handleSelectCategory(cat.id);
-                }}
-                className={`min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  isSelected
-                    ? `bg-gradient-to-r ${cat.color} text-white shadow-md shadow-purple-950/50 ring-1 ring-white/30`
-                    : 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
-                }`}
-              >
-                <span className="w-6 h-6 sm:w-5 sm:h-5 rounded-lg bg-black/20 flex items-center justify-center text-[10px] font-mono shrink-0">
-                  {idx + 1}
-                </span>
-                <span className="min-w-0 truncate text-left">{cat.name}</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-800 text-slate-400'}`}>
-                  {cat.topicsCount} SKK
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* MAIN BODY: 2 COLUMN LAYOUT */}
-        <div className="relative flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-          
-          {/* LEFT SIDEBAR: TOPICS LIST */}
-          <div className={`${isMobileListOpen ? 'absolute inset-0 z-30 flex' : 'hidden'} md:flex w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-800 bg-slate-950 flex-col shrink-0`}>
-            {/* Mobile list header */}
-            <div className="md:hidden px-4 py-3 border-b border-slate-800 bg-slate-900/95 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-extrabold text-white">Pilih Mata Krida</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">{filteredList.length} pilihan tersedia</p>
-              </div>
-              <button
-                onClick={() => setIsMobileListOpen(false)}
-                className="p-2 rounded-xl bg-slate-800 text-slate-300"
-                aria-label="Tutup daftar mata krida"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {/* Search bar */}
-            <div className="p-3 border-b border-slate-800/80">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari mata krida, silabus, materi..."
-                  className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* List items */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar min-h-0 max-h-none">
-              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
-                <span>{searchQuery ? `Hasil Pencarian (${filteredList.length})` : activeCategoryInfo.name}</span>
-                <span className="text-[10px] font-mono">{filteredList.length} Mata Krida</span>
-              </div>
-
-              {filteredList.map((mod) => {
-                const isCurrent = currentModule?.id === mod.id;
-                return (
-                  <div
-                    key={mod.id}
-                    onClick={() => {
-                      setSelectedModuleId(mod.id);
-                      setActiveTab('CONTENT');
-                      setIsMobileListOpen(false);
-                    }}
-                    className={`p-3 rounded-2xl transition-all cursor-pointer group flex items-start gap-2.5 text-left ${
-                      isCurrent
-                        ? 'bg-purple-900/30 border border-purple-500/50 shadow-md'
-                        : 'bg-slate-900/50 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 font-mono ${
-                      isCurrent 
-                        ? 'bg-purple-600 text-white shadow-xs' 
-                        : 'bg-slate-800 text-slate-400 group-hover:text-purple-300'
-                    }`}>
-                      {mod.code.replace(/[()]/g, '')}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <h4 className={`text-xs font-bold truncate ${isCurrent ? 'text-purple-200' : 'text-slate-200 group-hover:text-white'}`}>
-                          {mod.title}
-                        </h4>
-                        <ChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isCurrent ? 'text-purple-400 translate-x-0.5' : 'text-slate-600 group-hover:text-slate-400'}`} />
-                      </div>
-                      <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
-                        {mod.description}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-500">
-                        <span className="flex items-center gap-1">
-                          <BookOpen className="w-3 h-3" />
-                          <span>{mod.curriculum?.length || 0} Sesi</span>
-                        </span>
-                        <span>•</span>
-                        <span className="text-purple-400/80 font-medium">{mod.levelSKK}</span>
-                      </div>
-                    </div>
+        {/* UNIVERSAL DROPDOWN NAVIGATION: KRIDA -> SKK -> MATERI SKK */}
+        <div className="shrink-0 border-b border-slate-800 bg-slate-950/95 px-3 py-3 sm:px-5">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-5xl mx-auto">
+            {[
+              { key: 'KRIDA' as const, icon: Compass, label: 'Krida', value: activeCategoryInfo.shortTitle },
+              { key: 'SKK' as const, icon: Award, label: 'SKK', value: currentModule?.code || 'Pilih SKK' },
+              { key: 'MATERI' as const, icon: Layers, label: 'Materi SKK', value: activeTab === 'CONTENT' ? 'Materi & Naskah' : activeTab === 'CURRICULUM' ? 'Silabus' : activeTab === 'TEST' ? 'Materi Uji' : 'Dokumen' }
+            ].map((item) => {
+              const Icon = item.icon;
+              const open = mobileMenu === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setMobileMenu(open ? null : item.key)}
+                  className={`min-w-0 rounded-xl sm:rounded-2xl border px-2.5 py-2 sm:px-4 sm:py-3 text-left transition-all ${open ? 'border-purple-500/60 bg-purple-600/20 text-white ring-1 ring-purple-500/20' : 'border-slate-800 bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:border-slate-700'}`}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                      <Icon className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${open ? 'text-purple-300' : 'text-slate-400'}`} />
+                      <span className="text-[10px] sm:text-xs font-extrabold truncate">{item.label}</span>
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 transition-transform ${open ? 'rotate-180 text-purple-300' : 'text-slate-500'}`} />
                   </div>
-                );
-              })}
-
-              {filteredList.length === 0 && (
-                <div className="p-6 text-center text-slate-500 text-xs">
-                  Tidak ada mata krida yang sesuai pencarian "{searchQuery}".
-                </div>
-              )}
-            </div>
-
-            {/* Bottom info banner */}
-            <div className="p-3 border-t border-slate-800/80 bg-slate-900/30 text-[11px] text-slate-400 flex items-center gap-2">
-              <Compass className="w-4 h-4 text-purple-400 shrink-0" />
-              <span>Disesuaikan dengan Standar Juknis Kwarnas Gerakan Pramuka.</span>
-            </div>
+                  <span className="mt-1 block truncate text-[9px] sm:text-[11px] font-medium text-slate-500">{item.value}</span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* RIGHT DETAIL PANE: LEARNING CONTENT */}
-          <div className="flex-1 flex flex-col bg-slate-900/30 overflow-hidden">
+          {mobileMenu === 'KRIDA' && (
+            <div className="mt-2 sm:mt-3 mx-auto max-w-5xl rounded-2xl border border-slate-800 bg-slate-900 p-2 sm:p-3 shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {KRIDA_CATEGORIES.map((cat, idx) => {
+                  const selected = selectedKridaId === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => handleSelectCategory(cat.id)}
+                      className={`flex items-center gap-2 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${selected ? 'border-purple-500/60 bg-purple-600/20' : 'border-slate-800 bg-slate-950 hover:bg-slate-800'}`}
+                    >
+                      <span className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-[10px] font-bold shrink-0 ${selected ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{idx + 1}</span>
+                      <span className="min-w-0">
+                        <span className={`block text-[10px] sm:text-xs font-bold truncate ${selected ? 'text-white' : 'text-slate-200'}`}>{cat.name}</span>
+                        <span className="block text-[9px] sm:text-[10px] text-slate-500 mt-0.5">{cat.topicsCount} SKK</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {mobileMenu === 'SKK' && (
+            <div className="mt-2 sm:mt-3 mx-auto max-w-5xl rounded-2xl border border-slate-800 bg-slate-900 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="p-2.5 sm:p-3 border-b border-slate-800 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <List className="w-4 h-4 text-purple-400 shrink-0" />
+                  <span className="text-[11px] sm:text-xs font-extrabold text-white truncate">{activeCategoryInfo.name}</span>
+                </div>
+                <span className="text-[9px] sm:text-[10px] text-slate-500 shrink-0">{categoryModules.length} Mata Krida</span>
+              </div>
+              <div className="p-2 border-b border-slate-800/80">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Cari kode atau nama SKK..."
+                    className="w-full pl-9 pr-9 py-2 sm:py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                  />
+                  {searchQuery && (
+                    <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="max-h-72 sm:max-h-80 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
+                {filteredList.map((mod) => {
+                  const selected = currentModule?.id === mod.id;
+                  return (
+                    <button
+                      key={mod.id}
+                      type="button"
+                      onClick={() => handleSelectModule(mod.id)}
+                      className={`w-full flex items-center gap-2.5 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${selected ? 'border-purple-500/60 bg-purple-600/15' : 'border-slate-800 bg-slate-950 hover:bg-slate-800'}`}
+                    >
+                      <span className={`w-9 h-9 rounded-lg flex items-center justify-center text-[9px] font-bold font-mono shrink-0 ${selected ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{mod.code}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className={`block text-[11px] sm:text-xs font-bold ${selected ? 'text-purple-200' : 'text-slate-200'}`}>{mod.title}</span>
+                        <span className="block text-[9px] sm:text-[10px] text-slate-500 truncate mt-0.5">{mod.levelSKK}</span>
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+                    </button>
+                  );
+                })}
+                {filteredList.length === 0 && <div className="p-6 text-center text-slate-500 text-xs">Tidak ada SKK yang sesuai pencarian.</div>}
+              </div>
+            </div>
+          )}
+
+          {mobileMenu === 'MATERI' && (
+            <div className="mt-2 sm:mt-3 mx-auto max-w-5xl rounded-2xl border border-slate-800 bg-slate-900 p-2 sm:p-3 shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { tab: 'CONTENT' as const, icon: BookOpen, label: 'Materi & Naskah' },
+                  { tab: 'CURRICULUM' as const, icon: Layers, label: `Silabus (${currentModule?.curriculum?.length || 0})` },
+                  { tab: 'TEST' as const, icon: CheckCircle2, label: 'Materi Uji SKK' },
+                  { tab: 'DOWNLOADS' as const, icon: Download, label: `Dokumen (${currentModule?.downloads?.length || 0})` }
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const selected = activeTab === item.tab;
+                  return (
+                    <button
+                      key={item.tab}
+                      type="button"
+                      onClick={() => handleSelectMobileTab(item.tab)}
+                      className={`flex items-center gap-2 rounded-xl border p-2.5 sm:p-3 text-left text-[10px] sm:text-xs font-bold transition-all ${selected ? 'border-purple-500/60 bg-purple-600 text-white' : 'border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800'}`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* MAIN BODY: SINGLE CONTENT PANE */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+                    {/* CONTENT PANE */}
+          <div className="flex-1 flex flex-col bg-slate-900/30 overflow-hidden min-w-0">
             {currentModule ? (
               <>
                 {/* DETAIL HEADER */}
-                <div className="p-3 sm:p-6 border-b border-slate-800 bg-slate-950/70 shrink-0 space-y-3">
+                <div className="p-3 sm:p-6 border-b border-slate-800 bg-slate-950/60 shrink-0 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="px-2.5 py-1 rounded-xl bg-purple-950/80 text-purple-300 text-xs font-bold border border-purple-800/60 flex items-center gap-1.5">
@@ -389,11 +403,11 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2">
                       {isSuperAdmin && (
                         <button
                           onClick={() => onOpenEditor(currentModule)}
-                          className="sm:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600 text-white text-xs font-bold"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600 text-white text-xs font-bold"
                         >
                           <Edit3 className="w-3 h-3" />
                           <span>Edit</span>
@@ -402,105 +416,43 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       
                       <button
                         onClick={handleShare}
-                        className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] sm:text-xs font-bold transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer"
                         title="Salin Tautan Modul"
                       >
                         <Share2 className="w-3.5 h-3.5 text-purple-400" />
-                        <span>{copiedLink ? 'Tersalin!' : 'Bagikan'}</span>
+                        <span className="hidden sm:inline">{copiedLink ? 'Tersalin!' : 'Bagikan'}</span>
                       </button>
 
                       <button
                         onClick={handlePrint}
-                        className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] sm:text-xs font-bold transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer"
                         title="Cetak Materi Modul Ini"
                       >
                         <Printer className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Cetak</span>
+                        <span className="hidden sm:inline">Cetak</span>
                       </button>
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => setIsMobileListOpen(true)}
-                    className="md:hidden w-full min-h-[44px] px-3 rounded-xl bg-slate-900 border border-slate-800 text-left flex items-center justify-between gap-3"
-                  >
-                    <span className="flex items-center gap-2 min-w-0">
-                      <BookOpen className="w-4 h-4 text-purple-400 shrink-0" />
-                      <span className="text-xs font-bold text-slate-200 truncate">Pilih Mata Krida</span>
-                      <span className="text-[10px] text-slate-500 shrink-0">{filteredList.length}</span>
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
-                  </button>
 
                   <div>
                     <h1 className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-white font-heading leading-tight">
                       {currentModule.title}
                     </h1>
-                    <p className="text-[11px] sm:text-sm text-slate-400 mt-1 leading-relaxed line-clamp-3 sm:line-clamp-none">
+                    <p className="hidden sm:block text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
                       {currentModule.description}
                     </p>
                   </div>
 
-                  {/* 4 TAB SWITCHERS */}
-                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch gap-1.5 pt-2 border-t border-slate-800/80">
-                    <button
-                      onClick={() => setActiveTab('CONTENT')}
-                      className={`min-h-[42px] px-2.5 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer ${
-                        activeTab === 'CONTENT'
-                          ? 'bg-purple-600 text-white shadow-md shadow-purple-950/50'
-                          : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
-                      }`}
-                    >
-                      <BookOpen className="w-3.5 h-3.5" />
-                      <span>Materi & Naskah Modul</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('CURRICULUM')}
-                      className={`min-h-[42px] px-2.5 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer ${
-                        activeTab === 'CURRICULUM'
-                          ? 'bg-purple-600 text-white shadow-md shadow-purple-950/50'
-                          : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
-                      }`}
-                    >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>Silabus & Kurikulum ({currentModule.curriculum?.length || 0})</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('TEST')}
-                      className={`min-h-[42px] px-2.5 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer ${
-                        activeTab === 'TEST'
-                          ? 'bg-purple-600 text-white shadow-md shadow-purple-950/50'
-                          : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
-                      }`}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Materi Uji SKK (Purwa • Madya • Utama)</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('DOWNLOADS')}
-                      className={`min-h-[42px] px-2.5 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer ${
-                        activeTab === 'DOWNLOADS'
-                          ? 'bg-purple-600 text-white shadow-md shadow-purple-950/50'
-                          : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
-                      }`}
-                    >
-                      <Download className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Dokumen & Download ({currentModule.downloads?.length || 0})</span>
-                    </button>
-                  </div>
                 </div>
 
                 {/* DETAIL SCROLLABLE CONTENT AREA */}
-                <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 custom-scrollbar min-h-0">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar">
                   
                   {/* TAB 1: CONTENT / NASKAH MODUL */}
                   {activeTab === 'CONTENT' && (
                     <div className="space-y-6 max-w-4xl">
                       {/* Formatted Text */}
-                      <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-lg">
+                      <div className="bg-slate-950/80 border border-slate-800/80 rounded-3xl p-5 sm:p-7 shadow-lg">
                         {renderFormattedContent(currentModule.content)}
                       </div>
 
@@ -694,7 +646,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       </div>
 
                       {/* PURWA */}
-                      <div className="bg-slate-950 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 space-y-3">
+                      <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-emerald-500" />
@@ -742,7 +694,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       </div>
 
                       {/* MADYA */}
-                      <div className="bg-slate-950 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 space-y-3">
+                      <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-amber-500" />
@@ -790,7 +742,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       </div>
 
                       {/* UTAMA */}
-                      <div className="bg-slate-950 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 space-y-3">
+                      <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-purple-500" />
@@ -850,7 +802,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
 
                       {/* 8 Components Portfolio */}
                       {currentModule.portfolioItems && currentModule.portfolioItems.length > 0 && (
-                        <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-slate-950 border border-slate-800 space-y-3">
+                        <div className="p-5 rounded-3xl bg-slate-950 border border-slate-800 space-y-3">
                           <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2 font-heading">
                             <CheckCircle2 className="w-4 h-4" />
                             <span>8 Komponen Bukti Portofolio Uji Resmi 2026</span>
@@ -929,19 +881,19 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-500 text-sm">
-                Pilih salah satu mata krida di sebelah kiri untuk melihat materi lengkap.
+                Pilih SKK melalui tombol navigasi di atas untuk melihat materi lengkap.
               </div>
             )}
           </div>
         </div>
 
         {/* MODAL FOOTER */}
-        <div className="px-4 py-2.5 sm:px-5 sm:py-3 border-t border-slate-800 bg-slate-950/90 flex items-center justify-between gap-3 text-[10px] sm:text-xs text-slate-500 shrink-0">
+        <div className="hidden sm:flex px-5 py-3 border-t border-slate-800 bg-slate-950/80 flex-wrap items-center justify-between gap-3 text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>Terakhir disinkronkan: {currentModule?.updatedAt ? new Date(currentModule.updatedAt).toLocaleDateString('id-ID') : 'Terbaru'}</span>
             <span>•</span>
-            <span className="hidden sm:inline">Oleh: {currentModule?.updatedBy || 'Pimpinan Saka Pariwisata'}</span>
+            <span>Oleh: {currentModule?.updatedBy || 'Pimpinan Saka Pariwisata'}</span>
           </div>
 
           <div className="flex items-center gap-2">
