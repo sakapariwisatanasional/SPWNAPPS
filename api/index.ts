@@ -921,14 +921,7 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
         const regencyName = isNational ? 'Pusat Nasional' : rawReg;
         const districtId = getColVal(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || (isNational ? '00.00.00' : '');
         const districtName = isNational ? 'Nasional' : rawDistrict;
-        // Canonical Anggota schema:
-        // A ID | B Nomor KTA | C Nama | D Email | E WA | F Provinsi |
-        // G Kabupaten/Kota | H Kecamatan | I Jabatan | J Krida | K Status |
-        // L Foto | M Tanggal Daftar | N Link Verifikasi.
-        const jabatan = getColVal(row, [
-          'Jabatan', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi',
-          'currentPosition', 'current_position', 'col_8'
-        ]);
+        const currentPosition = getColVal(row, ['Jabatan', 'Gudep', 'Posisi / Jabatan', 'Posisi / Jabatan Kepengurusan', 'Jabatan Kepengurusan', 'Posisi', 'currentPosition', 'current_position', 'col_8']);
         const krida = getColVal(row, ['Krida', 'Peminatan Krida', 'Peminatan Krida Saka Pariwisata', 'col_9']) || 'Krida Pemandu';
         const status = (getColVal(row, ['Status', 'Status Keanggotaan', 'status', 'col_10']) || 'ACTIVE').toUpperCase();
         const photo = cleanDriveUrl(getColVal(row, ['Foto URL', 'Foto', 'Avatar', 'Link Foto', 'col_11'])) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
@@ -947,7 +940,7 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
           birthPlace: getColVal(row, ['Tempat Lahir']) || 'Indonesia', birthDate: getColVal(row, ['Tanggal Lahir']) || '2000-01-01',
           email, phone, address: getColVal(row, ['Alamat']) || `${districtName || regencyName}, ${regencyName}, ${provinceName}`,
           provinceId, provinceName, regencyId, regencyName, districtId, districtName,
-          currentPosition: jabatan || (isNational ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`),
+          currentPosition: currentPosition || `Anggota ${krida}`,
           krida, joinYear: Number(getColVal(row, ['Tahun Bergabung'])) || new Date().getFullYear(),
           educationLevel: getColVal(row, ['Pendidikan']) || 'SMA/SMK', occupation: getColVal(row, ['Pekerjaan']) || 'Anggota Pramuka',
           bio: getColVal(row, ['Bio']) || `Anggota resmi Saka Pariwisata ${provinceName || 'Indonesia'}.`,
@@ -1507,6 +1500,7 @@ app.post('/api/auth/register', async (req, res) => {
         newMember.provinceName || '',
         newMember.regencyName || '',
         newMember.districtName || '',
+        newMember.currentPosition || '',
         newMember.krida || '',
         'PENDING',
         newMember.avatarUrl || '',
@@ -1737,174 +1731,6 @@ app.put('/api/kta-settings', async (req, res) => {
   }
 });
 
-
-// =========================================================
-// PUBLIC KTA VERIFICATION — LIVE GOOGLE SPREADSHEET
-// =========================================================
-// Endpoint publik untuk QR KTA. Server melakukan proxy ke Google Apps Script
-// sehingga browser pengunjung tidak perlu melakukan fetch lintas-origin.
-// Sumber kebenaran tetap Spreadsheet, bukan database/localStorage browser.
-app.get('/api/verify-member', async (req, res) => {
-  try {
-    const rawVerifyId = String(req.query.verifyId || req.query.nta || req.query.kta || req.query.id || '').trim();
-    if (!rawVerifyId) {
-      return res.status(400).json({
-        found: false,
-        message: 'Parameter verifyId wajib diisi.'
-      });
-    }
-
-    const configuredUrl = normalizeManualAppsScriptUrl(req.query.scriptUrl || db.config.scriptUrl);
-    if (!configuredUrl) {
-      return res.status(503).json({
-        found: false,
-        message: 'Layanan verifikasi KTA belum terhubung ke Google Spreadsheet.'
-      });
-    }
-
-    let query = rawVerifyId;
-    try {
-      const parsed = new URL(rawVerifyId);
-      query = parsed.searchParams.get('verifyId') ||
-        parsed.searchParams.get('nta') ||
-        parsed.searchParams.get('kta') ||
-        parsed.searchParams.get('id') ||
-        rawVerifyId;
-    } catch {
-      // rawVerifyId is already a plain identifier.
-    }
-
-    const cleanQuery = String(query).replace(/^['"`]+|['"`]+$/g, '').trim();
-    const digits = cleanQuery.replace(/\D/g, '');
-
-    const url = `${configuredUrl}${configuredUrl.includes('?') ? '&' : '?'}sheet=Anggota&_t=${Date.now()}`;
-    const upstream = await fetch(url, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: { 'Cache-Control': 'no-cache' }
-    });
-
-    if (!upstream.ok) {
-      return res.status(502).json({
-        found: false,
-        message: `Google Apps Script mengembalikan HTTP ${upstream.status}.`
-      });
-    }
-
-    const payload = await upstream.json().catch(() => null);
-    const rows = Array.isArray(payload)
-      ? payload
-      : Array.isArray(payload?.rows)
-        ? payload.rows
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : Array.isArray(payload?.records)
-            ? payload.records
-            : [];
-
-    const norm = (v: any) => String(v ?? '').trim();
-    const lower = (v: any) => norm(v).toLowerCase();
-    const digitsOnly = (v: any) => norm(v).replace(/\D/g, '');
-
-    const matchRow = (row: Record<string, any>) => {
-      const id = getColVal(row, ['ID', 'id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']);
-      const kta = getColVal(row, [
-        'Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA',
-        'KTA', 'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_1'
-      ]);
-      const link = getColVal(row, ['Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'col_13']);
-
-      const candidates = [id, kta, link];
-      return candidates.some(candidate => {
-        const c = norm(candidate);
-        if (!c) return false;
-        if (lower(c) === lower(cleanQuery)) return true;
-        const cDigits = digitsOnly(c);
-        if (digits.length >= 4 && cDigits === digits) return true;
-        // Support a QR generated with a full verification URL.
-        try {
-          const parsed = new URL(c);
-          const embedded = parsed.searchParams.get('verifyId') || parsed.searchParams.get('nta') || parsed.searchParams.get('kta');
-          if (embedded && lower(embedded) === lower(cleanQuery)) return true;
-        } catch {}
-        return false;
-      });
-    };
-
-    const row = rows.find((item: any) => item && typeof item === 'object' && matchRow(item));
-    if (!row) {
-      return res.status(404).json({
-        found: false,
-        message: 'Nomor KTA tidak ditemukan pada Google Spreadsheet.'
-      });
-    }
-
-    const fullName = getColVal(row, ['Nama Lengkap', 'Nama', 'Full Name', 'col_2']) || 'Anggota Saka Pariwisata';
-    const kta = getColVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA', 'col_1']);
-    const id = getColVal(row, ['ID', 'id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']) || `sheet-member-${Date.now()}`;
-    const email = getColVal(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']);
-    const phone = getColVal(row, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_4']);
-    const prov = getColVal(row, ['Provinsi', 'Kwartir Daerah', 'Kwarda', 'col_5']) || 'Kwartir Nasional';
-    const kab = getColVal(row, ['Kabupaten/Kota', 'Kwartir Cabang', 'Kwarcab', 'Kabupaten', 'Kota', 'col_6']) || 'Pusat Nasional';
-    const kec = getColVal(row, ['Kecamatan', 'Kwarran', 'Kwartir Ranting', 'Ranting', 'col_7']) || 'Nasional';
-    const jabatan = getColVal(row, ['Jabatan', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi', 'currentPosition', 'col_8']);
-    const krida = getColVal(row, ['Krida', 'Peminatan Krida', 'Peminatan Krida Saka Pariwisata', 'col_9']) || 'Krida Pemandu';
-    const statusRaw = getColVal(row, ['Status', 'Status Keanggotaan', 'status', 'col_10']) || 'ACTIVE';
-    const photo = cleanDriveUrl(getColVal(row, ['Foto URL', 'Foto', 'Avatar', 'Link Foto', 'col_11']));
-    const registeredAt = getColVal(row, ['Tanggal Daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_12']) || new Date().toISOString();
-
-    const member = {
-      id,
-      userId: `user-${id}`,
-      nationalMemberNumber: kta || undefined,
-      fullName,
-      nikMasked: '3201**********01',
-      avatarUrl: photo || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80',
-      gender: 'LAKI_LAKI',
-      birthPlace: 'Indonesia',
-      birthDate: '2000-01-01',
-      email,
-      phone,
-      address: `${kec}, ${kab}, ${prov}`,
-      provinceId: '00',
-      provinceName: prov,
-      regencyId: '00.00',
-      regencyName: kab,
-      districtId: '00.00.00',
-      districtName: kec,
-      currentPosition: jabatan || 'Anggota Saka Pariwisata',
-      krida,
-      joinYear: new Date().getFullYear(),
-      educationLevel: 'SMA/SMK',
-      occupation: 'Anggota Pramuka',
-      bio: 'Anggota resmi Saka Pariwisata. Terdata langsung dari Google Spreadsheet.',
-      status: String(statusRaw).toUpperCase() as any,
-      registeredAt,
-      verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : id}`,
-      isOperator: false,
-      skills: [],
-      certifications: [],
-      locationHistory: []
-    };
-
-    // Jangan cache response publik agar perubahan profil segera terbaca.
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    return res.json({
-      found: true,
-      source: 'GOOGLE_SPREADSHEET',
-      member
-    });
-  } catch (error: any) {
-    console.error('[Public KTA Verification] error:', error);
-    return res.status(502).json({
-      found: false,
-      message: error?.message || 'Gagal menghubungkan verifikasi KTA ke Google Spreadsheet.'
-    });
-  }
-});
-
 // Central Data GET with strict Privacy and Role Enforcement
 app.get('/api/data', async (req, res) => {
   const session = getSessionUser(req);
@@ -2084,11 +1910,12 @@ app.post('/api/mutate', async (req, res) => {
       member.provinceName || '',
       member.regencyName || '',
       member.districtName || '',
+      member.currentPosition || '',
       member.krida || '',
       member.status || 'PENDING',
       member.avatarUrl || '',
       member.registeredAt || new Date().toISOString(),
-      member.verificationToken ? `${typeof window === 'undefined' ? 'https://sakapariwisata-nasional.vercel.app' : ''}/verify?verifyId=${encodeURIComponent(member.nationalMemberNumber || member.id)}` : ''
+      `https://sakapariwisata-nasional.vercel.app/verify?verifyId=${encodeURIComponent(member.nationalMemberNumber || member.id)}`
     ]
   });
 
