@@ -175,10 +175,10 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
                 {numberInput(settings.qrX??78,v=>setSettings(s=>({...s,qrX:Math.max(0,Math.min(100,v))})))}
               </label>
               <label className="text-[9px] font-bold">Posisi Y (%)
-                {numberInput(settings.qrY??30,v=>setSettings(s=>({...s,qrY:Math.max(0,Math.min(100,v))})))}
+                {numberInput(settings.qrY??29,v=>setSettings(s=>({...s,qrY:Math.max(0,Math.min(100,v))})))}
               </label>
               <label className="text-[9px] font-bold">Ukuran QR (%)
-                {numberInput(settings.qrSize??22,v=>setSettings(s=>({...s,qrSize:Math.max(5,Math.min(60,v))})))}
+                {numberInput(settings.qrSize??18,v=>setSettings(s=>({...s,qrSize:Math.max(5,Math.min(60,v))})))}
               </label>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -186,10 +186,10 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
                 {numberInput(settings.qrBorderWidth??1,v=>setSettings(s=>({...s,qrBorderWidth:Math.max(0,Math.min(12,v))})))}
               </label>
               <label className="text-[9px] font-bold">Sudut / Radius (px)
-                {numberInput(settings.qrBorderRadius??6,v=>setSettings(s=>({...s,qrBorderRadius:Math.max(0,Math.min(30,v))})))}
+                {numberInput(settings.qrBorderRadius??10,v=>setSettings(s=>({...s,qrBorderRadius:Math.max(0,Math.min(30,v))})))}
               </label>
               <label className="text-[9px] font-bold">Padding (px)
-                {numberInput(settings.qrPadding??2,v=>setSettings(s=>({...s,qrPadding:Math.max(0,Math.min(12,v))})))}
+                {numberInput(settings.qrPadding??6,v=>setSettings(s=>({...s,qrPadding:Math.max(0,Math.min(12,v))})))}
               </label>
               <label className="text-[9px] font-bold">Warna Garis
                 <input type="color" value={settings.qrBorderColor||'#ffffff'} onChange={e=>setSettings(s=>({...s,qrBorderColor:e.target.value}))} className="h-9 w-full rounded"/>
