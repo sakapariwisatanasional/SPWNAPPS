@@ -16,6 +16,7 @@ interface Props {
   showControls?: boolean;
   allowAdminEdit?: boolean;
   previewSettings?: KtaCardSettings;
+  onPreviewSettingsChange?: (settings: KtaCardSettings) => void;
 }
 
 const valueOf = (member: Member, field: KtaDataFieldConfig['field']): string => {
@@ -30,7 +31,7 @@ const valueOf = (member: Member, field: KtaDataFieldConfig['field']): string => 
 
 const weight = (w: KtaDataFieldConfig['fontWeight'] | string) => ({ normal:400, medium:500, bold:700, black:900 } as any)[w] || 400;
 
-export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrintPdf, showControls=true, allowAdminEdit=false, previewSettings }) => {
+export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrintPdf, showControls=true, allowAdminEdit=false, previewSettings, onPreviewSettingsChange }) => {
   const normalizeSettings = (value?: Partial<KtaCardSettings> | null): KtaCardSettings => {
     const merged = {
       ...DEFAULT_KTA_SETTINGS,
@@ -109,6 +110,38 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
   const frontLogos = logos.filter(l=>l.side==='FRONT' && l.url);
   const backLogos = logos.filter(l=>l.side==='BACK' && l.url);
   const bgFront = settings.frontBackgroundUrl || settings.bgImageUrl;
+
+  const updatePreviewSetting = (patch: Partial<KtaCardSettings>) => {
+    if (!onPreviewSettingsChange) return;
+    onPreviewSettingsChange({ ...settings, ...patch });
+  };
+
+  const handleQrPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onPreviewSettingsChange || !previewSettings || !settings.showQrCode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.setPointerCapture?.(e.pointerId);
+    const rect = target.parentElement?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startQrX = Number(settings.qrX ?? 78);
+    const startQrY = Number(settings.qrY ?? 30);
+    const qrPercent = Math.max(5, Math.min(60, Number(settings.qrSize ?? 22)));
+
+    const move = (ev: PointerEvent) => {
+      const nextX = Math.max(0, Math.min(100 - qrPercent, startQrX + ((ev.clientX - startX) / rect.width) * 100));
+      const nextY = Math.max(0, Math.min(100 - qrPercent, startQrY + ((ev.clientY - startY) / rect.height) * 100));
+      updatePreviewSetting({ qrX: Number(nextX.toFixed(2)), qrY: Number(nextY.toFixed(2)) });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up, { once: true });
+  };
   const bgBack = settings.backBackgroundUrl || settings.bgImageUrl;
   const radius = Math.max(8, settings.cornerRadiusMm * 3);
 
@@ -151,14 +184,28 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
             const qrPx = Math.max(36, Math.round(Math.min(widthPx, heightPx) * (qrPercent / 100)));
             return (
               <div
-                className="absolute"
-                style={{ left: `${qrX}%`, top: `${qrY}%`, width: `${qrPercent}%`, aspectRatio: '1 / 1' }}
+                className={`absolute ${onPreviewSettingsChange ? 'cursor-move select-none ring-1 ring-transparent hover:ring-emerald-400/80' : ''}`}
+                onPointerDown={handleQrPointerDown}
+                title={onPreviewSettingsChange ? 'Seret untuk memindahkan QR Code' : undefined}
+                style={{
+                  left: `${qrX}%`, top: `${qrY}%`, width: `${qrPercent}%`, aspectRatio: '1 / 1',
+                  padding: `${Math.max(0, Number(settings.qrPadding ?? 2))}px`,
+                  boxSizing: 'border-box',
+                  background: settings.qrBackgroundColor || '#ffffff',
+                  border: `${Math.max(0, Number(settings.qrBorderWidth ?? 1))}px solid ${settings.qrBorderColor || '#ffffff'}`,
+                  borderRadius: `${Math.max(0, Number(settings.qrBorderRadius ?? 6))}px`,
+                  overflow: 'hidden',
+                  touchAction: 'none'
+                }}
               >
                 <KtaQrCode
                   member={member}
-                  size={qrPx}
+                  size={Math.max(24, qrPx - Math.max(0, Number(settings.qrPadding ?? 2)) * 2)}
                   showLabel={false}
                   interactive={false}
+                  borderWidth={0}
+                  borderRadius={0}
+                  borderColor="transparent"
                 />
               </div>
             );
