@@ -305,7 +305,11 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // QR verification is handled by PublicPortalView on the dedicated /verify route.
+  // QR/Barcode URL verification ditangani sepenuhnya oleh PublicPortalView.
+  // App.tsx hanya menentukan route /verify agar tidak ada dua proses verifikasi
+  // yang saling menimpa state profil anggota.
+
+
   // Handle Approve / Reject Member
   // Status tidak lagi hanya diubah di localStorage. Proses menunggu sampai
   // /api/mutate berhasil menulis ke server dan Google Spreadsheet.
