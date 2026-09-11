@@ -116,7 +116,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const [selectedRegencyId, setSelectedRegencyId] = useState('');
   const [selectedDistrictId, setSelectedDistrictId] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState('');
-  const [gugusDepan, setGugusDepan] = useState('');
 
   // Saka Position & Status
   const [krida, setKrida] = useState<KridaType>('Krida Pemandu');
@@ -230,7 +229,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       setSelectedDistrictId(districtId);
       setSelectedBranchId(member.branchId || '');
 
-      setGugusDepan(member.gugusDepan || '');
       setKrida(member.krida || 'Krida Pemandu');
       setCurrentPosition(member.currentPosition || 'Anggota Krida Pemandu');
       setJoinYear(member.joinYear || 2024);
@@ -478,7 +476,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         branchId: selectedBranchId || member.branchId,
         branchName: currentBranch?.name || member.branchName || '',
 
-        gugusDepan: gugusDepan.trim(),
         krida,
         currentPosition: currentPosition.trim() || `Anggota ${krida}`,
         joinYear: Number(joinYear),
@@ -1158,16 +1155,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                     </select>
                   </div>
 
-                  <div className="md:col-span-2">
-                    <label className="block font-bold text-slate-800 mb-1">Gugus Depan (Gudep) & Pangkalan</label>
-                    <input
-                      type="text"
-                      value={gugusDepan}
-                      onChange={(e) => setGugusDepan(e.target.value)}
-                      placeholder="Contoh: 06.12.01-02 Pangkalan SMK Negeri 1 Pariwisata"
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800"
-                    />
-                  </div>
                 </div>
               </div>
             </div>
