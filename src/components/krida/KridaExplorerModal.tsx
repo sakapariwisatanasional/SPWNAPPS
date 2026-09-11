@@ -34,7 +34,7 @@ interface KridaExplorerModalProps {
   currentUser?: CurrentUser;
   initialKridaId?: KridaId;
   initialModuleId?: string;
-  onOpenEditor: (moduleItem: KridaModuleItem) => void;
+  onOpenEditor?: (moduleItem: KridaModuleItem) => void;
 }
 
 export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
@@ -76,10 +76,10 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
   // Handle switching category
   const handleSelectCategory = (kId: KridaId) => {
     setSelectedKridaId(kId);
+    setSearchQuery('');
+    setActiveTab('CONTENT');
     const firstInCat = modules.find(m => m.kridaId === kId);
-    if (firstInCat) {
-      setSelectedModuleId(firstInCat.id);
-    }
+    setSelectedModuleId(firstInCat?.id || '');
   };
 
   // Filtered list when searching across all or category
@@ -208,7 +208,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
           <div className="flex items-center gap-2">
             {isSuperAdmin && currentModule && (
               <button
-                onClick={() => onOpenEditor(currentModule)}
+                onClick={() => onOpenEditor?.(currentModule)}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
                 title="Super Admin: Edit naskah, gambar, tabel & link modul ini"
               >
@@ -295,7 +295,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                 return (
                   <div
                     key={mod.id}
-                    onClick={() => setSelectedModuleId(mod.id)}
+                    onClick={() => { setSelectedModuleId(mod.id); setActiveTab('CONTENT'); }}
                     className={`p-3 rounded-2xl transition-all cursor-pointer group flex items-start gap-2.5 text-left ${
                       isCurrent
                         ? 'bg-purple-900/30 border border-purple-500/50 shadow-md'
@@ -372,7 +372,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                     <div className="flex items-center gap-2">
                       {isSuperAdmin && (
                         <button
-                          onClick={() => onOpenEditor(currentModule)}
+                          onClick={() => onOpenEditor?.(currentModule)}
                           className="sm:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600 text-white text-xs font-bold"
                         >
                           <Edit3 className="w-3 h-3" />
@@ -678,7 +678,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         <div className="space-y-2 pt-1">
                           {((currentModule.testRequirements?.purwa && currentModule.testRequirements.purwa.length > 0)
                             ? currentModule.testRequirements.purwa
-                            : (currentModule.competencies?.purwa || [])
+                            : []
                           ).map((req, rIdx) => {
                             const key = `${currentModule.id}-purwa-${rIdx}`;
                             const isChecked = !!checkedPurwa[key];
@@ -726,7 +726,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         <div className="space-y-2 pt-1">
                           {((currentModule.testRequirements?.madya && currentModule.testRequirements.madya.length > 0)
                             ? currentModule.testRequirements.madya
-                            : (currentModule.competencies?.madya || [])
+                            : []
                           ).map((req, rIdx) => {
                             const key = `${currentModule.id}-madya-${rIdx}`;
                             const isChecked = !!checkedMadya[key];
@@ -774,7 +774,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         <div className="space-y-2 pt-1">
                           {((currentModule.testRequirements?.utama && currentModule.testRequirements.utama.length > 0)
                             ? currentModule.testRequirements.utama
-                            : (currentModule.competencies?.utama || [])
+                            : []
                           ).map((req, rIdx) => {
                             const key = `${currentModule.id}-utama-${rIdx}`;
                             const isChecked = !!checkedUtama[key];
@@ -849,10 +849,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       </div>
 
                       <div className="space-y-3">
-                        {((currentModule.materials?.downloads && currentModule.materials.downloads.length > 0) 
-                          ? currentModule.materials.downloads 
-                          : (currentModule.downloads || [])
-                        ).map((dl) => (
+                        {(currentModule.downloads || []).map((dl) => (
                           <div
                             key={dl.id}
                             className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 transition-all flex items-center justify-between gap-3 group"
@@ -872,7 +869,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                             </div>
 
                             <a
-                              href={dl.url || dl.fileUrl}
+                              href={dl.fileUrl}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shrink-0 cursor-pointer"
@@ -883,7 +880,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                           </div>
                         ))}
 
-                        {(!currentModule.materials?.downloads?.length && !currentModule.downloads?.length) && (
+                        {!currentModule.downloads?.length && (
                           <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 text-slate-500 text-xs space-y-2">
                             <Download className="w-8 h-8 mx-auto text-slate-600" />
                             <p>Dokumen PDF sedang dalam proses digitalisasi oleh Pimpinan Saka Pariwisata Nasional.</p>
