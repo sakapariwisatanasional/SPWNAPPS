@@ -118,7 +118,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
     } catch (e) {
       console.warn('URL verify param error', e);
     }
-  }, [members]);
+  }, []);
 
   // Verify Handler
   const handleVerify = (e: React.FormEvent) => {
