@@ -173,25 +173,6 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
       return 'MEMBER';
     };
 
-    const normalizeSpreadsheetDate = (raw: string): string => {
-      const value = String(raw || '').trim();
-      if (!value) return '';
-
-      // Google Sheets/Excel may expose a date as its serial number.
-      // Convert it to an ISO date so the verification card can display
-      // a real Indonesian calendar date instead of values such as "38724".
-      if (/^\d+(?:\.\d+)?$/.test(value)) {
-        const serial = Number(value);
-        if (Number.isFinite(serial) && serial > 20000 && serial < 100000) {
-          const date = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
-          if (!Number.isNaN(date.getTime())) return date.toISOString();
-        }
-      }
-
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
-    };
-
     const getVal = (row: Record<string, any>, aliases: string[]): string => {
       for (const a of aliases) {
         if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== '') {
@@ -231,7 +212,7 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
       const prov = getVal(row, ['Provinsi', 'Kwarda', 'provinsi', 'col_5']) || 'Tingkat Nasional';
       const kab = getVal(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'Kabupaten', 'Kota', 'col_6']) || 'Kwartir Nasional';
       const kec = getVal(row, ['Kecamatan', 'Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'kecamatan_ranting', 'Ranting', 'col_7']) || 'Pimpinan Nasional';
-      const jabatan = getVal(row, ['Jabatan', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi']);
+      const jabatan = getVal(row, ['Jabatan', 'Gudep', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi', 'col_8']);
       const krida = getVal(row, ['Krida', 'krida', 'Peminatan Krida', 'col_9']) || 'Krida Pemandu';
       const roleStr = getVal(row, ['Role', 'Peran', 'Hak Akses', 'Wewenang']);
       const role = parseRole(roleStr || jabatan);
@@ -264,7 +245,7 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
         occupation: 'Pramuka Pariwisata',
         bio: `Anggota resmi Saka Pariwisata. Terverifikasi dari database Google Spreadsheet.`,
         status: (getVal(row, ['Status', 'status', 'Status Keanggotaan', 'col_10']) || 'ACTIVE').toUpperCase() === 'PENDING' ? 'PENDING' : 'ACTIVE',
-        registeredAt: normalizeSpreadsheetDate(getVal(row, ['Tanggal Aktif', 'Tanggal Daftar', 'tanggal_aktif', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_12'])) || new Date().toISOString(),
+        registeredAt: getVal(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_12']) || new Date().toISOString(),
         // Token tetap dibuat untuk kompatibilitas QR lama, tetapi QR baru memakai NTA.
         verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
         isOperator: role !== 'MEMBER',
