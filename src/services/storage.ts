@@ -1546,9 +1546,18 @@ class StorageService {
       const data = await response.json();
       if (!data || !Array.isArray(data.members)) return false;
 
-      // Jangan menghapus data lokal hanya karena server sedang kosong.
+      // Lindungi perubahan profil yang masih pending agar cache server lama tidak
+      // menimpa edit Admin sebelum Spreadsheet benar-benar terkonfirmasi.
       if (data.members.length > 0) {
-        this.setMembers(data.members as Member[]);
+        const pending = this.getPendingMemberWrites();
+        const protectedMembers = (data.members as Member[]).map((serverMember: Member) => {
+          const entry = pending[serverMember.id] || Object.values(pending).find((p: any) => p?.member && (
+            (serverMember.nationalMemberNumber && p.member.nationalMemberNumber === serverMember.nationalMemberNumber) ||
+            (serverMember.email && String(p.member.email || '').toLowerCase() === String(serverMember.email || '').toLowerCase())
+          ));
+          return entry?.member ? { ...serverMember, ...entry.member } : serverMember;
+        });
+        this.setMembers(protectedMembers);
       }
 
       if (Array.isArray(data.users) && data.users.length > 0) {
