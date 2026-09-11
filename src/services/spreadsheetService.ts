@@ -1342,7 +1342,7 @@ class SpreadsheetService {
 
     const requestId = `member-${member.id || member.nationalMemberNumber || Date.now()}-${Date.now()}`;
     const verificationLink = typeof window !== 'undefined'
-      ? `${window.location.origin}/?verifyId=${encodeURIComponent(member.nationalMemberNumber || member.id)}`
+      ? `${window.location.origin}/verify?verifyId=${encodeURIComponent(member.nationalMemberNumber || member.id)}`
       : '';
 
     // Canonical schema Anggota: A ID, B Nomor KTA, C Nama Lengkap, D Email,
@@ -1657,11 +1657,12 @@ class SpreadsheetService {
           m.provinceName,
           m.regencyName,
           m.districtName,
+          m.currentPosition || '',
           m.krida || '',
           m.status,
           m.avatarUrl,
           m.registeredAt,
-          window.location.origin + '/?verifyId=' + (m.nationalMemberNumber || m.id)
+          window.location.origin + '/verify?verifyId=' + encodeURIComponent(m.nationalMemberNumber || m.id)
         ]),
         tours: tours.map(t => [
           t.id,
