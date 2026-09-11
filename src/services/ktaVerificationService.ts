@@ -278,9 +278,11 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
  */
 export async function verifyMemberUniversal(
   rawInput: string,
-  localMembers?: Member[]
+  localMembers?: Member[],
+  options?: { authoritativeRemote?: boolean }
 ): Promise<VerificationResult> {
   const { cleanQuery, strippedDigits } = normalizeNtaQuery(rawInput);
+  const authoritativeRemote = options?.authoritativeRemote === true;
 
   if (!cleanQuery && !strippedDigits) {
     return {
@@ -293,7 +295,35 @@ export async function verifyMemberUniversal(
     };
   }
 
-  // 1. Cek database lokal
+  // Untuk halaman verifikasi/QR, Google Spreadsheet adalah sumber kebenaran.
+  // Jangan mengembalikan record localStorage yang mungkin merupakan KTA lama.
+  if (authoritativeRemote) {
+    try {
+      const remoteMatch = await searchMemberInRemoteSpreadsheet(rawInput);
+      if (remoteMatch) {
+        return {
+          found: true,
+          member: remoteMatch,
+          source: 'GOOGLE_SPREADSHEET',
+          searchTerm: rawInput,
+          normalizedTerm: cleanQuery
+        };
+      }
+    } catch (e) {
+      console.warn('Authoritative Google Spreadsheet verification failed:', e);
+    }
+
+    return {
+      found: false,
+      member: null,
+      source: 'NONE',
+      searchTerm: rawInput,
+      normalizedTerm: cleanQuery,
+      message: 'Data KTA tidak ditemukan pada Google Spreadsheet terbaru. Data lokal lama tidak digunakan untuk verifikasi QR.'
+    };
+  }
+
+  // Mode umum/manual: lokal tetap boleh dipakai sebagai fallback cepat.
   const localMatch = searchMemberLocally(rawInput, localMembers);
   if (localMatch) {
     return {
@@ -305,7 +335,6 @@ export async function verifyMemberUniversal(
     };
   }
 
-  // 2. Jika tidak ditemukan di lokal, cari secara live ke Google Spreadsheet
   try {
     const remoteMatch = await searchMemberInRemoteSpreadsheet(rawInput);
     if (remoteMatch) {
