@@ -145,6 +145,21 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
     setIsKridaExplorerOpen(true);
   };
 
+  // Support deep-links created by the "Bagikan" button in the Krida Explorer.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kridaParam = params.get('krida') as KridaId | null;
+    const moduleParam = params.get('skk');
+
+    if (kridaParam && KRIDA_CATEGORIES.some(category => category.id === kridaParam)) {
+      const targetModule = moduleParam
+        ? kridaModules.find(module => module.id === moduleParam && module.kridaId === kridaParam)
+        : undefined;
+
+      openKrida(kridaParam, targetModule?.id);
+    }
+  }, []);
+
   const openReader = (moduleId?: string) => {
     setReaderModuleId(moduleId || kridaModules[0]?.id);
     setIsFullScreenReaderOpen(true);
@@ -272,7 +287,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
       <footer className="border-t border-white/5 px-4 sm:px-6 py-8 bg-black/20"><div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4"><div className="flex items-center gap-2.5"><SakaLogo size={34} id="landing-footer-logo" /><div><div className="text-xs font-black">Saka Pariwisata Indonesia</div><div className="text-[9px] text-slate-600">Kwartir Nasional Gerakan Pramuka</div></div></div><div className="flex items-center gap-2"><button type="button" onClick={onOpenLoginModal} className="p-2.5 rounded-xl border border-white/5 text-slate-400 hover:text-white cursor-pointer" title="Masuk"><LockKeyhole className="w-4 h-4" /></button><button type="button" onClick={onOpenRegisterModal} className="p-2.5 rounded-xl border border-white/5 text-slate-400 hover:text-white cursor-pointer" title="Daftar"><UserPlus className="w-4 h-4" /></button></div></div></footer>
 
-      {isKridaExplorerOpen && <KridaExplorerModal modules={kridaModules} kridaId={activeExplorerKrida} initialModuleId={activeExplorerModuleId} currentUser={currentUser} onClose={() => setIsKridaExplorerOpen(false)} onOpenEditor={currentUser?.role === 'SUPER_ADMIN' ? openEditor : undefined} />}
+      {isKridaExplorerOpen && (
+        <KridaExplorerModal
+          isOpen={isKridaExplorerOpen}
+          modules={kridaModules}
+          initialKridaId={activeExplorerKrida}
+          initialModuleId={activeExplorerModuleId}
+          currentUser={currentUser}
+          onClose={() => setIsKridaExplorerOpen(false)}
+          onOpenEditor={openEditor}
+        />
+      )}
       {isKridaEditorOpen && editingKridaModule && <KridaMaterialEditorModal module={editingKridaModule} onClose={() => setIsKridaEditorOpen(false)} onSave={handleSaveKridaModule} />}
       {isFullScreenReaderOpen && <KridaFullScreenReaderModal modules={kridaModules} initialModuleId={readerModuleId} onClose={() => setIsFullScreenReaderOpen(false)} />}
     </div>
