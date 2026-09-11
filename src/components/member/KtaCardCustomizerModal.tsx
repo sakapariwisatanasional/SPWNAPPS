@@ -169,7 +169,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
                 <input type="checkbox" checked={settings.showQrCode!==false} onChange={e=>setSettings(s=>({...s,showQrCode:e.target.checked}))}/> Tampilkan QR Code
               </label>
             </div>
-            <p className="text-[10px] text-slate-600">Atur posisi QR Code langsung melalui koordinat X/Y dan ukurannya. Nilai X/Y adalah persentase dari sisi kiri dan atas kartu. Pengaturan ini dipakai bersama oleh preview KTA, KTA digital, dan PDF.</p>
+            <p className="text-[10px] text-slate-600">Atur posisi, ukuran, dan garis tepi QR Code secara presisi. X/Y menggunakan persentase dari kiri/atas kartu. Semua pengaturan diterapkan ke preview KTA, KTA digital, dan PDF.</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <label className="text-[9px] font-bold">Posisi X (%)
                 {numberInput(settings.qrX??78,v=>setSettings(s=>({...s,qrX:Math.max(0,Math.min(100,v))})))}
@@ -181,10 +181,40 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
                 {numberInput(settings.qrSize??22,v=>setSettings(s=>({...s,qrSize:Math.max(5,Math.min(60,v))})))}
               </label>
             </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <label className="text-[9px] font-bold">Tebal Garis (px)
+                {numberInput(settings.qrBorderWidth??1,v=>setSettings(s=>({...s,qrBorderWidth:Math.max(0,Math.min(12,v))})))}
+              </label>
+              <label className="text-[9px] font-bold">Sudut / Radius (px)
+                {numberInput(settings.qrBorderRadius??6,v=>setSettings(s=>({...s,qrBorderRadius:Math.max(0,Math.min(30,v))})))}
+              </label>
+              <label className="text-[9px] font-bold">Padding (px)
+                {numberInput(settings.qrPadding??2,v=>setSettings(s=>({...s,qrPadding:Math.max(0,Math.min(12,v))})))}
+              </label>
+              <label className="text-[9px] font-bold">Warna Garis
+                <input type="color" value={settings.qrBorderColor||'#ffffff'} onChange={e=>setSettings(s=>({...s,qrBorderColor:e.target.value}))} className="h-9 w-full rounded"/>
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label className="text-[9px] font-bold">Warna Latar QR
+                <input type="color" value={settings.qrBackgroundColor||'#ffffff'} onChange={e=>setSettings(s=>({...s,qrBackgroundColor:e.target.value}))} className="h-9 w-full rounded"/>
+              </label>
+              <div className="text-[9px] font-bold">Posisi Cepat
+                <div className="grid grid-cols-3 gap-1 mt-1">
+                  <button type="button" onClick={()=>setSettings(s=>({...s,qrX:4,qrY:4}))} className="px-2 py-2 bg-white border rounded-lg hover:bg-violet-50">↖</button>
+                  <button type="button" onClick={()=>setSettings(s=>({...s,qrX:Math.max(0,50-(Number(s.qrSize??22)/2)),qrY:Math.max(0,50-(Number(s.qrSize??22)/2))}))} className="px-2 py-2 bg-white border rounded-lg hover:bg-violet-50">●</button>
+                  <button type="button" onClick={()=>setSettings(s=>({...s,qrX:Math.max(0,96-(Number(s.qrSize??22))),qrY:Math.max(0,96-(Number(s.qrSize??22)))}))} className="px-2 py-2 bg-white border rounded-lg hover:bg-violet-50">↘</button>
+                </div>
+              </div>
+              <div className="text-[9px] font-bold">Bantuan
+                <div className="mt-1 px-2 py-2 bg-white/70 border border-violet-200 rounded-lg font-normal leading-relaxed">Gunakan X/Y untuk presisi atau seret QR pada preview.</div>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2 text-[9px] text-violet-900">
-              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">X lebih besar → QR ke kanan</span>
-              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">Y lebih besar → QR ke bawah</span>
-              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">Ukuran → besar/kecil QR</span>
+              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">X → kiri/kanan</span>
+              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">Y → atas/bawah</span>
+              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">Ukuran → besar/kecil</span>
+              <span className="px-2 py-1 rounded-full bg-white border border-violet-200">Garis → tebal/tipis & warna</span>
             </div>
           </section>
           <section className="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 space-y-3">
@@ -274,7 +304,10 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
 
         <div className="xl:col-span-4 bg-slate-950 p-5 flex flex-col items-center justify-center gap-4 min-h-[500px]">
           <div className="text-center"><p className="text-xs font-bold text-emerald-400">LIVE PREVIEW</p><p className="text-[10px] text-slate-400">{settings.widthMm} × {settings.heightMm} mm • {side==='FRONT'?'Bagian Depan':'Bagian Belakang'}</p></div>
-          <DigitalMemberCard member={previewMember} previewSettings={settings} showControls={false}/>
+          <div className="relative">
+            <DigitalMemberCard member={previewMember} previewSettings={settings} onPreviewSettingsChange={setSettings} showControls={false}/>
+            <div className="mt-2 text-center text-[10px] text-slate-400">Seret QR Code langsung pada kartu untuk mengatur posisi.</div>
+          </div>
           <div className="w-full max-w-sm p-3 rounded-xl bg-white/5 border border-white/10 text-[10px] text-slate-300">{loadingRemote?'Memuat konfigurasi pusat...':'Perubahan di panel ini belum dipublikasikan sampai tombol Simpan ditekan.'}</div>
         </div>
       </div>
