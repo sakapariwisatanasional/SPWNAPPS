@@ -496,8 +496,18 @@ function drawFrontSystemElements(ctx: CanvasRenderingContext2D, member: Member, 
   }
 
   if(settings.showQrCode !== false && qrImg && (qrImg.naturalWidth||qrImg.width)) {
-    const x=pxX(settings.qrX ?? 78), y=pxY(settings.qrY ?? 30), size=Math.max(36,Math.min(pxW(settings.qrSize ?? 22),pxH(settings.qrSize ?? 22)));
-    ctx.save(); ctx.fillStyle='#fff'; roundRect(ctx,x,y,size,size,6); ctx.fill(); ctx.drawImage(qrImg,x+2,y+2,size-4,size-4); ctx.restore();
+    const x=pxX(settings.qrX ?? 78), y=pxY(settings.qrY ?? 29), size=Math.max(36,Math.min(pxW(settings.qrSize ?? 18),pxH(settings.qrSize ?? 18)));
+    const qrPadding=Math.max(0,Number(settings.qrPadding ?? 6));
+    const qrRadius=Math.max(0,Number(settings.qrBorderRadius ?? 10));
+    const qrBorderWidth=Math.max(0,Number(settings.qrBorderWidth ?? 1));
+    const qrBorderColor=settings.qrBorderColor || '#e9d5ff';
+    const qrBg=settings.qrBackgroundColor || '#ffffff';
+    ctx.save();
+    ctx.fillStyle=qrBg; roundRect(ctx,x,y,size,size,qrRadius); ctx.fill();
+    if(qrBorderWidth>0){ ctx.strokeStyle=qrBorderColor; ctx.lineWidth=qrBorderWidth; roundRect(ctx,x,y,size,size,qrRadius); ctx.stroke(); }
+    const innerSize=Math.max(1,size-(qrPadding*2));
+    ctx.drawImage(qrImg,x+qrPadding,y+qrPadding,innerSize,innerSize);
+    ctx.restore();
   }
 
   if(settings.showBarcodeFront !== false) {
