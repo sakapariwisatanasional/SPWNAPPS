@@ -291,7 +291,7 @@ class SpreadsheetService {
             if (member.avatarUrl && member.avatarUrl.startsWith('data:image')) {
               try {
                 const fname = `KTA_${member.nationalMemberNumber || member.id}_${(member.fullName || 'Anggota').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-                const uploadRes = await this.uploadImageToDrive(member.avatarUrl, fname, 'MEMBER_AVATAR');
+                const uploadRes = await this.uploadImageToDrive(member.avatarUrl: pendingMember?.avatarUrl || avatarUrl, fname, 'MEMBER_AVATAR');
                 if (uploadRes.directUrl) {
                   member.avatarUrl = uploadRes.directUrl;
                 }
@@ -730,6 +730,16 @@ class SpreadsheetService {
           const role = parseRole(roleRaw, rawProv, rawReg);
           const memberId = this.getRowValue(row, ['ID', 'id', 'Id', 'member_id', 'Nomor ID', 'col_0']) || `sheet-member-${idx + 1}`;
 
+          // Lindungi perubahan profil yang baru disimpan sampai Spreadsheet benar-benar
+          // memantulkan nilai terbaru. Ini mencegah polling mengembalikan jabatan/krida/status
+          // ke snapshot lama ketika dua jalur sinkronisasi selesai pada waktu berbeda.
+          const pendingWrites = storage.getPendingMemberWrites();
+          const pendingEntry = pendingWrites[memberId] || Object.values(pendingWrites).find((p: any) => p?.member && (
+            (kta && String(p.member.nationalMemberNumber || '').trim() === String(kta).trim()) ||
+            (email && String(p.member.email || '').trim().toLowerCase() === String(email).trim().toLowerCase())
+          ));
+          const pendingMember = (pendingEntry as any)?.member as Member | undefined;
+
           // Ekstraksi Sertifikasi Kompetensi jika ada di spreadsheet
           const rawCertName = this.getRowValue(row, [
             'Sertifikat Kompetensi', 'Sertifikasi', 'Kompetensi', 'Sertifikat', 'Nama Sertifikat',
@@ -774,30 +784,30 @@ class SpreadsheetService {
           return {
             id: memberId,
             userId: `user-${memberId}`,
-            nationalMemberNumber: kta || undefined,
-            fullName,
+            nationalMemberNumber: pendingMember?.nationalMemberNumber || kta || undefined,
+            fullName: pendingMember?.fullName || fullName,
             nikMasked: '3201**********01',
             avatarUrl,
             gender,
             birthPlace: 'Indonesia',
             birthDate: '2000-01-01',
-            email,
-            phone,
+            email: pendingMember?.email || email,
+            phone: pendingMember?.phone || phone,
             address: `${rawDistrict || territory.regencyName}, ${territory.regencyName}, ${territory.provinceName}`,
-            provinceId: territory.provinceId,
-            provinceName: territory.provinceName,
-            regencyId: territory.regencyId,
-            regencyName: territory.regencyName,
-            districtId: isNationalRow ? '00.00.00' : (this.getRowValue(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || `${territory.regencyId}.01`),
-            districtName: isNationalRow ? 'Nasional' : (rawDistrict || territory.regencyName),
-            currentPosition: currentPosition || (role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`),
-            krida,
+            provinceId: pendingMember?.provinceId || territory.provinceId,
+            provinceName: pendingMember?.provinceName || territory.provinceName,
+            regencyId: pendingMember?.regencyId || territory.regencyId,
+            regencyName: pendingMember?.regencyName || territory.regencyName,
+            districtId: pendingMember?.districtId || (isNationalRow ? '00.00.00' : (this.getRowValue(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || `${territory.regencyId}.01`)),
+            districtName: pendingMember?.districtName || (isNationalRow ? 'Nasional' : (rawDistrict || territory.regencyName)),
+            currentPosition: pendingMember?.currentPosition || currentPosition || `Anggota ${krida}`,
+            krida: pendingMember?.krida || krida,
             joinYear: new Date().getFullYear(),
             educationLevel: 'SMA/SMK',
             occupation: 'Anggota Pramuka',
             bio: `Anggota resmi Saka Pariwisata ${territory.provinceName}. Terdata langsung dari Google Spreadsheet.`,
             status: statusRaw === 'ACTIVE' || statusRaw === 'PENDING' ? statusRaw : 'ACTIVE',
-            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_12']) || new Date().toISOString(),
+            registeredAt: pendingMember?.registeredAt || this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_12']) || new Date().toISOString(),
             verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
             isOperator: role !== 'MEMBER',
             operatorRole: role !== 'MEMBER' ? role : undefined,
@@ -806,6 +816,40 @@ class SpreadsheetService {
             certifications: memberCerts,
             locationHistory: []
           };
+        });
+
+        // Pending write hanya boleh dihapus jika NILAI MENTAH dari Spreadsheet
+        // sudah sama dengan snapshot yang ditulis Admin. Jangan membandingkan
+        // importedMembers yang sudah dilindungi pending karena itu akan selalu sama.
+        const pendingAfterImport = storage.getPendingMemberWrites();
+        Object.entries(pendingAfterImport).forEach(([pendingId, entry]: [string, any]) => {
+          const pm = entry?.member as Member | undefined;
+          if (!pm) return;
+          const rawMatch = rows.find((row: Record<string, any>) => {
+            const rowId = this.getRowValue(row, ['ID', 'id', 'Id', 'member_id', 'Nomor ID', 'col_0']);
+            const rowKta = this.getRowValue(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'NTA', 'KTA', 'No KTA', 'col_1']);
+            const rowEmail = this.getRowValue(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']);
+            return String(rowId || '').trim() === String(pm.id || pendingId).trim() ||
+              (!!pm.nationalMemberNumber && String(rowKta || '').trim() === String(pm.nationalMemberNumber).trim()) ||
+              (!!pm.email && String(rowEmail || '').trim().toLowerCase() === String(pm.email).trim().toLowerCase());
+          });
+          if (!rawMatch) return;
+          const rawSheet = {
+            fullName: this.getRowValue(rawMatch, ['Nama Lengkap', 'Nama', 'Full Name', 'col_2']),
+            email: this.getRowValue(rawMatch, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']),
+            phone: this.getRowValue(rawMatch, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_4']),
+            provinceName: this.getRowValue(rawMatch, ['Kwartir Daerah (Provinsi)', 'Kwartir Daerah', 'Kwarda', 'Provinsi', 'provinsi', 'Daerah', 'Province', 'col_5']),
+            regencyName: this.getRowValue(rawMatch, ['Kwartir Cabang (Kab/Kota)', 'Kwartir Cabang', 'Kwarcab', 'Kabupaten/Kota', 'Kabupaten', 'Kota', 'col_6']),
+            districtName: this.getRowValue(rawMatch, ['Kwartir Ranting (Kecamatan)', 'Kwartir Ranting', 'Kwarran', 'Kwarran/Kecamatan', 'Kecamatan', 'Ranting', 'col_7']),
+            currentPosition: this.getRowValue(rawMatch, ['Jabatan', 'Posisi / Jabatan', 'Posisi/Jabatan Kepengurusan', 'Jabatan Kepengurusan', 'Posisi', 'currentPosition', 'current_position', 'col_8']),
+            krida: this.getRowValue(rawMatch, ['Krida', 'Peminatan Krida', 'Peminatan Krida Saka Pariwisata', 'Pilihan Krida', 'krida', 'col_9']),
+            status: this.getRowValue(rawMatch, ['Status', 'status', 'Status Keanggotaan', 'col_10'])
+          };
+          const same = (a: any, b: any) => String(a ?? '').trim() === String(b ?? '').trim();
+          const confirmed = ['fullName','email','phone','provinceName','regencyName','districtName','currentPosition','krida','status'].every(key =>
+            same((rawSheet as any)[key], (pm as any)[key])
+          );
+          if (confirmed) storage.clearPendingMemberWrite(pm.id || pendingId);
         });
 
         // Google Spreadsheet adalah source of truth. Snapshot yang berhasil
@@ -1657,12 +1701,11 @@ class SpreadsheetService {
           m.provinceName,
           m.regencyName,
           m.districtName,
-          m.currentPosition || '',
           m.krida || '',
           m.status,
           m.avatarUrl,
           m.registeredAt,
-          window.location.origin + '/verify?verifyId=' + encodeURIComponent(m.nationalMemberNumber || m.id)
+          window.location.origin + '/?verifyId=' + (m.nationalMemberNumber || m.id)
         ]),
         tours: tours.map(t => [
           t.id,
