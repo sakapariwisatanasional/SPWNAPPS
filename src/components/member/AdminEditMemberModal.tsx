@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { storage } from '../../services/storage';
 import { spreadsheetService } from '../../services/spreadsheetService';
-import { Member, CurrentUser, Province, Regency, District, Branch, KridaType, MemberStatus, MemberSkill, SkillProficiency, Skill } from '../../types';
+import { Member, CurrentUser, Province, Regency, District, KridaType, MemberStatus, MemberSkill, SkillProficiency, Skill } from '../../types';
 import { formatDriveImageUrl, getDriveDirectFallbackUrl, getValidAvatarUrl } from '../common/SakaLogo';
 import { GOOGLE_DRIVE_MAIN_FOLDER } from '../../services/driveRepository';
 
@@ -99,7 +99,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [regencies, setRegencies] = useState<Regency[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
 
   // Form States
   const [fullName, setFullName] = useState('');
@@ -115,7 +114,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const [selectedProvinceId, setSelectedProvinceId] = useState('');
   const [selectedRegencyId, setSelectedRegencyId] = useState('');
   const [selectedDistrictId, setSelectedDistrictId] = useState('');
-  const [selectedBranchId, setSelectedBranchId] = useState('');
 
   // Saka Position & Status
   const [krida, setKrida] = useState<KridaType>('Krida Pemandu');
@@ -227,7 +225,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       setSelectedProvinceId(provinceId);
       setSelectedRegencyId(regencyId);
       setSelectedDistrictId(districtId);
-      setSelectedBranchId(member.branchId || '');
 
       setKrida(member.krida || 'Krida Pemandu');
       setCurrentPosition(member.currentPosition || 'Anggota Krida Pemandu');
@@ -290,17 +287,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
     }
   }, [selectedRegencyId]);
 
-  // Load Branches when District changes
-  useEffect(() => {
-    if (selectedDistrictId) {
-      const brs = storage.getBranches(selectedDistrictId);
-      setBranches(brs);
-      if (brs.length > 0 && !brs.some(b => b.id === selectedBranchId)) {
-        setSelectedBranchId(brs[0].id);
-      }
-    }
-  }, [selectedDistrictId]);
-
   if (!isOpen || !member) return null;
 
   const isRegencyOperator = currentUser.role === 'ADMIN_REGENCY';
@@ -316,7 +302,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const currentProvince = provinces.find(p => p.id === selectedProvinceId);
   const currentRegency = regencies.find(r => r.id === selectedRegencyId);
   const currentDistrict = districts.find(d => d.id === selectedDistrictId);
-  const currentBranch = branches.find(b => b.id === selectedBranchId);
 
   const handleGenerateNewNta = () => {
     if (currentUser.role !== 'SUPER_ADMIN') {
@@ -473,8 +458,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         regencyName: currentRegency?.name || member.regencyName,
         districtId: selectedDistrictId,
         districtName: currentDistrict?.name || member.districtName,
-        branchId: selectedBranchId || member.branchId,
-        branchName: currentBranch?.name || member.branchName || '',
+        // Pangkalan/Gudep tidak lagi menjadi field profil utama.
 
         krida,
         currentPosition: currentPosition.trim() || `Anggota ${krida}`,
@@ -1140,21 +1124,6 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-800 mb-1">Pangkalan Saka / Kwarran</label>
-                    <select
-                      value={selectedBranchId}
-                      onChange={(e) => setSelectedBranchId(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800"
-                    >
-                      {branches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
                 </div>
               </div>
             </div>
@@ -1179,12 +1148,12 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-800 mb-1">Posisi / Jabatan Kepengurusan</label>
+                  <label className="block font-bold text-slate-800 mb-1">Jabatan</label>
                   <input
                     type="text"
                     value={currentPosition}
                     onChange={(e) => setCurrentPosition(e.target.value)}
-                    placeholder="Contoh: Anggota Krida / Dewan Saka / Instruktur"
+                    placeholder="Contoh: Anggota Krida / Dewan Saka / Instruktur / Pimpinan"
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800"
                   />
                 </div>
