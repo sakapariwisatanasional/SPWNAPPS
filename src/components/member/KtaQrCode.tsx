@@ -32,9 +32,15 @@ export interface KtaQrCodeProps {
  * Saat discan oleh kamera smartphone manapun, langsung membuka halaman profil KTA anggota ini.
  */
 export function getMemberVerificationUrl(member: Member): string {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sakapariwisata-nasional.vercel.app';
-  const nta = member.nationalMemberNumber || member.id;
-  return `${origin}/verify?verifyId=${encodeURIComponent(member.verificationToken || member.id || nta)}`;
+  const origin = typeof window !== 'undefined'
+    ? window.location.origin
+    : 'https://sakapariwisata-nasional.vercel.app';
+
+  // Sumber identitas QR harus sama dengan kolom verifikasi di Spreadsheet.
+  // Spreadsheet menyimpan Link Verifikasi dengan pola: /?verifyId=<Nomor KTA>,
+  // sehingga QR TIDAK boleh memprioritaskan verificationToken lokal.
+  const verifyId = String(member.nationalMemberNumber || member.id || '').trim();
+  return `${origin}/?verifyId=${encodeURIComponent(verifyId)}`;
 }
 
 export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
