@@ -298,6 +298,40 @@ export async function verifyMemberUniversal(
   // Untuk halaman verifikasi/QR, Google Spreadsheet adalah sumber kebenaran.
   // Jangan mengembalikan record localStorage yang mungkin merupakan KTA lama.
   if (authoritativeRemote) {
+    // Jalur publik utama: server menjadi proxy ke Google Apps Script.
+    // Ini menghindari ketergantungan pada CORS dan konfigurasi localStorage
+    // browser pengunjung.
+    try {
+      const params = new URLSearchParams();
+      params.set('verifyId', cleanQuery || rawInput.trim());
+      const configuredScriptUrl = spreadsheetService.getConfig().scriptUrl?.trim();
+      if (configuredScriptUrl) params.set('scriptUrl', configuredScriptUrl);
+
+      const response = await fetch(`/api/verify-member?${params.toString()}`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        if (payload?.found && payload.member) {
+          return {
+            found: true,
+            member: payload.member as Member,
+            source: 'GOOGLE_SPREADSHEET',
+            searchTerm: rawInput,
+            normalizedTerm: cleanQuery
+          };
+        }
+      } else {
+        console.warn('Public verification API returned HTTP', response.status);
+      }
+    } catch (e) {
+      console.warn('Public verification API failed:', e);
+    }
+
+    // Fallback hanya untuk kondisi API proxy gagal. Tetap remote, bukan localStorage.
     try {
       const remoteMatch = await searchMemberInRemoteSpreadsheet(rawInput);
       if (remoteMatch) {
