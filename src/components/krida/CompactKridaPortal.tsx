@@ -379,11 +379,9 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 <h3 className={`text-base sm:text-lg font-bold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {currentModule.title}
                 </h3>
-                {currentModule.subtitle && (
-                  <p className={`text-xs font-medium ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>
-                    {currentModule.subtitle}
-                  </p>
-                )}
+                <p className={`text-xs font-medium ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>
+                  {currentModule.badge}
+                </p>
                 <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   {currentModule.description}
                 </p>
@@ -543,9 +541,9 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                     <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
                       activeSection === 'RELATED_MATERIALS' ? 'bg-white/20 text-white' : 'bg-teal-500/20 text-teal-400'
                     }`}>
-                      {((currentModule.downloads?.length || 0) + ((currentModule as any).materials?.downloads?.length || 0)) +
-                       ((currentModule.competencyTable?.length || 0) + ((currentModule as any).materials?.tables?.length || 0)) +
-                       ((currentModule.images?.length || 0) + ((currentModule as any).materials?.images?.length || 0))} File
+                      {((currentModule.downloads?.length || 0) +
+                       (currentModule.competencyTable?.length || 0) +
+                       (currentModule.images?.length || 0))} File
                     </span>
                     <ChevronDown className={`w-4 h-4 transition-transform ${activeSection === 'RELATED_MATERIALS' ? 'rotate-180 text-white' : 'text-slate-500'}`} />
                   </div>
@@ -674,7 +672,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                             <span className="text-[10px] text-slate-500 font-mono">Bingkai Bulat</span>
                           </div>
                           <div className="space-y-1.5 pt-1">
-                            {currentModule.competencies?.purwa?.map((item, i) => {
+                            {currentModule.testRequirements?.purwa?.map((item, i) => {
                               const key = `purwa-${i}`;
                               const isChecked = !!checkedPurwa[key];
                               return (
@@ -715,7 +713,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                             <span className="text-[10px] text-slate-500 font-mono">Bingkai Persegi</span>
                           </div>
                           <div className="space-y-1.5 pt-1">
-                            {currentModule.competencies?.madya?.map((item, i) => {
+                            {currentModule.testRequirements?.madya?.map((item, i) => {
                               const key = `madya-${i}`;
                               const isChecked = !!checkedMadya[key];
                               return (
@@ -756,7 +754,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                             <span className="text-[10px] text-slate-500 font-mono">Bingkai Segilima</span>
                           </div>
                           <div className="space-y-1.5 pt-1">
-                            {currentModule.competencies?.utama?.map((item, i) => {
+                            {currentModule.testRequirements?.utama?.map((item, i) => {
                               const key = `utama-${i}`;
                               const isChecked = !!checkedUtama[key];
                               return (
@@ -844,7 +842,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                         📄 Berkas Panduan & Lembar Kerja PDF:
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {currentModule.materials?.downloads?.map((file) => (
+                        {currentModule.downloads?.map((file) => (
                           <div
                             key={file.id}
                             className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
@@ -866,7 +864,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                             </div>
 
                             <a
-                              href={file.url}
+                              href={file.fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition-all flex items-center gap-1 shrink-0"
@@ -880,7 +878,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                     </div>
 
                     {/* Sub-B: Matriks Tabel Kompetensi Khusus */}
-                    {currentModule.materials?.tables && currentModule.materials.tables.length > 0 && (
+                    {currentModule.competencyTable && currentModule.competencyTable.length > 0 && (
                       <div className="space-y-2 pt-2 border-t border-slate-800/80">
                         <div className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-purple-300' : 'text-purple-800'}`}>
                           <TableIcon className="w-3.5 h-3.5" />
@@ -892,19 +890,19 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                             <table className="w-full text-left text-xs">
                               <thead className={isDark ? 'bg-slate-950 text-slate-300 font-bold' : 'bg-slate-100 text-slate-700 font-bold'}>
                                 <tr>
-                                  <th className="p-2.5 border-b border-slate-800">Aspek / Unsur</th>
-                                  <th className="p-2.5 border-b border-slate-800">Tingkat Purwa</th>
-                                  <th className="p-2.5 border-b border-slate-800">Tingkat Madya</th>
-                                  <th className="p-2.5 border-b border-slate-800">Tingkat Utama</th>
+                                  <th className="p-2.5 border-b border-slate-800">Kode</th>
+                                  <th className="p-2.5 border-b border-slate-800">Elemen Kompetensi</th>
+                                  <th className="p-2.5 border-b border-slate-800">Indikator</th>
+                                  <th className="p-2.5 border-b border-slate-800">Metode Uji</th>
                                 </tr>
                               </thead>
                               <tbody className={`divide-y ${isDark ? 'divide-slate-800/60' : 'divide-slate-100'}`}>
-                                {currentModule.materials.tables.map((row, rIdx) => (
+                                {currentModule.competencyTable.map((row, rIdx) => (
                                   <tr key={rIdx} className={isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}>
-                                    <td className="p-2.5 font-semibold text-purple-400">{row.aspect}</td>
-                                    <td className="p-2.5">{row.purwa}</td>
-                                    <td className="p-2.5">{row.madya}</td>
-                                    <td className="p-2.5">{row.utama}</td>
+                                    <td className="p-2.5 font-mono text-purple-400">{row.code}</td>
+                                    <td className="p-2.5 font-semibold">{row.element}</td>
+                                    <td className="p-2.5">{row.indicator}</td>
+                                    <td className="p-2.5 text-emerald-400">{row.assessment}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -913,22 +911,15 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
 
                           {/* Mobile Cards View (Zero Horizontal Scrolling) */}
                           <div className={`md:hidden divide-y ${isDark ? 'divide-slate-800/60 bg-slate-950/70' : 'divide-slate-100 bg-white'}`}>
-                            {currentModule.materials.tables.map((row, rIdx) => (
+                            {currentModule.competencyTable.map((row, rIdx) => (
                               <div key={rIdx} className="p-3 space-y-2 text-xs">
-                                <p className="font-bold text-purple-400 text-[13px]">{row.aspect}</p>
                                 <div className="space-y-1.5">
-                                  <div className={`p-2 rounded-lg text-[11px] ${isDark ? 'bg-slate-900/90' : 'bg-slate-50'}`}>
-                                    <span className="font-bold text-amber-500 block text-[10px]">Tingkat Purwa:</span>
-                                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.purwa}</span>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-mono text-purple-400 font-bold">{row.code}</span>
+                                    <span className="text-emerald-400 font-semibold">{row.assessment}</span>
                                   </div>
-                                  <div className={`p-2 rounded-lg text-[11px] ${isDark ? 'bg-slate-900/90' : 'bg-slate-50'}`}>
-                                    <span className="font-bold text-teal-400 block text-[10px]">Tingkat Madya:</span>
-                                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.madya}</span>
-                                  </div>
-                                  <div className={`p-2 rounded-lg text-[11px] ${isDark ? 'bg-slate-900/90' : 'bg-slate-50'}`}>
-                                    <span className="font-bold text-indigo-400 block text-[10px]">Tingkat Utama:</span>
-                                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.utama}</span>
-                                  </div>
+                                  <p className="font-bold text-white text-[12px]">{row.element}</p>
+                                  <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.indicator}</p>
                                 </div>
                               </div>
                             ))}
@@ -938,13 +929,13 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                     )}
 
                     {/* Sub-C: Referensi Tautan Eksternal & Video Terkait */}
-                    {currentModule.materials?.links && currentModule.materials.links.length > 0 && (
+                    {currentModule.links && currentModule.links.length > 0 && (
                       <div className="space-y-2 pt-2 border-t border-slate-800/80">
                         <div className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           🌐 Tautan Referensi & Video Pendukung:
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {currentModule.materials.links.map((link, lIdx) => (
+                          {currentModule.links.map((link, lIdx) => (
                             <a
                               key={lIdx}
                               href={link.url}
