@@ -84,7 +84,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
     setVerificationMeta(null);
 
     try {
-      const result = await verifyMemberUniversal(term, members);
+      const result = await verifyMemberUniversal(term, members, { authoritativeRemote: true });
       setIsVerifying(false);
       setVerificationMeta(result);
 
