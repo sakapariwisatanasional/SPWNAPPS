@@ -40,7 +40,7 @@ export function getMemberVerificationUrl(member: Member): string {
   // Spreadsheet menyimpan Link Verifikasi dengan pola: /?verifyId=<Nomor KTA>,
   // sehingga QR TIDAK boleh memprioritaskan verificationToken lokal.
   const verifyId = String(member.nationalMemberNumber || member.id || '').trim();
-  return `${origin}/?verifyId=${encodeURIComponent(verifyId)}`;
+  return `${origin}/verify?verifyId=${encodeURIComponent(verifyId)}`;
 }
 
 export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
