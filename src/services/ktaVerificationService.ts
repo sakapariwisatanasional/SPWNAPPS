@@ -198,18 +198,25 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
     // Cari baris yang cocok
     for (let idx = 0; idx < rows.length; idx++) {
       const row = rows[idx];
-      const fullName = getVal(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'nama', 'Full Name', 'Name', 'col_1']) || `Anggota ${idx + 1}`;
-      const kta = getVal(row, ['Nomor KTA', 'Nomor Anggota', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'col_2', 'col_0']);
-      const email = getVal(row, ['Email', 'email', 'E-mail', 'col_10']) || `member${idx + 1}@pramuka.id`;
-      const phone = getVal(row, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'col_9', 'col_4']);
-      const memberId = getVal(row, ['ID', 'id', 'Id', 'member_id', 'col_0']) || `sheet-member-${idx}`;
-      const prov = getVal(row, ['Provinsi', 'Kwarda', 'provinsi', 'col_3']) || 'Tingkat Nasional';
-      const kab = getVal(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'col_4']) || 'Kwartir Nasional';
-      const kec = getVal(row, ['Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'kecamatan_ranting', 'col_5']) || 'Pimpinan Nasional';
-      const krida = getVal(row, ['Krida', 'krida', 'col_7']) || 'Krida Pemandu';
-      const roleStr = getVal(row, ['Role', 'Peran', 'Jabatan', 'Posisi']);
-      const role = parseRole(roleStr);
-      const rawFoto = getVal(row, ['Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Photo', 'Avatar', 'col_11']);
+      // Canonical schema Anggota (14 kolom):
+      // A ID | B Nomor KTA | C Nama Lengkap | D Email | E Nomor WA |
+      // F Provinsi | G Kabupaten/Kota | H Kecamatan | I Jabatan |
+      // J Krida | K Status | L Foto URL | M Tanggal Daftar | N Link Verifikasi.
+      // Alias col_* hanya dipakai sebagai kompatibilitas data lama; header bernama
+      // selalu diprioritaskan oleh getVal().
+      const fullName = getVal(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'nama', 'Full Name', 'Name', 'col_2']) || `Anggota ${idx + 1}`;
+      const kta = getVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_1']);
+      const email = getVal(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']) || `member${idx + 1}@pramuka.id`;
+      const phone = getVal(row, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'col_4']);
+      const memberId = getVal(row, ['ID', 'id', 'Id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']) || `sheet-member-${idx}`;
+      const prov = getVal(row, ['Provinsi', 'Kwarda', 'provinsi', 'col_5']) || 'Tingkat Nasional';
+      const kab = getVal(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'Kabupaten', 'Kota', 'col_6']) || 'Kwartir Nasional';
+      const kec = getVal(row, ['Kecamatan', 'Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'kecamatan_ranting', 'Ranting', 'col_7']) || 'Pimpinan Nasional';
+      const jabatan = getVal(row, ['Jabatan', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi']);
+      const krida = getVal(row, ['Krida', 'krida', 'Peminatan Krida', 'col_9']) || 'Krida Pemandu';
+      const roleStr = getVal(row, ['Role', 'Peran', 'Hak Akses', 'Wewenang']);
+      const role = parseRole(roleStr || jabatan);
+      const rawFoto = getVal(row, ['Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Photo', 'Avatar', 'Link Foto', 'col_11']);
       const avatarUrl = formatDriveImageUrl(rawFoto) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
 
       const tempMember: Member = {
@@ -231,14 +238,15 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
         regencyName: kab,
         districtId: '00.00.00',
         districtName: kec,
-        currentPosition: role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
+        currentPosition: jabatan || (role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`),
         krida: (krida || 'Krida Pemandu') as any,
         joinYear: new Date().getFullYear(),
         educationLevel: 'SMA/SMK',
         occupation: 'Pramuka Pariwisata',
         bio: `Anggota resmi Saka Pariwisata. Terverifikasi dari database Google Spreadsheet.`,
-        status: (getVal(row, ['Status', 'status', 'col_8']) || 'ACTIVE').toUpperCase() === 'PENDING' ? 'PENDING' : 'ACTIVE',
-        registeredAt: getVal(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_13']) || new Date().toISOString(),
+        status: (getVal(row, ['Status', 'status', 'Status Keanggotaan', 'col_10']) || 'ACTIVE').toUpperCase() === 'PENDING' ? 'PENDING' : 'ACTIVE',
+        registeredAt: getVal(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_12']) || new Date().toISOString(),
+        // Token tetap dibuat untuk kompatibilitas QR lama, tetapi QR baru memakai NTA.
         verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
         isOperator: role !== 'MEMBER',
         operatorRole: role !== 'MEMBER' ? role : undefined,
@@ -247,7 +255,12 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
         locationHistory: []
       };
 
-      if (isMemberMatch(tempMember, cleanQuery, strippedDigits)) {
+      const spreadsheetVerificationLink = getVal(row, ['Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'col_13']);
+      const linkMatchesQuery = spreadsheetVerificationLink
+        ? normalizeNtaQuery(spreadsheetVerificationLink).cleanQuery.toLowerCase() === cleanQuery.toLowerCase()
+        : false;
+
+      if (linkMatchesQuery || isMemberMatch(tempMember, cleanQuery, strippedDigits)) {
         // Simpan langsung ke database lokal agar pencarian berikutnya instan
         storage.addOrUpdateMember(tempMember);
         return tempMember;
