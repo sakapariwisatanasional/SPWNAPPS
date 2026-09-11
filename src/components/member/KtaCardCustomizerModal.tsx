@@ -15,7 +15,7 @@ const FIELD_OPTIONS: Array<{ value: KtaMemberFieldKey; label: string }> = [
   { value:'nationalMemberNumber', label:'Nomor KTA / NTA' }, { value:'currentPosition', label:'Jabatan' },
   { value:'provinceName', label:'Kwartir / Provinsi' }, { value:'regencyName', label:'Kwarcab / Kabupaten' },
   { value:'districtName', label:'Kwarran / Kecamatan' }, { value:'branchName', label:'Gugus / Pangkalan' },
-  { value:'gugusDepan', label:'Gugus Depan' }, { value:'krida', label:'Krida' },
+  { value:'krida', label:'Krida' },
   { value:'phone', label:'WhatsApp' }, { value:'email', label:'Email' },
   { value:'joinYear', label:'Tahun Bergabung' }, { value:'status', label:'Status' }
 ];
@@ -48,7 +48,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
   const previewMember: Member = members[0] || ({
     id:'SPW-000001', userId:'user-01', nationalMemberNumber:'00.00.00.000001', fullName:'Rohadi Wijaya', nikMasked:'',
     avatarUrl:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300', gender:'LAKI_LAKI', birthPlace:'Jakarta', birthDate:'2000-08-14', phone:'081234567890', email:'admin@sakapariwisata.id', address:'',
-    provinceId:'00', provinceName:'Kwartir Nasional', regencyId:'00.00', regencyName:'Kwartir Nasional (Pusat)', districtId:'00.00.00', districtName:'Nasional', branchId:'branch-nasional', branchName:'PANDU NUSANTARA', gugusDepan:'PANDU NUSANTARA', joinYear:2024, currentPosition:'Andalan Nasional', krida:'Krida Mice & Event', status:'ACTIVE', educationLevel:'S1', occupation:'Pimpinan Saka', bio:'', skills:[], certifications:[], locationHistory:[], registeredAt:new Date().toISOString(), verificationToken:'preview'
+    provinceId:'00', provinceName:'Kwartir Nasional', regencyId:'00.00', regencyName:'Kwartir Nasional (Pusat)', districtId:'00.00.00', districtName:'Nasional', branchId:'branch-nasional', branchName:'PANDU NUSANTARA', joinYear:2024, currentPosition:'Andalan Nasional', krida:'Krida Mice & Event', status:'ACTIVE', educationLevel:'S1', occupation:'Pimpinan Saka', bio:'', skills:[], certifications:[], locationHistory:[], registeredAt:new Date().toISOString(), verificationToken:'preview'
   } as Member);
 
   useEffect(() => {
