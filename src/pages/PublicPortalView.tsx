@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
   Search, 
@@ -62,6 +62,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   const [notFoundMessage, setNotFoundMessage] = useState<string>('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const verificationResultRef = useRef<HTMLDivElement | null>(null);
 
   // --- Tour Packages State ---
   const [tourCategoryFilter, setTourCategoryFilter] = useState<string>('ALL');
@@ -91,6 +92,17 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
       if (result.found && result.member) {
         setSearchedMember(result.member);
         setNotFound(false);
+
+        // Setelah QR/URL berhasil diverifikasi, arahkan pengguna langsung
+        // ke kartu hasil verifikasi agar tidak perlu mencari/scroll manual.
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            verificationResultRef.current?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center'
+            });
+          });
+        });
       } else {
         setSearchedMember(null);
         setNotFound(true);
@@ -105,7 +117,9 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
     }
   };
 
-  // Auto-check URL parameters on mount
+  // Auto-check URL parameters on mount. QR verification is intentionally
+  // executed once per page load so a later local member sync cannot overwrite
+  // the authoritative remote result or force the page to jump again.
   useEffect(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -118,6 +132,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
     } catch (e) {
       console.warn('URL verify param error', e);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Verify Handler
@@ -709,7 +724,10 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
 
           {/* Verification Result Card */}
           {searchedMember && !isVerifying && (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-emerald-500 text-slate-900 shadow-2xl max-w-2xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div
+              ref={verificationResultRef}
+              className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-emerald-500 text-slate-900 shadow-2xl max-w-2xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-200"
+            >
               <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
                 <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs sm:text-sm">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
@@ -734,31 +752,56 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                   alt={searchedMember.fullName}
                   className="w-24 h-28 object-cover rounded-2xl border-2 border-purple-500 shadow-md"
                 />
-                <div className="flex-1 text-center sm:text-left space-y-1.5">
-                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 font-heading">
-                    {searchedMember.fullName}
-                  </h3>
-                  <div className="bg-purple-50 inline-block px-3 py-1 rounded-lg border border-purple-200 text-purple-950 font-mono font-bold text-xs">
-                    NTA: {searchedMember.nationalMemberNumber || 'Dalam Proses'}
+                <div className="flex-1 text-center sm:text-left space-y-2">
+                  <div>
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">Nama Anggota</p>
+                    <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 font-heading leading-tight">
+                      {searchedMember.fullName}
+                    </h3>
                   </div>
-                  <p className="text-xs font-semibold text-slate-700">
-                    Jabatan: {searchedMember.currentPosition || 'Anggota Saka Pariwisata'}
-                  </p>
-                  <p className="text-xs text-slate-600">
-                    Kecamatan: <strong className="text-slate-800">{searchedMember.districtName}</strong>
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {searchedMember.provinceId === '00' || searchedMember.provinceName?.toLowerCase().includes('nasional')
-                      ? 'Kwartir Nasional Gerakan Pramuka'
-                      : `Kwartir Cabang ${searchedMember.regencyName}, Kwarda ${searchedMember.provinceName}`}
-                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div className="bg-purple-50 rounded-xl border border-purple-200 px-3 py-2.5">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600">Nomor KTA</p>
+                      <p className="mt-0.5 text-xs sm:text-sm font-mono font-extrabold text-purple-950 break-all">
+                        {searchedMember.nationalMemberNumber || 'Dalam Proses'}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Jabatan</p>
+                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-800">
+                        {searchedMember.currentPosition || 'Anggota Saka Pariwisata'}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Kwartir</p>
+                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-800">
+                        {searchedMember.provinceId === '00' || searchedMember.provinceName?.toLowerCase().includes('nasional')
+                          ? 'Kwartir Nasional'
+                          : `Kwartir Daerah ${searchedMember.provinceName || ''}`}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Krida</p>
+                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-800">
+                        {searchedMember.krida || 'Krida Pemandu'}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5 sm:col-span-2">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Tanggal Aktif</p>
+                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-800">
+                        {searchedMember.registeredAt ? new Date(searchedMember.registeredAt).toLocaleDateString('id-ID', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric'
+                        }) : '—'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                <span className="text-[11px] text-slate-400">
-                  Terdaftar sejak {new Date(searchedMember.registeredAt).getFullYear()}
-                </span>
+              <div className="pt-2 flex items-center justify-end border-t border-slate-100">
                 <button
                   onClick={() => onOpenVerifyModal(searchedMember)}
                   className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
