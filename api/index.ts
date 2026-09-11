@@ -566,8 +566,8 @@ app.use((req, res, next) => {
 });
 
 // Middleware
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 // CORS handler for cross-device access
 app.use((req, res, next) => {
@@ -1404,180 +1404,220 @@ app.post('/api/auth/change-password', (req, res) => {
 
 // POST /api/auth/register - Public new member registration
 app.post('/api/auth/register', async (req, res) => {
-  const { memberData, password, scriptUrl } = req.body || {};
-  const registrationScriptUrl = normalizeManualAppsScriptUrl(scriptUrl);
+  const requestId = `REG-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
-  if (!memberData || !memberData.fullName) {
-    return res.status(400).json({ success: false, message: 'Data anggota wajib dilengkapi.' });
-  }
-
-  const rawPassword = typeof password === 'string' ? password : '';
-  if (rawPassword.length < 6) {
-    return res.status(400).json({ success: false, message: 'Kata sandi minimal 6 karakter.' });
-  }
-
-  const email = String(memberData.email || '').trim().toLowerCase();
-  const requestedUsername = String(memberData.username || '').trim().toLowerCase();
-  const username = requestedUsername || (email ? email.split('@')[0] : '');
-
-  if (!email) {
-    return res.status(400).json({ success: false, message: 'Email wajib diisi untuk membuat akun.' });
-  }
-  if (!username) {
-    return res.status(400).json({ success: false, message: 'Nama pengguna tidak dapat ditentukan dari data pendaftaran.' });
-  }
-
-  const duplicateUser = db.users.find(u =>
-    (u.username && String(u.username).toLowerCase() === username) ||
-    (u.email && String(u.email).toLowerCase() === email)
-  );
-  if (duplicateUser) {
-    return res.status(409).json({ success: false, message: 'Username atau email sudah terdaftar. Silakan gunakan akun yang sudah ada.' });
-  }
-
-  const duplicateMember = db.members.find(m =>
-    (m.email && String(m.email).toLowerCase() === email) ||
-    (memberData.nationalMemberNumber && m.nationalMemberNumber &&
-      String(m.nationalMemberNumber).toLowerCase() === String(memberData.nationalMemberNumber).toLowerCase())
-  );
-  if (duplicateMember) {
-    return res.status(409).json({ success: false, message: 'Email atau Nomor KTA sudah terdaftar.' });
-  }
-
-  // Preserve a client-generated ID when supplied so the frontend/local cache,
-  // server DB and Spreadsheet row refer to the same member.
-  const generatedMemberNumber = String(Date.now()).slice(-6).padStart(6, '0');
-  const suppliedMemberId = String(memberData.id || '').trim();
-  const memberId = suppliedMemberId.startsWith('SPW-') ? suppliedMemberId : `SPW-${generatedMemberNumber}`;
-  const userId = String(memberData.userId || `USER-${Date.now().toString().slice(-10)}`);
-  const registeredAt = new Date().toISOString();
-  const passHash = hashPassword(rawPassword);
-
-  const newMember = {
-    ...memberData,
-    id: memberId,
-    userId,
-    email,
-    status: 'PENDING',
-    registeredAt,
-    passwordHash: passHash
-  };
-
-  const newUser = {
-    id: userId,
-    username,
-    email,
-    passwordHash: passHash,
-    name: newMember.fullName,
-    role: 'MEMBER',
-    jurisdictionName: newMember.provinceId === '00' ? 'Kwartir Nasional' : (newMember.districtName ? `${newMember.districtName}, ${newMember.regencyName || ''}`.replace(/,\s*$/, '') : (newMember.regencyName || newMember.provinceName || 'Indonesia')),
-    jurisdictionId: newMember.provinceId === '00' ? '00' : (newMember.regencyId || ''),
-    avatarUrl: newMember.avatarUrl,
-    memberId,
-    createdAt: registeredAt
-  };
-
-  if (!registrationScriptUrl) {
-    return res.status(400).json({
-      success: false,
-      message: 'Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API sebelum pendaftaran.'
-    });
-  }
-
-  // Jangan menganggap pendaftaran berhasil hanya karena data masuk ke memory server.
-  // Spreadsheet harus berhasil menerima MEMBER dan USER terlebih dahulu.
   try {
-    await forwardToGoogleAppsScript({
-      action: 'UPSERT_MEMBER',
-      sheet: 'Anggota',
-      memberId: newMember.id,
-      rowData: [
-        newMember.id,
-        newMember.nationalMemberNumber || '',
-        newMember.fullName || '',
-        newMember.email || '',
-        newMember.phone || '',
-        newMember.provinceName || '',
-        newMember.regencyName || '',
-        newMember.districtName || '',
-        newMember.currentPosition || '',
-        newMember.krida || '',
-        'PENDING',
-        newMember.avatarUrl || '',
-        newMember.registeredAt,
-        `https://sakapariwisata-nasional.vercel.app/verify?verifyId=${encodeURIComponent(newMember.nationalMemberNumber || newMember.id)}`
-      ]
-    }, registrationScriptUrl);
+    const { memberData, password, photoData, photoUrl, photoFileName, scriptUrl } = req.body || {};
+    const registrationScriptUrl = normalizeManualAppsScriptUrl(scriptUrl);
 
-    const userResult = await forwardToGoogleAppsScript({
-      action: 'UPSERT_USER',
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        email: newUser.email,
-        passwordHash: newUser.passwordHash,
-        name: newUser.name,
-        role: newUser.role,
-        jurisdictionName: newUser.jurisdictionName,
-        jurisdictionId: newUser.jurisdictionId,
-        avatarUrl: newUser.avatarUrl || '',
-        memberId: newUser.memberId,
-        createdAt: newUser.createdAt,
-        status: 'ACTIVE'
-      }
-    }, registrationScriptUrl);
+    console.log(`[Register][${requestId}] START`, {
+      hasMemberData: Boolean(memberData),
+      hasPassword: typeof password === 'string' && password.length > 0,
+      hasPhotoData: typeof photoData === 'string' && photoData.startsWith('data:image/'),
+      hasPhotoUrl: Boolean(photoUrl),
+      scriptConfigured: Boolean(registrationScriptUrl)
+    });
 
-    if (!userResult || !userResult.user || String(userResult.user.memberId || '') !== String(newUser.memberId)) {
-      throw new Error('Google Apps Script tidak mengembalikan akun Users yang tersimpan dan terverifikasi.');
+    if (!memberData || !memberData.fullName) {
+      return res.status(400).json({ success: false, requestId, message: 'Data anggota wajib dilengkapi.' });
     }
-  } catch (syncError: any) {
-    console.error('[Register] Google Spreadsheet sync failed:', syncError);
+
+    const rawPassword = typeof password === 'string' ? password : '';
+    if (rawPassword.length < 6) {
+      return res.status(400).json({ success: false, requestId, message: 'Kata sandi minimal 6 karakter.' });
+    }
+
+    const email = String(memberData.email || '').trim().toLowerCase();
+    const requestedUsername = String(memberData.username || '').trim().toLowerCase();
+    const username = requestedUsername || (email ? email.split('@')[0] : '');
+
+    if (!email) {
+      return res.status(400).json({ success: false, requestId, message: 'Email wajib diisi untuk membuat akun.' });
+    }
+    if (!username) {
+      return res.status(400).json({ success: false, requestId, message: 'Nama pengguna tidak dapat ditentukan dari data pendaftaran.' });
+    }
+
+    if (!registrationScriptUrl) {
+      return res.status(400).json({
+        success: false,
+        requestId,
+        message: 'Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API sebelum pendaftaran.'
+      });
+    }
+
+    const hasPhotoData = typeof photoData === 'string' && /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(photoData.trim());
+    const hasPhotoUrl = typeof photoUrl === 'string' && /^https?:\/\//i.test(photoUrl.trim());
+    if (!hasPhotoData && !hasPhotoUrl) {
+      return res.status(400).json({
+        success: false,
+        requestId,
+        message: 'Pas foto wajib dipilih atau diberikan melalui URL gambar.'
+      });
+    }
+
+    // Jangan melakukan pre-upload. Foto dan data akun dikirim sekali ke GAS
+    // melalui REGISTER_MEMBER agar browser hanya menunggu satu transaksi.
+    const duplicateUser = db.users.find(u =>
+      (u.username && String(u.username).toLowerCase() === username) ||
+      (u.email && String(u.email).toLowerCase() === email)
+    );
+    if (duplicateUser) {
+      return res.status(409).json({
+        success: false,
+        requestId,
+        message: 'Username atau email sudah terdaftar. Silakan gunakan akun yang sudah ada.'
+      });
+    }
+
+    const duplicateMember = db.members.find(m =>
+      (m.email && String(m.email).toLowerCase() === email) ||
+      (memberData.nationalMemberNumber && m.nationalMemberNumber &&
+        String(m.nationalMemberNumber).toLowerCase() === String(memberData.nationalMemberNumber).toLowerCase())
+    );
+    if (duplicateMember) {
+      return res.status(409).json({ success: false, requestId, message: 'Email atau Nomor KTA sudah terdaftar.' });
+    }
+
+    const generatedMemberNumber = String(Date.now()).slice(-6).padStart(6, '0');
+    const suppliedMemberId = String(memberData.id || '').trim();
+    const memberId = suppliedMemberId.startsWith('SPW-') ? suppliedMemberId : `SPW-${generatedMemberNumber}`;
+    const userId = String(memberData.userId || `USER-${Date.now().toString().slice(-10)}`);
+    const registeredAt = new Date().toISOString();
+    const passHash = hashPassword(rawPassword);
+
+    const newMember = {
+      ...memberData,
+      id: memberId,
+      userId,
+      email,
+      status: 'PENDING',
+      registeredAt,
+      passwordHash: passHash,
+      avatarUrl: hasPhotoUrl ? String(photoUrl).trim() : ''
+    };
+
+    const newUser = {
+      id: userId,
+      username,
+      email,
+      passwordHash: passHash,
+      name: newMember.fullName,
+      role: 'MEMBER',
+      jurisdictionName: newMember.provinceId === '00'
+        ? 'Kwartir Nasional'
+        : (newMember.districtName
+          ? `${newMember.districtName}, ${newMember.regencyName || ''}`.replace(/,\s*$/, '')
+          : (newMember.regencyName || newMember.provinceName || 'Indonesia')),
+      jurisdictionId: newMember.provinceId === '00' ? '00' : (newMember.regencyId || ''),
+      avatarUrl: newMember.avatarUrl,
+      memberId,
+      createdAt: registeredAt,
+      status: 'PENDING'
+    };
+
+    console.log(`[Register][${requestId}] Sending REGISTER_MEMBER to GAS`, {
+      memberId,
+      userId,
+      hasPhotoData,
+      hasPhotoUrl
+    });
+
+    const gasResult = await forwardToGoogleAppsScript({
+      action: 'REGISTER_MEMBER',
+      requestId,
+      memberId,
+      userId,
+      passwordHash: passHash,
+      photoData: hasPhotoData ? photoData.trim() : '',
+      photoUrl: hasPhotoUrl ? String(photoUrl).trim() : '',
+      photoFileName: String(photoFileName || `KTA_${memberId}.jpg`).trim(),
+      member: newMember,
+      user: newUser
+    }, registrationScriptUrl);
+
+    if (!gasResult || gasResult.success !== true || !gasResult.memberId || !gasResult.userId) {
+      throw new Error('Google Apps Script tidak mengembalikan konfirmasi pendaftaran yang lengkap.');
+    }
+
+    if (String(gasResult.memberId) !== memberId || String(gasResult.userId) !== userId) {
+      throw new Error('Konfirmasi ID anggota dari Google Apps Script tidak sesuai dengan permintaan pendaftaran.');
+    }
+
+    // GAS adalah sumber kebenaran untuk transaksi. Gunakan objek yang
+    // dikembalikan GAS bila tersedia agar URL Drive dan timestamp konsisten.
+    const savedMember = gasResult.member && typeof gasResult.member === 'object'
+      ? { ...newMember, ...gasResult.member }
+      : newMember;
+    const savedUser = gasResult.user && typeof gasResult.user === 'object'
+      ? { ...newUser, ...gasResult.user }
+      : newUser;
+
+    db.members = db.members.filter(m => m.id !== memberId && m.email !== email);
+    db.members.unshift(savedMember);
+    db.users = db.users.filter(u => u.id !== userId && String(u.email || '').toLowerCase() !== email);
+    db.users.push(savedUser);
+
+    db.auditLogs.unshift({
+      id: `log-${Date.now()}`,
+      userId: 'public-register',
+      userName: savedMember.fullName,
+      userRole: 'PUBLIC',
+      action: 'REGISTER',
+      targetType: 'MEMBER',
+      targetId: memberId,
+      description: `Pendaftaran mandiri calon anggota baru: ${savedMember.fullName}`,
+      timestamp: registeredAt
+    });
+    if (db.auditLogs.length > 500) db.auditLogs.pop();
+    saveDatabase();
+
+    const token = createSession(savedUser);
+    const sanitizedUser = {
+      id: savedUser.id,
+      username: savedUser.username,
+      name: savedUser.name,
+      email: savedUser.email,
+      role: savedUser.role,
+      jurisdictionName: savedUser.jurisdictionName,
+      jurisdictionId: savedUser.jurisdictionId,
+      avatarUrl: savedUser.avatarUrl,
+      memberId: savedUser.memberId,
+      status: savedUser.status || 'PENDING'
+    };
+
+    console.log(`[Register][${requestId}] SUCCESS`, {
+      memberId,
+      userId,
+      driveFileId: gasResult.drive?.fileId || null,
+      memberRow: gasResult.memberRow || null,
+      userRow: gasResult.userRow || null
+    });
+
+    return res.status(201).json({
+      success: true,
+      status: 'success',
+      requestId,
+      message: 'Pendaftaran keanggotaan berhasil diajukan dan sedang menunggu verifikasi.',
+      memberId,
+      userId,
+      member: savedMember,
+      user: sanitizedUser,
+      drive: gasResult.drive || null,
+      memberRow: gasResult.memberRow || null,
+      userRow: gasResult.userRow || null,
+      token
+    });
+  } catch (error: any) {
+    console.error(`[Register][${requestId}] FAILED`, error);
+    const message = error?.message || 'Pendaftaran gagal diproses.';
     return res.status(502).json({
       success: false,
-      message: `Pendaftaran dibatalkan karena data belum berhasil disimpan ke Google Spreadsheet: ${syncError?.message || String(syncError)}`
+      status: 'error',
+      requestId,
+      message: `Pendaftaran gagal diproses: ${message}`
     });
   }
-
-  db.members.unshift(newMember);
-  db.users.push(newUser);
-
-  db.auditLogs.unshift({
-    id: `log-${Date.now()}`,
-    userId: 'public-register',
-    userName: newMember.fullName,
-    userRole: 'PUBLIC',
-    action: 'REGISTER',
-    targetType: 'MEMBER',
-    targetId: memberId,
-    description: `Pendaftaran mandiri calon anggota baru: ${newMember.fullName}`,
-    timestamp: registeredAt
-  });
-  if (db.auditLogs.length > 500) db.auditLogs.pop();
-  saveDatabase();
-
-  // Registration creates a real server account and immediately establishes
-  // a stateless session, so the newly registered user is already logged in.
-  const token = createSession(newUser);
-  const sanitizedUser = {
-    id: newUser.id,
-    username: newUser.username,
-    name: newUser.name,
-    email: newUser.email,
-    role: newUser.role,
-    jurisdictionName: newUser.jurisdictionName,
-    jurisdictionId: newUser.jurisdictionId,
-    avatarUrl: newUser.avatarUrl,
-    memberId: newUser.memberId
-  };
-
-  res.status(201).json({
-    success: true,
-    message: 'Pendaftaran keanggotaan berhasil diajukan dan sedang menunggu verifikasi.',
-    memberId,
-    member: newMember,
-    user: sanitizedUser,
-    token
-  });
 });
 
 // ------------------------------------------
