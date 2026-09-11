@@ -37,8 +37,7 @@ export function getMemberVerificationUrl(member: Member): string {
     : 'https://sakapariwisata-nasional.vercel.app';
 
   // Sumber identitas QR harus sama dengan kolom verifikasi di Spreadsheet.
-  // Spreadsheet menyimpan Link Verifikasi dengan pola: /?verifyId=<Nomor KTA>,
-  // sehingga QR TIDAK boleh memprioritaskan verificationToken lokal.
+  // QR membuka route verifikasi langsung; identitas utama adalah Nomor KTA.
   const verifyId = String(member.nationalMemberNumber || member.id || '').trim();
   return `${origin}/verify?verifyId=${encodeURIComponent(verifyId)}`;
 }
