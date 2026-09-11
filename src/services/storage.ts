@@ -432,6 +432,32 @@ class StorageService {
   }
 
   /**
+   * Snapshot perubahan profil yang belum dikonfirmasi oleh live-sync Spreadsheet.
+   * Dipakai agar polling tidak menimpa perubahan lokal dengan snapshot lama.
+   */
+  public getPendingMemberWrites(): Record<string, { status: string; timestamp: number; member: Member }> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.PENDING_MEMBER_WRITES);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  public clearPendingMemberWrite(memberId: string) {
+    if (typeof window === 'undefined' || !memberId) return;
+    try {
+      const map = this.getPendingMemberWrites();
+      if (map[memberId]) {
+        delete map[memberId];
+        localStorage.setItem(STORAGE_KEYS.PENDING_MEMBER_WRITES, JSON.stringify(map));
+      }
+    } catch {}
+  }
+
+  /**
    * Memperbarui foto anggota dan menyinkronkannya ke profil user.
    * Foto dapat berupa data URL hasil upload lokal atau URL/Google Drive.
    */
