@@ -127,8 +127,8 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
     const startX = e.clientX;
     const startY = e.clientY;
     const startQrX = Number(settings.qrX ?? 78);
-    const startQrY = Number(settings.qrY ?? 30);
-    const qrPercent = Math.max(5, Math.min(60, Number(settings.qrSize ?? 22)));
+    const startQrY = Number(settings.qrY ?? 29);
+    const qrPercent = Math.max(5, Math.min(60, Number(settings.qrSize ?? 18)));
 
     const move = (ev: PointerEvent) => {
       const nextX = Math.max(0, Math.min(100 - qrPercent, startQrX + ((ev.clientX - startX) / rect.width) * 100));
@@ -178,9 +178,9 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
             borderColor:(settings as any).photoBorderColor ?? '#fcd34d'
           }}><img src={photo} alt={member.fullName} className="w-full h-full" style={{objectFit:(settings as any).photoObjectFit || 'cover'}}/></div>}
           {settings.showQrCode && (() => {
-            const qrPercent = Math.max(5, Math.min(60, Number(settings.qrSize ?? 22)));
+            const qrPercent = Math.max(5, Math.min(60, Number(settings.qrSize ?? 18)));
             const qrX = Math.max(0, Math.min(100 - qrPercent, Number(settings.qrX ?? 78)));
-            const qrY = Math.max(0, Math.min(100 - qrPercent, Number(settings.qrY ?? 30)));
+            const qrY = Math.max(0, Math.min(100 - qrPercent, Number(settings.qrY ?? 29)));
             const qrPx = Math.max(36, Math.round(Math.min(widthPx, heightPx) * (qrPercent / 100)));
             return (
               <div
@@ -189,20 +189,21 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
                 title={onPreviewSettingsChange ? 'Seret untuk memindahkan QR Code' : undefined}
                 style={{
                   left: `${qrX}%`, top: `${qrY}%`, width: `${qrPercent}%`, aspectRatio: '1 / 1',
-                  padding: `${Math.max(0, Number(settings.qrPadding ?? 2))}px`,
+                  padding: `${Math.max(0, Number(settings.qrPadding ?? 6))}px`,
                   boxSizing: 'border-box',
                   background: settings.qrBackgroundColor || '#ffffff',
-                  border: `${Math.max(0, Number(settings.qrBorderWidth ?? 1))}px solid ${settings.qrBorderColor || '#ffffff'}`,
-                  borderRadius: `${Math.max(0, Number(settings.qrBorderRadius ?? 6))}px`,
+                  border: `${Math.max(0, Number(settings.qrBorderWidth ?? 1))}px solid ${settings.qrBorderColor || '#e9d5ff'}`,
+                  borderRadius: `${Math.max(0, Number(settings.qrBorderRadius ?? 10))}px`,
                   overflow: 'hidden',
                   touchAction: 'none'
                 }}
               >
                 <KtaQrCode
                   member={member}
-                  size={Math.max(24, qrPx - Math.max(0, Number(settings.qrPadding ?? 2)) * 2)}
+                  size={Math.max(24, qrPx - Math.max(0, Number(settings.qrPadding ?? 6)) * 2)}
                   showLabel={false}
                   interactive={false}
+                  className="!p-0 !shadow-none"
                   borderWidth={0}
                   borderRadius={0}
                   borderColor="transparent"
