@@ -486,7 +486,13 @@ class StorageService {
         const raw = localStorage.getItem(STORAGE_KEYS.PENDING_MEMBER_WRITES);
         const map = raw ? JSON.parse(raw) : {};
         if (pending) {
-          map[memberId] = { status: updatedMember.status, timestamp: Date.now() };
+          // Simpan snapshot lengkap. Live-sync memakainya untuk melindungi
+          // perubahan profil sampai Spreadsheet benar-benar memantulkan nilai baru.
+          map[memberId] = {
+            status: 'PENDING',
+            timestamp: Date.now(),
+            member: { ...updatedMember }
+          };
         } else {
           delete map[memberId];
         }
@@ -567,20 +573,22 @@ class StorageService {
       }
 
       if (!response.ok || !result?.success) {
-        throw new Error(result?.message || `Server menolak perubahan profil (HTTP ${response.status}).`);
+        // Jangan rollback perubahan lokal di sini. Penyimpanan utama profil
+        // dilakukan oleh modal melalui POST UPSERT_MEMBER -> CHECK_RECORD.
+        // Rollback pada titik ini membuat modal tidak pernah sempat mengirim
+        // snapshot terbaru ke Spreadsheet.
+        console.warn(
+          '[Storage] /api/mutate gagal; perubahan tetap dipertahankan sementara agar dapat diverifikasi ke Spreadsheet.',
+          result?.message || `HTTP ${response.status}`
+        );
       }
-
-      markPendingWrite(false);
+      // Pending write sengaja TIDAK dihapus di sini. Ia akan dihapus oleh
+      // spreadsheetService setelah nilai Spreadsheet benar-benar terkonfirmasi.
     } catch (error) {
-      // Jangan biarkan UI menyimpan status palsu jika server/Spreadsheet gagal.
-      const latestMembers = this.getMembers();
-      const latestIndex = latestMembers.findIndex(member => member.id === memberId);
-      if (latestIndex !== -1) {
-        latestMembers[latestIndex] = previousMember;
-        this.setMembers(latestMembers);
-      }
-      markPendingWrite(false);
-      throw error;
+      // /api/mutate adalah jalur sinkronisasi sekunder. Jangan membatalkan
+      // perubahan profil yang sudah disimpan lokal; modal akan mengirim snapshot
+      // yang sama langsung ke Google Apps Script dan melakukan CHECK_RECORD.
+      console.warn('[Storage] Jalur /api/mutate gagal; lanjutkan verifikasi direct Apps Script:', error);
     }
 
     return updatedMember;
