@@ -21,6 +21,9 @@ export interface KtaQrCodeProps {
   lightColor?: string;
   showLabel?: boolean;
   interactive?: boolean;
+  borderWidth?: number;
+  borderColor?: string;
+  borderRadius?: number;
   onVerifyClick?: (member: Member) => void;
 }
 
@@ -42,6 +45,9 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
   lightColor = '#ffffff',
   showLabel = true,
   interactive = true,
+  borderWidth = 1,
+  borderColor = '#c4b5fd',
+  borderRadius = 12,
   onVerifyClick
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
@@ -148,9 +154,10 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
     <>
       {/* Container QR Code Kartu */}
       <div 
-        className={`flex flex-col items-center flex-shrink-0 bg-white p-1 rounded-xl shadow-md border border-purple-200/50 transition-all ${
+        className={`flex flex-col items-center flex-shrink-0 bg-white p-1 shadow-md transition-all ${
           interactive ? 'hover:scale-105 hover:shadow-lg cursor-pointer group/qr relative' : ''
         } ${className}`}
+        style={{ border: `${Math.max(0, borderWidth)}px solid ${borderColor}`, borderRadius: `${Math.max(0, borderRadius)}px`, boxSizing: 'border-box' }}
         onClick={(e) => {
           if (!interactive) return;
           e.stopPropagation();
@@ -164,7 +171,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
               src={qrDataUrl} 
               alt="QR Code KTA" 
               style={{ width: `${size}px`, height: `${size}px` }}
-              className="object-contain rounded-lg"
+              className="object-contain"
             />
           ) : (
             <div 
