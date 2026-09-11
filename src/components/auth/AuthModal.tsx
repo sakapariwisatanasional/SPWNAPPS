@@ -145,8 +145,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // IMAGE COMPRESSION
   // ============================================================
   const processAndCompressFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setRegError('Mohon pilih berkas gambar yang valid (JPG, PNG, WEBP).');
+    const mime = String(file.type || '').toLowerCase();
+    const name = String(file.name || '').toLowerCase();
+    const isImage = mime.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(name);
+
+    if (!isImage) {
+      setRegError('Mohon pilih foto yang valid (JPG, PNG, WEBP, HEIC/HEIF).');
       return;
     }
 
@@ -161,67 +165,65 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const reader = new FileReader();
 
     reader.onload = (event) => {
-      const source = event.target?.result as string;
-
+      const source = String(event.target?.result || '');
       if (!source) {
         setRegError('Foto tidak dapat dibaca.');
         setIsUploadingPhoto(false);
         return;
       }
 
-      const img = new Image();
-
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-
-          const maxDim = 1200;
-
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > maxDim) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            }
-          } else {
-            if (height > maxDim) {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-
-          if (!ctx) {
-            setRegAvatarUrl(source);
-            setIsUploadingPhoto(false);
-            return;
-          }
-
-          ctx.drawImage(img, 0, 0, width, height);
-
-          const compressed = canvas.toDataURL('image/jpeg', 0.82);
-
-          setRegAvatarUrl(compressed);
-          setRegPhotoInputUrl('');
-          setIsUploadingPhoto(false);
-        } catch (error) {
-          console.error('[Auth] Gagal melakukan kompresi foto:', error);
-          setRegError('Foto berhasil dibaca tetapi gagal diproses.');
-          setIsUploadingPhoto(false);
-        }
-      };
-
-      img.onerror = () => {
-        setRegError('File foto tidak dapat diproses sebagai gambar.');
+      const finishWithSource = (value: string) => {
+        setRegAvatarUrl(value);
+        setRegPhotoInputUrl('');
         setIsUploadingPhoto(false);
       };
 
+      // HEIC/HEIF tidak selalu dapat didecode oleh canvas browser.
+      // Bila browser tidak dapat membuka file tersebut, beri pesan yang jelas
+      // daripada mengirim file rusak ke server.
+      const img = new Image();
+      let finished = false;
+      const fail = () => {
+        if (finished) return;
+        finished = true;
+        setRegError('Foto HEIC/HEIF ini tidak dapat diproses oleh browser. Silakan pilih JPG/PNG dari galeri atau kamera.');
+        setIsUploadingPhoto(false);
+      };
+
+      img.onload = () => {
+        if (finished) return;
+        try {
+          const canvas = document.createElement('canvas');
+          const maxDim = 1200;
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
+          if (!width || !height) throw new Error('Dimensi foto tidak terbaca.');
+
+          const scale = Math.min(1, maxDim / Math.max(width, height));
+          width = Math.max(1, Math.round(width * scale));
+          height = Math.max(1, Math.round(height * scale));
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d', { alpha: false });
+          if (!ctx) throw new Error('Canvas tidak tersedia.');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // JPEG jauh lebih kecil daripada PNG untuk foto kamera dan aman
+          // dikirim sebagai JSON ke proxy Vercel lalu ke GAS.
+          const compressed = canvas.toDataURL('image/jpeg', 0.78);
+          if (!/^data:image\/jpeg;base64,/i.test(compressed)) {
+            throw new Error('Hasil kompresi foto tidak valid.');
+          }
+          finished = true;
+          finishWithSource(compressed);
+        } catch (error) {
+          console.error('[Auth] Gagal melakukan kompresi foto:', error);
+          fail();
+        }
+      };
+
+      img.onerror = fail;
       img.src = source;
     };
 
@@ -232,7 +234,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     reader.readAsDataURL(file);
   };
-
   // ============================================================
   // FILE SELECT
   // ============================================================
@@ -491,84 +492,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // --------------------------------------------------------
       // FOTO
       //
-      // Jika berupa Data URL, foto WAJIB masuk Google Drive
-      // terlebih dahulu.
+      // PENTING: jangan upload foto terpisah sebelum registrasi.
+      // Foto dikirim bersama REGISTER_MEMBER sehingga GAS dapat menyelesaikan
+      // Drive + Anggota + Users dalam satu workflow dan mengembalikan satu
+      // hasil transaksi ke browser.
       // --------------------------------------------------------
-      let finalAvatarUrl =
-        regAvatarUrl;
+      const photoData = /^data:image\//i.test(regAvatarUrl) ? regAvatarUrl : '';
+      const photoUrl = photoData ? '' : String(regAvatarUrl || '').trim();
 
-      if (
-        /^data:image\//i.test(
-          finalAvatarUrl
-        )
-      ) {
-        setIsUploadingPhoto(true);
-
-        try {
-          const cleanName =
-            fullName
-              .replace(
-                /[^a-zA-Z0-9_-]/g,
-                '_'
-              )
-              .slice(0, 80) ||
-            'Anggota';
-
-          const fileName =
-            `KTA_${newMemberId}_${cleanName}.jpg`;
-
-          console.log(
-            '[Auth Register] Upload foto ke Google Drive:',
-            fileName
-          );
-
-          const uploadResult =
-            await spreadsheetService.uploadImageToDrive(
-              finalAvatarUrl,
-              fileName,
-              'MEMBER_AVATAR'
-            );
-
-          console.log(
-            '[Auth Register] Hasil upload foto:',
-            uploadResult
-          );
-
-          if (
-            !uploadResult ||
-            !uploadResult.success
-          ) {
-            throw new Error(
-              uploadResult?.message ||
-              'Google Drive menolak penyimpanan foto.'
-            );
-          }
-
-          if (
-            !uploadResult.url
-          ) {
-            throw new Error(
-              'Foto dilaporkan berhasil diunggah, tetapi URL Google Drive tidak diterima oleh aplikasi.'
-            );
-          }
-
-          finalAvatarUrl =
-            uploadResult.url;
-        } catch (photoError: any) {
-          console.error(
-            '[Auth Register] Upload foto gagal:',
-            photoError
-          );
-
-          throw new Error(
-            `Gagal mengunggah foto ke Google Drive: ${
-              photoError?.message ||
-              'Kesalahan tidak diketahui.'
-            }`
-          );
-        } finally {
-          setIsUploadingPhoto(false);
-        }
+      if (!photoData && !photoUrl) {
+        throw new Error('Pas foto wajib dipilih atau diberikan melalui URL gambar.');
       }
 
       // --------------------------------------------------------
@@ -674,90 +607,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // JANGAN simpan ke Local Storage sebelum bagian ini
       // berhasil.
       // --------------------------------------------------------
-      const response =
-        await fetch(
-          '/api/auth/register',
-          {
-            method: 'POST',
+      const result = await spreadsheetService.registerMember({
+        memberData,
+        password: regPassword,
+        photoData,
+        photoUrl,
+        photoFileName: `KTA_${newMemberId}_${fullName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'Anggota'}.jpg`
+      });
 
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-
-            credentials: 'include',
-
-            body: JSON.stringify({
-              memberData,
-              password:
-                regPassword,
-              scriptUrl
-            })
-          }
-        );
-
-      const result =
-        await response
-          .json()
-          .catch(() => ({}));
-
-      console.log(
-        '[Auth Register] Respons server:',
-        {
-          httpStatus:
-            response.status,
-          ok:
-            response.ok,
-          success:
-            result?.success,
-          hasMember:
-            Boolean(result?.member),
-          hasUser:
-            Boolean(result?.user),
-          message:
-            result?.message
-        }
-      );
-
-      // --------------------------------------------------------
-      // SERVER HARUS BENAR-BENAR MENGEMBALIKAN:
-      //
-      // success: true
-      // member: {...}
-      // user: {...}
-      //
-      // Jika salah satu tidak ada, dianggap GAGAL.
-      // --------------------------------------------------------
-      if (
-        !response.ok ||
-        !result?.success
-      ) {
-        const serverMessage =
-          result?.message ||
-          result?.error ||
-          `Pendaftaran gagal (HTTP ${response.status}).`;
-
-        throw new Error(
-          serverMessage
-        );
-      }
-
-      if (
-        !result.member
-      ) {
-        throw new Error(
-          'Server menyatakan pendaftaran berhasil tetapi data anggota tidak dikembalikan.'
-        );
-      }
-
-      if (
-        !result.user
-      ) {
-        throw new Error(
-          'Server menyatakan pendaftaran berhasil tetapi data akun pengguna tidak dikembalikan.'
-        );
-      }
-
+      console.log('[Auth Register] Registrasi server berhasil:', {
+        memberId: result?.memberId,
+        userId: result?.userId,
+        hasDrive: Boolean(result?.drive),
+        requestId: result?.requestId
+      });
       // --------------------------------------------------------
       // BARU DI SINI BOLEH MENYIMPAN KE LOCAL STORAGE
       //
@@ -1500,7 +1363,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept="image/png,image/jpeg,image/webp"
+                        accept="image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif"
                         onChange={
                           handlePhotoFileUpload
                         }
@@ -1540,7 +1403,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           </p>
 
                           <p className="text-[9px] text-slate-400">
-                            Mendukung JPG, PNG, WEBP (Kompresi otomatis)
+                            Mendukung JPG, PNG, WEBP, HEIC/HEIF (kompresi otomatis)
                           </p>
                         </div>
                       ) : (
