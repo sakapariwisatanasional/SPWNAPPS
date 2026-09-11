@@ -530,11 +530,11 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
   const renderModuleSlideContent = (slideType: string) => {
     if (!currentModule) return null;
 
-    const purwaList = (currentModule.testRequirements?.purwa?.length ? currentModule.testRequirements.purwa : currentModule.competencies?.purwa) || [];
-    const madyaList = (currentModule.testRequirements?.madya?.length ? currentModule.testRequirements.madya : currentModule.competencies?.madya) || [];
-    const utamaList = (currentModule.testRequirements?.utama?.length ? currentModule.testRequirements.utama : currentModule.competencies?.utama) || [];
-    const syllabusList = currentModule.syllabus || [];
-    const downloadsList = (currentModule.materials?.downloads?.length ? currentModule.materials.downloads : currentModule.downloads) || [];
+    const purwaList = currentModule.testRequirements?.purwa || [];
+    const madyaList = currentModule.testRequirements?.madya || [];
+    const utamaList = currentModule.testRequirements?.utama || [];
+    const syllabusList = currentModule.curriculum || [];
+    const downloadsList = currentModule.downloads || [];
 
     switch (slideType) {
       case 'COVER':
@@ -558,11 +558,9 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                 {currentModule.title}
               </h2>
               
-              {currentModule.subtitle && (
-                <p className={`text-sm sm:text-base font-medium ${themeClasses.accentText}`}>
-                  {currentModule.subtitle}
-                </p>
-              )}
+              <p className={`text-sm sm:text-base font-medium ${themeClasses.accentText}`}>
+                {currentModule.badge}
+              </p>
 
               <p className={`leading-relaxed line-clamp-3 sm:line-clamp-4 ${fontClasses} ${themeClasses.mutedText}`}>
                 {currentModule.description}
@@ -574,7 +572,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               <div className={`p-3 rounded-2xl border ${themeClasses.subCardBg}`}>
                 <div className={`text-[10px] font-bold uppercase ${themeClasses.mutedText}`}>Alokasi Pelatihan</div>
                 <div className="text-base sm:text-lg font-bold mt-1">4 Pertemuan</div>
-                <div className={`text-[10px] ${themeClasses.mutedText}`}>± {currentModule.estimatedHours || 12} Jam Pelajaran</div>
+                <div className={`text-[10px] ${themeClasses.mutedText}`}>± {(currentModule.curriculum?.length || 4) * 3} Jam Pelajaran</div>
               </div>
               <div className={`p-3 rounded-2xl border ${themeClasses.subCardBg}`}>
                 <div className={`text-[10px] font-bold uppercase ${themeClasses.mutedText}`}>Jenjang SKK</div>
@@ -1129,7 +1127,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                         </div>
                       </div>
                       <a
-                        href={dl.url || dl.fileUrl || '#'}
+                        href={dl.fileUrl || '#'}
                         target="_blank"
                         rel="noreferrer"
                         className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer"
