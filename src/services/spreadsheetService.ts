@@ -291,7 +291,7 @@ class SpreadsheetService {
             if (member.avatarUrl && member.avatarUrl.startsWith('data:image')) {
               try {
                 const fname = `KTA_${member.nationalMemberNumber || member.id}_${(member.fullName || 'Anggota').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-                const uploadRes = await this.uploadImageToDrive(member.avatarUrl: pendingMember?.avatarUrl || avatarUrl, fname, 'MEMBER_AVATAR');
+                const uploadRes = await this.uploadImageToDrive(member.avatarUrl, fname, 'MEMBER_AVATAR');
                 if (uploadRes.directUrl) {
                   member.avatarUrl = uploadRes.directUrl;
                 }
