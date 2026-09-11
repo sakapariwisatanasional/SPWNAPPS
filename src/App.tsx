@@ -320,7 +320,7 @@ export default function App() {
 
     const resolveVerification = async () => {
       try {
-        const result = await verifyMemberUniversal(verifyId, members);
+        const result = await verifyMemberUniversal(verifyId, members, { authoritativeRemote: true });
 
         if (!cancelled && result.found && result.member) {
           setCurrentTab('verify-portal');
