@@ -22,7 +22,7 @@ const valueOf = (member: Member, field: KtaDataFieldConfig['field']): string => 
   const values: Record<string, any> = {
     fullName: member.fullName, id: member.id, nationalMemberNumber: member.nationalMemberNumber,
     currentPosition: member.currentPosition, provinceName: member.provinceName, regencyName: member.regencyName,
-    districtName: member.districtName, branchName: member.branchName, gugusDepan: member.gugusDepan,
+    districtName: member.districtName, branchName: member.branchName,
     krida: member.krida, phone: member.phone, email: member.email, joinYear: member.joinYear, status: member.status
   };
   return String(values[field] ?? '');
