@@ -1229,9 +1229,8 @@ app.post('/api/upload-image', express.raw({ type: ['application/octet-stream', '
     }, requestedScriptUrl);
 
     const uploadUrl = String(sessionResult?.uploadUrl || sessionResult?.url || '').trim();
-    const fileId = String(sessionResult?.fileId || '').trim();
-    if (!uploadUrl || !fileId) {
-      throw new Error(sessionResult?.message || 'Google Apps Script tidak mengembalikan upload session Google Drive.');
+    if (!uploadUrl) {
+      throw new Error(sessionResult?.message || 'Google Apps Script tidak mengembalikan URL sesi upload Google Drive.');
     }
 
     // 2) Stream binary langsung ke Google Drive.
@@ -1248,6 +1247,13 @@ app.post('/api/upload-image', express.raw({ type: ['application/octet-stream', '
     try { driveData = driveText ? JSON.parse(driveText) : null; } catch {}
     if (!driveResponse.ok) {
       throw new Error(driveData?.error?.message || `Google Drive upload gagal (HTTP ${driveResponse.status}).`);
+    }
+
+    // ID file baru tersedia setelah binary benar-benar diterima oleh Drive.
+    // GET_UPLOAD_URL hanya membuat resumable session, bukan file final.
+    const fileId = String(driveData?.id || '').trim();
+    if (!fileId) {
+      throw new Error('Google Drive menerima upload tetapi tidak mengembalikan File ID. Respons Drive tidak lengkap.');
     }
 
     // 3) Finalize file di GAS dan ambil URL Drive.
