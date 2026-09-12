@@ -1537,25 +1537,75 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // POST /api/auth/change-password
-app.post('/api/auth/change-password', (req, res) => {
+app.post('/api/auth/change-password', async (req, res) => {
   const session = getSessionUser(req);
   if (!session) {
     return res.status(401).json({ success: false, message: 'Harap masuk terlebih dahulu.' });
   }
+
   const { currentPassword, newPassword } = req.body || {};
-  if (!currentPassword || !newPassword || newPassword.length < 6) {
+  if (!currentPassword || !newPassword || String(newPassword).length < 6) {
     return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
   }
 
-  const user = db.users.find(u => u.id === session.userId);
-  if (!user || !verifyPassword(currentPassword, user.passwordHash)) {
-    return res.status(400).json({ success: false, message: 'Kata sandi saat ini tidak sesuai.' });
+  const user = db.users.find(u => String(u.id || '') === String(session.userId || '')) || {
+    id: session.userId,
+    username: session.username,
+    name: session.name,
+    memberId: session.memberId
+  };
+
+  // Google Spreadsheet / Users adalah sumber autentikasi utama.
+  // Perubahan password WAJIB ditulis ke Users sheet agar password baru
+  // yang dipakai AUTH_LOGIN tidak berbeda dengan password lokal Vercel.
+  try {
+    const gasResult = await forwardToGoogleAppsScript({
+      action: 'AUTH_CHANGE_PASSWORD',
+      userId: String(user.id || session.userId || ''),
+      username: String(user.username || session.username || '').trim().toLowerCase(),
+      email: String(user.email || '').trim().toLowerCase(),
+      memberId: String(user.memberId || session.memberId || ''),
+      currentPassword: String(currentPassword),
+      newPassword: String(newPassword)
+    }, DEFAULT_APPS_SCRIPT_URL);
+
+    if (!gasResult?.success) {
+      return res.status(400).json({
+        success: false,
+        message: gasResult?.message || 'Kata sandi gagal diperbarui di Google Spreadsheet.'
+      });
+    }
+
+    // Sinkronkan cache lokal hanya setelah Google Apps Script berhasil.
+    const newHash = hashPassword(String(newPassword));
+    const existingIndex = db.users.findIndex(u => String(u.id || '') === String(session.userId || ''));
+    if (existingIndex >= 0) {
+      db.users[existingIndex].passwordHash = newHash;
+    } else {
+      db.users.push({
+        id: session.userId,
+        username: session.username,
+        email: user.email || '',
+        name: session.name,
+        role: session.role,
+        jurisdictionName: session.jurisdictionName,
+        jurisdictionId: session.jurisdictionId,
+        avatarUrl: session.avatarUrl,
+        memberId: session.memberId,
+        status: 'ACTIVE',
+        passwordHash: newHash
+      });
+    }
+    saveDatabase();
+
+    return res.json({ success: true, message: 'Kata sandi berhasil diperbarui.' });
+  } catch (error: any) {
+    console.error('[Auth] Perubahan password ke Google Apps Script gagal:', error);
+    return res.status(502).json({
+      success: false,
+      message: error?.message || 'Gagal menyimpan kata sandi ke Google Spreadsheet.'
+    });
   }
-
-  user.passwordHash = hashPassword(newPassword);
-  saveDatabase();
-
-  res.json({ success: true, message: 'Kata sandi berhasil diperbarui.' });
 });
 
 // POST /api/auth/register - Public new member registration
