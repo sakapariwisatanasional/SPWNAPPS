@@ -643,11 +643,8 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-this-session-secret';
 const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
 
-// URL produksi Google Apps Script yang baru diberikan dan aktif.
-// Dipakai sebagai fallback agar login tetap bekerja pada perangkat yang masih
-// menyimpan URL deployment GAS lama di localStorage/cache.
-const DEFAULT_APPS_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
+// URL Google Apps Script TIDAK boleh ditentukan oleh source code.
+// Super Admin mengisinya melalui Dashboard > Pengaturan API.
 
 function normalizeManualAppsScriptUrl(raw: unknown): string {
   const value = String(raw || '').trim().replace(/\s+/g, '');
@@ -1157,6 +1154,9 @@ if (!IS_VERCEL) {
   }, 25000);
 }
 
+const DEFAULT_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
+
 // Proxy mutation to Google Apps Script Web App
 async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
   // Browser mobile dapat membawa URL deployment lama dari localStorage.
@@ -1166,11 +1166,10 @@ async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unkn
   const requested = normalizeManualAppsScriptUrl(requestedScriptUrl);
   const configured = normalizeManualAppsScriptUrl(db.config.scriptUrl);
   const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+  // Prioritas mutlak: URL yang dikirim halaman aktif (hasil Dashboard), lalu
+  // konfigurasi server. ENV hanya menjadi bootstrap opsional; tidak ada URL GAS
+  // tertentu yang ditanam permanen di source code.
   const defaultUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
-  // Perangkat lama dapat membawa URL deployment GAS lama. Semua kandidat tetap
-  // dicoba; URL produksi terbaru menjadi fallback terakhir agar sistem lama tidak
-  // langsung diputus dan deployment baru tetap dapat mengambil alih bila URL lama
-  // mengembalikan 404/410.
   const candidates = [requested, configured, envUrl, defaultUrl]
     .filter(Boolean)
     .filter((url, index, arr) => arr.indexOf(url) === index);
@@ -1199,6 +1198,9 @@ async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unkn
 
       if (!res.ok) {
         lastError = `Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`;
+        // Deployment GAS lama yang sudah tidak aktif dapat mengembalikan 404/410.
+        // Untuk login, lanjutkan ke endpoint produksi terbaru yang sudah ditetapkan.
+        if (res.status === 404 || res.status === 410) continue;
         throw new Error(lastError);
       }
 
@@ -1376,11 +1378,14 @@ app.post('/api/auth/login', async (req, res) => {
   let persistentAuthMessage = '';
 
   try {
+    // Login harus menggunakan deployment GAS produksi terbaru.
+    // Ini mencegah URL lama yang tersimpan di localStorage perangkat
+    // menyebabkan HTTP 404 sebelum autentikasi mencapai Users sheet.
     const gasResult = await forwardToGoogleAppsScript({
       action: 'AUTH_LOGIN',
       username: cleanUser,
       password: rawPass
-    }, scriptUrl);
+    }, DEFAULT_APPS_SCRIPT_URL);
 
     if (gasResult?.success === true && gasResult?.user) {
       matchedUser = {
@@ -1562,8 +1567,7 @@ app.post('/api/auth/register', async (req, res) => {
     const registrationScriptUrl =
       normalizeManualAppsScriptUrl(scriptUrl) ||
       normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
-      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) ||
-      normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
+      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
 
     console.log(`[Register][${requestId}] START`, {
       hasMemberData: Boolean(memberData),
@@ -1833,11 +1837,8 @@ app.get('/api/config', (req, res) => {
       config: {
         // Web App URL bukan credential rahasia; browser pengguna membutuhkannya
         // agar dapat melakukan sinkronisasi langsung ke Google Apps Script.
-        // Member baru tidak boleh bergantung pada localStorage/browser.
-        // Berikan endpoint produksi server-side sebagai default publik.
         scriptUrl: normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
-          normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) ||
-          normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL) || '',
+          normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) || '',
         spreadsheetId: db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID,
         spreadsheetUrl: db.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
         status: db.config.status || 'CONNECTED',
