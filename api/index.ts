@@ -621,7 +621,11 @@ const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
 
 // URL Google Apps Script TIDAK boleh ditentukan oleh source code.
 // Super Admin mengisinya melalui Dashboard > Pengaturan API.
-const DEFAULT_APPS_SCRIPT_URL = '';
+// Production GAS endpoint. Keep a server-side fallback so registration works
+// from a completely new device/browser even when /api/config has no persisted
+// value (Vercel filesystem is not a durable database).
+const DEFAULT_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekQK_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
 
 function normalizeManualAppsScriptUrl(raw: unknown): string {
   const value = String(raw || '').trim().replace(/\s+/g, '');
@@ -1678,7 +1682,7 @@ app.get('/api/config', (req, res) => {
       config: {
         // Web App URL bukan credential rahasia; browser pengguna membutuhkannya
         // agar dapat melakukan sinkronisasi langsung ke Google Apps Script.
-        scriptUrl: db.config.scriptUrl || '',
+        scriptUrl: db.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL,
         spreadsheetId: db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID,
         spreadsheetUrl: db.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
         status: db.config.status || 'CONNECTED',
@@ -1724,7 +1728,7 @@ app.post('/api/config', (req, res) => {
 // The actual source of truth remains the Google Spreadsheet via Apps Script.
 app.get('/api/kta-settings', async (req, res) => {
   try {
-    const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+    const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl) || DEFAULT_APPS_SCRIPT_URL;
     if (!scriptUrl) {
       return res.status(503).json({
         success: false,
