@@ -1921,7 +1921,15 @@ class SpreadsheetService {
     photoUrl?: string;
     photoFileName?: string;
   }): Promise<any> {
-    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    // PENTING: konfigurasi server dimuat asynchronous saat service dibuat.
+    // Pada HP/tablet, pengguna dapat menekan tombol Daftar sebelum fetch /api/config
+    // selesai. Jangan menganggap URL GAS kosong pada percobaan pertama. Tunggu
+    // satu kali pemuatan konfigurasi lalu lanjutkan transaksi.
+    let scriptUrl = this.getEffectiveAppsScriptUrl();
+    if (!scriptUrl) {
+      await this.fetchServerConfig();
+      scriptUrl = this.getEffectiveAppsScriptUrl();
+    }
     if (!scriptUrl) {
       throw new Error('Google Apps Script Web App URL belum dipasang. Harap pasang URL /exec di Pengaturan API.');
     }
@@ -1972,7 +1980,13 @@ class SpreadsheetService {
     filename: string,
     category: 'MEMBER_AVATAR' | 'TOUR_PACKAGES' | 'CULINARY_SOUVENIRS' | 'DOCUMENTS' | 'KTA_CARD' | 'ACTIVITIES' = 'MEMBER_AVATAR'
   ): Promise<{ success: boolean; url?: string; directUrl?: string; fileId?: string; viewUrl?: string; folderId?: string; message: string }> {
-    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    // Sama seperti registrasi: jangan gagal pada klik pertama hanya karena
+    // /api/config belum selesai dimuat setelah halaman mobile baru dibuka.
+    let scriptUrl = this.getEffectiveAppsScriptUrl();
+    if (!scriptUrl) {
+      await this.fetchServerConfig();
+      scriptUrl = this.getEffectiveAppsScriptUrl();
+    }
     if (!scriptUrl) {
       return { success: false, message: 'Google Apps Script Web App URL belum dipasang. Harap pasang Web App URL di Pengaturan API.' };
     }
