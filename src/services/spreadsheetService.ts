@@ -5,7 +5,6 @@ import { MASTER_SKILLS } from '../data/initialData';
 
 export const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 export const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
-export const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekQK_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
 
 const SPREADSHEET_CONFIG_KEY = 'saka_spreadsheet_config_v1';
 
@@ -79,35 +78,36 @@ class SpreadsheetService {
   }
 
   public async fetchServerConfig() {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return this.getConfig();
     try {
-      const res = await fetch('/api/config');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.config) {
-          // Jangan biarkan konfigurasi server lama menimpa konfigurasi lokal
-          // (terutama Web App deployment URL yang baru saja dipasang pengguna).
-          // Local config adalah konfigurasi aktif perangkat; server hanya fallback
-          // untuk nilai yang memang belum tersedia secara lokal.
-          const localScriptUrl = String(this.config.scriptUrl || '').trim();
-          const localSpreadsheetId = String(this.config.spreadsheetId || '').trim();
-          const serverScriptUrl = String(data.config.scriptUrl || '').trim();
-          const serverSpreadsheetId = String(data.config.spreadsheetId || '').trim();
-
-          this.config = {
-            ...this.config,
-            ...data.config,
-            spreadsheetId: localSpreadsheetId || serverSpreadsheetId || DEFAULT_SPREADSHEET_ID,
-            spreadsheetUrl: this.config.spreadsheetUrl || data.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
-            scriptUrl: localScriptUrl || serverScriptUrl || DEFAULT_APPS_SCRIPT_URL
-          };
-          localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
-          this.notifySyncState();
-        }
+      const res = await fetch('/api/config', { cache: 'no-store' });
+      if (!res.ok) return this.getConfig();
+      const data = await res.json();
+      if (data && data.config) {
+        const serverConfig = data.config as Partial<SpreadsheetConfig>;
+        const currentLocalUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
+        const serverUrl = this.normalizeAppsScriptUrl(serverConfig.scriptUrl);
+        const activeScriptUrl = currentLocalUrl || serverUrl || ''; 
+        this.config = {
+          ...this.config,
+          ...serverConfig,
+          spreadsheetId: String(this.config.spreadsheetId || serverConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID),
+          spreadsheetUrl: String(this.config.spreadsheetUrl || serverConfig.spreadsheetUrl || DEFAULT_SPREADSHEET_URL),
+          scriptUrl: activeScriptUrl,
+          autoSync: serverConfig.autoSync !== undefined ? Boolean(serverConfig.autoSync) : this.config.autoSync !== false,
+          autoRefreshIntervalSeconds: Number(serverConfig.autoRefreshIntervalSeconds || this.config.autoRefreshIntervalSeconds || 5),
+          syncOnStartup: this.config.syncOnStartup !== false,
+          syncOnFocus: this.config.syncOnFocus !== false,
+          syncOnOnline: this.config.syncOnOnline !== false
+        };
+        localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
+        this.syncState.pollingIntervalSeconds = this.config.autoRefreshIntervalSeconds || 5;
+        this.notifySyncState();
       }
     } catch (err) {
-      // offline fallback
+      // Offline: retain the locally saved configuration.
     }
+    return this.getConfig();
   }
 
   private initBroadcastChannel() {
@@ -192,27 +192,38 @@ class SpreadsheetService {
   }
 
   private loadConfig(): SpreadsheetConfig {
+    const normalize = (raw: any) => String(raw || '').trim().replace(/\s+/g, '');
+    const isValid = (url: string) => /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(url);
     try {
       const raw = localStorage.getItem(SPREADSHEET_CONFIG_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        return {
+        let storedUrl = normalize(parsed?.scriptUrl);
+        // URL GAS sepenuhnya dikendalikan dari Dashboard > Pengaturan API.
+        // Jangan menanam URL deployment tertentu di source code.
+        if (storedUrl && !isValid(storedUrl)) storedUrl = '';
+        const cfg = {
           ...parsed,
+          spreadsheetId: String(parsed?.spreadsheetId || DEFAULT_SPREADSHEET_ID),
+          spreadsheetUrl: String(parsed?.spreadsheetUrl || DEFAULT_SPREADSHEET_URL),
+          scriptUrl: storedUrl,
           autoSync: parsed.autoSync !== undefined ? parsed.autoSync : true,
-          autoRefreshIntervalSeconds: parsed.autoRefreshIntervalSeconds || 5,
+          autoRefreshIntervalSeconds: Number(parsed.autoRefreshIntervalSeconds || 5),
           syncOnStartup: parsed.syncOnStartup !== false,
           syncOnFocus: parsed.syncOnFocus !== false,
-          syncOnOnline: parsed.syncOnOnline !== false
-        };
+          syncOnOnline: parsed.syncOnOnline !== false,
+          status: parsed.status || 'CONNECTED'
+        } as SpreadsheetConfig;
+        localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(cfg));
+        return cfg;
       }
     } catch (e) {
       console.error('Failed to load spreadsheet config', e);
     }
-
     return {
       spreadsheetId: DEFAULT_SPREADSHEET_ID,
       spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
-      scriptUrl: DEFAULT_APPS_SCRIPT_URL,
+      scriptUrl: '',
       autoSync: true,
       autoRefreshIntervalSeconds: 5,
       syncOnStartup: true,
@@ -244,15 +255,26 @@ class SpreadsheetService {
   }
 
   public saveConfig(updates: Partial<SpreadsheetConfig>): SpreadsheetConfig {
+    const previousConfig = this.config;
     this.config = { ...this.config, ...updates };
+    if (updates.scriptUrl !== undefined) {
+      const normalized = this.normalizeAppsScriptUrl(updates.scriptUrl);
+      if (!normalized) throw new Error('Google Apps Script Web App URL tidak valid. Gunakan URL deployment /exec.');
+      this.config.scriptUrl = normalized;
+    }
     localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
     this.notifySyncState();
+    try {
+      window.dispatchEvent(new CustomEvent('saka:gas-config-updated', {
+        detail: { ...this.config, previousScriptUrl: previousConfig.scriptUrl || '' }
+      }));
+    } catch {}
 
     // Hanya konfigurasi operasional yang benar-benar perlu dibagikan ke server.
     // Status runtime (SYNCING/ERROR/CONNECTED), lastError, dan lastSyncedAt
     // tidak diposting setiap beberapa detik karena akan membuat dashboard
     // menulis konfigurasi server terus-menerus saat polling.
-    if (typeof window !== 'undefined' && (updates.autoSync !== undefined || updates.autoRefreshIntervalSeconds !== undefined || updates.syncOnStartup !== undefined || updates.syncOnFocus !== undefined || updates.syncOnOnline !== undefined || updates.spreadsheetId !== undefined || updates.spreadsheetUrl !== undefined || updates.scriptUrl !== undefined)) {
+    if (typeof window !== 'undefined' && storage.getCurrentUser()?.role === 'SUPER_ADMIN' && (updates.autoSync !== undefined || updates.autoRefreshIntervalSeconds !== undefined || updates.syncOnStartup !== undefined || updates.syncOnFocus !== undefined || updates.syncOnOnline !== undefined || updates.spreadsheetId !== undefined || updates.spreadsheetUrl !== undefined || updates.scriptUrl !== undefined)) {
       try {
         const token = storage.getAuthToken();
         const headers: Record<string, string> = {
@@ -1281,8 +1303,8 @@ class SpreadsheetService {
     return value;
   }
 
-  private getEffectiveAppsScriptUrl(): string {
-    return this.normalizeAppsScriptUrl(this.config.scriptUrl) || DEFAULT_APPS_SCRIPT_URL;
+  public getEffectiveAppsScriptUrl(): string {
+    return this.normalizeAppsScriptUrl(this.config.scriptUrl);
   }
 
   /**
@@ -1927,31 +1949,26 @@ class SpreadsheetService {
       let blob: Blob;
       if (typeof imageData === 'string') {
         const value = imageData.trim();
-        const match = value.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,(.+)$/i);
+        const match = value.match(/^data:(image\/[a-z0-9.+-]+);base64,(.*)$/is);
         if (!match) return { success: false, message: 'Data foto tidak valid.' };
         const binary = atob(match[2]);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        blob = new Blob([bytes], { type: match[1].toLowerCase() });
+        blob = new Blob([bytes], { type: match[1] });
       } else {
         blob = imageData;
       }
 
-      if (!blob || !blob.size) return { success: false, message: 'Data foto kosong.' };
-      if (blob.size > 4 * 1024 * 1024) return { success: false, message: 'Ukuran foto maksimal 4 MB.' };
-      if (!/^image\/(?:png|jpe?g|webp|gif)$/i.test(blob.type || '')) {
-        return { success: false, message: 'Format foto tidak didukung.' };
-      }
+      if (!blob || blob.size <= 0) return { success: false, message: 'File foto kosong atau tidak valid.' };
+      if (blob.size > 4 * 1024 * 1024) return { success: false, message: 'Ukuran foto terlalu besar. Maksimal 4 MB.' };
 
-      // Primary path: binary. The server obtains the GAS Drive resumable session,
-      // streams the bytes to Google Drive, then finalizes the file through GAS.
       const response = await fetch('/api/upload-image', {
         method: 'POST',
         headers: {
-          'Content-Type': blob.type || 'image/jpeg',
-          'X-File-Name': encodeURIComponent(filename || `KTA_${Date.now()}.jpg`),
-          'X-File-Category': encodeURIComponent(category),
-          'X-Script-Url': encodeURIComponent(scriptUrl)
+          'Content-Type': 'application/octet-stream',
+          'X-File-Name': encodeURIComponent(filename),
+          'X-File-Category': category,
+          'X-Script-Url': scriptUrl
         },
         credentials: 'same-origin',
         cache: 'no-store',
@@ -1962,7 +1979,6 @@ class SpreadsheetService {
       if (!response.ok || data?.success === false || !data?.url) {
         throw new Error(data?.message || `Upload foto gagal (HTTP ${response.status}).`);
       }
-
       const directUrl = String(data.url || data.directUrl || '').trim();
       return {
         success: true,
@@ -1974,8 +1990,7 @@ class SpreadsheetService {
         message: data.message || `Foto ${filename} berhasil disimpan ke folder Google Drive.`
       };
     } catch (err: any) {
-      console.error('Failed to upload image to Drive:', err);
-      return { success: false, message: `Gagal mengunggah foto ke Google Drive: ${err?.message || String(err)}` };
+      return { success: false, message: err?.message || 'Upload foto gagal.' };
     }
   }
 
@@ -1986,7 +2001,9 @@ class SpreadsheetService {
    */
   public async refreshKtaSettings(): Promise<KtaCardSettings | null> {
     try {
-      const response = await fetch('/api/kta-settings', {
+      const scriptUrl = this.getEffectiveAppsScriptUrl();
+      const url = `/api/kta-settings?scriptUrl=${encodeURIComponent(scriptUrl)}&_t=${Date.now()}`;
+      const response = await fetch(url, {
         method: 'GET',
         credentials: 'include',
         cache: 'no-store',
