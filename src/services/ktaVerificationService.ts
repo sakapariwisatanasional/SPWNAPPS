@@ -20,156 +20,108 @@ export function normalizeNtaQuery(rawInput: string): {
   strippedDigits: string;
   isUrl: boolean;
   extractedQuery: string;
-  verifyId?: string;
-  memberId?: string;
-  candidates?: string[];
 } {
   if (!rawInput) {
-    return { cleanQuery: '', strippedDigits: '', isUrl: false, extractedQuery: '', candidates: [] };
+    return { cleanQuery: '', strippedDigits: '', isUrl: false, extractedQuery: '' };
   }
 
-  const text = String(rawInput).trim();
+  let text = rawInput.trim();
+
+  // 1. Cek apakah input berupa URL (misal hasil scan QR Code atau pemindai kamera)
   let isUrl = false;
   let extractedQuery = text;
-  let verifyId = '';
-  let memberId = '';
-  const candidates: string[] = [];
 
-  const push = (value: string | null | undefined) => {
-    const v = String(value || '').trim();
-    if (v && !candidates.some(c => c.toLowerCase() === v.toLowerCase())) candidates.push(v);
-  };
-
-  // QR lama dan QR baru sama-sama didukung:
-  // /?verifyId=...
-  // /verify?verifyId=...&memberId=...
-  // /verify/...
-  try {
-    if (/^https?:\/\//i.test(text)) {
-      const urlObj = new URL(text);
-      isUrl = true;
-      verifyId = String(
-        urlObj.searchParams.get('verifyId') ||
-        urlObj.searchParams.get('nta') ||
-        urlObj.searchParams.get('kta') ||
-        ''
-      ).trim();
-      memberId = String(
-        urlObj.searchParams.get('memberId') ||
-        urlObj.searchParams.get('id') ||
-        ''
-      ).trim();
-
-      push(verifyId);
-      push(memberId);
-
-      if (!verifyId && !memberId && urlObj.pathname.includes('/verify/')) {
-        push(decodeURIComponent(urlObj.pathname.split('/verify/')[1]?.split('?')[0] || '').trim());
+  if (text.includes('http://') || text.includes('https://') || text.includes('verifyId=') || text.includes('/verify/')) {
+    isUrl = true;
+    try {
+      if (text.startsWith('http://') || text.startsWith('https://')) {
+        const urlObj = new URL(text);
+        const qId = urlObj.searchParams.get('verifyId') || 
+                    urlObj.searchParams.get('nta') || 
+                    urlObj.searchParams.get('kta') ||
+                    urlObj.searchParams.get('memberId') ||
+                    urlObj.searchParams.get('id');
+        if (qId) {
+          extractedQuery = qId.trim();
+        } else if (urlObj.pathname.includes('/verify/')) {
+          extractedQuery = decodeURIComponent(urlObj.pathname.split('/verify/')[1]?.split('?')[0] || '').trim();
+        }
+      } else if (text.includes('verifyId=')) {
+        const match = text.match(/verifyId=([^&]+)/);
+        if (match && match[1]) {
+          extractedQuery = decodeURIComponent(match[1]).trim();
+        }
       }
-
-      extractedQuery = candidates[0] || text;
-    } else if (/verifyId=/i.test(text) || /memberId=/i.test(text)) {
-      isUrl = true;
-      const queryString = text.includes('?') ? text.split('?')[1] : text;
-      const params = new URLSearchParams(queryString);
-      verifyId = String(params.get('verifyId') || params.get('nta') || params.get('kta') || '').trim();
-      memberId = String(params.get('memberId') || params.get('id') || '').trim();
-      push(verifyId);
-      push(memberId);
-      extractedQuery = candidates[0] || text;
-    } else {
-      push(text);
+    } catch {
+      // Jika URL parsing gagal, gunakan string apa adanya
     }
-  } catch {
-    push(text);
   }
 
-  const cleanQuery = (extractedQuery || candidates[0] || text)
-    .replace(/^['"`]+|['"`]+$/g, '')
-    .trim();
+  // Bersihkan tanda petik atau karakter aneh Excel/Spreadsheet
+  const cleanQuery = extractedQuery.replace(/^['"`]+|['"`]+$/g, '').trim();
   const strippedDigits = cleanQuery.replace(/\D/g, '');
-
-  // Pastikan semua identitas QR tersedia bagi verifier authoritative.
-  if (verifyId) push(verifyId);
-  if (memberId) push(memberId);
 
   return {
     cleanQuery,
     strippedDigits,
     isUrl,
-    extractedQuery,
-    verifyId: verifyId || undefined,
-    memberId: memberId || undefined,
-    candidates
+    extractedQuery
   };
 }
 
 /**
  * Memeriksa kecocokan anggota dengan berbagai variasi format (dengan/tanpa titik, token, nama, ID)
  */
-function normalizeIdentity(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase().replace(/^['"`]+|['"`]+$/g, '');
-}
-
-function normalizeKtaDigits(value: unknown): string {
-  const digits = String(value ?? '').replace(/\D/g, '');
-  if (!digits) return '';
-  // Google Sheets kadang mengembalikan Nomor KTA sebagai angka sehingga
-  // 00.00.00.000001 bisa terbaca sebagai 1. Hilangkan leading zero hanya
-  // untuk membandingkan representasi numerik KTA.
-  return digits.replace(/^0+(?=\d)/, '');
-}
-
 export function isMemberMatch(member: Member, cleanQuery: string, strippedDigits: string): boolean {
   if (!member) return false;
 
-  const query = normalizeIdentity(cleanQuery);
-  const queryDigits = normalizeKtaDigits(strippedDigits || cleanQuery);
-
-  // 1. Nomor KTA/NTA — dukung data lama yang tersimpan sebagai angka.
+  const queryLower = cleanQuery.toLowerCase();
+  
+  // 1. Cek Nomor Anggota Nasional (NTA)
   if (member.nationalMemberNumber) {
-    const nta = normalizeIdentity(member.nationalMemberNumber);
-    if (nta === query) return true;
+    const ntaLower = member.nationalMemberNumber.toLowerCase().trim();
+    if (ntaLower === queryLower) return true;
 
-    const ntaDigits = normalizeKtaDigits(member.nationalMemberNumber);
-    if (queryDigits && ntaDigits && ntaDigits === queryDigits) return true;
+    // Cek tanpa titik / karakter non-digit (misal: 000000000002 vs 00.00.00.000002)
+    const ntaDigits = member.nationalMemberNumber.replace(/\D/g, '');
+    if (strippedDigits.length >= 4 && ntaDigits === strippedDigits) return true;
 
-    // Kompatibilitas dengan QR yang hanya membawa beberapa digit terakhir.
-    if (queryDigits.length >= 4 && ntaDigits.endsWith(queryDigits)) return true;
-    if (query.length >= 4 && nta.endsWith(query)) return true;
+    // Cek jika query adalah nomor urut 6 digit terakhir (misal: 000002 atau 000124)
+    if (strippedDigits.length >= 4 && ntaDigits.endsWith(strippedDigits)) return true;
+    if (cleanQuery.length >= 4 && ntaLower.endsWith(cleanQuery.toLowerCase())) return true;
   }
 
-  // 2. Verification token
+  // 2. Cek Token Verifikasi Unik (misal: VERIFY-SP-NAS001)
   if (member.verificationToken) {
-    const token = normalizeIdentity(member.verificationToken);
-    if (token === query) return true;
-    if (query.length >= 5 && token.includes(query)) return true;
+    const tokenLower = member.verificationToken.toLowerCase().trim();
+    if (tokenLower === queryLower) return true;
+    if (tokenLower.includes(queryLower) && queryLower.length >= 5) return true;
   }
 
-  // 3. ID anggota dan User ID
-  if (normalizeIdentity(member.id) === query) return true;
-  if (normalizeIdentity(member.userId) === query) return true;
+  // 3. Cek ID Anggota & User ID
+  if (member.id && member.id.toLowerCase() === queryLower) return true;
+  if (member.userId && member.userId.toLowerCase() === queryLower) return true;
 
-  // 4. NIK
-  if (member.nikMasked && member.nikMasked.replace(/\D/g, '').length >= 6 && queryDigits.length >= 6) {
+  // 4. Cek NIK
+  if (member.nikMasked && member.nikMasked.replace(/\D/g, '').length >= 6 && strippedDigits.length >= 6) {
     const nikDigits = member.nikMasked.replace(/\D/g, '');
-    if (nikDigits.includes(queryDigits) || queryDigits.includes(nikDigits)) return true;
+    if (nikDigits.includes(strippedDigits) || strippedDigits.includes(nikDigits)) return true;
   }
 
-  // 5. WhatsApp
-  if (member.phone && queryDigits.length >= 8) {
+  // 5. Cek Nomor Telepon / WhatsApp
+  if (member.phone && strippedDigits.length >= 8) {
     const phoneDigits = member.phone.replace(/\D/g, '');
-    if (phoneDigits.endsWith(queryDigits) || queryDigits.endsWith(phoneDigits)) return true;
+    if (phoneDigits.endsWith(strippedDigits) || strippedDigits.endsWith(phoneDigits)) return true;
   }
 
-  // 6. Email
-  if (member.email && normalizeIdentity(member.email) === query) return true;
+  // 6. Cek Email
+  if (member.email && member.email.toLowerCase().trim() === queryLower) return true;
 
-  // 7. Nama
+  // 7. Cek Nama Lengkap (exact match atau contains jika query cukup panjang)
   if (member.fullName) {
-    const name = normalizeIdentity(member.fullName);
-    if (name === query) return true;
-    if (query.length >= 4 && (name.includes(query) || query.includes(name))) return true;
+    const nameLower = member.fullName.toLowerCase().trim();
+    if (nameLower === queryLower) return true;
+    if (queryLower.length >= 4 && (nameLower.includes(queryLower) || queryLower.includes(nameLower))) return true;
   }
 
   return false;
@@ -197,23 +149,30 @@ export function searchMemberLocally(rawInput: string, memberList?: Member[]): Me
  * Cari anggota secara live ke Google Spreadsheet
  */
 export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise<Member | null> {
-  const parsed = normalizeNtaQuery(rawInput);
-  const queryCandidates = [...(parsed.candidates || []), parsed.cleanQuery]
-    .map(v => String(v || '').trim())
-    .filter(Boolean)
-    .filter((v, i, arr) => arr.findIndex(x => x.toLowerCase() === v.toLowerCase()) === i);
-
-  if (queryCandidates.length === 0) return null;
+  const { cleanQuery, strippedDigits } = normalizeNtaQuery(rawInput);
+  if (!cleanQuery && !strippedDigits) return null;
 
   try {
-    // Anggota adalah sumber profil KTA. Users hanya dipakai sebagai tabel
-    // relasi tambahan: Users.Member ID -> Anggota.ID.
-    const [rows, userRows] = await Promise.all([
-      spreadsheetService.fetchSheetRows('Anggota'),
-      spreadsheetService.fetchSheetRows('Users').catch(() => [])
-    ]);
+    const rows = await spreadsheetService.fetchSheetRows('Anggota');
+    if (!rows || rows.length === 0) return null;
 
-    if (!Array.isArray(rows) || rows.length === 0) return null;
+    const parseRole = (roleStr?: string): UserRole => {
+      if (!roleStr) return 'MEMBER';
+      const r = roleStr.toUpperCase().replace(/\s+/g, '_');
+      if (r.includes('SUPER') || r.includes('NASIONAL') || r.includes('PIMPINAN_NASIONAL') || r === 'SUPER_ADMIN') {
+        return 'SUPER_ADMIN';
+      }
+      if (r.includes('KWARDA') || r.includes('PROVINSI') || r === 'ADMIN_PROVINCE') {
+        return 'ADMIN_PROVINCE';
+      }
+      if (r.includes('KWARCAB') || r.includes('KABUPATEN') || r.includes('KOTA') || r === 'ADMIN_REGENCY') {
+        return 'ADMIN_REGENCY';
+      }
+      if (r.includes('KWARRAN') || r.includes('RANTING') || r.includes('KECAMATAN') || r === 'ADMIN_BRANCH') {
+        return 'ADMIN_BRANCH';
+      }
+      return 'MEMBER';
+    };
 
     const getVal = (row: Record<string, any>, aliases: string[]): string => {
       for (const a of aliases) {
@@ -228,79 +187,27 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
           const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
           if (cleanK === cleanA) {
             const v = row[k];
-            if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+            if (v !== undefined && v !== null && String(v).trim() !== '') {
+              return String(v).trim();
+            }
           }
         }
       }
       return '';
     };
 
-    const parseRole = (roleStr?: string): UserRole => {
-      if (!roleStr) return 'MEMBER';
-      const r = roleStr.toUpperCase().replace(/\s+/g, '_');
-      if (r.includes('SUPER') || r.includes('NASIONAL') || r.includes('PIMPINAN_NASIONAL') || r === 'SUPER_ADMIN') return 'SUPER_ADMIN';
-      if (r.includes('KWARDA') || r.includes('PROVINSI') || r === 'ADMIN_PROVINCE') return 'ADMIN_PROVINCE';
-      if (r.includes('KWARCAB') || r.includes('KABUPATEN') || r.includes('KOTA') || r === 'ADMIN_REGENCY') return 'ADMIN_REGENCY';
-      if (r.includes('KWARRAN') || r.includes('RANTING') || r.includes('KECAMATAN') || r === 'ADMIN_BRANCH') return 'ADMIN_BRANCH';
-      return 'MEMBER';
-    };
-
-    // Bangun relasi User ID / Member ID -> Member ID.
-    const userLinkedMemberIds = new Set<string>();
-    if (Array.isArray(userRows)) {
-      for (const userRow of userRows) {
-        const userId = getVal(userRow, ['ID', 'ID User', 'User ID', 'id_user', 'userId', 'col_0']);
-        const linkedMemberId = getVal(userRow, ['Member ID', 'member_id', 'memberId', 'ID Anggota', 'ID Member', 'col_9']);
-        if (!userId && !linkedMemberId) continue;
-
-        for (const candidate of queryCandidates) {
-          const c = normalizeIdentity(candidate);
-          if (
-            (userId && normalizeIdentity(userId) === c) ||
-            (linkedMemberId && normalizeIdentity(linkedMemberId) === c)
-          ) {
-            if (linkedMemberId) userLinkedMemberIds.add(linkedMemberId);
-            // Jika QR lama ternyata membawa ID anggota yang sama dengan User.ID,
-            // tetap simpan linked ID bila tersedia.
-            if (!linkedMemberId && userId) userLinkedMemberIds.add(userId);
-          }
-        }
-      }
-    }
-
-    const matchRow = (row: Record<string, any>): boolean => {
-      const id = getVal(row, ['ID', 'id', 'Id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']);
-      const kta = getVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_1']);
-      const token = getVal(row, ['Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'Verification Token', 'Token']);
-      const link = getVal(row, ['Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'col_13']);
-
-      for (const candidate of queryCandidates) {
-        const temp: Partial<Member> = {
-          id,
-          userId: id,
-          nationalMemberNumber: kta || undefined,
-          verificationToken: token || link || undefined
-        };
-        if (isMemberMatch(temp as Member, candidate, candidate.replace(/\D/g, ''))) return true;
-        if (id && normalizeIdentity(id) === normalizeIdentity(candidate)) return true;
-        if (kta && normalizeKtaDigits(kta) === normalizeKtaDigits(candidate)) return true;
-      }
-
-      if (id && [...userLinkedMemberIds].some(uid => normalizeIdentity(uid) === normalizeIdentity(id))) {
-        return true;
-      }
-
-      return false;
-    };
-
+    // Cari baris yang cocok
     for (let idx = 0; idx < rows.length; idx++) {
       const row = rows[idx];
-      if (!row || typeof row !== 'object') continue;
-      if (!matchRow(row)) continue;
-
+      // Canonical schema Anggota (14 kolom):
+      // A ID | B Nomor KTA | C Nama Lengkap | D Email | E Nomor WA |
+      // F Provinsi | G Kabupaten/Kota | H Kecamatan | I Jabatan |
+      // J Krida | K Status | L Foto URL | M Tanggal Daftar | N Link Verifikasi.
+      // Alias col_* hanya dipakai sebagai kompatibilitas data lama; header bernama
+      // selalu diprioritaskan oleh getVal().
       const fullName = getVal(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'nama', 'Full Name', 'Name', 'col_2']) || `Anggota ${idx + 1}`;
       const kta = getVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_1']);
-      const email = getVal(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']);
+      const email = getVal(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']) || `member${idx + 1}@pramuka.id`;
       const phone = getVal(row, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'col_4']);
       const memberId = getVal(row, ['ID', 'id', 'Id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']) || `sheet-member-${idx}`;
       const prov = getVal(row, ['Provinsi', 'Kwarda', 'provinsi', 'col_5']) || 'Tingkat Nasional';
@@ -312,28 +219,17 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
       const role = parseRole(roleStr || jabatan);
       const rawFoto = getVal(row, ['Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Photo', 'Avatar', 'Link Foto', 'col_11']);
       const avatarUrl = formatDriveImageUrl(rawFoto) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
-      const rawStatus = getVal(row, ['Status', 'status', 'Status Keanggotaan', 'col_10']).toUpperCase();
-
-      const linkedUser = Array.isArray(userRows)
-        ? userRows.find((u: any) => {
-            const uid = getVal(u, ['ID', 'ID User', 'User ID', 'id_user', 'userId', 'col_0']);
-            const mid = getVal(u, ['Member ID', 'member_id', 'memberId', 'ID Anggota', 'ID Member', 'col_9']);
-            return normalizeIdentity(mid) === normalizeIdentity(memberId) || normalizeIdentity(uid) === normalizeIdentity(memberId);
-          })
-        : null;
 
       const tempMember: Member = {
         id: memberId,
-        userId: linkedUser
-          ? getVal(linkedUser, ['ID', 'ID User', 'User ID', 'id_user', 'userId', 'col_0'])
-          : `user-${memberId}`,
+        userId: `user-${memberId}`,
         nationalMemberNumber: kta || undefined,
         fullName,
-        nikMasked: getVal(row, ['NIK', 'NIK Masked', 'nik_masked', 'col_nik']) || '3201**********01',
+        nikMasked: '3201**********01',
         avatarUrl,
-        gender: (getVal(row, ['Jenis Kelamin', 'Gender', 'gender']) || 'LAKI_LAKI').toUpperCase().includes('PEREMPUAN') ? 'PEREMPUAN' : 'LAKI_LAKI',
-        birthPlace: getVal(row, ['Tempat Lahir', 'Birth Place']) || 'Indonesia',
-        birthDate: getVal(row, ['Tanggal Lahir', 'Birth Date']) || '2000-01-01',
+        gender: 'LAKI_LAKI',
+        birthPlace: 'Indonesia',
+        birthDate: '2000-01-01',
         email,
         phone,
         address: `${kec}, ${kab}, ${prov}`,
@@ -344,14 +240,15 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
         districtId: '00.00.00',
         districtName: kec,
         currentPosition: jabatan || (role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`),
-        krida: krida as any,
+        krida: (krida || 'Krida Pemandu') as any,
         joinYear: new Date().getFullYear(),
         educationLevel: 'SMA/SMK',
         occupation: 'Pramuka Pariwisata',
-        bio: 'Anggota resmi Saka Pariwisata. Terverifikasi dari database Google Spreadsheet.',
-        status: rawStatus === 'PENDING' ? 'PENDING' : rawStatus === 'ACTIVE' ? 'ACTIVE' : (rawStatus as any) || 'ACTIVE',
+        bio: `Anggota resmi Saka Pariwisata. Terverifikasi dari database Google Spreadsheet.`,
+        status: (getVal(row, ['Status', 'status', 'Status Keanggotaan', 'col_10']) || 'ACTIVE').toUpperCase() === 'PENDING' ? 'PENDING' : 'ACTIVE',
         registeredAt: getVal(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_12']) || new Date().toISOString(),
-        verificationToken: getVal(row, ['Verification Token', 'Token', 'Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'col_13']) || `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
+        // Token tetap dibuat untuk kompatibilitas QR lama, tetapi QR baru memakai NTA.
+        verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
         isOperator: role !== 'MEMBER',
         operatorRole: role !== 'MEMBER' ? role : undefined,
         skills: [],
@@ -359,16 +256,24 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
         locationHistory: []
       };
 
-      storage.addOrUpdateMember(tempMember);
-      return tempMember;
+      const spreadsheetVerificationLink = getVal(row, ['Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'col_13']);
+      const linkMatchesQuery = spreadsheetVerificationLink
+        ? normalizeNtaQuery(spreadsheetVerificationLink).cleanQuery.toLowerCase() === cleanQuery.toLowerCase()
+        : false;
+
+      if (linkMatchesQuery || isMemberMatch(tempMember, cleanQuery, strippedDigits)) {
+        // Simpan langsung ke database lokal agar pencarian berikutnya instan
+        storage.addOrUpdateMember(tempMember);
+        return tempMember;
+      }
     }
   } catch (err) {
-    console.error('Live remote spreadsheet lookup failed:', err);
-    return null;
+    console.warn('Live remote spreadsheet lookup failed:', err);
   }
 
   return null;
 }
+
 /**
  * Fungsi Utama: Verifikasi Anggota Multi-Tier (Lokal + Cloud Google Spreadsheet)
  */
@@ -398,11 +303,10 @@ export async function verifyMemberUniversal(
       // QR baru dapat membawa lebih dari satu identitas: Nomor KTA dan memberId.
       // Coba semuanya ke Spreadsheet sehingga perubahan Nomor KTA tidak memutus QR.
       const candidates: string[] = [];
-      const pushCandidate = (value: string | null | undefined) => {
+      const pushCandidate = (value: string | null) => {
         const v = String(value || '').trim();
         if (v && !candidates.some(c => c.toLowerCase() === v.toLowerCase())) candidates.push(v);
       };
-      for (const candidate of (normalizeNtaQuery(rawInput).candidates || [])) pushCandidate(candidate);
       pushCandidate(cleanQuery);
       if (typeof window !== 'undefined') {
         try {
