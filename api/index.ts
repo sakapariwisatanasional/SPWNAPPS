@@ -2293,6 +2293,10 @@ app.post('/api/mutate', async (req, res) => {
       if (!isSuperAdmin) {
         return res.status(403).json({ success: false, message: 'Hanya Super Admin Nasional yang berhak menghapus data anggota.' });
       }
+    } else if (action === 'SELF_UPDATE') {
+      if (session?.role !== 'MEMBER' || !session?.memberId) {
+        return res.status(403).json({ success: false, message: 'Hanya anggota yang sedang login yang dapat memperbarui profilnya sendiri.' });
+      }
     } else if (action === 'UPDATE' || action === 'STATUS' || action === 'BATCH_DELETE_DUMMY') {
       if (!isSuperAdmin && !isOperator) {
         return res.status(403).json({ success: false, message: 'Wewenang administrator diperlukan untuk memperbarui data anggota.' });
@@ -2313,10 +2317,13 @@ app.post('/api/mutate', async (req, res) => {
 
   // Validasi kewenangan wilayah dilakukan di server, bukan hanya di browser.
   const canEditMemberInJurisdiction = (target: any, incoming: any): boolean => {
-    if (isSuperAdmin) return true;
-    if (!isOperator || !session) return false;
     const current = target || {};
     const next = incoming || {};
+    if (isSuperAdmin) return true;
+    if (session?.role === 'MEMBER') {
+      return !!session.memberId && String(current.id || '').trim() === String(session.memberId).trim();
+    }
+    if (!isOperator || !session) return false;
     if (session.role === 'ADMIN_PROVINCE') {
       const allowed = String(session.jurisdictionId || '').trim();
       return !!allowed && String(current.provinceId || '').trim() === allowed && String(next.provinceId || current.provinceId || '').trim() === allowed;
@@ -2372,7 +2379,7 @@ app.post('/api/mutate', async (req, res) => {
 
   try {
     if (type === 'MEMBER') {
-      const member = payload;
+      let member = payload;
       if (action === 'CREATE' || action === 'REGISTER') {
         const idx = db.members.findIndex(m => m.id === member.id || (member.nationalMemberNumber && m.nationalMemberNumber === member.nationalMemberNumber));
         if (idx !== -1) {
@@ -2381,7 +2388,7 @@ app.post('/api/mutate', async (req, res) => {
           db.members.unshift(member);
         }
         await forwardMutation(spreadsheetMemberPayload(member));
-      } else if (action === 'UPDATE' || action === 'STATUS' || action === 'PHOTO_UPDATE') {
+      } else if (action === 'SELF_UPDATE' || action === 'UPDATE' || action === 'STATUS' || action === 'PHOTO_UPDATE') {
         let idx = db.members.findIndex(m => m.id === member.id);
         let existingMember = idx !== -1 ? db.members[idx] : null;
 
@@ -2408,6 +2415,23 @@ app.post('/api/mutate', async (req, res) => {
             message: 'Anggota tidak ditemukan pada database server maupun hasil sinkronisasi Google Spreadsheet. Pastikan ID, Nomor KTA/NTA, atau email anggota sesuai dengan data pada sheet Anggota.'
           });
         }
+
+        if (action === 'SELF_UPDATE') {
+          if (String(existingMember.id || '').trim() !== String(session?.memberId || '').trim()) {
+            return res.status(403).json({ success: false, message: 'Anda hanya dapat mengubah profil Anda sendiri.' });
+          }
+          const allowed = [
+            'fullName', 'nikMasked', 'gender', 'birthPlace', 'birthDate',
+            'phone', 'email', 'address', 'educationLevel', 'occupation',
+            'bio', 'avatarUrl'
+          ];
+          const safeMember: any = { id: existingMember.id };
+          for (const key of allowed) {
+            if (Object.prototype.hasOwnProperty.call(member || {}, key)) safeMember[key] = member[key];
+          }
+          member = safeMember;
+        }
+
         if (!canEditMemberInJurisdiction(existingMember, member)) {
           return res.status(403).json({ success: false, message: 'Anda tidak memiliki kewenangan wilayah untuk mengubah data anggota ini atau memindahkannya ke wilayah lain.' });
         }
