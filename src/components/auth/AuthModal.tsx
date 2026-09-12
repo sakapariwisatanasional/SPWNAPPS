@@ -193,25 +193,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       img.onload = () => {
         if (finished) return;
         try {
-          const canvas = document.createElement('canvas');
-          const maxDim = 1200;
-          let width = img.naturalWidth || img.width;
-          let height = img.naturalHeight || img.height;
-          if (!width || !height) throw new Error('Dimensi foto tidak terbaca.');
+          // Kompresi agresif untuk perangkat mobile. Base64 menambah ukuran
+          // payload, sehingga hasil foto dijaga sekitar <= 1.2 MB.
+          const maxBytes = 1200 * 1024;
+          let maxDim = 900;
+          const sourceWidth = img.naturalWidth || img.width;
+          const sourceHeight = img.naturalHeight || img.height;
+          if (!sourceWidth || !sourceHeight) throw new Error('Dimensi foto tidak terbaca.');
 
-          const scale = Math.min(1, maxDim / Math.max(width, height));
-          width = Math.max(1, Math.round(width * scale));
-          height = Math.max(1, Math.round(height * scale));
-          canvas.width = width;
-          canvas.height = height;
+          let compressed = '';
+          for (let pass = 0; pass < 4; pass++) {
+            const scale = Math.min(1, maxDim / Math.max(sourceWidth, sourceHeight));
+            const outWidth = Math.max(1, Math.round(sourceWidth * scale));
+            const outHeight = Math.max(1, Math.round(sourceHeight * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = outWidth;
+            canvas.height = outHeight;
 
-          const ctx = canvas.getContext('2d', { alpha: false });
-          if (!ctx) throw new Error('Canvas tidak tersedia.');
-          ctx.drawImage(img, 0, 0, width, height);
+            const ctx = canvas.getContext('2d', { alpha: false });
+            if (!ctx) throw new Error('Canvas tidak tersedia.');
+            ctx.drawImage(img, 0, 0, outWidth, outHeight);
 
-          // JPEG jauh lebih kecil daripada PNG untuk foto kamera dan aman
-          // dikirim sebagai JSON ke proxy Vercel lalu ke GAS.
-          const compressed = canvas.toDataURL('image/jpeg', 0.78);
+            const quality = pass === 0 ? 0.72 : pass === 1 ? 0.64 : pass === 2 ? 0.56 : 0.48;
+            compressed = canvas.toDataURL('image/jpeg', quality);
+            const comma = compressed.indexOf(',');
+            const estimatedBytes = comma >= 0 ? Math.floor((compressed.length - comma - 1) * 0.75) : Number.MAX_SAFE_INTEGER;
+            if (estimatedBytes <= maxBytes) break;
+            maxDim = Math.max(640, Math.round(maxDim * 0.82));
+          }
+
           if (!/^data:image\/jpeg;base64,/i.test(compressed)) {
             throw new Error('Hasil kompresi foto tidak valid.');
           }
@@ -492,16 +502,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // --------------------------------------------------------
       // FOTO
       //
-      // PENTING: jangan upload foto terpisah sebelum registrasi.
-      // Foto dikirim bersama REGISTER_MEMBER sehingga GAS dapat menyelesaikan
-      // Drive + Anggota + Users dalam satu workflow dan mengembalikan satu
-      // hasil transaksi ke browser.
+      // Foto perangkat di-upload lebih dahulu ke Drive melalui proxy aplikasi.
+      // Request REGISTER_MEMBER kemudian hanya membawa URL Drive, bukan Base64.
       // --------------------------------------------------------
-      const photoData = /^data:image\//i.test(regAvatarUrl) ? regAvatarUrl : '';
-      const photoUrl = photoData ? '' : String(regAvatarUrl || '').trim();
+      let photoData = /^data:image\//i.test(regAvatarUrl) ? regAvatarUrl : '';
+      let photoUrl = photoData ? '' : String(regAvatarUrl || '').trim();
 
       if (!photoData && !photoUrl) {
         throw new Error('Pas foto wajib dipilih atau diberikan melalui URL gambar.');
+      }
+
+      // Foto dari perangkat diunggah lebih dahulu melalui proxy aplikasi.
+      // Setelah Drive mengembalikan URL, registrasi hanya mengirim URL tersebut.
+      // Ini mencegah Base64 terkirim dua kali dalam request REGISTER_MEMBER.
+      if (photoData) {
+        const cleanName = fullName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'Anggota';
+        setIsUploadingPhoto(true);
+
+        const uploadResult = await spreadsheetService.uploadImageToDrive(
+          photoData,
+          `KTA_${newMemberId}_${cleanName}.jpg`,
+          'MEMBER_AVATAR'
+        );
+
+        setIsUploadingPhoto(false);
+
+        if (!uploadResult.success || !uploadResult.url) {
+          throw new Error(uploadResult.message || 'Foto gagal disimpan ke Google Drive. Pendaftaran dibatalkan.');
+        }
+
+        photoUrl = uploadResult.url;
+        photoData = '';
+        setRegAvatarUrl(photoUrl);
       }
 
       // --------------------------------------------------------
@@ -518,7 +550,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           generatedNikMasked,
 
         avatarUrl:
-          photoData || photoUrl,
+          photoUrl,
 
         gender:
           regGender,
