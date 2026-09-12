@@ -584,8 +584,18 @@ export async function generateKtaPdf({
 }: GenerateKtaOptions): Promise<jsPDF> {
   if (onProgress) onProgress('Mempersiapkan data dan aset KTA...');
 
-  const nta = member.nationalMemberNumber || member.verificationToken || member.id;
-  const verificationUrl = `${window.location.origin}/?verifyId=${encodeURIComponent(nta)}&tab=verify-portal`;
+  // QR KTA dibuat dengan dua identitas:
+  // - verifyId = Nomor KTA (kompatibel dengan QR/KTA lama)
+  // - memberId = ID Anggota permanen sebagai fallback jika Nomor KTA berubah
+  // Halaman /verify menerima keduanya dan melakukan verifikasi ke Spreadsheet.
+  const nta = String(member.nationalMemberNumber || '').trim();
+  const memberId = String(member.id || member.userId || '').trim();
+  const verificationParams = new URLSearchParams();
+  if (nta) verificationParams.set('verifyId', nta);
+  if (memberId) verificationParams.set('memberId', memberId);
+  if (!nta && memberId) verificationParams.set('id', memberId);
+  verificationParams.set('tab', 'verify-portal');
+  const verificationUrl = `${window.location.origin}/verify?${verificationParams.toString()}`;
 
   const [qrDataUrl, avatarImg, logoImg, frontBgImg, backBgImg, configuredLogoImages] = await Promise.all([
     generateQrDataUrl(verificationUrl),
