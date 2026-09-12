@@ -96,6 +96,13 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   onClose,
   onSuccess
 }) => {
+  // Anggota biasa hanya boleh mengedit profil miliknya sendiri.
+  // Hak ini sengaja dibatasi di UI dan juga akan divalidasi ulang oleh server.
+  const isSelfEditor = currentUser?.role === 'MEMBER' && Boolean(
+    member && currentUser?.memberId && member.id === currentUser.memberId
+  );
+  const isAdministrator = currentUser?.role !== 'MEMBER' && currentUser?.role !== 'PUBLIC';
+
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [regencies, setRegencies] = useState<Regency[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
@@ -390,7 +397,12 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
     if (isSubmitting) return;
 
-    if (isUnauthorized) {
+    if (isSelfEditor && (!member || member.id !== currentUser.memberId)) {
+      alert('Akses ditolak: Anda hanya dapat mengubah profil Anda sendiri.');
+      return;
+    }
+
+    if (!isSelfEditor && isUnauthorized) {
       alert('Akses Ditolak: Anda tidak memiliki wewenang untuk mengedit data anggota di luar wilayah Kwartir Anda.');
       return;
     }
@@ -405,14 +417,20 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       return;
     }
 
-    const validProvince = storage.getProvinces().find(p => p.id === selectedProvinceId);
-    const validRegency = storage.getRegencies(selectedProvinceId).find(r => r.id === selectedRegencyId);
-    const validDistrict = storage.getDistricts(selectedRegencyId).find(d => d.id === selectedDistrictId);
+    {
+      const validProvince = storage.getProvinces().find(p => p.id === selectedProvinceId);
+      const validRegency = storage.getRegencies(selectedProvinceId).find(r => r.id === selectedRegencyId);
+      const validDistrict = storage.getDistricts(selectedRegencyId).find(d => d.id === selectedDistrictId);
 
-    if (!validProvince || !validRegency || validRegency.provinceId !== validProvince.id ||
-        !validDistrict || validDistrict.regencyId !== validRegency.id) {
-      alert('Struktur wilayah tidak valid. Provinsi, Kabupaten/Kota, dan Kecamatan harus berasal dari hierarki wilayah yang sama.');
-      return;
+      if (!validProvince || !validRegency || validRegency.provinceId !== validProvince.id ||
+          !validDistrict || validDistrict.regencyId !== validRegency.id) {
+        alert('Struktur wilayah tidak valid. Provinsi, Kabupaten/Kota, dan Kecamatan harus berasal dari hierarki wilayah yang sama.');
+        return;
+      }
+      if (isSelfEditor && selectedProvinceId === '00') {
+        alert('Kwartir Nasional tidak dapat dipilih atau diubah oleh anggota.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -442,43 +460,61 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         throw new Error('Foto belum berhasil dikonversi menjadi URL Google Drive.');
       }
 
-      const updatedPayload: Partial<Member> = {
-        fullName: fullName.trim(),
-        nikMasked: nikMasked.trim(),
-        gender,
-        birthPlace: birthPlace.trim(),
-        birthDate,
-        phone: phone.trim(),
-        email: email.trim(),
-        address: address.trim(),
-
-        provinceId: selectedProvinceId,
-        provinceName: currentProvince?.name || member.provinceName,
-        regencyId: selectedRegencyId,
-        regencyName: currentRegency?.name || member.regencyName,
-        districtId: selectedDistrictId,
-        districtName: currentDistrict?.name || member.districtName,
-        // Pangkalan/Gudep tidak lagi menjadi field profil utama.
-
-        krida,
-        currentPosition: currentPosition.trim() || `Anggota ${krida}`,
-        joinYear: Number(joinYear),
-        status,
-        educationLevel,
-        occupation: occupation.trim(),
-        bio: bio.trim(),
-
-        avatarUrl: finalAvatarUrl,
-
-        nationalMemberNumber: finalNta || member.nationalMemberNumber,
-        skills: memberSkills
-      };
+      const updatedPayload: Partial<Member> = isSelfEditor
+        ? {
+            fullName: fullName.trim(),
+            nikMasked: nikMasked.trim(),
+            gender,
+            birthPlace: birthPlace.trim(),
+            birthDate,
+            phone: phone.trim(),
+            email: email.trim(),
+            address: address.trim(),
+            provinceId: selectedProvinceId,
+            provinceName: currentProvince?.name || member.provinceName,
+            regencyId: selectedRegencyId,
+            regencyName: currentRegency?.name || member.regencyName,
+            districtId: selectedDistrictId,
+            districtName: currentDistrict?.name || member.districtName,
+            krida,
+            currentPosition: currentPosition.trim() || `Anggota ${krida}`,
+            educationLevel,
+            occupation: occupation.trim(),
+            bio: bio.trim(),
+            avatarUrl: finalAvatarUrl,
+          }
+        : {
+            fullName: fullName.trim(),
+            nikMasked: nikMasked.trim(),
+            gender,
+            birthPlace: birthPlace.trim(),
+            birthDate,
+            phone: phone.trim(),
+            email: email.trim(),
+            address: address.trim(),
+            provinceId: selectedProvinceId,
+            provinceName: currentProvince?.name || member.provinceName,
+            regencyId: selectedRegencyId,
+            regencyName: currentRegency?.name || member.regencyName,
+            districtId: selectedDistrictId,
+            districtName: currentDistrict?.name || member.districtName,
+            krida,
+            currentPosition: currentPosition.trim() || `Anggota ${krida}`,
+            joinYear: Number(joinYear),
+            status,
+            educationLevel,
+            occupation: occupation.trim(),
+            bio: bio.trim(),
+            avatarUrl: finalAvatarUrl,
+            nationalMemberNumber: finalNta || member.nationalMemberNumber,
+            skills: memberSkills
+          };
 
       const result = await storage.adminUpdateMember(
         member.id,
         updatedPayload,
         currentUser,
-        updateReason.trim() || 'Perbaikan profil oleh Operator Kwartir'
+        isSelfEditor ? 'Pembaruan profil oleh anggota sendiri' : (updateReason.trim() || 'Perbaikan profil oleh Operator Kwartir')
       );
 
       if (!result) {
@@ -570,13 +606,13 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-base font-heading">Koreksi & Pembaruan Profil Anggota</h3>
+                <h3 className="font-bold text-base font-heading">{isSelfEditor ? 'Edit Profil Saya' : 'Koreksi & Pembaruan Profil Anggota'}</h3>
                 <span className="px-2 py-0.5 bg-purple-500/30 text-purple-200 border border-purple-400/30 rounded-md text-[10px] font-mono font-bold">
-                  {isRegencyOperator ? 'Operator Cabang' : 'Hak Akses Admin'}
+                  {isSelfEditor ? 'Anggota' : (isRegencyOperator ? 'Operator Cabang' : 'Hak Akses Admin')}
                 </span>
               </div>
               <p className="text-xs text-purple-200/80">
-                Ubah nama lengkap, gelar akademis/kepramukaan, kontak, peminatan krida, dan gudep
+                {isSelfEditor ? 'Perbarui data pribadi, Jabatan, Krida, dan wilayah Anda. Kwartir Nasional serta hak administrator tetap dilindungi.' : 'Ubah nama lengkap, gelar akademis/kepramukaan, kontak, peminatan krida, dan data profil anggota.'}
               </p>
             </div>
           </div>
@@ -607,7 +643,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-purple-200/70 shadow-xs">
-            <span className="text-[11px] text-slate-500">Operator:</span>
+            <span className="text-[11px] text-slate-500">{isSelfEditor ? 'Akun:' : 'Operator:'}</span>
             <span className="font-bold text-purple-950">{currentUser.name}</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-semibold">
               {currentUser.role}
@@ -672,6 +708,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             <span>4. Krida & Status KTA</span>
           </button>
 
+          {!isSelfEditor && (
           <button
             type="button"
             onClick={() => setActiveTab('SKILLS')}
@@ -689,7 +726,9 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
               </span>
             )}
           </button>
+          )}
 
+          {!isSelfEditor && (
           <button
             type="button"
             onClick={() => setActiveTab('REASON')}
@@ -702,6 +741,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             <FileText className="w-3.5 h-3.5" />
             <span>6. Catatan Perubahan</span>
           </button>
+          )}
         </div>
 
         {/* Modal Form Content */}
@@ -997,7 +1037,14 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
           {/* TAB 2: DOMISILI & KWARTIR */}
           {activeTab === 'DOMICILE' && (
             <div className="space-y-4 animate-in fade-in duration-100">
-              {isRegencyOperator ? (
+              {isSelfEditor ? (
+                <div className="bg-purple-50 border border-purple-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-purple-900">
+                  <MapPin className="w-4 h-4 text-purple-700 flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-relaxed">
+                    Anda dapat memperbarui Provinsi, Kabupaten/Kota, dan Kecamatan. <strong>Kwartir Nasional tidak dapat dipilih</strong> melalui edit profil anggota.
+                  </p>
+                </div>
+              ) : isRegencyOperator ? (
                 <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-amber-900">
                   <Lock className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
                   <p className="text-[11px] leading-relaxed">
@@ -1070,7 +1117,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                       Kwartir Daerah (Provinsi) {isRegencyOperator && <span className="text-amber-700 text-[10px]">(Terkunci)</span>}
                     </label>
                     <select
-                      disabled={isRegencyOperator || isProvinceAdmin || isBranchAdmin}
+                      disabled={isRegencyOperator || isProvinceAdmin || isBranchAdmin || (isSelfEditor && selectedProvinceId === '00')}
                       value={selectedProvinceId}
                       onChange={(e) => setSelectedProvinceId(e.target.value)}
                       className={`w-full px-3.5 py-2 border rounded-xl outline-none text-slate-800 ${
@@ -1079,9 +1126,11 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                           : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600'
                       }`}
                     >
-                      {provinces.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.code} - {p.name}
+                      {provinces
+                        .filter(p => p.id !== '00' || selectedProvinceId === '00')
+                        .map((p) => (
+                        <option key={p.id} value={p.id} disabled={isSelfEditor && p.id === '00'}>
+                          {p.code} - {p.name}{p.id === '00' ? ' (Terkunci)' : ''}
                         </option>
                       ))}
                     </select>
@@ -1092,7 +1141,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                       Kwartir Cabang (Kabupaten / Kota) {isRegencyOperator && <span className="text-amber-700 text-[10px]">(Khusus Wilayah Anda)</span>}
                     </label>
                     <select
-                      disabled={isRegencyOperator || isBranchAdmin}
+                      disabled={isRegencyOperator || isBranchAdmin || (isSelfEditor && selectedProvinceId === '00')}
                       value={selectedRegencyId}
                       onChange={(e) => setSelectedRegencyId(e.target.value)}
                       className={`w-full px-3.5 py-2 border rounded-xl outline-none ${
@@ -1112,6 +1161,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                   <div>
                     <label className="block font-bold text-slate-800 mb-1">Kecamatan (Distrik / Kwarran)</label>
                     <select
+                      disabled={isSelfEditor && selectedProvinceId === '00'}
                       value={selectedDistrictId}
                       onChange={(e) => setSelectedDistrictId(e.target.value)}
                       className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800"
@@ -1161,6 +1211,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                 <div>
                   <label className="block font-bold text-slate-800 mb-1">Status Keanggotaan</label>
                   <select
+                    disabled={isSelfEditor}
                     value={status}
                     onChange={(e: any) => setStatus(e.target.value)}
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800 font-bold"
@@ -1226,7 +1277,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
           )}
 
           {/* TAB 5: KEAHLIAN & SERTIFIKASI */}
-          {activeTab === 'SKILLS' && (
+          {!isSelfEditor && activeTab === 'SKILLS' && (
             <div className="space-y-5 animate-in fade-in duration-100">
               <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-xs">
                 <div>
@@ -1494,7 +1545,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
           )}
 
           {/* TAB 6: CATATAN PERUBAHAN & AUDIT TRAIL */}
-          {activeTab === 'REASON' && (
+          {!isSelfEditor && activeTab === 'REASON' && (
             <div className="space-y-4 animate-in fade-in duration-100">
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                 <label className="block font-bold text-slate-900 mb-1.5 text-xs">
@@ -1558,7 +1609,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                 className="px-5 py-2 bg-gradient-to-r from-purple-900 to-indigo-900 hover:from-purple-950 hover:to-indigo-950 text-white rounded-xl font-bold transition-all shadow-md shadow-purple-950/20 flex items-center gap-2 cursor-pointer text-xs disabled:opacity-50"
               >
                 <CheckCircle2 className="w-4 h-4 text-purple-300" />
-                <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan Data'}</span>
+                <span>{isSubmitting ? 'Menyimpan...' : (isSelfEditor ? 'Simpan Profil Saya' : 'Simpan Perubahan Data')}</span>
               </button>
             </div>
           </div>
