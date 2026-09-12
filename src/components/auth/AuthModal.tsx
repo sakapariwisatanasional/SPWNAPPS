@@ -420,16 +420,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       // --------------------------------------------------------
-      // VALIDASI SCRIPT URL
+      // ENDPOINT GOOGLE APPS SCRIPT
       // --------------------------------------------------------
+      // Registrasi publik tidak boleh bergantung pada localStorage HP/tablet.
+      // SpreadsheetService mempunyai fallback endpoint produksi dan API server
+      // juga akan mencoba endpoint cadangan jika URL lama menghasilkan HTTP 404.
       const scriptUrl =
         spreadsheetService.getConfig().scriptUrl || '';
-
-      if (!scriptUrl) {
-        throw new Error(
-          'Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.'
-        );
-      }
 
       // --------------------------------------------------------
       // DATA WILAYAH
