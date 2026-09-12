@@ -1997,7 +1997,11 @@ class SpreadsheetService {
       const response = await fetch('/api/upload-image', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/octet-stream',
+          // Keep the request body binary, but also tell the API the REAL image MIME.
+          // Some mobile browsers/proxies otherwise rewrite Content-Type to
+          // application/octet-stream, which caused valid JPG uploads to be rejected.
+          'Content-Type': blob.type || 'application/octet-stream',
+          'X-Upload-Mime-Type': blob.type || 'image/jpeg',
           'X-File-Name': encodeURIComponent(filename),
           'X-File-Category': category,
           'X-Script-Url': scriptUrl
