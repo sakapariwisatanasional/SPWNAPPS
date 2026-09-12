@@ -483,9 +483,51 @@ class StorageService {
     if (index === -1) return null;
 
     const current = members[index];
+
+    // Anggota hanya boleh memperbarui field profil yang diizinkan. Proteksi ini
+    // dilakukan sebelum state lokal dan direct Spreadsheet sync agar payload
+    // berbahaya tidak pernah masuk ke jalur penyimpanan sekunder.
+    let effectivePayload = payload;
+    if (actor?.role === 'MEMBER') {
+      if (String(memberId) !== String(actor.memberId || '')) {
+        throw new Error('Anda hanya dapat mengubah profil Anda sendiri.');
+      }
+      const allowedSelfKeys: (keyof Member)[] = [
+        'fullName', 'nikMasked', 'gender', 'birthPlace', 'birthDate', 'phone',
+        'email', 'address', 'provinceId', 'provinceName', 'regencyId',
+        'regencyName', 'districtId', 'districtName', 'krida', 'currentPosition',
+        'educationLevel', 'occupation', 'bio', 'avatarUrl'
+      ];
+      const safe: Partial<Member> = {};
+      for (const key of allowedSelfKeys) {
+        if (Object.prototype.hasOwnProperty.call(payload || {}, key)) {
+          (safe as any)[key] = (payload as any)[key];
+        }
+      }
+
+      const currentIsNational = String(current.provinceId || '') === '00';
+      const requestedProvinceId = String(safe.provinceId ?? current.provinceId ?? '');
+      if (requestedProvinceId === '00' && !currentIsNational) {
+        throw new Error('Kwartir Nasional tidak dapat dipilih oleh anggota.');
+      }
+      if (currentIsNational && requestedProvinceId !== '00') {
+        throw new Error('Anggota Kwartir Nasional tidak dapat memindahkan struktur Kwartir melalui edit profil mandiri.');
+      }
+      if (currentIsNational) {
+        // Struktur pusat tetap apa adanya; anggota tidak dapat mengubah hierarchy-nya.
+        delete (safe as any).provinceId;
+        delete (safe as any).provinceName;
+        delete (safe as any).regencyId;
+        delete (safe as any).regencyName;
+        delete (safe as any).districtId;
+        delete (safe as any).districtName;
+      }
+      effectivePayload = safe;
+    }
+
     const updatedMember: Member = {
       ...current,
-      ...payload,
+      ...effectivePayload,
       id: memberId,
       // Field wajib jangan sampai hilang akibat payload parsial.
       userId: payload.userId ?? current.userId,
@@ -594,7 +636,7 @@ class StorageService {
         credentials: 'include',
         body: JSON.stringify({
           type: 'MEMBER',
-          action: 'UPDATE',
+          action: actor?.role === 'MEMBER' ? 'SELF_UPDATE' : 'UPDATE',
           payload: updatedMember,
           reason: reason || 'Pembaruan profil anggota',
           scriptUrl: getManualAppsScriptUrl()
