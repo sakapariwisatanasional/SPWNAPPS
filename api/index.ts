@@ -1198,6 +1198,36 @@ async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unkn
 // Upload image proxy: browser -> application server -> Google Apps Script -> Google Drive.
 // The browser must not call Apps Script directly because the JSON POST would
 // require cross-origin handling. This route also keeps the GAS URL server-side.
+//
+// Mobile browsers can legitimately send binary images with
+// Content-Type: application/octet-stream. Therefore MIME validation must prefer
+// the explicit X-Upload-Mime-Type header and, if that is generic/invalid, sniff
+// the binary signature instead of rejecting a valid JPG/PNG/WEBP/GIF.
+function detectImageMimeFromBuffer(buffer: Buffer): string {
+  if (!buffer || buffer.length < 4) return '';
+  // JPEG FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  // PNG 89 50 4E 47 0D 0A 1A 0A
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) return 'image/png';
+  // GIF87a / GIF89a
+  if (buffer.length >= 6) {
+    const sig = buffer.subarray(0, 6).toString('ascii');
+    if (sig === 'GIF87a' || sig === 'GIF89a') return 'image/gif';
+  }
+  // WEBP: RIFF....WEBP
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return '';
+}
+
+function resolveUploadMimeType(req: any, body: Buffer): string {
+  const hinted = String(req.headers['x-upload-mime-type'] || '').split(';')[0].trim().toLowerCase();
+  const contentType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  const allowed = /^image\/(?:png|jpe?g|webp|gif)$/i;
+  if (allowed.test(hinted)) return hinted === 'image/jpg' ? 'image/jpeg' : hinted;
+  if (allowed.test(contentType)) return contentType === 'image/jpg' ? 'image/jpeg' : contentType;
+  return detectImageMimeFromBuffer(body);
+}
+
 app.post('/api/upload-image', express.raw({ type: ['application/octet-stream', 'image/*'], limit: '4mb' }), async (req, res) => {
   try {
     const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '');
@@ -1215,9 +1245,9 @@ app.post('/api/upload-image', express.raw({ type: ['application/octet-stream', '
       try { return decodeURIComponent(filenameHeader); } catch { return filenameHeader; }
     })().replace(/[^a-zA-Z0-9._-]/g, '_') || `image_${Date.now()}.jpg`;
 
-    const mimeType = String(req.headers['content-type'] || 'image/jpeg').split(';')[0].trim().toLowerCase();
-    if (!/^image\/(png|jpe?g|webp|gif)$/i.test(mimeType)) {
-      return res.status(415).json({ success: false, status: 'error', message: 'Format ảnh không được hỗ trợ. Chỉ PNG/JPG/WEBP/GIF.' });
+    const mimeType = resolveUploadMimeType(req, body);
+    if (!mimeType) {
+      return res.status(415).json({ success: false, status: 'error', message: 'Format foto tidak didukung. Gunakan JPG, PNG, WEBP, atau GIF.' });
     }
 
     // 1) Xin resumable upload session từ GAS.
