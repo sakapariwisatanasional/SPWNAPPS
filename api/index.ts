@@ -1874,6 +1874,80 @@ app.put('/api/kta-settings', async (req, res) => {
   }
 });
 
+// Read Google Spreadsheet data through the Vercel server so the browser never
+// depends on Google Apps Script redirect/CORS behaviour. The active GAS URL is
+// supplied by the SuperAdmin-configured runtime setting.
+app.get('/api/spreadsheet-data', async (req, res) => {
+  const sheet = String(req.query?.sheet || 'Anggota').trim() || 'Anggota';
+  const requestedScriptUrl = normalizeManualAppsScriptUrl(req.query?.scriptUrl);
+  const configuredScriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+  const envScriptUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+  const scriptUrl = requestedScriptUrl || configuredScriptUrl || envScriptUrl;
+
+  if (!scriptUrl) {
+    return res.status(400).json({
+      success: false,
+      message: 'Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.'
+    });
+  }
+
+  try {
+    const separator = scriptUrl.includes('?') ? '&' : '?';
+    const url = `${scriptUrl}${separator}sheet=${encodeURIComponent(sheet)}&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+    const upstream = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, max-age=0',
+        'Pragma': 'no-cache'
+      },
+      redirect: 'follow'
+    });
+
+    const text = await upstream.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch {}
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({
+        success: false,
+        message: `Google Apps Script HTTP ${upstream.status}${data?.message ? `: ${data.message}` : ''}`
+      });
+    }
+
+    if (data?.status === 'error' || data?.success === false) {
+      return res.status(502).json({
+        success: false,
+        message: data?.message || `Google Apps Script gagal membaca sheet ${sheet}.`
+      });
+    }
+
+    const rows = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.rows) ? data.rows
+      : Array.isArray(data?.data) ? data.data
+      : Array.isArray(data?.records) ? data.records
+      : null;
+
+    if (!rows) {
+      return res.status(502).json({
+        success: false,
+        message: `Respons Google Apps Script untuk sheet ${sheet} tidak berisi array data yang valid.`
+      });
+    }
+
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    return res.json({ success: true, sheet, rows, count: rows.length, fetchedAt: new Date().toISOString() });
+  } catch (error: any) {
+    console.error(`[Spreadsheet Proxy] Gagal membaca ${sheet}:`, error);
+    return res.status(502).json({
+      success: false,
+      message: error?.message || `Gagal membaca sheet ${sheet} melalui Google Apps Script.`
+    });
+  }
+});
+
 // Central Data GET with strict Privacy and Role Enforcement
 app.get('/api/data', async (req, res) => {
   const session = getSessionUser(req);
