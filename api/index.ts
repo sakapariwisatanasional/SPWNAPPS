@@ -228,6 +228,16 @@ export interface TourPackage {
   publishedAt?: string;
   reviewedBy?: string;
   rejectionReason?: string;
+  contentType?: 'DESTINATION' | 'PACKAGE';
+  krida?: KridaType;
+  authorMemberId?: string;
+  authorName?: string;
+  adminApprovalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminApprovedAt?: string;
+  adminApprovedBy?: string;
+  superAdminApprovalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  superAdminApprovedAt?: string;
+  superAdminApprovedBy?: string;
   viewsCount: number;
   featured?: boolean;
 }
@@ -2353,8 +2363,8 @@ app.get('/api/data', async (req, res) => {
 
   res.json({
     members: sanitizedMembers,
-    tours: db.tours.filter(t => isSuperAdmin || isOperator || t.status === 'APPROVED_PUBLISHED'),
-    culinaryItems: db.culinaryItems.filter(c => isSuperAdmin || isOperator || c.status === 'APPROVED'),
+    tours: db.tours.filter(t => isSuperAdmin || (isOperator && contentBelongsToAdminJurisdiction(t, session)) || (session?.role === 'MEMBER' && String(t.authorMemberId || t.ownerId || '') === String(session.memberId || '')) || t.status === 'APPROVED_PUBLISHED'),
+    culinaryItems: db.culinaryItems.filter(c => isSuperAdmin || (isOperator && contentBelongsToAdminJurisdiction(c, session)) || (session?.role === 'MEMBER' && String(c.authorMemberId || '') === String(session.memberId || '')) || c.status === 'APPROVED'),
     activities: db.activities,
     kridaModules: db.kridaModules || [],
     users: sanitizedUsers,
@@ -2400,6 +2410,133 @@ app.post('/api/sync-spreadsheet', async (req, res) => {
   });
 });
 
+// =========================================================
+// SUPER ADMIN - ADMIN ASSIGNMENT & JURISDICTION HELPERS
+// =========================================================
+const CONTENT_ADMIN_ROLES = ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
+const ADMIN_ROLE_LABELS: Record<string, string> = {
+  ADMIN_PROVINCE: 'Admin Provinsi',
+  ADMIN_REGENCY: 'Admin Kabupaten/Kota',
+  ADMIN_BRANCH: 'Admin Ranting/Kecamatan'
+};
+
+function normalizeText(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function contentBelongsToAdminJurisdiction(content: any, session: any): boolean {
+  if (!session || session.role === 'SUPER_ADMIN') return true;
+  if (!CONTENT_ADMIN_ROLES.includes(session.role)) return false;
+
+  const allowed = normalizeText(session.jurisdictionId);
+  const allowedName = normalizeText(session.jurisdictionName);
+  if (!allowed && !allowedName) return false;
+
+  const provinceId = normalizeText(content?.provinceId);
+  const regencyId = normalizeText(content?.regencyId);
+  const districtId = normalizeText(content?.districtId);
+  const provinceName = normalizeText(content?.provinceName);
+  const regencyName = normalizeText(content?.regencyName);
+  const districtName = normalizeText(content?.districtName);
+  const branchName = normalizeText(content?.branchName);
+
+  if (session.role === 'ADMIN_PROVINCE') {
+    return (allowed && provinceId === allowed) || (allowedName && provinceName === allowedName);
+  }
+  if (session.role === 'ADMIN_REGENCY') {
+    return (allowed && regencyId === allowed) || (allowedName && regencyName === allowedName);
+  }
+  if (session.role === 'ADMIN_BRANCH') {
+    return (allowed && districtId === allowed) ||
+      (allowedName && (districtName === allowedName || branchName === allowedName));
+  }
+  return false;
+}
+
+// Content moderation helpers
+const CONTENT_ADMIN_ROLES_UNUSED = CONTENT_ADMIN_ROLES;
+ = ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
+const isContentAdmin = (session: any) => !!session && CONTENT_ADMIN_ROLES.includes(session.role);
+const isContentReviewer = (session: any) => !!session && (session.role === 'SUPER_ADMIN' || isContentAdmin(session));
+
+// =========================================================
+// SUPER ADMIN - PENETAPAN / PENCABUTAN ADMIN WILAYAH
+// =========================================================
+app.post('/api/admin/assign', async (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat menetapkan Admin wilayah.' });
+  }
+
+  const body = req.body || {};
+  const memberId = String(body.memberId || '').trim();
+  const userId = String(body.userId || '').trim();
+  const role = String(body.role || '').trim().toUpperCase();
+  const jurisdictionId = String(body.jurisdictionId || '').trim();
+  const jurisdictionName = String(body.jurisdictionName || '').trim();
+
+  if (!memberId && !userId) return res.status(400).json({ success:false, message:'Member yang akan dijadikan Admin belum dipilih.' });
+  if (!CONTENT_ADMIN_ROLES.includes(role)) return res.status(400).json({ success:false, message:'Tingkat Admin tidak valid.' });
+  if (!jurisdictionId && !jurisdictionName) return res.status(400).json({ success:false, message:'Wilayah kewenangan wajib dipilih.' });
+
+  const targetMember = db.members.find(m => String(m.id || '') === memberId);
+  const targetUser = db.users.find(u =>
+    (userId && String(u.id || '') === userId) ||
+    (memberId && String(u.memberId || '') === memberId)
+  );
+  if (!targetMember && !targetUser) return res.status(404).json({ success:false, message:'Member/akun pengguna tidak ditemukan.' });
+
+  const resolvedMemberId = memberId || String(targetUser?.memberId || targetMember?.id || '');
+  const resolvedUserId = String(targetUser?.id || userId || '');
+  const resolvedName = String(targetMember?.fullName || targetUser?.name || '').trim();
+  const resolvedEmail = String(targetMember?.email || targetUser?.email || '').trim();
+  const resolvedUsername = String(targetUser?.username || resolvedEmail || '').trim();
+  if (!resolvedUserId) return res.status(409).json({ success:false, message:'Akun login member belum ditemukan pada sheet Users.' });
+
+  const now = new Date().toISOString();
+  const userPayload = {
+    id: resolvedUserId, username: resolvedUsername, email: resolvedEmail,
+    name: resolvedName, role, jurisdictionName, jurisdictionId,
+    avatarUrl: targetMember?.avatarUrl || targetUser?.avatarUrl || '',
+    memberId: resolvedMemberId, status: targetUser?.status || targetMember?.status || 'ACTIVE',
+    passwordHash: targetUser?.passwordHash || '', createdAt: targetUser?.createdAt || now
+  };
+
+  const gasResult = await forwardToGoogleAppsScript({ action:'ASSIGN_ADMIN', user:userPayload, assignedBy:session.name || session.username || 'Super Admin' }, requestScriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '');
+  if (gasResult?.success === false || gasResult?.status === 'error') return res.status(502).json(gasResult);
+
+  const idx = db.users.findIndex(u => String(u.id || '') === resolvedUserId);
+  const saved = { ...(idx >= 0 ? db.users[idx] : targetUser || {}), ...userPayload, operatorRole:role, operatorJurisdictionId:jurisdictionId, operatorJurisdictionName:jurisdictionName, operatorAssignedAt:now, operatorAssignedBy:session.name || session.username || 'Super Admin' };
+  if (idx >= 0) db.users[idx] = saved; else db.users.push(saved);
+  if (targetMember) {
+    const mi = db.members.findIndex(m => String(m.id || '') === resolvedMemberId);
+    if (mi >= 0) db.members[mi] = { ...db.members[mi], isOperator:true, operatorRole:role, operatorJurisdictionId:jurisdictionId, operatorJurisdictionName:jurisdictionName, operatorAssignedAt:now, operatorAssignedBy:session.name || session.username || 'Super Admin' };
+  }
+  saveDatabase();
+
+  return res.json({ success:true, status:'success', message:`${resolvedName || 'Member'} berhasil ditetapkan sebagai ${ADMIN_ROLE_LABELS[role]}.`, user:{ id:resolvedUserId, memberId:resolvedMemberId, name:resolvedName, role, jurisdictionId, jurisdictionName } });
+});
+
+app.post('/api/admin/revoke', async (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') return res.status(403).json({ success:false, message:'Hanya Super Admin yang dapat mencabut Admin wilayah.' });
+  const body = req.body || {};
+  const memberId = String(body.memberId || '').trim();
+  const userId = String(body.userId || '').trim();
+  const targetUser = db.users.find(u => (userId && String(u.id || '') === userId) || (memberId && String(u.memberId || '') === memberId));
+  if (!targetUser) return res.status(404).json({ success:false, message:'Akun Admin tidak ditemukan.' });
+  if (targetUser.role === 'SUPER_ADMIN') return res.status(400).json({ success:false, message:'Akun SuperAdmin tidak dapat dicabut melalui menu ini.' });
+  const resolvedMemberId = String(targetUser.memberId || memberId || '');
+  const gasResult = await forwardToGoogleAppsScript({ action:'REVOKE_ADMIN', userId:String(targetUser.id || ''), memberId:resolvedMemberId, assignedBy:session.name || session.username || 'Super Admin' }, requestScriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '');
+  if (gasResult?.success === false || gasResult?.status === 'error') return res.status(502).json(gasResult);
+  const idx = db.users.findIndex(u => String(u.id || '') === String(targetUser.id || ''));
+  if (idx >= 0) db.users[idx] = { ...db.users[idx], role:'MEMBER', jurisdictionName:'', jurisdictionId:'' };
+  const mi = db.members.findIndex(m => String(m.id || '') === resolvedMemberId);
+  if (mi >= 0) db.members[mi] = { ...db.members[mi], isOperator:false, operatorRole:undefined, operatorJurisdictionId:undefined, operatorJurisdictionName:undefined, operatorAssignedAt:undefined, operatorAssignedBy:undefined };
+  saveDatabase();
+  return res.json({ success:true, status:'success', message:'Status Admin dicabut. Akun kembali menjadi Member.', user:{ id:targetUser.id, memberId:resolvedMemberId, role:'MEMBER', jurisdictionId:'', jurisdictionName:'' } });
+});
+
 // Central Mutation API - Receives any create/update/delete with Server Role Enforcement
 app.post('/api/mutate', async (req, res) => {
   const session = getSessionUser(req);
@@ -2426,6 +2563,24 @@ app.post('/api/mutate', async (req, res) => {
       if (!isSuperAdmin && !isOperator) {
         return res.status(403).json({ success: false, message: 'Wewenang administrator diperlukan untuk memperbarui data anggota.' });
       }
+    }
+  }
+
+  // CONTENT POLICY: member dapat mengajukan, tetapi tidak dapat menerbitkan.
+  // Urutan wajib: MEMBER -> ADMIN -> SUPER_ADMIN -> PUBLISHED.
+  if (type === 'TOUR' || type === 'CULINARY') {
+    const isMember = session?.role === 'MEMBER';
+    if (['CREATE', 'UPDATE', 'DELETE'].includes(action)) {
+      if (!isMember && !isContentReviewer(session)) return res.status(403).json({ success: false, message: 'Hanya anggota terdaftar atau administrator yang dapat mengelola konten.' });
+      if (isMember && ['UPDATE', 'DELETE'].includes(action) && payload?.authorMemberId && String(payload.authorMemberId) !== String(session.memberId || '')) return res.status(403).json({ success: false, message: 'Anda hanya dapat mengelola posting milik Anda sendiri.' });
+    } else if (action === 'APPROVE_ADMIN') {
+      if (!isContentAdmin(session)) return res.status(403).json({ success: false, message: 'Persetujuan tahap Admin hanya dapat dilakukan oleh Admin.' });
+    } else if (action === 'APPROVE_SUPER_ADMIN') {
+      if (!isSuperAdmin) return res.status(403).json({ success: false, message: 'Persetujuan akhir hanya dapat dilakukan oleh Super Admin.' });
+    } else if (action === 'REJECT') {
+      if (!isContentReviewer(session)) return res.status(403).json({ success: false, message: 'Penolakan hanya dapat dilakukan oleh Admin atau Super Admin.' });
+    } else {
+      return res.status(400).json({ success: false, message: 'Aksi konten tidak dikenal.' });
     }
   }
 
@@ -2592,77 +2747,29 @@ app.post('/api/mutate', async (req, res) => {
         await syncFromGoogleSpreadsheet();
       }
     } else if (type === 'TOUR') {
-      const tour = payload;
+      let tour = { ...(payload || {}) };
+      const now = new Date().toISOString();
+      const isMember = session?.role === 'MEMBER';
+      const rowForTour = (x: any) => [x.id,x.title||'',x.slug||x.id,x.contentType||'PACKAGE',x.category||'',x.description||'',x.pricePerPerson||0,x.durationDays||0,x.locationAddress||'',x.provinceName||'',x.regencyName||'',x.districtName||'',x.ownerName||'',x.ownerId||'',x.ownerType||'MEMBER',x.contactPhone||'',x.contactEmail||'',x.coverImage||'',JSON.stringify(x.galleryImages||[]),JSON.stringify(x.facilities||[]),JSON.stringify(x.itinerary||[]),x.krida||'',x.authorMemberId||'',x.authorName||'',x.adminApprovalStatus||'PENDING',x.adminApprovedAt||'',x.adminApprovedBy||'',x.superAdminApprovalStatus||'PENDING',x.superAdminApprovedAt||'',x.superAdminApprovedBy||'',x.status||'SUBMITTED',x.submittedAt||now,x.publishedAt||'',x.rejectionReason||'',x.viewsCount||0,x.featured?'TRUE':'FALSE',now];
       if (action === 'CREATE' || action === 'UPDATE') {
-        const idx = db.tours.findIndex(t => t.id === tour.id);
-        if (idx !== -1) {
-          db.tours[idx] = { ...db.tours[idx], ...tour };
-        } else {
-          db.tours.unshift(tour);
-        }
-        forwardMutation({
-          action: 'UPSERT_ROW',
-          sheet: 'Paket_Wisata',
-          id: tour.id,
-          rowData: [
-            tour.id,
-            tour.title,
-            tour.category,
-            tour.pricePerPerson,
-            tour.durationDays,
-            tour.locationAddress || '',
-            tour.provinceName,
-            tour.regencyName,
-            tour.ownerName,
-            tour.contactPhone,
-            tour.coverImage,
-            new Date().toISOString()
-          ]
-        });
-      } else if (action === 'DELETE') {
-        db.tours = db.tours.filter(t => t.id !== payload.id);
-        forwardMutation({
-          action: 'DELETE_ROW',
-          sheet: 'Paket_Wisata',
-          id: payload.id
-        });
-      }
+        const idx = db.tours.findIndex(t => t.id === tour.id); const existing = idx >= 0 ? db.tours[idx] : null;
+        if (isMember) tour={...(existing||{}),...tour,id:tour.id||`tour-${Date.now()}`,ownerType:'MEMBER',ownerId:String(session.memberId||''),ownerName:session.name||tour.ownerName||'Anggota Saka Pariwisata',authorMemberId:String(session.memberId||''),authorName:session.name||tour.authorName||'Anggota Saka Pariwisata',krida:tour.krida||existing?.krida||'Krida Pemandu',status:'SUBMITTED',adminApprovalStatus:'PENDING',superAdminApprovalStatus:'PENDING',submittedAt:existing?.submittedAt||now,publishedAt:undefined,reviewedBy:undefined,rejectionReason:undefined}; else tour={...(existing||{}),...tour};
+        const ti=db.tours.findIndex(t=>t.id===tour.id); if(ti>=0) db.tours[ti]=tour; else db.tours.unshift(tour);
+        await forwardMutation({action:'UPSERT_ROW',sheet:'Paket_Wisata',id:tour.id,rowData:rowForTour(tour)});
+      } else if (['APPROVE_ADMIN','APPROVE_SUPER_ADMIN','REJECT'].includes(action)) {
+        const idx=db.tours.findIndex(t=>t.id===tour.id); if(idx<0)return res.status(404).json({success:false,message:'Posting wisata tidak ditemukan.'}); const current=db.tours[idx];
+        if(action==='APPROVE_ADMIN' && !contentBelongsToAdminJurisdiction(current, session)) return res.status(403).json({success:false,message:'Posting ini berada di luar wilayah kewenangan Admin Anda.'});
+        if(action==='APPROVE_ADMIN'){current.adminApprovalStatus='APPROVED';current.adminApprovedAt=now;current.adminApprovedBy=session.name||session.username||'Admin';current.status='SUBMITTED';}
+        else if(action==='APPROVE_SUPER_ADMIN'){if(current.adminApprovalStatus!=='APPROVED')return res.status(409).json({success:false,message:'Konten belum disetujui Admin.'});current.superAdminApprovalStatus='APPROVED';current.superAdminApprovedAt=now;current.superAdminApprovedBy=session.name||session.username||'Super Admin';current.status='APPROVED_PUBLISHED';current.publishedAt=now;current.reviewedBy=current.superAdminApprovedBy;current.rejectionReason=undefined;}
+        else{current.status='REJECTED';current.rejectionReason=String(payload.rejectionReason||'Posting ditolak oleh reviewer.');current.reviewedBy=session.name||session.username||'Reviewer';if(isSuperAdmin)current.superAdminApprovalStatus='REJECTED';else current.adminApprovalStatus='REJECTED';}
+        await forwardMutation({action:'UPSERT_ROW',sheet:'Paket_Wisata',id:current.id,rowData:rowForTour(current)}); tour=current;
+      } else if(action==='DELETE'){db.tours=db.tours.filter(t=>t.id!==payload.id);await forwardMutation({action:'DELETE_ROW',sheet:'Paket_Wisata',id:payload.id});}
     } else if (type === 'CULINARY') {
-      const item = payload;
-      if (action === 'CREATE' || action === 'UPDATE') {
-        const idx = db.culinaryItems.findIndex(c => c.id === item.id);
-        if (idx !== -1) {
-          db.culinaryItems[idx] = { ...db.culinaryItems[idx], ...item };
-        } else {
-          db.culinaryItems.unshift(item);
-        }
-        forwardMutation({
-          action: 'UPSERT_ROW',
-          sheet: 'Kuliner_Cinderamata',
-          id: item.id,
-          rowData: [
-            item.id,
-            item.name,
-            item.kind,
-            item.krida,
-            item.priceEstimate,
-            item.authorName,
-            item.contactPhone,
-            item.provinceName,
-            item.regencyName,
-            item.imageUrl,
-            item.categoryLabel || 'Produk UMKM Saka Pariwisata',
-            new Date().toISOString()
-          ]
-        });
-      } else if (action === 'DELETE') {
-        db.culinaryItems = db.culinaryItems.filter(c => c.id !== payload.id);
-        forwardMutation({
-          action: 'DELETE_ROW',
-          sheet: 'Kuliner_Cinderamata',
-          id: payload.id
-        });
-      }
+      let item={...(payload||{})}; const now=new Date().toISOString(); const isMember=session?.role==='MEMBER';
+      const rowForCulinary=(x:any)=>[x.id,x.name||'',x.kind||'KULINER',x.krida||'Krida Kuliner & Cinderamata',x.priceEstimate||0,x.authorName||'',x.contactPhone||'',x.provinceName||'',x.regencyName||'',x.imageUrl||'',x.categoryLabel||'',x.description||'',x.kridaCategory||'',x.authorMemberId||'',x.authorNta||'',x.districtId||'',x.districtName||'',x.address||'',x.contactEmail||'',JSON.stringify(x.galleryImages||[]),JSON.stringify(x.tags||[]),x.adminApprovalStatus||'PENDING',x.adminApprovedAt||'',x.adminApprovedBy||'',x.superAdminApprovalStatus||'PENDING',x.superAdminApprovedAt||'',x.superAdminApprovedBy||'',x.status||'PENDING_APPROVAL',x.submittedAt||now,x.createdAt||now,x.rejectionReason||'',x.featured?'TRUE':'FALSE',now];
+      if(action==='CREATE'||action==='UPDATE'){const idx=db.culinaryItems.findIndex(c=>c.id===item.id);const existing=idx>=0?db.culinaryItems[idx]:null;if(isMember)item={...(existing||{}),...item,id:item.id||`culinary-${Date.now()}`,authorMemberId:String(session.memberId||''),authorName:session.name||item.authorName||'Anggota Saka Pariwisata',authorRole:'MEMBER',status:'PENDING_APPROVAL',adminApprovalStatus:'PENDING',superAdminApprovalStatus:'PENDING',submittedAt:existing?.submittedAt||now,rejectionReason:undefined};else item={...(existing||{}),...item};const ti=db.culinaryItems.findIndex(c=>c.id===item.id);if(ti>=0)db.culinaryItems[ti]=item;else db.culinaryItems.unshift(item);await forwardMutation({action:'UPSERT_ROW',sheet:'Kuliner_Cinderamata',id:item.id,rowData:rowForCulinary(item)});}
+      else if(['APPROVE_ADMIN','APPROVE_SUPER_ADMIN','REJECT'].includes(action)){const idx=db.culinaryItems.findIndex(c=>c.id===item.id);if(idx<0)return res.status(404).json({success:false,message:'Posting kuliner/cinderamata tidak ditemukan.'});const current=db.culinaryItems[idx];if(action==='APPROVE_ADMIN' && !contentBelongsToAdminJurisdiction(current, session)) return res.status(403).json({success:false,message:'Posting ini berada di luar wilayah kewenangan Admin Anda.'});if(action==='APPROVE_ADMIN'){current.adminApprovalStatus='APPROVED';current.adminApprovedAt=now;current.adminApprovedBy=session.name||session.username||'Admin';current.status='PENDING_APPROVAL';}else if(action==='APPROVE_SUPER_ADMIN'){if(current.adminApprovalStatus!=='APPROVED')return res.status(409).json({success:false,message:'Konten belum disetujui Admin.'});current.superAdminApprovalStatus='APPROVED';current.superAdminApprovedAt=now;current.superAdminApprovedBy=session.name||session.username||'Super Admin';current.status='APPROVED';current.approvedAt=now;current.approvedBy=current.superAdminApprovedBy;current.approverRole='SUPER_ADMIN';current.rejectionReason=undefined;}else{current.status='REJECTED';current.rejectionReason=String(payload.rejectionReason||'Posting ditolak oleh reviewer.');if(isSuperAdmin)current.superAdminApprovalStatus='REJECTED';else current.adminApprovalStatus='REJECTED';}await forwardMutation({action:'UPSERT_ROW',sheet:'Kuliner_Cinderamata',id:current.id,rowData:rowForCulinary(current)});item=current;}
+      else if(action==='DELETE'){db.culinaryItems=db.culinaryItems.filter(c=>c.id!==payload.id);await forwardMutation({action:'DELETE_ROW',sheet:'Kuliner_Cinderamata',id:payload.id});}
     } else if (type === 'ACTIVITY') {
       const act = payload;
       if (action === 'CREATE' || action === 'UPDATE') {
