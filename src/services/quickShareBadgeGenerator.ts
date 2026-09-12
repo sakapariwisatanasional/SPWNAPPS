@@ -1,865 +1,478 @@
-import jsPDF from 'jspdf';
-import QRCode from 'qrcode';
-import { Member } from '../types';
-import { 
-  SAKA_LOGO_URL, 
-  SAKA_LOGO_DRIVE_DIRECT_URL,
-  SAKA_CARD_BG_DRIVE_DIRECT_URL,
-  SAKA_CARD_BG_FALLBACK_URL,
-  formatDriveImageUrl,
-  getDriveDirectFallbackUrl
-} from '../components/common/SakaLogo';
-import { getMemberVerificationUrl } from '../components/member/KtaQrCode';
+import { Member, UserRole } from '../types';
+import { storage } from './storage';
+import { spreadsheetService } from './spreadsheetService';
+import { formatDriveImageUrl } from '../components/common/SakaLogo';
 
-export type BadgeTheme = 'purple_gold' | 'emerald_pesona' | 'midnight_slate' | 'clean_white';
-export type BadgeFormat = 'VERTICAL_LANYARD' | 'HORIZONTAL_CARD';
-
-export interface BadgeOptions {
-  theme: BadgeTheme;
-  format: BadgeFormat;
-  eventName?: string;
-  showContactPhone?: boolean;
-  showEmail?: boolean;
-  showSkills?: boolean;
-  showKwartirDetails?: boolean;
+export interface VerificationResult {
+  found: boolean;
+  member: Member | null;
+  source: 'LOCAL' | 'GOOGLE_SPREADSHEET' | 'NONE';
+  searchTerm: string;
+  normalizedTerm: string;
+  message?: string;
 }
 
-export const DEFAULT_BADGE_OPTIONS: BadgeOptions = {
-  theme: 'purple_gold',
-  format: 'VERTICAL_LANYARD',
-  eventName: 'Saka Pariwisata • Networking & Event Pass',
-  showContactPhone: true,
-  showEmail: true,
-  showSkills: true,
-  showKwartirDetails: true,
-};
-
 /**
- * Dimensions for badge rendering (High resolution for crisp printing)
+ * Pembersih dan penormalisasi kueri pencarian NTA/Barcode/URL
  */
-const VERTICAL_WIDTH = 900;
-const VERTICAL_HEIGHT = 1400;
+export function normalizeNtaQuery(rawInput: string): {
+  cleanQuery: string;
+  strippedDigits: string;
+  isUrl: boolean;
+  extractedQuery: string;
+  verifyId?: string;
+  memberId?: string;
+  candidates?: string[];
+} {
+  if (!rawInput) {
+    return { cleanQuery: '', strippedDigits: '', isUrl: false, extractedQuery: '', candidates: [] };
+  }
 
-const HORIZONTAL_WIDTH = 1200;
-const HORIZONTAL_HEIGHT = 750;
+  const text = String(rawInput).trim();
+  let isUrl = false;
+  let extractedQuery = text;
+  let verifyId = '';
+  let memberId = '';
+  const candidates: string[] = [];
 
-/**
- * Safely load an image from URL
- */
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve) => {
-    if (!src) {
-      resolve(new Image());
-      return;
-    }
+  const push = (value: string | null | undefined) => {
+    const v = String(value || '').trim();
+    if (v && !candidates.some(c => c.toLowerCase() === v.toLowerCase())) candidates.push(v);
+  };
 
-    const primaryUrl = formatDriveImageUrl(src) || src;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => {
-      const fallbackUrl = getDriveDirectFallbackUrl(src);
-      if (fallbackUrl && fallbackUrl !== primaryUrl) {
-        const fallbackImg = new Image();
-        fallbackImg.crossOrigin = 'anonymous';
-        fallbackImg.onload = () => resolve(fallbackImg);
-        fallbackImg.onerror = () => {
-          const rawImg = new Image();
-          rawImg.onload = () => resolve(rawImg);
-          rawImg.onerror = () => resolve(rawImg);
-          rawImg.src = fallbackUrl;
-        };
-        fallbackImg.src = fallbackUrl;
-      } else if (img.crossOrigin) {
-        const retryImg = new Image();
-        retryImg.onload = () => resolve(retryImg);
-        retryImg.onerror = () => resolve(retryImg);
-        retryImg.src = primaryUrl;
-      } else {
-        resolve(img);
+  // QR lama dan QR baru sama-sama didukung:
+  // /?verifyId=...
+  // /verify?verifyId=...&memberId=...
+  // /verify/...
+  try {
+    if (/^https?:\/\//i.test(text)) {
+      const urlObj = new URL(text);
+      isUrl = true;
+      verifyId = String(
+        urlObj.searchParams.get('verifyId') ||
+        urlObj.searchParams.get('nta') ||
+        urlObj.searchParams.get('kta') ||
+        ''
+      ).trim();
+      memberId = String(
+        urlObj.searchParams.get('memberId') ||
+        urlObj.searchParams.get('id') ||
+        ''
+      ).trim();
+
+      push(verifyId);
+      push(memberId);
+
+      if (!verifyId && !memberId && urlObj.pathname.includes('/verify/')) {
+        push(decodeURIComponent(urlObj.pathname.split('/verify/')[1]?.split('?')[0] || '').trim());
       }
+
+      extractedQuery = candidates[0] || text;
+    } else if (/verifyId=/i.test(text) || /memberId=/i.test(text)) {
+      isUrl = true;
+      const queryString = text.includes('?') ? text.split('?')[1] : text;
+      const params = new URLSearchParams(queryString);
+      verifyId = String(params.get('verifyId') || params.get('nta') || params.get('kta') || '').trim();
+      memberId = String(params.get('memberId') || params.get('id') || '').trim();
+      push(verifyId);
+      push(memberId);
+      extractedQuery = candidates[0] || text;
+    } else {
+      push(text);
+    }
+  } catch {
+    push(text);
+  }
+
+  const cleanQuery = (extractedQuery || candidates[0] || text)
+    .replace(/^['"`]+|['"`]+$/g, '')
+    .trim();
+  const strippedDigits = cleanQuery.replace(/\D/g, '');
+
+  // Pastikan semua identitas QR tersedia bagi verifier authoritative.
+  if (verifyId) push(verifyId);
+  if (memberId) push(memberId);
+
+  return {
+    cleanQuery,
+    strippedDigits,
+    isUrl,
+    extractedQuery,
+    verifyId: verifyId || undefined,
+    memberId: memberId || undefined,
+    candidates
+  };
+}
+
+/**
+ * Memeriksa kecocokan anggota dengan berbagai variasi format (dengan/tanpa titik, token, nama, ID)
+ */
+function normalizeIdentity(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase().replace(/^['"`]+|['"`]+$/g, '');
+}
+
+function normalizeKtaDigits(value: unknown): string {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  // Google Sheets kadang mengembalikan Nomor KTA sebagai angka sehingga
+  // 00.00.00.000001 bisa terbaca sebagai 1. Hilangkan leading zero hanya
+  // untuk membandingkan representasi numerik KTA.
+  return digits.replace(/^0+(?=\d)/, '');
+}
+
+export function isMemberMatch(member: Member, cleanQuery: string, strippedDigits: string): boolean {
+  if (!member) return false;
+
+  const query = normalizeIdentity(cleanQuery);
+  const queryDigits = normalizeKtaDigits(strippedDigits || cleanQuery);
+
+  // 1. Nomor KTA/NTA — dukung data lama yang tersimpan sebagai angka.
+  if (member.nationalMemberNumber) {
+    const nta = normalizeIdentity(member.nationalMemberNumber);
+    if (nta === query) return true;
+
+    const ntaDigits = normalizeKtaDigits(member.nationalMemberNumber);
+    if (queryDigits && ntaDigits && ntaDigits === queryDigits) return true;
+
+    // Kompatibilitas dengan QR yang hanya membawa beberapa digit terakhir.
+    if (queryDigits.length >= 4 && ntaDigits.endsWith(queryDigits)) return true;
+    if (query.length >= 4 && nta.endsWith(query)) return true;
+  }
+
+  // 2. Verification token
+  if (member.verificationToken) {
+    const token = normalizeIdentity(member.verificationToken);
+    if (token === query) return true;
+    if (query.length >= 5 && token.includes(query)) return true;
+  }
+
+  // 3. ID anggota dan User ID
+  if (normalizeIdentity(member.id) === query) return true;
+  if (normalizeIdentity(member.userId) === query) return true;
+
+  // 4. NIK
+  if (member.nikMasked && member.nikMasked.replace(/\D/g, '').length >= 6 && queryDigits.length >= 6) {
+    const nikDigits = member.nikMasked.replace(/\D/g, '');
+    if (nikDigits.includes(queryDigits) || queryDigits.includes(nikDigits)) return true;
+  }
+
+  // 5. WhatsApp
+  if (member.phone && queryDigits.length >= 8) {
+    const phoneDigits = member.phone.replace(/\D/g, '');
+    if (phoneDigits.endsWith(queryDigits) || queryDigits.endsWith(phoneDigits)) return true;
+  }
+
+  // 6. Email
+  if (member.email && normalizeIdentity(member.email) === query) return true;
+
+  // 7. Nama
+  if (member.fullName) {
+    const name = normalizeIdentity(member.fullName);
+    if (name === query) return true;
+    if (query.length >= 4 && (name.includes(query) || query.includes(name))) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Cari anggota di database lokal React / localStorage
+ */
+export function searchMemberLocally(rawInput: string, memberList?: Member[]): Member | null {
+  const { cleanQuery, strippedDigits } = normalizeNtaQuery(rawInput);
+  if (!cleanQuery && !strippedDigits) return null;
+
+  const members = memberList && memberList.length > 0 ? memberList : storage.getMembers();
+
+  for (const m of members) {
+    if (isMemberMatch(m, cleanQuery, strippedDigits)) {
+      return m;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Cari anggota secara live ke Google Spreadsheet
+ */
+export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise<Member | null> {
+  const parsed = normalizeNtaQuery(rawInput);
+  const queryCandidates = [...(parsed.candidates || []), parsed.cleanQuery]
+    .map(v => String(v || '').trim())
+    .filter(Boolean)
+    .filter((v, i, arr) => arr.findIndex(x => x.toLowerCase() === v.toLowerCase()) === i);
+
+  if (queryCandidates.length === 0) return null;
+
+  try {
+    // Anggota adalah sumber profil KTA. Users hanya dipakai sebagai tabel
+    // relasi tambahan: Users.Member ID -> Anggota.ID.
+    const [rows, userRows] = await Promise.all([
+      spreadsheetService.fetchSheetRows('Anggota'),
+      spreadsheetService.fetchSheetRows('Users').catch(() => [])
+    ]);
+
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+
+    const getVal = (row: Record<string, any>, aliases: string[]): string => {
+      for (const a of aliases) {
+        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== '') {
+          return String(row[a]).trim();
+        }
+      }
+      const keys = Object.keys(row);
+      for (const a of aliases) {
+        const cleanA = a.toLowerCase().replace(/[^a-z0-9]/g, '');
+        for (const k of keys) {
+          const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanK === cleanA) {
+            const v = row[k];
+            if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+          }
+        }
+      }
+      return '';
     };
-    img.src = primaryUrl;
-  });
-}
 
-/**
- * Generate QR code data URL
- */
-async function generateQrDataUrl(text: string, darkColor = '#1e0842', lightColor = '#ffffff'): Promise<string> {
-  try {
-    return await QRCode.toDataURL(text, {
-      width: 512,
-      margin: 1,
-      errorCorrectionLevel: 'H',
-      color: {
-        dark: darkColor,
-        light: lightColor
+    const parseRole = (roleStr?: string): UserRole => {
+      if (!roleStr) return 'MEMBER';
+      const r = roleStr.toUpperCase().replace(/\s+/g, '_');
+      if (r.includes('SUPER') || r.includes('NASIONAL') || r.includes('PIMPINAN_NASIONAL') || r === 'SUPER_ADMIN') return 'SUPER_ADMIN';
+      if (r.includes('KWARDA') || r.includes('PROVINSI') || r === 'ADMIN_PROVINCE') return 'ADMIN_PROVINCE';
+      if (r.includes('KWARCAB') || r.includes('KABUPATEN') || r.includes('KOTA') || r === 'ADMIN_REGENCY') return 'ADMIN_REGENCY';
+      if (r.includes('KWARRAN') || r.includes('RANTING') || r.includes('KECAMATAN') || r === 'ADMIN_BRANCH') return 'ADMIN_BRANCH';
+      return 'MEMBER';
+    };
+
+    // Bangun relasi User ID / Member ID -> Member ID.
+    const userLinkedMemberIds = new Set<string>();
+    if (Array.isArray(userRows)) {
+      for (const userRow of userRows) {
+        const userId = getVal(userRow, ['ID', 'ID User', 'User ID', 'id_user', 'userId', 'col_0']);
+        const linkedMemberId = getVal(userRow, ['Member ID', 'member_id', 'memberId', 'ID Anggota', 'ID Member', 'col_9']);
+        if (!userId && !linkedMemberId) continue;
+
+        for (const candidate of queryCandidates) {
+          const c = normalizeIdentity(candidate);
+          if (
+            (userId && normalizeIdentity(userId) === c) ||
+            (linkedMemberId && normalizeIdentity(linkedMemberId) === c)
+          ) {
+            if (linkedMemberId) userLinkedMemberIds.add(linkedMemberId);
+            // Jika QR lama ternyata membawa ID anggota yang sama dengan User.ID,
+            // tetap simpan linked ID bila tersedia.
+            if (!linkedMemberId && userId) userLinkedMemberIds.add(userId);
+          }
+        }
       }
-    });
-  } catch (err) {
-    console.error('QR generation error:', err);
-    return '';
-  }
-}
-
-/**
- * Load official Saka Logo
- */
-async function loadSakaLogo(): Promise<HTMLImageElement> {
-  try {
-    const localImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => (img.naturalWidth > 0 ? resolve(img) : reject(new Error('Empty')));
-      img.onerror = () => reject(new Error('Failed'));
-      img.src = SAKA_LOGO_URL;
-    });
-    return localImg;
-  } catch {
-    try {
-      const driveImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => (img.naturalWidth > 0 ? resolve(img) : reject(new Error('Empty')));
-        img.onerror = () => reject(new Error('Failed'));
-        img.src = SAKA_LOGO_DRIVE_DIRECT_URL;
-      });
-      return driveImg;
-    } catch {
-      return new Image();
     }
-  }
-}
 
-/**
- * Load background watermark
- */
-async function loadBgImage(): Promise<HTMLImageElement | null> {
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve) => {
-      const el = new Image();
-      el.crossOrigin = 'anonymous';
-      el.onload = () => resolve(el);
-      el.onerror = () => {
-        const retry = new Image();
-        retry.onload = () => resolve(retry);
-        retry.onerror = () => resolve(el);
-        retry.src = SAKA_CARD_BG_FALLBACK_URL;
+    const matchRow = (row: Record<string, any>): boolean => {
+      const id = getVal(row, ['ID', 'id', 'Id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']);
+      const kta = getVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_1']);
+      const token = getVal(row, ['Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'Verification Token', 'Token']);
+      const link = getVal(row, ['Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'col_13']);
+
+      for (const candidate of queryCandidates) {
+        const temp: Partial<Member> = {
+          id,
+          userId: id,
+          nationalMemberNumber: kta || undefined,
+          verificationToken: token || link || undefined
+        };
+        if (isMemberMatch(temp as Member, candidate, candidate.replace(/\D/g, ''))) return true;
+        if (id && normalizeIdentity(id) === normalizeIdentity(candidate)) return true;
+        if (kta && normalizeKtaDigits(kta) === normalizeKtaDigits(candidate)) return true;
+      }
+
+      if (id && [...userLinkedMemberIds].some(uid => normalizeIdentity(uid) === normalizeIdentity(id))) {
+        return true;
+      }
+
+      return false;
+    };
+
+    for (let idx = 0; idx < rows.length; idx++) {
+      const row = rows[idx];
+      if (!row || typeof row !== 'object') continue;
+      if (!matchRow(row)) continue;
+
+      const fullName = getVal(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'nama', 'Full Name', 'Name', 'col_2']) || `Anggota ${idx + 1}`;
+      const kta = getVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_1']);
+      const email = getVal(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_3']);
+      const phone = getVal(row, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'col_4']);
+      const memberId = getVal(row, ['ID', 'id', 'Id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']) || `sheet-member-${idx}`;
+      const prov = getVal(row, ['Provinsi', 'Kwarda', 'provinsi', 'col_5']) || 'Tingkat Nasional';
+      const kab = getVal(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'Kabupaten', 'Kota', 'col_6']) || 'Kwartir Nasional';
+      const kec = getVal(row, ['Kecamatan', 'Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'kecamatan_ranting', 'Ranting', 'col_7']) || 'Pimpinan Nasional';
+      const jabatan = getVal(row, ['Jabatan', 'Gudep', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi', 'col_8']);
+      const krida = getVal(row, ['Krida', 'krida', 'Peminatan Krida', 'col_9']) || 'Krida Pemandu';
+      const roleStr = getVal(row, ['Role', 'Peran', 'Hak Akses', 'Wewenang']);
+      const role = parseRole(roleStr || jabatan);
+      const rawFoto = getVal(row, ['Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Photo', 'Avatar', 'Link Foto', 'col_11']);
+      const avatarUrl = formatDriveImageUrl(rawFoto) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
+      const rawStatus = getVal(row, ['Status', 'status', 'Status Keanggotaan', 'col_10']).toUpperCase();
+
+      const linkedUser = Array.isArray(userRows)
+        ? userRows.find((u: any) => {
+            const uid = getVal(u, ['ID', 'ID User', 'User ID', 'id_user', 'userId', 'col_0']);
+            const mid = getVal(u, ['Member ID', 'member_id', 'memberId', 'ID Anggota', 'ID Member', 'col_9']);
+            return normalizeIdentity(mid) === normalizeIdentity(memberId) || normalizeIdentity(uid) === normalizeIdentity(memberId);
+          })
+        : null;
+
+      const tempMember: Member = {
+        id: memberId,
+        userId: linkedUser
+          ? getVal(linkedUser, ['ID', 'ID User', 'User ID', 'id_user', 'userId', 'col_0'])
+          : `user-${memberId}`,
+        nationalMemberNumber: kta || undefined,
+        fullName,
+        nikMasked: getVal(row, ['NIK', 'NIK Masked', 'nik_masked', 'col_nik']) || '3201**********01',
+        avatarUrl,
+        gender: (getVal(row, ['Jenis Kelamin', 'Gender', 'gender']) || 'LAKI_LAKI').toUpperCase().includes('PEREMPUAN') ? 'PEREMPUAN' : 'LAKI_LAKI',
+        birthPlace: getVal(row, ['Tempat Lahir', 'Birth Place']) || 'Indonesia',
+        birthDate: getVal(row, ['Tanggal Lahir', 'Birth Date']) || '2000-01-01',
+        email,
+        phone,
+        address: `${kec}, ${kab}, ${prov}`,
+        provinceId: '00',
+        provinceName: prov,
+        regencyId: '00.00',
+        regencyName: kab,
+        districtId: '00.00.00',
+        districtName: kec,
+        currentPosition: jabatan || (role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`),
+        krida: krida as any,
+        joinYear: new Date().getFullYear(),
+        educationLevel: 'SMA/SMK',
+        occupation: 'Pramuka Pariwisata',
+        bio: 'Anggota resmi Saka Pariwisata. Terverifikasi dari database Google Spreadsheet.',
+        status: rawStatus === 'PENDING' ? 'PENDING' : rawStatus === 'ACTIVE' ? 'ACTIVE' : (rawStatus as any) || 'ACTIVE',
+        registeredAt: getVal(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_12']) || new Date().toISOString(),
+        verificationToken: getVal(row, ['Verification Token', 'Token', 'Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'col_13']) || `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
+        isOperator: role !== 'MEMBER',
+        operatorRole: role !== 'MEMBER' ? role : undefined,
+        skills: [],
+        certifications: [],
+        locationHistory: []
       };
-      el.src = formatDriveImageUrl(SAKA_CARD_BG_DRIVE_DIRECT_URL);
-    });
-    return img;
-  } catch {
+
+      storage.addOrUpdateMember(tempMember);
+      return tempMember;
+    }
+  } catch (err) {
+    console.error('Live remote spreadsheet lookup failed:', err);
     return null;
   }
+
+  return null;
 }
-
 /**
- * Draw rounded rectangle path helper
+ * Fungsi Utama: Verifikasi Anggota Multi-Tier (Lokal + Cloud Google Spreadsheet)
  */
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number
-) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-}
+export async function verifyMemberUniversal(
+  rawInput: string,
+  localMembers?: Member[],
+  options?: { authoritativeRemote?: boolean }
+): Promise<VerificationResult> {
+  const { cleanQuery, strippedDigits } = normalizeNtaQuery(rawInput);
+  const authoritativeRemote = options?.authoritativeRemote === true;
 
-/**
- * Get Color Palette for theme
- */
-function getBadgePalette(theme: BadgeTheme) {
-  switch (theme) {
-    case 'emerald_pesona':
-      return {
-        bgGradient: ['#022c22', '#064e3b', '#0f172a'],
-        accent: '#34d399',
-        accentLight: '#a7f3d0',
-        cardBg: 'rgba(6, 78, 59, 0.75)',
-        border: 'rgba(52, 211, 153, 0.4)',
-        headerBg: '#047857',
-        headerText: '#ffffff',
-        gold: '#fbbf24',
-        textLight: '#f0fdf4',
-        textMuted: '#99f6e4',
-        qrDark: '#022c22',
-        badgePillBg: '#059669',
-        badgePillText: '#ffffff',
-        strapHole: '#022c22',
-        isLight: false
-      };
-    case 'midnight_slate':
-      return {
-        bgGradient: ['#0f172a', '#1e293b', '#020617'],
-        accent: '#94a3b8',
-        accentLight: '#e2e8f0',
-        cardBg: 'rgba(30, 41, 59, 0.75)',
-        border: 'rgba(148, 163, 184, 0.35)',
-        headerBg: '#334155',
-        headerText: '#ffffff',
-        gold: '#38bdf8',
-        textLight: '#f8fafc',
-        textMuted: '#cbd5e1',
-        qrDark: '#0f172a',
-        badgePillBg: '#475569',
-        badgePillText: '#ffffff',
-        strapHole: '#020617',
-        isLight: false
-      };
-    case 'clean_white':
-      return {
-        bgGradient: ['#f8fafc', '#f1f5f9', '#e2e8f0'],
-        accent: '#7c3aed',
-        accentLight: '#6d28d9',
-        cardBg: 'rgba(255, 255, 255, 0.95)',
-        border: 'rgba(124, 58, 237, 0.25)',
-        headerBg: '#2e1065',
-        headerText: '#ffffff',
-        gold: '#b45309',
-        textLight: '#0f172a',
-        textMuted: '#475569',
-        qrDark: '#1e0842',
-        badgePillBg: '#ede9fe',
-        badgePillText: '#5b21b6',
-        strapHole: '#cbd5e1',
-        isLight: true
-      };
-    case 'purple_gold':
-    default:
-      return {
-        bgGradient: ['#1e0842', '#3b0764', '#0f172a'],
-        accent: '#d8b4fe',
-        accentLight: '#f3e8ff',
-        cardBg: 'rgba(59, 7, 100, 0.75)',
-        border: 'rgba(192, 132, 252, 0.4)',
-        headerBg: '#581c87',
-        headerText: '#ffffff',
-        gold: '#fbbf24',
-        textLight: '#faf5ff',
-        textMuted: '#e9d5ff',
-        qrDark: '#1e0842',
-        badgePillBg: '#7e22ce',
-        badgePillText: '#ffffff',
-        strapHole: '#0f0521',
-        isLight: false
-      };
-  }
-}
-
-/**
- * Render Vertical Lanyard Event Badge onto HTML5 Canvas
- */
-export async function renderVerticalLanyardCanvas(
-  member: Member,
-  options: BadgeOptions = DEFAULT_BADGE_OPTIONS
-): Promise<HTMLCanvasElement> {
-  const canvas = document.createElement('canvas');
-  canvas.width = VERTICAL_WIDTH;
-  canvas.height = VERTICAL_HEIGHT;
-  const ctx = canvas.getContext('2d')!;
-
-  const palette = getBadgePalette(options.theme);
-  const nta = member.nationalMemberNumber || member.verificationToken || member.id;
-  const verificationUrl = getMemberVerificationUrl(member);
-
-  // Load assets in parallel
-  const [avatarImg, logoImg, bgImg, qrDataUrl] = await Promise.all([
-    loadImage(member.avatarUrl),
-    loadSakaLogo(),
-    loadBgImage(),
-    generateQrDataUrl(verificationUrl, palette.qrDark, '#ffffff')
-  ]);
-
-  const qrImg = await loadImage(qrDataUrl);
-
-  // 1. Clip Rounded Outer Badge
-  roundRect(ctx, 0, 0, VERTICAL_WIDTH, VERTICAL_HEIGHT, 44);
-  ctx.clip();
-
-  // 2. Background Gradient
-  const grad = ctx.createLinearGradient(0, 0, VERTICAL_WIDTH, VERTICAL_HEIGHT);
-  grad.addColorStop(0, palette.bgGradient[0]);
-  grad.addColorStop(0.5, palette.bgGradient[1]);
-  grad.addColorStop(1, palette.bgGradient[2]);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, VERTICAL_WIDTH, VERTICAL_HEIGHT);
-
-  // 2b. Background Watermark Artwork
-  if (bgImg && (bgImg.naturalWidth > 0 || bgImg.width > 0)) {
-    ctx.save();
-    ctx.globalAlpha = palette.isLight ? 0.05 : 0.08;
-    ctx.drawImage(bgImg, 0, 0, VERTICAL_WIDTH, VERTICAL_HEIGHT);
-    ctx.restore();
+  if (!cleanQuery && !strippedDigits) {
+    return {
+      found: false,
+      member: null,
+      source: 'NONE',
+      searchTerm: rawInput,
+      normalizedTerm: '',
+      message: 'Silakan masukkan nomor anggota atau token verifikasi.'
+    };
   }
 
-  // 2c. Outer Border
-  ctx.strokeStyle = palette.border;
-  ctx.lineWidth = 6;
-  roundRect(ctx, 3, 3, VERTICAL_WIDTH - 6, VERTICAL_HEIGHT - 6, 44);
-  ctx.stroke();
-
-  // 3. Realistic Lanyard Slot / Punch Hole at Top
-  const strapSlotW = 160;
-  const strapSlotH = 22;
-  const strapSlotX = (VERTICAL_WIDTH - strapSlotW) / 2;
-  const strapSlotY = 28;
-
-  ctx.fillStyle = palette.strapHole;
-  roundRect(ctx, strapSlotX, strapSlotY, strapSlotW, strapSlotH, 11);
-  ctx.fill();
-  ctx.strokeStyle = palette.border;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // 4. Header Section: Event & Organization Title Banner
-  const headerTopY = 70;
-  
-  // Header background pill
-  ctx.fillStyle = palette.cardBg;
-  roundRect(ctx, 40, headerTopY, VERTICAL_WIDTH - 80, 110, 24);
-  ctx.fill();
-  ctx.strokeStyle = palette.border;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Logo on Left
-  if (logoImg.complete && logoImg.naturalWidth > 0) {
-    ctx.drawImage(logoImg, 64, headerTopY + 16, 78, 78);
-  }
-
-  // Title Texts
-  ctx.textAlign = 'left';
-  ctx.fillStyle = palette.gold;
-  ctx.font = 'bold 15px "Inter", sans-serif';
-  ctx.fillText(
-    (options.eventName || 'SAKA PARIWISATA • EVENT PASS').toUpperCase(),
-    160,
-    headerTopY + 42
-  );
-
-  ctx.fillStyle = palette.isLight ? '#1e0842' : '#ffffff';
-  ctx.font = '900 24px "Inter", -apple-system, sans-serif';
-  ctx.fillText('SATUAN KARYA PRAMUKA PARIWISATA', 160, headerTopY + 72);
-
-  ctx.fillStyle = palette.accent;
-  ctx.font = 'bold 13px "Inter", sans-serif';
-  ctx.fillText('KWARTIR NASIONAL GERAKAN PRAMUKA INDONESIA', 160, headerTopY + 95);
-
-  // 5. Member Profile Section (Avatar + Name + Position)
-  const profileCenterY = 320;
-
-  // Avatar Ring & Image
-  const avatarSize = 210;
-  const avatarX = (VERTICAL_WIDTH - avatarSize) / 2;
-  const avatarY = 205;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
-  ctx.clip();
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(avatarX, avatarY, avatarSize, avatarSize);
-
-  if (avatarImg.complete && avatarImg.width > 0) {
-    ctx.drawImage(avatarImg, avatarX, avatarY, avatarSize, avatarSize);
-  }
-  ctx.restore();
-
-  // Avatar Circular Golden/Accent Border
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
-  ctx.strokeStyle = palette.gold;
-  ctx.lineWidth = 6;
-  ctx.stroke();
-
-  // Verified Badge on Avatar
-  const badgeRadius = 24;
-  const badgeX = avatarX + avatarSize - 18;
-  const badgeY = avatarY + avatarSize - 18;
-  ctx.beginPath();
-  ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
-  ctx.fillStyle = '#10b981';
-  ctx.fill();
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 22px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('✓', badgeX, badgeY + 8);
-
-  // Full Name
-  ctx.textAlign = 'center';
-  ctx.fillStyle = palette.isLight ? '#0f172a' : '#ffffff';
-  ctx.font = '900 36px "Inter", -apple-system, sans-serif';
-  ctx.fillText(member.fullName.toUpperCase(), VERTICAL_WIDTH / 2, 470, VERTICAL_WIDTH - 100);
-
-  // Position / Role Badge Pill
-  const roleText = (member.currentPosition || 'ANGGOTA SAKA PARIWISATA').toUpperCase();
-  ctx.font = 'bold 16px "Inter", sans-serif';
-  const roleWidth = Math.max(220, ctx.measureText(roleText).width + 50);
-  const roleX = (VERTICAL_WIDTH - roleWidth) / 2;
-
-  ctx.fillStyle = palette.badgePillBg;
-  roundRect(ctx, roleX, 492, roleWidth, 38, 19);
-  ctx.fill();
-  ctx.strokeStyle = palette.border;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  ctx.fillStyle = palette.badgePillText;
-  ctx.fillText(roleText, VERTICAL_WIDTH / 2, 517);
-
-  // 6. NTA (Nomor Tanda Anggota) Box - Very Prominent
-  const ntaBoxW = VERTICAL_WIDTH - 120;
-  const ntaBoxH = 88;
-  const ntaBoxX = 60;
-  const ntaBoxY = 550;
-
-  ctx.fillStyle = palette.cardBg;
-  roundRect(ctx, ntaBoxX, ntaBoxY, ntaBoxW, ntaBoxH, 20);
-  ctx.fill();
-  ctx.strokeStyle = palette.gold;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = palette.gold;
-  ctx.font = 'bold 12px "Inter", sans-serif';
-  ctx.fillText('NOMOR TANDA ANGGOTA NASIONAL (NTA)', VERTICAL_WIDTH / 2, ntaBoxY + 28);
-
-  ctx.fillStyle = palette.isLight ? '#1e0842' : '#ffffff';
-  ctx.font = 'bold 30px "Courier New", monospace';
-  ctx.fillText(nta, VERTICAL_WIDTH / 2, ntaBoxY + 66);
-
-  // 7. Kwartir & Krida Details
-  let currentY = 660;
-
-  if (options.showKwartirDetails) {
-    const kwartirText = `${member.regencyName ? `Kwarcab ${member.regencyName}` : ''} • Kwarda ${member.provinceName}`;
-    ctx.fillStyle = palette.isLight ? '#334155' : palette.accentLight;
-    ctx.font = 'bold 18px "Inter", sans-serif';
-    ctx.fillText(kwartirText, VERTICAL_WIDTH / 2, currentY);
-    currentY += 28;
-
-    if (member.krida) {
-      const kridaText = `Krida Utama: ${member.krida}`;
-      ctx.fillStyle = palette.gold;
-      ctx.font = 'bold 16px "Inter", sans-serif';
-      ctx.fillText(kridaText, VERTICAL_WIDTH / 2, currentY);
-      currentY += 28;
+  // Untuk halaman verifikasi/QR, Google Spreadsheet adalah sumber kebenaran.
+  // Jangan mengembalikan record localStorage yang mungkin merupakan KTA lama.
+  if (authoritativeRemote) {
+    try {
+      // QR baru dapat membawa lebih dari satu identitas: Nomor KTA dan memberId.
+      // Coba semuanya ke Spreadsheet sehingga perubahan Nomor KTA tidak memutus QR.
+      const candidates: string[] = [];
+      const pushCandidate = (value: string | null | undefined) => {
+        const v = String(value || '').trim();
+        if (v && !candidates.some(c => c.toLowerCase() === v.toLowerCase())) candidates.push(v);
+      };
+      for (const candidate of (normalizeNtaQuery(rawInput).candidates || [])) pushCandidate(candidate);
+      pushCandidate(cleanQuery);
+      if (typeof window !== 'undefined') {
+        try {
+          const u = new URL(rawInput, window.location.origin);
+          pushCandidate(u.searchParams.get('verifyId'));
+          pushCandidate(u.searchParams.get('memberId'));
+          pushCandidate(u.searchParams.get('nta'));
+          pushCandidate(u.searchParams.get('kta'));
+          pushCandidate(u.searchParams.get('id'));
+        } catch {}
+      }
+      for (const candidate of candidates) {
+        const remoteMatch = await searchMemberInRemoteSpreadsheet(candidate);
+        if (remoteMatch) {
+          return {
+            found: true,
+            member: remoteMatch,
+            source: 'GOOGLE_SPREADSHEET',
+            searchTerm: rawInput,
+            normalizedTerm: normalizeNtaQuery(candidate).cleanQuery
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Authoritative Google Spreadsheet verification failed:', e);
     }
+
+    return {
+      found: false,
+      member: null,
+      source: 'NONE',
+      searchTerm: rawInput,
+      normalizedTerm: cleanQuery,
+      message: 'Data KTA tidak ditemukan pada Google Spreadsheet terbaru. Data lokal lama tidak digunakan untuk verifikasi QR.'
+    };
   }
 
-  // 8. Top Skills Pills (if enabled)
-  if (options.showSkills && member.skills && member.skills.length > 0) {
-    const topSkills = member.skills.slice(0, 3).map(s => s.skillName);
-    const skillsString = topSkills.join('  •  ');
-    ctx.fillStyle = palette.isLight ? '#64748b' : palette.textMuted;
-    ctx.font = '14px "Inter", sans-serif';
-    ctx.fillText(`Keahlian: ${skillsString}`, VERTICAL_WIDTH / 2, currentY);
-    currentY += 26;
+  // Mode umum/manual: lokal tetap boleh dipakai sebagai fallback cepat.
+  const localMatch = searchMemberLocally(rawInput, localMembers);
+  if (localMatch) {
+    return {
+      found: true,
+      member: localMatch,
+      source: 'LOCAL',
+      searchTerm: rawInput,
+      normalizedTerm: cleanQuery
+    };
   }
 
-  // 9. Large Scannable QR Code Box
-  const qrBoxSize = 340;
-  const qrBoxX = (VERTICAL_WIDTH - qrBoxSize) / 2;
-  const qrBoxY = 780;
-
-  // QR Container Card
-  ctx.fillStyle = '#ffffff';
-  roundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize + 85, 28);
-  ctx.fill();
-  ctx.strokeStyle = palette.gold;
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  // QR Image
-  const qrImgSize = 280;
-  const qrImgX = (VERTICAL_WIDTH - qrImgSize) / 2;
-  const qrImgY = qrBoxY + 24;
-
-  if (qrImg.complete && qrImg.width > 0) {
-    ctx.drawImage(qrImg, qrImgX, qrImgY, qrImgSize, qrImgSize);
-  }
-
-  // QR Center Saka Badge
-  if (logoImg.complete && logoImg.naturalWidth > 0) {
-    const centerLogoSize = 52;
-    const centerLogoX = (VERTICAL_WIDTH - centerLogoSize) / 2;
-    const centerLogoY = qrImgY + (qrImgSize - centerLogoSize) / 2;
-
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(centerLogoX + centerLogoSize / 2, centerLogoY + centerLogoSize / 2, centerLogoSize / 2 + 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = palette.gold;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    ctx.drawImage(logoImg, centerLogoX, centerLogoY, centerLogoSize, centerLogoSize);
-  }
-
-  // QR Label below code
-  ctx.fillStyle = '#1e0842';
-  ctx.font = 'bold 15px "Inter", sans-serif';
-  ctx.fillText('PINDAI UNTUK PROFIL & PORTOFOLIO RESMI', VERTICAL_WIDTH / 2, qrBoxY + qrBoxSize + 32);
-
-  ctx.fillStyle = '#6b7280';
-  ctx.font = '12px monospace';
-  ctx.fillText('Verifikasi KTA Digital Saka Pariwisata', VERTICAL_WIDTH / 2, qrBoxY + qrBoxSize + 55);
-
-  // 10. Contact Info Banner at Bottom (Optional)
-  const contactY = 1240;
-  if (options.showContactPhone || options.showEmail) {
-    const contactParts: string[] = [];
-    if (options.showContactPhone && member.phone) contactParts.push(`WA: ${member.phone}`);
-    if (options.showEmail && member.email) contactParts.push(member.email);
-
-    if (contactParts.length > 0) {
-      ctx.fillStyle = palette.cardBg;
-      roundRect(ctx, 80, contactY, VERTICAL_WIDTH - 160, 46, 23);
-      ctx.fill();
-      ctx.strokeStyle = palette.border;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      ctx.fillStyle = palette.isLight ? '#1e0842' : palette.textLight;
-      ctx.font = 'bold 14px "Inter", sans-serif';
-      ctx.fillText(contactParts.join('   |   '), VERTICAL_WIDTH / 2, contactY + 28);
+  try {
+    const remoteMatch = await searchMemberInRemoteSpreadsheet(rawInput);
+    if (remoteMatch) {
+      return {
+        found: true,
+        member: remoteMatch,
+        source: 'GOOGLE_SPREADSHEET',
+        searchTerm: rawInput,
+        normalizedTerm: cleanQuery
+      };
     }
+  } catch (e) {
+    console.warn('Error during universal verification remote lookup:', e);
   }
 
-  // 11. Security Footer Watermark
-  ctx.textAlign = 'center';
-  ctx.fillStyle = palette.isLight ? '#94a3b8' : 'rgba(255, 255, 255, 0.45)';
-  ctx.font = '11px monospace';
-  ctx.fillText('OFFICIAL DIGITAL CREDENTIAL • KWARTIR NASIONAL GERAKAN PRAMUKA', VERTICAL_WIDTH / 2, 1340);
-  ctx.fillText(`TOKEN VERIFIKASI: ${member.verificationToken || member.id.slice(0, 16).toUpperCase()}`, VERTICAL_WIDTH / 2, 1360);
-
-  return canvas;
-}
-
-/**
- * Render Horizontal Networking Card onto HTML5 Canvas
- */
-export async function renderHorizontalBadgeCanvas(
-  member: Member,
-  options: BadgeOptions = DEFAULT_BADGE_OPTIONS
-): Promise<HTMLCanvasElement> {
-  const canvas = document.createElement('canvas');
-  canvas.width = HORIZONTAL_WIDTH;
-  canvas.height = HORIZONTAL_HEIGHT;
-  const ctx = canvas.getContext('2d')!;
-
-  const palette = getBadgePalette(options.theme);
-  const nta = member.nationalMemberNumber || member.verificationToken || member.id;
-  const verificationUrl = getMemberVerificationUrl(member);
-
-  const [avatarImg, logoImg, bgImg, qrDataUrl] = await Promise.all([
-    loadImage(member.avatarUrl),
-    loadSakaLogo(),
-    loadBgImage(),
-    generateQrDataUrl(verificationUrl, palette.qrDark, '#ffffff')
-  ]);
-
-  const qrImg = await loadImage(qrDataUrl);
-
-  // 1. Clip Rounded Outer Card
-  roundRect(ctx, 0, 0, HORIZONTAL_WIDTH, HORIZONTAL_HEIGHT, 36);
-  ctx.clip();
-
-  // 2. Background Gradient
-  const grad = ctx.createLinearGradient(0, 0, HORIZONTAL_WIDTH, HORIZONTAL_HEIGHT);
-  grad.addColorStop(0, palette.bgGradient[0]);
-  grad.addColorStop(0.5, palette.bgGradient[1]);
-  grad.addColorStop(1, palette.bgGradient[2]);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, HORIZONTAL_WIDTH, HORIZONTAL_HEIGHT);
-
-  // 2b. Background Watermark
-  if (bgImg && (bgImg.naturalWidth > 0 || bgImg.width > 0)) {
-    ctx.save();
-    ctx.globalAlpha = palette.isLight ? 0.05 : 0.08;
-    ctx.drawImage(bgImg, 0, 0, HORIZONTAL_WIDTH, HORIZONTAL_HEIGHT);
-    ctx.restore();
-  }
-
-  // 2c. Outer Border
-  ctx.strokeStyle = palette.border;
-  ctx.lineWidth = 5;
-  roundRect(ctx, 2.5, 2.5, HORIZONTAL_WIDTH - 5, HORIZONTAL_HEIGHT - 5, 36);
-  ctx.stroke();
-
-  // 3. Header Banner
-  const headerY = 32;
-  if (logoImg.complete && logoImg.naturalWidth > 0) {
-    ctx.drawImage(logoImg, 48, headerY, 68, 68);
-  }
-
-  ctx.textAlign = 'left';
-  ctx.fillStyle = palette.gold;
-  ctx.font = 'bold 14px "Inter", sans-serif';
-  ctx.fillText((options.eventName || 'SAKA PARIWISATA • EVENT NETWORKING PASS').toUpperCase(), 130, headerY + 24);
-
-  ctx.fillStyle = palette.isLight ? '#1e0842' : '#ffffff';
-  ctx.font = '900 22px "Inter", sans-serif';
-  ctx.fillText('SATUAN KARYA PRAMUKA PARIWISATA', 130, headerY + 50);
-
-  ctx.fillStyle = palette.accent;
-  ctx.font = 'bold 12px "Inter", sans-serif';
-  ctx.fillText('Kwartir Nasional Gerakan Pramuka', 130, headerY + 70);
-
-  // Verified Badge Header Right
-  ctx.fillStyle = palette.badgePillBg;
-  roundRect(ctx, HORIZONTAL_WIDTH - 240, headerY + 12, 190, 36, 18);
-  ctx.fill();
-  ctx.fillStyle = palette.badgePillText;
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 13px "Inter", sans-serif';
-  ctx.fillText('✓ ANGGOTA TERVERIFIKASI', HORIZONTAL_WIDTH - 145, headerY + 35);
-
-  // Header Divider
-  ctx.strokeStyle = palette.border;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(48, 116);
-  ctx.lineTo(HORIZONTAL_WIDTH - 48, 116);
-  ctx.stroke();
-
-  // 4. Left Column: Avatar & Main Profile Details (Width ~ 680px)
-  const avatarSize = 170;
-  const avatarX = 48;
-  const avatarY = 150;
-
-  ctx.save();
-  roundRect(ctx, avatarX, avatarY, avatarSize, avatarSize * 1.25, 20);
-  ctx.clip();
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(avatarX, avatarY, avatarSize, avatarSize * 1.25);
-  if (avatarImg.complete && avatarImg.width > 0) {
-    ctx.drawImage(avatarImg, avatarX, avatarY, avatarSize, avatarSize * 1.25);
-  }
-  ctx.restore();
-
-  ctx.strokeStyle = palette.gold;
-  ctx.lineWidth = 3.5;
-  roundRect(ctx, avatarX, avatarY, avatarSize, avatarSize * 1.25, 20);
-  ctx.stroke();
-
-  // Profile Details to the right of Avatar
-  const infoX = 245;
-  ctx.textAlign = 'left';
-
-  // NTA Box
-  ctx.fillStyle = palette.cardBg;
-  roundRect(ctx, infoX, 150, 480, 56, 14);
-  ctx.fill();
-  ctx.strokeStyle = palette.gold;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  ctx.fillStyle = palette.gold;
-  ctx.font = 'bold 11px "Inter", sans-serif';
-  ctx.fillText('NOMOR TANDA ANGGOTA (NTA)', infoX + 16, 172);
-
-  ctx.fillStyle = palette.isLight ? '#1e0842' : '#ffffff';
-  ctx.font = 'bold 22px monospace';
-  ctx.fillText(nta, infoX + 16, 196);
-
-  // Full Name
-  ctx.fillStyle = palette.isLight ? '#0f172a' : '#ffffff';
-  ctx.font = '900 30px "Inter", sans-serif';
-  ctx.fillText(member.fullName.toUpperCase(), infoX, 245, 480);
-
-  // Position
-  ctx.fillStyle = palette.accent;
-  ctx.font = 'bold 18px "Inter", sans-serif';
-  ctx.fillText((member.currentPosition || 'Anggota Saka Pariwisata').toUpperCase(), infoX, 278, 480);
-
-  // Kwartir & Krida
-  ctx.fillStyle = palette.isLight ? '#334155' : palette.textLight;
-  ctx.font = '15px "Inter", sans-serif';
-  const kwartirLine = `${member.regencyName ? `Kwarcab ${member.regencyName}` : ''} • Kwarda ${member.provinceName}`;
-  ctx.fillText(kwartirLine, infoX, 310, 480);
-
-  if (member.krida) {
-    ctx.fillStyle = palette.gold;
-    ctx.font = 'bold 14px "Inter", sans-serif';
-    ctx.fillText(`Krida: ${member.krida}`, infoX, 336, 480);
-  }
-
-  // Skills
-  if (options.showSkills && member.skills && member.skills.length > 0) {
-    const skillsList = member.skills.slice(0, 3).map(s => s.skillName).join('  •  ');
-    ctx.fillStyle = palette.isLight ? '#64748b' : palette.textMuted;
-    ctx.font = '13px "Inter", sans-serif';
-    ctx.fillText(`Keahlian: ${skillsList}`, infoX, 362, 480);
-  }
-
-  // 5. Right Column: Large QR Code Box (Width ~ 380px)
-  const qrBoxW = 380;
-  const qrBoxH = 460;
-  const qrBoxX = HORIZONTAL_WIDTH - 48 - qrBoxW;
-  const qrBoxY = 150;
-
-  ctx.fillStyle = '#ffffff';
-  roundRect(ctx, qrBoxX, qrBoxY, qrBoxW, qrBoxH, 24);
-  ctx.fill();
-  ctx.strokeStyle = palette.gold;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // QR Code Image
-  const qrImgSize = 280;
-  const qrImgX = qrBoxX + (qrBoxW - qrImgSize) / 2;
-  const qrImgY = qrBoxY + 25;
-
-  if (qrImg.complete && qrImg.width > 0) {
-    ctx.drawImage(qrImg, qrImgX, qrImgY, qrImgSize, qrImgSize);
-  }
-
-  // Center Logo
-  if (logoImg.complete && logoImg.naturalWidth > 0) {
-    const centerLogoSize = 48;
-    const centerLogoX = qrImgX + (qrImgSize - centerLogoSize) / 2;
-    const centerLogoY = qrImgY + (qrImgSize - centerLogoSize) / 2;
-
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(centerLogoX + centerLogoSize / 2, centerLogoY + centerLogoSize / 2, centerLogoSize / 2 + 5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = palette.gold;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.drawImage(logoImg, centerLogoX, centerLogoY, centerLogoSize, centerLogoSize);
-  }
-
-  // Text below QR
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#1e0842';
-  ctx.font = 'bold 15px "Inter", sans-serif';
-  ctx.fillText('PINDAI VERIFIKASI RESMI', qrBoxX + qrBoxW / 2, qrBoxY + 340);
-
-  ctx.fillStyle = '#6b7280';
-  ctx.font = '12px "Inter", sans-serif';
-  ctx.fillText('Scan dengan Smartphone / Google Lens', qrBoxX + qrBoxW / 2, qrBoxY + 365);
-  ctx.fillText('untuk portofolio & kontak', qrBoxX + qrBoxW / 2, qrBoxY + 385);
-
-  ctx.fillStyle = '#1e0842';
-  ctx.font = 'bold 11px monospace';
-  ctx.fillText(`NTA: ${nta}`, qrBoxX + qrBoxW / 2, qrBoxY + 420);
-
-  // 6. Bottom Bar / Contact Information
-  const bottomBarY = 640;
-  ctx.strokeStyle = palette.border;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(48, bottomBarY);
-  ctx.lineTo(HORIZONTAL_WIDTH - 48, bottomBarY);
-  ctx.stroke();
-
-  ctx.textAlign = 'left';
-  ctx.fillStyle = palette.isLight ? '#334155' : palette.textLight;
-  ctx.font = 'bold 13px "Inter", sans-serif';
-
-  const contactList: string[] = [];
-  if (options.showContactPhone && member.phone) contactList.push(`WhatsApp: ${member.phone}`);
-  if (options.showEmail && member.email) contactList.push(`Email: ${member.email}`);
-  contactList.push(`Pangkalan: ${member.districtName || ''}`);
-
-  ctx.fillText(contactList.join('   •   '), 48, bottomBarY + 35);
-
-  ctx.textAlign = 'right';
-  ctx.fillStyle = palette.isLight ? '#94a3b8' : 'rgba(255, 255, 255, 0.5)';
-  ctx.font = '11px monospace';
-  ctx.fillText('KARTU PENGENAL JEJARING RESMI SAKA PARIWISATA', HORIZONTAL_WIDTH - 48, bottomBarY + 35);
-
-  return canvas;
-}
-
-/**
- * Download Badge as High-Resolution PNG
- */
-export async function downloadBadgePng(
-  member: Member,
-  options: BadgeOptions = DEFAULT_BADGE_OPTIONS
-): Promise<void> {
-  const canvas = options.format === 'VERTICAL_LANYARD'
-    ? await renderVerticalLanyardCanvas(member, options)
-    : await renderHorizontalBadgeCanvas(member, options);
-
-  const cleanName = member.fullName.replace(/[^a-zA-Z0-9]/g, '_');
-  const cleanNta = (member.nationalMemberNumber || member.id).replace(/[^a-zA-Z0-9]/g, '-');
-  const filename = `Badge-Networking-SakaPariwisata-${cleanNta}-${cleanName}.png`;
-
-  const link = document.createElement('a');
-  link.download = filename;
-  link.href = canvas.toDataURL('image/png', 1.0);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-/**
- * Download Badge as Printable PDF (A6 or Standard Page)
- */
-export async function downloadBadgePdf(
-  member: Member,
-  options: BadgeOptions = DEFAULT_BADGE_OPTIONS
-): Promise<void> {
-  const canvas = options.format === 'VERTICAL_LANYARD'
-    ? await renderVerticalLanyardCanvas(member, options)
-    : await renderHorizontalBadgeCanvas(member, options);
-
-  const imgData = canvas.toDataURL('image/png', 1.0);
-
-  if (options.format === 'VERTICAL_LANYARD') {
-    // Standard A6 Vertical Badge Card (105 mm x 148 mm)
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a6'
-    });
-
-    const a6Width = 105;
-    const a6Height = 148;
-
-    doc.addImage(imgData, 'PNG', 0, 0, a6Width, a6Height, undefined, 'FAST');
-
-    const cleanName = member.fullName.replace(/[^a-zA-Z0-9]/g, '_');
-    const cleanNta = (member.nationalMemberNumber || member.id).replace(/[^a-zA-Z0-9]/g, '-');
-    doc.save(`Badge-Pass-SakaPariwisata-${cleanNta}-${cleanName}-A6.pdf`);
-  } else {
-    // A5 Horizontal Card (210 mm x 148 mm)
-    const doc = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a5'
-    });
-
-    const a5Width = 210;
-    const a5Height = 148;
-
-    doc.addImage(imgData, 'PNG', 0, 0, a5Width, a5Height, undefined, 'FAST');
-
-    const cleanName = member.fullName.replace(/[^a-zA-Z0-9]/g, '_');
-    const cleanNta = (member.nationalMemberNumber || member.id).replace(/[^a-zA-Z0-9]/g, '-');
-    doc.save(`Badge-Networking-SakaPariwisata-${cleanNta}-${cleanName}-A5.pdf`);
-  }
+  return {
+    found: false,
+    member: null,
+    source: 'NONE',
+    searchTerm: rawInput,
+    normalizedTerm: cleanQuery,
+    message: 'Nomor Anggota Tidak Ditemukan. Pastikan nomor anggota yang dimasukkan benar dan sesuai dengan format resmi Kwartir.'
+  };
 }
