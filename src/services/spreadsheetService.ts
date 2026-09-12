@@ -1914,38 +1914,48 @@ class SpreadsheetService {
    * Upload gambar base64 langsung ke Google Drive melalui Apps Script Web App
    */
   public async uploadImageToDrive(
-    base64Data: string, 
-    filename: string, 
+    imageData: string | Blob | File,
+    filename: string,
     category: 'MEMBER_AVATAR' | 'TOUR_PACKAGES' | 'CULINARY_SOUVENIRS' | 'DOCUMENTS' | 'KTA_CARD' | 'ACTIVITIES' = 'MEMBER_AVATAR'
   ): Promise<{ success: boolean; url?: string; directUrl?: string; fileId?: string; viewUrl?: string; folderId?: string; message: string }> {
     const scriptUrl = this.getEffectiveAppsScriptUrl();
     if (!scriptUrl) {
-      return {
-        success: false,
-        message: 'Google Apps Script Web App URL belum dipasang. Harap pasang Web App URL di Pengaturan API.'
-      };
-    }
-
-    const value = String(base64Data || '').trim();
-    if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
-      return { success: false, message: 'Data foto tidak valid.' };
+      return { success: false, message: 'Google Apps Script Web App URL belum dipasang. Harap pasang Web App URL di Pengaturan API.' };
     }
 
     try {
-      // Gunakan proxy aplikasi agar browser dapat menerima response JSON dari GAS.
-      // Proxy juga meneruskan URL GAS yang dipilih Super Admin dan memvalidasi
-      // hasil upload sebelum frontend melanjutkan pendaftaran.
+      let blob: Blob;
+      if (typeof imageData === 'string') {
+        const value = imageData.trim();
+        const match = value.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,(.+)$/i);
+        if (!match) return { success: false, message: 'Data foto tidak valid.' };
+        const binary = atob(match[2]);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        blob = new Blob([bytes], { type: match[1].toLowerCase() });
+      } else {
+        blob = imageData;
+      }
+
+      if (!blob || !blob.size) return { success: false, message: 'Data foto kosong.' };
+      if (blob.size > 4 * 1024 * 1024) return { success: false, message: 'Ukuran foto maksimal 4 MB.' };
+      if (!/^image\/(?:png|jpe?g|webp|gif)$/i.test(blob.type || '')) {
+        return { success: false, message: 'Format foto tidak didukung.' };
+      }
+
+      // Primary path: binary. The server obtains the GAS Drive resumable session,
+      // streams the bytes to Google Drive, then finalizes the file through GAS.
       const response = await fetch('/api/upload-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': blob.type || 'image/jpeg',
+          'X-File-Name': encodeURIComponent(filename || `KTA_${Date.now()}.jpg`),
+          'X-File-Category': encodeURIComponent(category),
+          'X-Script-Url': encodeURIComponent(scriptUrl)
+        },
         credentials: 'same-origin',
         cache: 'no-store',
-        body: JSON.stringify({
-          base64: value,
-          filename,
-          category,
-          scriptUrl
-        })
+        body: blob
       });
 
       const data = await response.json().catch(() => ({}));
@@ -1965,10 +1975,7 @@ class SpreadsheetService {
       };
     } catch (err: any) {
       console.error('Failed to upload image to Drive:', err);
-      return {
-        success: false,
-        message: `Gagal mengunggah foto ke Google Drive: ${err.message}`
-      };
+      return { success: false, message: `Gagal mengunggah foto ke Google Drive: ${err?.message || String(err)}` };
     }
   }
 
