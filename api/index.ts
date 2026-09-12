@@ -584,17 +584,41 @@ app.use((req, res, next) => {
 // PASSWORD HASHING & SESSION MANAGEMENT
 // ==========================================
 function hashPassword(password: string): string {
+  // Password hash harus kompatibel dengan Google Apps Script AUTH_LOGIN.
+  // Format: GAS2:<salt>:SHA256(<salt>|<password>)
   const salt = crypto.randomBytes(16).toString('hex');
-  const derivedKey = crypto.scryptSync(password, salt, 64);
-  return `${salt}:${derivedKey.toString('hex')}`;
+  const digest = crypto
+    .createHash('sha256')
+    .update(`${salt}|${String(password)}`, 'utf8')
+    .digest('hex');
+  return `GAS2:${salt}:${digest}`;
 }
 
 function verifyPassword(password: string, storedHash: string): boolean {
   try {
-    if (!storedHash || !storedHash.includes(':')) return false;
-    const [salt, key] = storedHash.split(':');
+    const value = String(storedHash || '');
+
+    // Format baru yang sama dengan Google Apps Script.
+    if (value.startsWith('GAS2:')) {
+      const parts = value.split(':');
+      if (parts.length !== 3) return false;
+      const salt = parts[1];
+      const expected = parts[2].toLowerCase();
+      const actual = crypto
+        .createHash('sha256')
+        .update(`${salt}|${String(password)}`, 'utf8')
+        .digest('hex')
+        .toLowerCase();
+      return actual === expected;
+    }
+
+    // Kompatibilitas akun lama yang masih memakai format scrypt:salt:key.
+    if (!value.includes(':')) return false;
+    const [salt, key] = value.split(':');
+    if (!salt || !key) return false;
     const derivedKey = crypto.scryptSync(password, salt, 64);
-    return crypto.timingSafeEqual(Buffer.from(key, 'hex'), derivedKey);
+    const storedKey = Buffer.from(key, 'hex');
+    return storedKey.length === derivedKey.length && crypto.timingSafeEqual(storedKey, derivedKey);
   } catch {
     return false;
   }
@@ -1338,13 +1362,14 @@ app.post('/api/auth/login', async (req, res) => {
 
   const cleanUser = String(username).trim().toLowerCase();
   const rawPass = String(password);
+
+  // Google Spreadsheet / Users adalah sumber autentikasi utama.
+  // Cache Vercel tidak dipakai lebih dahulu agar login setelah logout/cold-start
+  // selalu menggunakan kredensial yang tersimpan secara persisten.
   let matchedUser: any = null;
   let persistentAuthSucceeded = false;
-  let persistentAuthError = '';
+  let persistentAuthMessage = '';
 
-  // Sumber autentikasi utama: Google Apps Script -> Sheet Users.
-  // Jangan menggunakan cache db.users lebih dahulu karena cache Vercel dapat
-  // berisi kredensial/data lama dan bukan sumber kebenaran yang persisten.
   try {
     const gasResult = await forwardToGoogleAppsScript({
       action: 'AUTH_LOGIN',
@@ -1352,73 +1377,89 @@ app.post('/api/auth/login', async (req, res) => {
       password: rawPass
     }, scriptUrl);
 
-    if (gasResult?.success !== false && gasResult?.status !== 'error' && gasResult?.user) {
-      matchedUser = gasResult.user;
+    if (gasResult?.success === true && gasResult?.user) {
+      matchedUser = {
+        ...gasResult.user,
+        passwordHash: '',
+        status: gasResult.user.status || 'ACTIVE'
+      };
       persistentAuthSucceeded = true;
 
-      // Cache hanya setelah autentikasi persisten berhasil.
+      // Cache hanya setelah Google Apps Script berhasil mengautentikasi.
       const existingIndex = db.users.findIndex(u =>
         String(u.id || '') === String(matchedUser.id || '')
       );
-      if (existingIndex >= 0) db.users[existingIndex] = { ...db.users[existingIndex], ...matchedUser };
-      else db.users.push(matchedUser);
+      if (existingIndex >= 0) {
+        db.users[existingIndex] = { ...db.users[existingIndex], ...matchedUser };
+      } else {
+        db.users.push(matchedUser);
+      }
       saveDatabase();
     } else {
-      persistentAuthError = String(gasResult?.message || 'Autentikasi Google Spreadsheet gagal.');
+      persistentAuthMessage = String(
+        gasResult?.message || 'Kombinasi nama pengguna atau kata sandi tidak valid.'
+      );
     }
   } catch (gasError: any) {
-    persistentAuthError = gasError?.message || String(gasError);
-    console.warn('[Auth] AUTH_LOGIN Google Apps Script gagal:', persistentAuthError);
+    persistentAuthMessage = gasError?.message || String(gasError);
+    console.warn('[Auth] AUTH_LOGIN Google Apps Script gagal:', persistentAuthMessage);
   }
 
-  // Jika Google Apps Script secara eksplisit menolak kredensial/status akun,
-  // jangan pernah jatuh kembali ke cache lokal karena dapat menghidupkan akun
-  // lama atau password lama. Fallback lokal hanya untuk gangguan infrastruktur.
-  const explicitAuthFailure = /tidak valid|invalid|kata sandi|password|username|nama pengguna|belum disetujui|pending|ditolak|akun.*(tidak|belum)|credentials/i.test(persistentAuthError);
-  if (!persistentAuthSucceeded && explicitAuthFailure) {
-    const isPending = /belum disetujui|pending|menunggu.*persetujuan/i.test(persistentAuthError);
+  // Jangan gunakan password cache jika Google secara eksplisit menolak login.
+  // Ini mencegah kredensial lama mengalahkan Users sheet.
+  const explicitCredentialFailure = /username|nama pengguna|email|password|kata sandi|tidak valid|salah|credential|akun.*(tidak|belum)|belum disetujui|pending|ditolak/i.test(persistentAuthMessage);
+  if (!persistentAuthSucceeded && explicitCredentialFailure) {
+    const isPending = /belum disetujui|pending|menunggu.*persetujuan/i.test(persistentAuthMessage);
     return res.status(isPending ? 403 : 401).json({
       success: false,
-      message: isPending ? 'Akun belum disetujui administrator.' : (persistentAuthError || 'Kombinasi nama pengguna atau kata sandi tidak valid.')
+      message: isPending ? 'Akun belum disetujui administrator.' : persistentAuthMessage
     });
   }
 
-  // Kompatibilitas untuk akun legacy/server-only ketika layanan Google Apps
-  // Script benar-benar tidak dapat dihubungi. Tetap hanya menerima passwordHash.
-  if (!matchedUser && !persistentAuthSucceeded) {
-    matchedUser = db.users.find(u =>
+  // Fallback legacy hanya ketika Google Apps Script benar-benar tidak tersedia.
+  if (!matchedUser) {
+    const cachedUser = db.users.find(u =>
       (u.username && String(u.username).toLowerCase() === cleanUser) ||
       (u.email && String(u.email).toLowerCase() === cleanUser)
     );
 
-    if (matchedUser && (!matchedUser.passwordHash || !verifyPassword(rawPass, String(matchedUser.passwordHash)))) {
-      matchedUser = null;
+    if (cachedUser?.passwordHash && verifyPassword(rawPass, String(cachedUser.passwordHash))) {
+      matchedUser = cachedUser;
     }
+  }
 
-    // Kompatibilitas data lama yang menyimpan kredensial pada member cache.
-    if (!matchedUser) {
-      const member = db.members.find(m =>
-        (m.email && String(m.email).toLowerCase() === cleanUser) ||
-        (m.nationalMemberNumber && String(m.nationalMemberNumber).toLowerCase() === cleanUser)
-      );
-      if (member && member.passwordHash && verifyPassword(rawPass, String(member.passwordHash))) {
-        matchedUser = {
-          id: member.userId || `USER-${String(member.id || '').replace(/^SPW-/, '')}`,
-          username: member.email.split('@')[0],
-          email: member.email,
-          name: member.fullName,
-          role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
-          jurisdictionName: member.provinceId === '00' ? 'Kwartir Nasional' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
-          jurisdictionId: member.provinceId === '00' ? '00' : member.regencyId,
-          avatarUrl: member.avatarUrl,
-          memberId: member.id
-        };
-      }
+  // Kompatibilitas akun legacy yang hanya tersimpan bersama member cache.
+  if (!matchedUser) {
+    const member = db.members.find(m =>
+      (m.email && String(m.email).toLowerCase() === cleanUser) ||
+      (m.nationalMemberNumber && String(m.nationalMemberNumber).toLowerCase() === cleanUser)
+    );
+    if (member?.passwordHash && verifyPassword(rawPass, String(member.passwordHash))) {
+      matchedUser = {
+        id: member.userId || `USER-${String(member.id || '').replace(/^SPW-/, '')}`,
+        username: member.email.split('@')[0],
+        email: member.email,
+        name: member.fullName,
+        role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
+        jurisdictionName: member.provinceId === '00' ? 'Kwartir Nasional' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
+        jurisdictionId: member.provinceId === '00' ? '00' : member.regencyId,
+        avatarUrl: member.avatarUrl,
+        memberId: member.id,
+        passwordHash: member.passwordHash
+      };
     }
   }
 
   if (!matchedUser) {
-    console.warn(`[Auth] Failed login attempt for user: ${cleanUser}. Persistent auth error: ${persistentAuthError || 'unknown'}`);
+    console.warn(`[Auth] Failed login attempt for user: ${cleanUser}`);
+    return res.status(401).json({
+      success: false,
+      message: persistentAuthMessage || 'Kombinasi nama pengguna atau kata sandi tidak valid.'
+    });
+  }
+
+  // Bila memakai fallback legacy, password tetap harus diverifikasi lokal.
+  if (!persistentAuthSucceeded && (!matchedUser.passwordHash || !verifyPassword(rawPass, String(matchedUser.passwordHash)))) {
     return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid.' });
   }
 
@@ -2447,11 +2488,7 @@ app.post('/api/mutate', async (req, res) => {
           const allowed = [
             'fullName', 'nikMasked', 'gender', 'birthPlace', 'birthDate',
             'phone', 'email', 'address', 'educationLevel', 'occupation',
-            'bio', 'avatarUrl',
-            'provinceId', 'provinceName',
-            'regencyId', 'regencyName',
-            'districtId', 'districtName',
-            'krida', 'currentPosition'
+            'bio', 'avatarUrl'
           ];
           const safeMember: any = { id: existingMember.id };
           for (const key of allowed) {
