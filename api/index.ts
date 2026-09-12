@@ -1486,8 +1486,15 @@ app.post('/api/auth/register', async (req, res) => {
     const registeredAt = new Date().toISOString();
     const passHash = hashPassword(rawPassword);
 
-    const newMember = {
+    // Jangan pernah menyimpan Base64 di memberData.avatarUrl. Foto perangkat
+    // sekarang sudah di-upload ke Drive sebelum request registrasi.
+    const safeMemberData = {
       ...memberData,
+      avatarUrl: hasPhotoUrl ? String(photoUrl).trim() : ''
+    };
+
+    const newMember = {
+      ...safeMemberData,
       id: memberId,
       userId,
       email,
