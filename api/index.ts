@@ -1196,71 +1196,98 @@ async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unkn
 // ==========================================
 
 // Health check
-// Upload image proxy: browser -> application server -> Google Apps Script -> Google Drive.
-// The browser must not call Apps Script directly because the JSON POST would
-// require cross-origin handling. This route also keeps the GAS URL server-side.
-app.post('/api/upload-image', async (req, res) => {
-  try {
-    const { base64, filename, category, scriptUrl } = req.body || {};
-    const value = String(base64 || '').trim();
+// Upload image proxy:
+// Browser -> Vercel (binary) -> GAS creates Drive resumable session
+// -> Vercel streams the binary to Google Drive -> GAS finalizes sharing.
+// IMPORTANT: no Base64 is sent over the network on the primary path.
+app.post(
+  '/api/upload-image',
+  express.raw({
+    type: ['application/octet-stream', 'image/*'],
+    limit: '4mb'
+  }),
+  async (req, res) => {
+    const requestId = `UP-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
-    if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
-      return res.status(400).json({
-        success: false,
-        status: 'error',
-        message: 'Data gambar tidak valid.'
+    try {
+      const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from([]);
+      const filenameHeader = String(req.header('x-upload-filename') || '').trim();
+      const mimeType = String(req.header('x-upload-mime-type') || req.header('content-type') || '').trim().toLowerCase();
+      const category = String(req.header('x-upload-category') || 'MEMBER_AVATAR').trim().toUpperCase();
+      const requestedScriptUrl = String(req.header('x-script-url') || '').trim();
+
+      if (!body.length) {
+        return res.status(400).json({ success: false, status: 'error', requestId, message: 'Berkas foto kosong.' });
+      }
+
+      if (body.length > 4 * 1024 * 1024) {
+        return res.status(413).json({ success: false, status: 'error', requestId, message: 'Foto terlalu besar. Maksimal 4 MB untuk jalur upload mobile.' });
+      }
+
+      if (!/^image\/(?:jpeg|jpg|png|webp|gif)$/i.test(mimeType)) {
+        return res.status(415).json({ success: false, status: 'error', requestId, message: 'Format foto tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
+      }
+
+      const safeFilename = (filenameHeader || `KTA_${Date.now()}.jpg`)
+        .replace(/[\\/:*?"<>|#%]+/g, '_')
+        .slice(0, 160);
+
+      const sessionResult = await forwardToGoogleAppsScript({
+        action: 'GET_UPLOAD_URL',
+        fileName: safeFilename,
+        mimeType,
+        category
+      }, requestedScriptUrl);
+
+      const uploadUrl = String(sessionResult?.uploadUrl || '').trim();
+      if (!uploadUrl) throw new Error(sessionResult?.message || 'Google Apps Script tidak mengembalikan URL upload Drive.');
+
+      const driveResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': mimeType, 'Content-Length': String(body.length) },
+        body
+      });
+
+      const driveText = await driveResponse.text();
+      let driveData: any = null;
+      try { driveData = driveText ? JSON.parse(driveText) : null; } catch { driveData = null; }
+
+      if (!driveResponse.ok || !driveData?.id) {
+        throw new Error(`Google Drive upload HTTP ${driveResponse.status}` + (driveData?.error?.message ? `: ${driveData.error.message}` : ''));
+      }
+
+      const fileId = String(driveData.id);
+      const finalized = await forwardToGoogleAppsScript({
+        action: 'FINALIZE_UPLOAD',
+        fileId,
+        fileName: safeFilename,
+        mimeType,
+        category
+      }, requestedScriptUrl);
+
+      const finalUrl = String(finalized?.url || finalized?.directUrl || `https://drive.google.com/uc?export=view&id=${fileId}`).trim();
+
+      console.log(`[Upload][${requestId}] Drive upload successful`, { fileId, filename: safeFilename, bytes: body.length });
+
+      return res.json({
+        success: true, status: 'success', action: 'UPLOAD_IMAGE', requestId, fileId,
+        url: finalUrl,
+        directUrl: String(finalized?.directUrl || finalUrl),
+        viewUrl: String(finalized?.viewUrl || `https://drive.google.com/uc?export=view&id=${fileId}`),
+        folderId: finalized?.folderId || null, filename: safeFilename, category,
+        message: 'Foto berhasil disimpan ke Google Drive.'
+      });
+    } catch (error: any) {
+      console.error(`[Upload][${requestId}] Error:`, error);
+      const message = error?.message || 'Upload foto gagal.';
+      const statusMatch = message.match(/HTTP (\d{3})/i);
+      const upstreamStatus = statusMatch ? Number(statusMatch[1]) : 502;
+      return res.status(upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 502).json({
+        success: false, status: 'error', requestId, message
       });
     }
-
-    // Match the Apps Script limit and avoid oversized requests reaching GAS.
-    if (value.length > 12 * 1024 * 1024) {
-      return res.status(413).json({
-        success: false,
-        status: 'error',
-        message: 'Data gambar terlalu besar.'
-      });
-    }
-
-    const result = await forwardToGoogleAppsScript({
-      action: 'UPLOAD_IMAGE',
-      base64: value,
-      filename: String(filename || `image_${Date.now()}.jpg`).trim(),
-      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase(),
-      scriptUrl
-    }, scriptUrl);
-
-    if (!result || result.success === false || !result.url) {
-      return res.status(502).json({
-        success: false,
-        status: 'error',
-        message: result?.message || 'Google Apps Script tidak mengembalikan URL foto.'
-      });
-    }
-
-    return res.json({
-      success: true,
-      status: 'success',
-      action: 'UPLOAD_IMAGE',
-      fileId: result.fileId || null,
-      url: result.url,
-      directUrl: result.directUrl || result.url,
-      viewUrl: result.viewUrl || null,
-      category: result.category || category || 'MEMBER_AVATAR',
-      filename: result.filename || filename || null,
-      message: result.message || 'Foto berhasil disimpan ke Google Drive'
-    });
-  } catch (error: any) {
-    console.error('[Upload Image] Error:', error);
-    const message = error?.message || 'Upload foto gagal.';
-    const statusMatch = message.match(/HTTP (\d{3})/i);
-    const upstreamStatus = statusMatch ? Number(statusMatch[1]) : 502;
-    return res.status(upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 502).json({
-      success: false,
-      status: 'error',
-      message
-    });
   }
-});
+);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
