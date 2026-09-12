@@ -292,7 +292,14 @@ export default function App() {
       if (!cancelled) setCloudSync(spreadsheetService.getSyncState());
     });
     const handleMemberSynced = () => {
-      if (!cancelled) void spreadsheetService.syncFromSpreadsheet(true).catch(() => {});
+      if (cancelled) return;
+      void spreadsheetService.syncFromSpreadsheet(true)
+        .then(() => {
+          if (!cancelled) refreshAll();
+        })
+        .catch(() => {
+          if (!cancelled) setCloudSync(spreadsheetService.getSyncState());
+        });
     };
     const handleGasConfigUpdated = () => {
       if (cancelled) return;
