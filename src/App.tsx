@@ -164,6 +164,7 @@ export default function App() {
 
   // Reactive State from storage service
   const [members, setMembers] = useState<Member[]>([]);
+  const [cloudSync, setCloudSync] = useState(spreadsheetService.getSyncState());
   const [tours, setTours] = useState<TourPackage[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -282,16 +283,36 @@ export default function App() {
     void hydrateFromCloud();
     const unsubscribe = storage.subscribe(refreshAll);
     const handleCloudUpdate = () => {
-      if (!cancelled) refreshAll();
+      if (!cancelled) {
+        refreshAll();
+        setCloudSync(spreadsheetService.getSyncState());
+      }
+    };
+    const unsubscribeSyncState = spreadsheetService.subscribeSyncState(() => {
+      if (!cancelled) setCloudSync(spreadsheetService.getSyncState());
+    });
+    const handleMemberSynced = () => {
+      if (!cancelled) void spreadsheetService.syncFromSpreadsheet(true).catch(() => {});
     };
     window.addEventListener('saka:cloud-data-updated', handleCloudUpdate as EventListener);
+    window.addEventListener('saka:member-synced', handleMemberSynced as EventListener);
 
     return () => {
       cancelled = true;
       unsubscribe();
       window.removeEventListener('saka:cloud-data-updated', handleCloudUpdate as EventListener);
+      window.removeEventListener('saka:member-synced', handleMemberSynced as EventListener);
+      unsubscribeSyncState();
     };
   }, []);
+
+  useEffect(() => {
+    // Menjaga status sinkronisasi tetap tersedia di root untuk komponen dashboard
+    // tanpa memaksa komponen lain membaca localStorage secara langsung.
+    if (typeof document !== 'undefined') {
+      document.documentElement.dataset.cloudSyncStatus = cloudSync.status || 'IDLE';
+    }
+  }, [cloudSync.status]);
 
   // Listen to popstate for browser back/forward buttons
   useEffect(() => {
