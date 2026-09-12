@@ -89,6 +89,11 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
       (member.fullName && currentUser.name && member.fullName.toLowerCase() === currentUser.name.toLowerCase())
     )
   );
+  // Untuk tindakan edit, wajib gunakan relasi memberId yang pasti.
+  // Jangan gunakan fallback nama karena dua anggota dapat memiliki nama sama.
+  const isStrictOwner = Boolean(
+    member && currentUser?.memberId && member.id === currentUser.memberId
+  );
   const isAdmin = currentUser?.role !== 'MEMBER' && currentUser?.role !== 'PUBLIC';
 
   const [copiedLink, setCopiedLink] = useState(false);
@@ -226,13 +231,13 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
             </button>
           )}
 
-          {isAdmin && onOpenEditMemberModal && (
+          {(isStrictOwner || isAdmin) && onOpenEditMemberModal && (
             <button
               onClick={() => onOpenEditMemberModal(member)}
               className="px-4 py-2.5 bg-indigo-900 hover:bg-indigo-950 text-white rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
               <Edit3 className="w-4 h-4 text-indigo-300" />
-              <span>Koreksi Data</span>
+              <span>{isStrictOwner && !isAdmin ? 'Edit Profil Saya' : 'Koreksi Data'}</span>
             </button>
           )}
 
