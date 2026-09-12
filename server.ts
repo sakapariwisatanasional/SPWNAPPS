@@ -143,7 +143,6 @@ const DB_FILE = path.join(DATA_DIR, 'saka-database.json');
 
 const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
-const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekQK_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
 
 function hashPasswordForGoogleAppsScript(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -581,7 +580,7 @@ setInterval(() => {
 
 // Proxy mutation to Google Apps Script Web App
 async function forwardToGoogleAppsScript(payload: any): Promise<any> {
-  const scriptUrl = String(db.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL).trim();
+  const scriptUrl = String(db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '').trim();
   if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
 
   const res = await fetch(scriptUrl, {
