@@ -770,185 +770,59 @@ app.post('/api/auth/change-password', (req, res) => {
 // POST /api/auth/register - Public new member registration
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const {
-      memberData,
-      password,
-      photoData,
-      photoUrl,
-      photoFileName,
-      scriptUrl
-    } = req.body || {};
-
+    const { memberData, password, photoData, photoUrl, photoFileName } = req.body || {};
     if (!memberData || !memberData.fullName) {
       return res.status(400).json({ success: false, message: 'Data anggota wajib dilengkapi.' });
     }
-
     const rawPassword = typeof password === 'string' ? password : '';
     if (rawPassword.length < 6) {
       return res.status(400).json({ success: false, message: 'Kata sandi minimal 6 karakter.' });
     }
-
     const email = String(memberData.email || '').trim().toLowerCase();
-    const requestedUsername = String(memberData.username || '').trim().toLowerCase();
-    const username = requestedUsername || (email ? email.split('@')[0] : '');
-
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email wajib diisi untuk membuat akun.' });
+    const username = String(memberData.username || (email ? email.split('@')[0] : '')).trim().toLowerCase();
+    if (!email || !username) {
+      return res.status(400).json({ success: false, message: 'Email dan nama pengguna wajib diisi.' });
     }
-
-    if (!username) {
-      return res.status(400).json({ success: false, message: 'Nama pengguna tidak dapat ditentukan dari data pendaftaran.' });
-    }
-
-    const hasPhotoData = typeof photoData === 'string' && /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(photoData.trim());
-    const hasPhotoUrl = typeof photoUrl === 'string' && /^https?:\/\//i.test(photoUrl.trim());
-
-    if (!hasPhotoData && !hasPhotoUrl) {
-      return res.status(400).json({ success: false, message: 'Foto anggota belum dipilih atau format foto tidak valid.' });
-    }
-
-    // Jika klien lama masih mengirim Base64 ke endpoint register, pindahkan
-    // foto ke Drive terlebih dahulu agar REGISTER_MEMBER tetap ringan.
-    let resolvedPhotoUrl = hasPhotoUrl ? String(photoUrl).trim() : '';
-    if (hasPhotoData) {
-      const uploadResult = await forwardToGoogleAppsScript({
+    let resolvedPhotoUrl = typeof photoUrl === 'string' && /^https?:\/\//i.test(photoUrl.trim()) ? photoUrl.trim() : '';
+    if (!resolvedPhotoUrl && typeof photoData === 'string' && /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(photoData.trim())) {
+      const gasResult = await forwardToGoogleAppsScript({
         action: 'UPLOAD_IMAGE',
-        base64: String(photoData).trim(),
-        filename: String(photoFileName || `KTA_${Date.now()}.jpg`),
+        base64: photoData.trim(),
+        filename: String(photoFileName || `KTA_${Date.now()}.jpg`).trim(),
         category: 'MEMBER_AVATAR'
       });
-      if (!uploadResult?.success || !uploadResult?.url) {
-        throw new Error(uploadResult?.message || 'Google Apps Script gagal menyimpan foto ke Drive.');
+      if (!gasResult?.success || !gasResult?.url) {
+        return res.status(502).json({ success: false, message: gasResult?.message || 'Foto gagal disimpan ke Google Drive.' });
       }
-      resolvedPhotoUrl = String(uploadResult.url).trim();
+      resolvedPhotoUrl = String(gasResult.url).trim();
     }
-
-    const duplicateUser = db.users.find(u =>
-      (u.username && String(u.username).toLowerCase() === username) ||
-      (u.email && String(u.email).toLowerCase() === email)
-    );
-
-    if (duplicateUser) {
-      return res.status(409).json({ success: false, message: 'Username atau email sudah terdaftar. Silakan gunakan akun yang sudah ada.' });
+    if (!resolvedPhotoUrl) {
+      return res.status(400).json({ success: false, message: 'Foto anggota belum dipilih atau URL foto tidak valid.' });
     }
-
-    const duplicateMember = db.members.find(m =>
-      (m.email && String(m.email).toLowerCase() === email) ||
-      (memberData.nationalMemberNumber && m.nationalMemberNumber &&
-        String(m.nationalMemberNumber).toLowerCase() === String(memberData.nationalMemberNumber).toLowerCase())
-    );
-
-    if (duplicateMember) {
-      return res.status(409).json({ success: false, message: 'Email atau Nomor KTA sudah terdaftar.' });
-    }
-
+    const duplicateUser = db.users.find(u => (u.username && String(u.username).toLowerCase() === username) || (u.email && String(u.email).toLowerCase() === email));
+    if (duplicateUser) return res.status(409).json({ success: false, message: 'Username atau email sudah terdaftar.' });
+    const duplicateMember = db.members.find(m => m.email && String(m.email).toLowerCase() === email);
+    if (duplicateMember) return res.status(409).json({ success: false, message: 'Email sudah terdaftar.' });
     const memberId = String(memberData.id || `member-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`);
     const userId = String(memberData.userId || `user-${memberId}`);
     const registeredAt = new Date().toISOString();
     const gasPasswordHash = hashPasswordForGoogleAppsScript(rawPassword);
-
-    const safeMemberData = {
-      ...memberData,
-      avatarUrl: resolvedPhotoUrl
-    };
-
-    const newMember = {
-      ...safeMemberData,
-      id: memberId,
-      userId,
-      email,
-      status: 'PENDING',
-      registeredAt,
-      passwordHash: hashPassword(rawPassword),
-      avatarUrl: resolvedPhotoUrl
-    };
-
-    const newUser = {
-      id: userId,
-      username,
-      email,
-      passwordHash: hashPassword(rawPassword),
-      name: newMember.fullName,
-      role: 'MEMBER',
-      jurisdictionName: `${newMember.branchName || ''}${newMember.regencyName ? `, ${newMember.regencyName}` : ''}`.replace(/^,\s*|\s*,\s*$/g, ''),
-      jurisdictionId: newMember.regencyId,
-      avatarUrl: resolvedPhotoUrl,
-      memberId,
-      createdAt: registeredAt
-    };
-
-    const gasResult = await forwardToGoogleAppsScript({
-      action: 'REGISTER_MEMBER',
-      memberId,
-      userId,
-      passwordHash: gasPasswordHash,
-      photoData: '',
-      photoUrl: resolvedPhotoUrl,
-      photoFileName: String(photoFileName || `${memberId}.jpg`),
-      member: newMember,
-      user: {
-        ...newUser,
-        passwordHash: gasPasswordHash
-      }
-    });
-
-    if (!gasResult || gasResult.success !== true) {
-      throw new Error(gasResult?.message || 'Google Apps Script tidak mengonfirmasi penyimpanan.');
-    }
-
-    if (!gasResult.member || !gasResult.user || !gasResult.member.avatarUrl) {
-      throw new Error('Google Apps Script belum mengembalikan data anggota dan URL foto Drive yang valid.');
-    }
-
-    newMember.avatarUrl = gasResult.member.avatarUrl;
-    newUser.avatarUrl = gasResult.user.avatarUrl;
-
-    db.members.unshift(newMember);
-    db.users.push(newUser);
-
-    db.auditLogs.unshift({
-      id: `log-${Date.now()}`,
-      userId: 'public-register',
-      userName: newMember.fullName,
-      userRole: 'PUBLIC',
-      action: 'REGISTER',
-      targetType: 'MEMBER',
-      targetId: memberId,
-      description: `Pendaftaran mandiri calon anggota baru: ${newMember.fullName}`,
-      timestamp: registeredAt
-    });
-
-    if (db.auditLogs.length > 500) db.auditLogs.pop();
+    const localPasswordHash = hashPassword(rawPassword);
+    const newMember = { ...memberData, id: memberId, userId, email, status: 'PENDING', registeredAt, passwordHash: localPasswordHash, avatarUrl: resolvedPhotoUrl };
+    const newUser = { id: userId, username, email, passwordHash: gasPasswordHash, name: newMember.fullName, role: 'MEMBER', jurisdictionName: `${newMember.branchName || ''}${newMember.regencyName ? `, ${newMember.regencyName}` : ''}`.replace(/^,\s*|\s*,\s*$/g, ''), jurisdictionId: newMember.regencyId || '', avatarUrl: resolvedPhotoUrl, memberId, createdAt: registeredAt, status: 'PENDING' };
+    const gasResult = await forwardToGoogleAppsScript({ action: 'REGISTER_MEMBER', memberId, userId, passwordHash: gasPasswordHash, photoData: '', photoUrl: resolvedPhotoUrl, photoFileName: String(photoFileName || `${memberId}.jpg`), member: newMember, user: newUser });
+    if (!gasResult?.success || !gasResult.member || !gasResult.user) throw new Error(gasResult?.message || 'Google Apps Script tidak mengonfirmasi penyimpanan.');
+    const savedMember = { ...newMember, ...(gasResult.member || {}), avatarUrl: resolvedPhotoUrl };
+    const savedUser = { ...newUser, ...(gasResult.user || {}), avatarUrl: resolvedPhotoUrl };
+    const existingMemberIndex = db.members.findIndex(m => String(m.id) === memberId);
+    if (existingMemberIndex >= 0) db.members[existingMemberIndex] = savedMember; else db.members.push(savedMember);
+    const existingUserIndex = db.users.findIndex(u => String(u.id) === userId);
+    if (existingUserIndex >= 0) db.users[existingUserIndex] = savedUser; else db.users.push(savedUser);
     saveDatabase();
-
-    const token = createSession(newUser);
-    const sanitizedUser = {
-      id: newUser.id,
-      username: newUser.username,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      jurisdictionName: newUser.jurisdictionName,
-      jurisdictionId: newUser.jurisdictionId,
-      avatarUrl: newUser.avatarUrl,
-      memberId: newUser.memberId
-    };
-
-    return res.status(201).json({
-      success: true,
-      message: 'Pendaftaran berhasil disimpan ke Google Spreadsheet dan foto berhasil diunggah ke Google Drive.',
-      memberId,
-      member: newMember,
-      user: sanitizedUser,
-      token,
-      drive: gasResult.drive || null
-    });
-  } catch (err: any) {
-    console.error('[Auth Register] Gagal:', err);
-    return res.status(502).json({
-      success: false,
-      message: err?.message || 'Pendaftaran gagal disimpan ke Google Spreadsheet.'
-    });
+    return res.json({ success: true, message: 'Pendaftaran berhasil. Data tersimpan di Google Spreadsheet.', memberId, userId, member: savedMember, user: savedUser, drive: gasResult.drive || { url: resolvedPhotoUrl } });
+  } catch (error: any) {
+    console.error('[Register] Failed:', error);
+    return res.status(500).json({ success: false, message: error?.message || 'Pendaftaran gagal diproses.' });
   }
 });
 
