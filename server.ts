@@ -626,6 +626,29 @@ app.get('/api/health', (req, res) => {
 // Browser -> Node/Vercel -> GAS creates Drive resumable session
 // -> Node/Vercel streams binary to Google Drive -> GAS finalizes permission.
 // Base64 is intentionally NOT used on the primary upload path.
+// Mobile browsers may label the binary body as application/octet-stream, so use
+// the explicit upload MIME header first and fall back to binary signature sniffing.
+function detectImageMimeFromBufferServer(buffer: Buffer): string {
+  if (!buffer || buffer.length < 4) return '';
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) return 'image/png';
+  if (buffer.length >= 6) {
+    const sig = buffer.subarray(0, 6).toString('ascii');
+    if (sig === 'GIF87a' || sig === 'GIF89a') return 'image/gif';
+  }
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return '';
+}
+
+function resolveUploadMimeTypeServer(req: any, body: Buffer): string {
+  const hinted = String(req.header('x-upload-mime-type') || '').split(';')[0].trim().toLowerCase();
+  const contentType = String(req.header('content-type') || '').split(';')[0].trim().toLowerCase();
+  const allowed = /^image\/(?:jpeg|jpg|png|webp|gif)$/i;
+  if (allowed.test(hinted)) return hinted === 'image/jpg' ? 'image/jpeg' : hinted;
+  if (allowed.test(contentType)) return contentType === 'image/jpg' ? 'image/jpeg' : contentType;
+  return detectImageMimeFromBufferServer(body);
+}
+
 app.post(
   '/api/upload-image',
   express.raw({ type: ['application/octet-stream', 'image/*'], limit: '4mb' }),
@@ -634,7 +657,7 @@ app.post(
     try {
       const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from([]);
       const filenameHeader = String(req.header('x-upload-filename') || '').trim();
-      const mimeType = String(req.header('x-upload-mime-type') || req.header('content-type') || '').trim().toLowerCase();
+      const mimeType = resolveUploadMimeTypeServer(req, body);
       const category = String(req.header('x-upload-category') || 'MEMBER_AVATAR').trim().toUpperCase();
       if (!body.length) return res.status(400).json({ success:false, status:'error', requestId, message:'Berkas foto kosong.' });
       if (body.length > 4 * 1024 * 1024) return res.status(413).json({ success:false, status:'error', requestId, message:'Foto terlalu besar. Maksimal 4 MB untuk jalur upload mobile.' });
