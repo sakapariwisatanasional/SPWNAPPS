@@ -142,6 +142,7 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
 
 class StorageService {
   private listeners: (() => void)[] = [];
+  private mutationListeners: ((event: any) => void)[] = [];
 
   constructor() {
     this.initDefaultData();
@@ -184,37 +185,35 @@ class StorageService {
     };
   }
 
-  public subscribeMutation(
-    listener: (event: any) => void
-  ): () => void {
-    if (typeof window === 'undefined') {
-      return () => {};
-    }
+  public subscribeMutation(listener: (event: any) => void): () => void {
+    this.mutationListeners.push(listener);
+    if (typeof window === 'undefined') return () => {};
 
-    const handler = (e: StorageEvent) => {
-      if (
-        e.key &&
-        Object.values(STORAGE_KEYS).includes(e.key)
-      ) {
-        try {
-          listener({
-            type: e.key,
-            payload: JSON.parse(e.newValue || '{}')
-          });
-        } catch {
-          listener({
-            type: e.key,
-            payload: null
-          });
-        }
-      }
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key !== 'saka_mutation_event_v2' || !e.newValue) return;
+      try { listener(JSON.parse(e.newValue)); } catch {}
     };
-
-    window.addEventListener('storage', handler);
-
+    window.addEventListener('storage', storageHandler);
     return () => {
-      window.removeEventListener('storage', handler);
+      this.mutationListeners = this.mutationListeners.filter(l => l !== listener);
+      window.removeEventListener('storage', storageHandler);
     };
+  }
+
+  public emitMutation(type: string, action: string, payload: any, meta: Record<string, any> = {}) {
+    if (typeof window === 'undefined') return;
+    const event = {
+      type, action, payload,
+      timestamp: Date.now(),
+      source: 'storage-service',
+      ...meta
+    };
+    this.mutationListeners.forEach(listener => { try { listener(event); } catch (e) { console.warn('[Storage] mutation listener error', e); } });
+    try {
+      localStorage.setItem('saka_mutation_event_v2', JSON.stringify(event));
+      localStorage.removeItem('saka_mutation_event_v2');
+    } catch {}
+    try { window.dispatchEvent(new CustomEvent('saka:local-mutation', { detail: event })); } catch {}
   }
 
   public notify() {
@@ -512,6 +511,7 @@ class StorageService {
     const previousMember = { ...current };
     members[index] = updatedMember;
     this.setMembers(members);
+    this.emitMutation('MEMBER', 'UPDATE', updatedMember, { pending: true });
 
     const markPendingWrite = (pending: boolean) => {
       try {
@@ -930,6 +930,7 @@ class StorageService {
 
     // Simpan perubahan lokal terlebih dahulu agar UI langsung berubah.
     this.setMembers(filteredMembers);
+    this.emitMutation('MEMBER', 'DELETE', { id: memberId, memberId, kta: members.find(member => member.id === memberId)?.nationalMemberNumber || '' });
 
     // DELETE harus diteruskan ke server agar benar-benar menghapus baris
     // pada Google Spreadsheet. Jangan hanya mengandalkan LocalStorage.
