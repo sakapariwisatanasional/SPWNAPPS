@@ -1825,7 +1825,7 @@ class SpreadsheetService {
         throw new Error(data?.message || `Pendaftaran gagal (HTTP ${response.status}).`);
       }
       if (!data.member || !data.user) {
-        throw new Error('Server tidak mengembalikan data anggota dan akun yang lengkap.');
+        throw new Error(data?.message || 'Server tidak mengembalikan data anggota dan akun yang lengkap.');
       }
       return data;
     } catch (err: any) {
