@@ -1231,6 +1231,10 @@ app.post('/api/mutate', async (req, res) => {
       if (!isSuperAdmin) {
         return res.status(403).json({ success: false, message: 'Hanya Super Admin Nasional yang berhak menghapus data anggota.' });
       }
+    } else if (action === 'SELF_UPDATE') {
+      if (session?.role !== 'MEMBER' || !session?.memberId) {
+        return res.status(403).json({ success: false, message: 'Hanya anggota yang sedang login yang dapat memperbarui profilnya sendiri.' });
+      }
     } else if (action === 'UPDATE' || action === 'STATUS' || action === 'BATCH_DELETE_DUMMY') {
       if (!isSuperAdmin && !isOperator) {
         return res.status(403).json({ success: false, message: 'Wewenang administrator diperlukan untuk memperbarui data anggota.' });
@@ -1256,7 +1260,7 @@ app.post('/api/mutate', async (req, res) => {
 
   try {
     if (type === 'MEMBER') {
-      const member = payload;
+      let member = payload;
       if (action === 'CREATE' || action === 'REGISTER') {
         const idx = db.members.findIndex(m => m.id === member.id || (member.nationalMemberNumber && m.nationalMemberNumber === member.nationalMemberNumber));
         if (idx !== -1) {
@@ -1285,13 +1289,44 @@ app.post('/api/mutate', async (req, res) => {
             `https://spwnapps.vercel.app/?verifyId=${member.nationalMemberNumber || member.id}`
           ]
         });
-      } else if (action === 'UPDATE' || action === 'STATUS' || action === 'PHOTO_UPDATE') {
-        const idx = db.members.findIndex(m => m.id === member.id);
-        if (idx !== -1) {
-          db.members[idx] = { ...db.members[idx], ...member };
-        } else {
-          db.members.unshift(member);
+      } else if (action === 'SELF_UPDATE' || action === 'UPDATE' || action === 'STATUS' || action === 'PHOTO_UPDATE') {
+        let idx = db.members.findIndex(m => m.id === member.id);
+        if (idx === -1 && action === 'SELF_UPDATE' && session?.memberId) {
+          idx = db.members.findIndex(m => m.id === session.memberId);
         }
+        if (idx === -1) {
+          return res.status(404).json({ success: false, message: 'Anggota tidak ditemukan.' });
+        }
+        const existingMember = db.members[idx];
+
+        if (action === 'SELF_UPDATE') {
+          if (!session?.memberId || String(existingMember.id) !== String(session.memberId)) {
+            return res.status(403).json({ success: false, message: 'Anda hanya dapat mengubah profil Anda sendiri.' });
+          }
+          const allowed = ['fullName','nikMasked','gender','birthPlace','birthDate','phone','email','address','provinceId','provinceName','regencyId','regencyName','districtId','districtName','krida','currentPosition','educationLevel','occupation','bio','avatarUrl'];
+          const safeMember: any = { id: existingMember.id };
+          for (const key of allowed) {
+            if (Object.prototype.hasOwnProperty.call(member || {}, key)) safeMember[key] = member[key];
+          }
+
+          const existingIsNational = String(existingMember.provinceId || '') === '00';
+          const requestedProvinceId = String(safeMember.provinceId ?? existingMember.provinceId ?? '');
+          if (requestedProvinceId === '00' && !existingIsNational) {
+            return res.status(403).json({ success: false, message: 'Kwartir Nasional tidak dapat dipilih oleh anggota.' });
+          }
+          if (existingIsNational && requestedProvinceId !== '00') {
+            return res.status(403).json({ success: false, message: 'Anggota Kwartir Nasional tidak dapat memindahkan struktur Kwartir melalui edit profil mandiri.' });
+          }
+          if (requestedProvinceId === '00') {
+            delete safeMember.regencyId;
+            delete safeMember.regencyName;
+            delete safeMember.districtId;
+            delete safeMember.districtName;
+          }
+          member = safeMember;
+        }
+
+        db.members[idx] = { ...existingMember, ...member, id: existingMember.id, userId: existingMember.userId };
         await forwardToGoogleAppsScript({
           action: 'UPSERT_MEMBER',
           sheet: 'Anggota',
