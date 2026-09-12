@@ -36,10 +36,15 @@ export function getMemberVerificationUrl(member: Member): string {
     ? window.location.origin
     : 'https://sakapariwisata-nasional.vercel.app';
 
-  // Sumber identitas QR harus sama dengan kolom verifikasi di Spreadsheet.
-  // QR membuka route verifikasi langsung; identitas utama adalah Nomor KTA.
-  const verifyId = String(member.nationalMemberNumber || member.id || '').trim();
-  return `${origin}/verify?verifyId=${encodeURIComponent(verifyId)}`;
+  // QR membawa dua identitas. Nomor KTA menjadi identitas utama, sedangkan
+  // memberId menjadi fallback permanen bila Nomor KTA diedit oleh SuperAdmin.
+  const verifyId = String(member.nationalMemberNumber || '').trim();
+  const memberId = String(member.id || member.userId || '').trim();
+  const params = new URLSearchParams();
+  if (verifyId) params.set('verifyId', verifyId);
+  if (memberId) params.set('memberId', memberId);
+  if (!verifyId && memberId) params.set('id', memberId);
+  return `${origin}/verify?${params.toString()}`;
 }
 
 export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
