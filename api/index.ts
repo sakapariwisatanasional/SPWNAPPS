@@ -1447,8 +1447,29 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const hasPhotoData = typeof photoData === 'string' && /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(photoData.trim());
-    const hasPhotoUrl = typeof photoUrl === 'string' && /^https?:\/\//i.test(photoUrl.trim());
-    if (!hasPhotoData && !hasPhotoUrl) {
+    let resolvedPhotoUrl = typeof photoUrl === 'string' && /^https?:\/\//i.test(photoUrl.trim()) ? photoUrl.trim() : '';
+
+    // Backward compatibility: if an older browser still sends Base64, upload it
+    // before REGISTER_MEMBER and forward only the resulting Drive URL.
+    if (hasPhotoData && !resolvedPhotoUrl) {
+      const uploadResult = await forwardToGoogleAppsScript({
+        action: 'UPLOAD_IMAGE',
+        base64: photoData.trim(),
+        filename: String(photoFileName || `KTA_${Date.now()}.jpg`).trim(),
+        category: 'MEMBER_AVATAR'
+      }, registrationScriptUrl);
+
+      if (!uploadResult?.success || !uploadResult?.url) {
+        return res.status(502).json({
+          success: false,
+          requestId,
+          message: uploadResult?.message || 'Foto gagal disimpan ke Google Drive.'
+        });
+      }
+      resolvedPhotoUrl = String(uploadResult.url).trim();
+    }
+
+    if (!resolvedPhotoUrl) {
       return res.status(400).json({
         success: false,
         requestId,
@@ -1486,22 +1507,15 @@ app.post('/api/auth/register', async (req, res) => {
     const registeredAt = new Date().toISOString();
     const passHash = hashPassword(rawPassword);
 
-    // Jangan pernah menyimpan Base64 di memberData.avatarUrl. Foto perangkat
-    // sekarang sudah di-upload ke Drive sebelum request registrasi.
-    const safeMemberData = {
-      ...memberData,
-      avatarUrl: hasPhotoUrl ? String(photoUrl).trim() : ''
-    };
-
     const newMember = {
-      ...safeMemberData,
+      ...memberData,
       id: memberId,
       userId,
       email,
       status: 'PENDING',
       registeredAt,
       passwordHash: passHash,
-      avatarUrl: hasPhotoUrl ? String(photoUrl).trim() : ''
+      avatarUrl: resolvedPhotoUrl
     };
 
     const newUser = {
@@ -1527,7 +1541,7 @@ app.post('/api/auth/register', async (req, res) => {
       memberId,
       userId,
       hasPhotoData,
-      hasPhotoUrl
+      hasPhotoUrl: Boolean(resolvedPhotoUrl)
     });
 
     const gasResult = await forwardToGoogleAppsScript({
@@ -1536,8 +1550,8 @@ app.post('/api/auth/register', async (req, res) => {
       memberId,
       userId,
       passwordHash: passHash,
-      photoData: hasPhotoData ? photoData.trim() : '',
-      photoUrl: hasPhotoUrl ? String(photoUrl).trim() : '',
+      photoData: '',
+      photoUrl: resolvedPhotoUrl,
       photoFileName: String(photoFileName || `KTA_${memberId}.jpg`).trim(),
       member: newMember,
       user: newUser
