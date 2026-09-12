@@ -566,42 +566,64 @@ class SpreadsheetService {
    * Mengambil data mentah baris dari Google Spreadsheet menggunakan Google Visualization API
    */
   public async fetchSheetRows(sheetName: string = 'Anggota'): Promise<Record<string, any>[]> {
-    // Google Apps Script URL adalah satu-satunya endpoint sinkronisasi browser.
-    // Jangan melakukan fetch langsung ke docs.google.com karena akan terkena CORS.
-    const scriptUrl = this.config.scriptUrl;
-    if (!scriptUrl || !scriptUrl.trim()) return [];
-
-    try {
-      let lastError: any = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          const gasUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}&nocache=1`;
-          const response = await fetch(gasUrl, {
-            method: 'GET',
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, max-age=0' }
-          });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = await response.json();
-          if (Array.isArray(data)) return data;
-          if (Array.isArray(data?.rows)) return data.rows;
-          if (Array.isArray(data?.data)) return data.data;
-          if (Array.isArray(data?.records)) return data.records;
-          return [];
-        } catch (e) {
-          lastError = e;
-          if (attempt < 3) await new Promise(r => setTimeout(r, 250 * attempt));
-        }
-      }
-      throw lastError || new Error('Gagal membaca Spreadsheet');
-    } catch (error: any) {
-      const message = error?.message || `Gagal membaca sheet ${sheetName}`;
-      console.error(`[Spreadsheet] Gagal membaca sheet ${sheetName} melalui Google Apps Script:`, message);
-      // PENTING: jangan mengubah kegagalan READ menjadi [] karena [] akan
-      // terlihat seperti Spreadsheet kosong dan membuat Dashboard mempertahankan
-      // cache lama. Error harus naik ke syncFromSpreadsheet() agar status menjadi ERROR.
-      throw new Error(`Gagal membaca sheet ${sheetName}: ${message}`);
+    // Semua pembacaan Spreadsheet browser melewati proxy Vercel. Ini menghindari
+    // masalah redirect/CORS Google Apps Script dan memastikan URL GAS yang dipilih
+    // SuperAdmin benar-benar dipakai oleh seluruh halaman.
+    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    if (!scriptUrl) {
+      throw new Error('Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.');
     }
+
+    let lastError: any = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const params = new URLSearchParams();
+        params.set('sheet', sheetName);
+        params.set('scriptUrl', scriptUrl);
+        params.set('_t', String(Date.now()));
+        params.set('_r', String(Math.floor(Math.random() * 1000000)));
+
+        const response = await fetch(`/api/spreadsheet-data?${params.toString()}`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+            'Pragma': 'no-cache'
+          }
+        });
+
+        const text = await response.text();
+        let data: any = null;
+        try { data = text ? JSON.parse(text) : null; } catch {}
+
+        if (!response.ok) {
+          throw new Error(data?.message || `HTTP ${response.status}`);
+        }
+
+        if (data?.success === false) {
+          throw new Error(data?.message || `Gagal membaca sheet ${sheetName}.`);
+        }
+
+        const rows = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.rows) ? data.rows
+          : Array.isArray(data?.data) ? data.data
+          : Array.isArray(data?.records) ? data.records
+          : null;
+
+        if (!rows) {
+          throw new Error(`Respons sheet ${sheetName} tidak berisi array data yang valid.`);
+        }
+
+        return rows;
+      } catch (e: any) {
+        lastError = e;
+        if (attempt < 3) await new Promise(r => setTimeout(r, 300 * attempt));
+      }
+    }
+
+    console.warn(`[Spreadsheet] Gagal membaca sheet ${sheetName}:`, lastError);
+    throw lastError || new Error(`Gagal membaca sheet ${sheetName}.`);
   }
 
   /**
@@ -720,7 +742,7 @@ class SpreadsheetService {
       let addedMemberCount = 0;
       const newlyDiscoveredMembers: Member[] = [];
       
-      if (rows && rows.length > 0) {
+      if (Array.isArray(rows)) {
         const existingMembers = storage.getMembers();
         const existingUsers = storage.getUsers();
         const prevMemberIds = new Set(existingMembers.map(m => m.id));
@@ -943,11 +965,7 @@ class SpreadsheetService {
         // Google Spreadsheet adalah source of truth. Snapshot yang berhasil
         // dibaca menggantikan cache anggota, sehingga penghapusan/perubahan
         // dari perangkat lain juga hilang dari browser pada polling berikutnya.
-        // Snapshot Anggota yang berhasil dibaca adalah source of truth.
-        // Bahkan jika sheet benar-benar kosong, cache harus ikut menjadi kosong.
-        // Kondisi READ gagal tidak pernah sampai di sini karena fetchSheetRows()
-        // sekarang melempar error, bukan mengembalikan [] saat gagal.
-        {
+        if (importedMembers.length > 0) {
           const merged = [...importedMembers];
           const mergedUsers = [...existingUsers];
 
@@ -1015,16 +1033,13 @@ class SpreadsheetService {
           // Kirim notifikasi jika terdeteksi pendaftaran anggota baru dari perangkat lain
           if (this.lastKnownMemberCount > 0 && newlyDiscoveredMembers.length > 0) {
             newlyDiscoveredMembers.forEach(nm => {
-              storage.addNotification({
-                id: `sync-new-member-${nm.id}-${Date.now()}`,
-                userId: 'user-superadmin-rohadi',
-                title: `Pendaftaran Anggota Baru (${nm.krida})`,
-                message: `Kak ${nm.fullName} (${nm.districtName || 'Kecamatan'}, ${nm.regencyName}) baru saja mendaftar online. Data langsung sinkron secara real-time.`,
-                type: 'SUCCESS',
-                link: '/members',
-                isRead: false,
-                createdAt: new Date().toISOString()
-              });
+              storage.addNotification(
+                'user-superadmin-rohadi',
+                `Pendaftaran Anggota Baru (${nm.krida})`,
+                `Kak ${nm.fullName} (${nm.districtName || 'Kecamatan'}, ${nm.regencyName}) baru saja mendaftar online. Data langsung sinkron secara real-time.`,
+                'SUCCESS',
+                '/members'
+              );
             });
           }
           this.lastKnownMemberCount = importedMembers.length;
@@ -1039,6 +1054,12 @@ class SpreadsheetService {
             storage.setUsers(mergedUsers);
           }
           memberCount = importedMembers.length;
+        } else {
+          // Sheet berhasil dibaca dan memang kosong: kosongkan cache anggota.
+          // Ini berbeda dengan kegagalan baca, yang akan melempar error di atas.
+          storage.setMembers([]);
+          memberCount = 0;
+          this.lastKnownMemberCount = 0;
         }
       }
 
