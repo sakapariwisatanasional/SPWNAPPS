@@ -144,6 +144,18 @@ const DB_FILE = path.join(DATA_DIR, 'saka-database.json');
 const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
 
+function normalizeManualAppsScriptUrl(value: unknown): string {
+  const url = String(value || '').trim();
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('script.google.com') || !parsed.pathname.endsWith('/exec')) return '';
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
 function hashPasswordForGoogleAppsScript(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
   const digest = crypto.createHash('sha256').update(`${salt}|${password}`, 'utf8').digest('hex');
@@ -579,8 +591,8 @@ setInterval(() => {
 }, 25000);
 
 // Proxy mutation to Google Apps Script Web App
-async function forwardToGoogleAppsScript(payload: any): Promise<any> {
-  const scriptUrl = String(db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '').trim();
+async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
+  const scriptUrl = String(normalizeManualAppsScriptUrl(requestedScriptUrl || '') || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '').trim();
   if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
 
   const res = await fetch(scriptUrl, {
@@ -628,7 +640,8 @@ app.post(
       if (body.length > 4 * 1024 * 1024) return res.status(413).json({ success:false, status:'error', requestId, message:'Foto terlalu besar. Maksimal 4 MB untuk jalur upload mobile.' });
       if (!/^image\/(?:jpeg|jpg|png|webp|gif)$/i.test(mimeType)) return res.status(415).json({ success:false, status:'error', requestId, message:'Format foto tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
       const safeFilename = (filenameHeader || `KTA_${Date.now()}.jpg`).replace(/[\\/:*?"<>|#%]+/g, '_').slice(0,160);
-      const sessionResult = await forwardToGoogleAppsScript({ action:'GET_UPLOAD_URL', fileName:safeFilename, mimeType, category });
+      const requestedScriptUrl = normalizeManualAppsScriptUrl(req.header('x-script-url') || '');
+      const sessionResult = await forwardToGoogleAppsScript({ action:'GET_UPLOAD_URL', fileName:safeFilename, mimeType, category }, requestedScriptUrl);
       const uploadUrl = String(sessionResult?.uploadUrl || '').trim();
       if (!uploadUrl) throw new Error(sessionResult?.message || 'Google Apps Script tidak mengembalikan URL upload Drive.');
       const driveResponse = await fetch(uploadUrl, { method:'PUT', headers:{ 'Content-Type':mimeType, 'Content-Length':String(body.length) }, body });
@@ -637,7 +650,7 @@ app.post(
       try { driveData = driveText ? JSON.parse(driveText) : null; } catch { driveData = null; }
       if (!driveResponse.ok || !driveData?.id) throw new Error(`Google Drive upload HTTP ${driveResponse.status}` + (driveData?.error?.message ? `: ${driveData.error.message}` : ''));
       const fileId = String(driveData.id);
-      const finalized = await forwardToGoogleAppsScript({ action:'FINALIZE_UPLOAD', fileId, fileName:safeFilename, mimeType, category });
+      const finalized = await forwardToGoogleAppsScript({ action:'FINALIZE_UPLOAD', fileId, fileName:safeFilename, mimeType, category }, requestedScriptUrl);
       const finalUrl = String(finalized?.url || finalized?.directUrl || `https://drive.google.com/uc?export=view&id=${fileId}`).trim();
       console.log(`[Upload][${requestId}] Drive upload successful`, { fileId, filename:safeFilename, bytes:body.length });
       return res.json({ success:true, status:'success', action:'UPLOAD_IMAGE', requestId, fileId, url:finalUrl, directUrl:String(finalized?.directUrl || finalUrl), viewUrl:String(finalized?.viewUrl || `https://drive.google.com/uc?export=view&id=${fileId}`), folderId:finalized?.folderId || null, filename:safeFilename, category, message:'Foto berhasil disimpan ke Google Drive.' });
