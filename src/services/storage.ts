@@ -49,6 +49,10 @@ function getManualAppsScriptUrl(): string {
   }
 }
 
+export function getConfiguredAppsScriptUrl(): string {
+  return getManualAppsScriptUrl();
+}
+
 const STORAGE_KEYS = {
   MEMBERS: 'saka_members',
   TOURS: 'saka_tours',
