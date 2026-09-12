@@ -38,8 +38,9 @@ export function normalizeNtaQuery(rawInput: string): {
         const urlObj = new URL(text);
         const qId = urlObj.searchParams.get('verifyId') || 
                     urlObj.searchParams.get('nta') || 
-                    urlObj.searchParams.get('id') || 
-                    urlObj.searchParams.get('kta');
+                    urlObj.searchParams.get('kta') ||
+                    urlObj.searchParams.get('memberId') ||
+                    urlObj.searchParams.get('id');
         if (qId) {
           extractedQuery = qId.trim();
         } else if (urlObj.pathname.includes('/verify/')) {
@@ -299,15 +300,35 @@ export async function verifyMemberUniversal(
   // Jangan mengembalikan record localStorage yang mungkin merupakan KTA lama.
   if (authoritativeRemote) {
     try {
-      const remoteMatch = await searchMemberInRemoteSpreadsheet(rawInput);
-      if (remoteMatch) {
-        return {
-          found: true,
-          member: remoteMatch,
-          source: 'GOOGLE_SPREADSHEET',
-          searchTerm: rawInput,
-          normalizedTerm: cleanQuery
-        };
+      // QR baru dapat membawa lebih dari satu identitas: Nomor KTA dan memberId.
+      // Coba semuanya ke Spreadsheet sehingga perubahan Nomor KTA tidak memutus QR.
+      const candidates: string[] = [];
+      const pushCandidate = (value: string | null) => {
+        const v = String(value || '').trim();
+        if (v && !candidates.some(c => c.toLowerCase() === v.toLowerCase())) candidates.push(v);
+      };
+      pushCandidate(cleanQuery);
+      if (typeof window !== 'undefined') {
+        try {
+          const u = new URL(rawInput, window.location.origin);
+          pushCandidate(u.searchParams.get('verifyId'));
+          pushCandidate(u.searchParams.get('memberId'));
+          pushCandidate(u.searchParams.get('nta'));
+          pushCandidate(u.searchParams.get('kta'));
+          pushCandidate(u.searchParams.get('id'));
+        } catch {}
+      }
+      for (const candidate of candidates) {
+        const remoteMatch = await searchMemberInRemoteSpreadsheet(candidate);
+        if (remoteMatch) {
+          return {
+            found: true,
+            member: remoteMatch,
+            source: 'GOOGLE_SPREADSHEET',
+            searchTerm: rawInput,
+            normalizedTerm: normalizeNtaQuery(candidate).cleanQuery
+          };
+        }
       }
     } catch (e) {
       console.warn('Authoritative Google Spreadsheet verification failed:', e);
