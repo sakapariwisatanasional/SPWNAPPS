@@ -774,7 +774,9 @@ app.post('/api/auth/register', async (req, res) => {
       memberData,
       password,
       photoData,
-      photoFileName
+      photoUrl,
+      photoFileName,
+      scriptUrl
     } = req.body || {};
 
     if (!memberData || !memberData.fullName) {
@@ -798,8 +800,27 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Nama pengguna tidak dapat ditentukan dari data pendaftaran.' });
     }
 
-    if (!photoData || typeof photoData !== 'string' || !photoData.startsWith('data:image/')) {
+    const hasPhotoData = typeof photoData === 'string' && /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(photoData.trim());
+    const hasPhotoUrl = typeof photoUrl === 'string' && /^https?:\/\//i.test(photoUrl.trim());
+
+    if (!hasPhotoData && !hasPhotoUrl) {
       return res.status(400).json({ success: false, message: 'Foto anggota belum dipilih atau format foto tidak valid.' });
+    }
+
+    // Jika klien lama masih mengirim Base64 ke endpoint register, pindahkan
+    // foto ke Drive terlebih dahulu agar REGISTER_MEMBER tetap ringan.
+    let resolvedPhotoUrl = hasPhotoUrl ? String(photoUrl).trim() : '';
+    if (hasPhotoData) {
+      const uploadResult = await forwardToGoogleAppsScript({
+        action: 'UPLOAD_IMAGE',
+        base64: String(photoData).trim(),
+        filename: String(photoFileName || `KTA_${Date.now()}.jpg`),
+        category: 'MEMBER_AVATAR'
+      });
+      if (!uploadResult?.success || !uploadResult?.url) {
+        throw new Error(uploadResult?.message || 'Google Apps Script gagal menyimpan foto ke Drive.');
+      }
+      resolvedPhotoUrl = String(uploadResult.url).trim();
     }
 
     const duplicateUser = db.users.find(u =>
@@ -826,15 +847,20 @@ app.post('/api/auth/register', async (req, res) => {
     const registeredAt = new Date().toISOString();
     const gasPasswordHash = hashPasswordForGoogleAppsScript(rawPassword);
 
-    const newMember = {
+    const safeMemberData = {
       ...memberData,
+      avatarUrl: resolvedPhotoUrl
+    };
+
+    const newMember = {
+      ...safeMemberData,
       id: memberId,
       userId,
       email,
       status: 'PENDING',
       registeredAt,
       passwordHash: hashPassword(rawPassword),
-      avatarUrl: ''
+      avatarUrl: resolvedPhotoUrl
     };
 
     const newUser = {
@@ -846,7 +872,7 @@ app.post('/api/auth/register', async (req, res) => {
       role: 'MEMBER',
       jurisdictionName: `${newMember.branchName || ''}${newMember.regencyName ? `, ${newMember.regencyName}` : ''}`.replace(/^,\s*|\s*,\s*$/g, ''),
       jurisdictionId: newMember.regencyId,
-      avatarUrl: '',
+      avatarUrl: resolvedPhotoUrl,
       memberId,
       createdAt: registeredAt
     };
@@ -856,7 +882,8 @@ app.post('/api/auth/register', async (req, res) => {
       memberId,
       userId,
       passwordHash: gasPasswordHash,
-      photoData,
+      photoData: '',
+      photoUrl: resolvedPhotoUrl,
       photoFileName: String(photoFileName || `${memberId}.jpg`),
       member: newMember,
       user: {
