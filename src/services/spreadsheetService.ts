@@ -6,6 +6,13 @@ import { MASTER_SKILLS } from '../data/initialData';
 export const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 export const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
 
+// Production Google Apps Script Web App used by public/member registration.
+// This MUST be available on a fresh HP/tablet/browser; relying only on
+// localStorage makes public registration fail on devices that never opened
+// the Super Admin API settings.
+export const DEFAULT_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekQK_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
+
 const SPREADSHEET_CONFIG_KEY = 'saka_spreadsheet_config_v1';
 
 export interface SpreadsheetConfig {
@@ -88,7 +95,7 @@ class SpreadsheetService {
             ...data.config,
             spreadsheetId: localSpreadsheetId || serverSpreadsheetId || DEFAULT_SPREADSHEET_ID,
             spreadsheetUrl: this.config.spreadsheetUrl || data.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
-            scriptUrl: localScriptUrl || serverScriptUrl
+            scriptUrl: localScriptUrl || serverScriptUrl || DEFAULT_APPS_SCRIPT_URL
           };
           localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
           this.notifySyncState();
@@ -192,7 +199,7 @@ class SpreadsheetService {
     return {
       spreadsheetId: DEFAULT_SPREADSHEET_ID,
       spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
-      scriptUrl: '',
+      scriptUrl: DEFAULT_APPS_SCRIPT_URL,
       autoSync: true,
       autoRefreshIntervalSeconds: 5,
       status: 'CONNECTED'
@@ -1795,9 +1802,19 @@ class SpreadsheetService {
     photoUrl?: string;
     photoFileName?: string;
   }): Promise<any> {
-    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
+    // Public registration must work on a new HP/tablet/browser where
+    // localStorage is empty. Refresh the server config once, then fall back
+    // to the production Web App URL compiled into the application.
+    if (!this.normalizeAppsScriptUrl(this.config.scriptUrl)) {
+      await this.fetchServerConfig().catch(() => {});
+    }
+
+    const scriptUrl =
+      this.normalizeAppsScriptUrl(this.config.scriptUrl) ||
+      DEFAULT_APPS_SCRIPT_URL;
+
     if (!scriptUrl) {
-      throw new Error('Google Apps Script Web App URL belum dipasang. Harap pasang URL /exec di Pengaturan API.');
+      throw new Error('Google Apps Script Web App URL belum dipasang.');
     }
 
     const controller = new AbortController();
@@ -1846,11 +1863,20 @@ class SpreadsheetService {
     filename: string, 
     category: 'MEMBER_AVATAR' | 'TOUR_PACKAGES' | 'CULINARY_SOUVENIRS' | 'DOCUMENTS' | 'KTA_CARD' | 'ACTIVITIES' = 'MEMBER_AVATAR'
   ): Promise<{ success: boolean; url?: string; directUrl?: string; fileId?: string; viewUrl?: string; folderId?: string; message: string }> {
-    const scriptUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
+    // Upload foto is also a public registration dependency. Never require
+    // a Super Admin to have opened this browser before registration.
+    if (!this.normalizeAppsScriptUrl(this.config.scriptUrl)) {
+      await this.fetchServerConfig().catch(() => {});
+    }
+
+    const scriptUrl =
+      this.normalizeAppsScriptUrl(this.config.scriptUrl) ||
+      DEFAULT_APPS_SCRIPT_URL;
+
     if (!scriptUrl) {
       return {
         success: false,
-        message: 'Google Apps Script Web App URL belum dipasang. Harap pasang Web App URL di Pengaturan API.'
+        message: 'Google Apps Script Web App URL belum dipasang.'
       };
     }
 
