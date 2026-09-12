@@ -134,7 +134,7 @@ export const KtaBarcodeScannerModal: React.FC<KtaBarcodeScannerModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const result = await verifyMemberUniversal(decodedText, localMembers);
+      const result = await verifyMemberUniversal(decodedText, localMembers, { authoritativeRemote: true });
       setIsVerifying(false);
 
       if (result.found && result.member) {
