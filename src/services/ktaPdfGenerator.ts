@@ -584,8 +584,13 @@ export async function generateKtaPdf({
 }: GenerateKtaOptions): Promise<jsPDF> {
   if (onProgress) onProgress('Mempersiapkan data dan aset KTA...');
 
-  const nta = member.nationalMemberNumber || member.verificationToken || member.id;
-  const verificationUrl = `${window.location.origin}/?verifyId=${encodeURIComponent(nta)}&tab=verify-portal`;
+  const nta = String(member.nationalMemberNumber || member.verificationToken || '').trim();
+  const memberId = String(member.id || member.userId || '').trim();
+  const verificationParams = new URLSearchParams();
+  if (nta) verificationParams.set('verifyId', nta);
+  if (memberId) verificationParams.set('memberId', memberId);
+  verificationParams.set('tab', 'verify-portal');
+  const verificationUrl = `${window.location.origin}/verify?${verificationParams.toString()}`;
 
   const [qrDataUrl, avatarImg, logoImg, frontBgImg, backBgImg, configuredLogoImages] = await Promise.all([
     generateQrDataUrl(verificationUrl),
