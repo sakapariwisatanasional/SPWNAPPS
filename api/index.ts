@@ -1196,233 +1196,134 @@ async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unkn
 // ==========================================
 
 // Health check
-// Upload image proxy: browser -> application server -> Google Apps Script -> Google Drive.
-// The browser must not call Apps Script directly because the JSON POST would
-// require cross-origin handling. This route also keeps the GAS URL server-side.
-app.post('/api/upload-image', async (req, res) => {
-  try {
-    const { base64, filename, category, scriptUrl } = req.body || {};
-    const value = String(base64 || '').trim();
-
-    if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
-      return res.status(400).json({
-        success: false,
-        status: 'error',
-        message: 'Data gambar tidak valid.'
-      });
-    }
-
-    // Match the Apps Script limit and avoid oversized requests reaching GAS.
-    if (value.length > 12 * 1024 * 1024) {
-      return res.status(413).json({
-        success: false,
-        status: 'error',
-        message: 'Data gambar terlalu besar.'
-      });
-    }
-
-    const result = await forwardToGoogleAppsScript({
-      action: 'UPLOAD_IMAGE',
-      base64: value,
-      filename: String(filename || `image_${Date.now()}.jpg`).trim(),
-      category: String(category || 'MEMBER_AVATAR').trim().toUpperCase(),
-      scriptUrl
-    }, scriptUrl);
-
-    if (!result || result.success === false || !result.url) {
-      return res.status(502).json({
-        success: false,
-        status: 'error',
-        message: result?.message || 'Google Apps Script tidak mengembalikan URL foto.'
-      });
-    }
-
-    return res.json({
-      success: true,
-      status: 'success',
-      action: 'UPLOAD_IMAGE',
-      fileId: result.fileId || null,
-      url: result.url,
-      directUrl: result.directUrl || result.url,
-      viewUrl: result.viewUrl || null,
-      category: result.category || category || 'MEMBER_AVATAR',
-      filename: result.filename || filename || null,
-      message: result.message || 'Foto berhasil disimpan ke Google Drive'
-    });
-  } catch (error: any) {
-    console.error('[Upload Image] Error:', error);
-    const message = error?.message || 'Upload foto gagal.';
-    const statusMatch = message.match(/HTTP (\d{3})/i);
-    const upstreamStatus = statusMatch ? Number(statusMatch[1]) : 502;
-    return res.status(upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 502).json({
-      success: false,
-      status: 'error',
-      message
-    });
-  }
-});
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// ------------------------------------------
-// AUTHENTICATION ROUTES
-// ------------------------------------------
-
-// POST /api/auth/login
-app.post('/api/auth/login', async (req, res) => {
-  const { username, password, scriptUrl } = req.body || {};
-  if (!username || !password) {
-    return res.status(400).json({ success: false, message: 'Nama pengguna dan kata sandi wajib diisi.' });
-  }
-
-  const cleanUser = String(username).trim().toLowerCase();
-  const rawPass = String(password);
-
-  // 1. Coba cache/server DB terlebih dahulu.
-  let matchedUser: any = db.users.find(u =>
-    (u.username && String(u.username).toLowerCase() === cleanUser) ||
-    (u.email && String(u.email).toLowerCase() === cleanUser)
-  );
-
-  // 2. Sumber autentikasi utama adalah Sheet Users.
-  // Ini membuat login tetap bekerja setelah logout/cold start Vercel,
-  // karena akun tidak bergantung pada LocalStorage atau memory server.
-  if (!matchedUser) {
+// Upload image proxy:
+// browser/mobile -> Vercel binary endpoint -> GAS GET_UPLOAD_URL -> Drive
+// resumable upload -> GAS FINALIZE_UPLOAD. Base64 remains only as a legacy fallback.
+app.post(
+  '/api/upload-image',
+  express.raw({ type: ['application/octet-stream', 'image/*'], limit: '4mb' }),
+  async (req, res) => {
     try {
-      const gasResult = await forwardToGoogleAppsScript({
-        action: 'AUTH_GET_USER',
-        identifier: cleanUser
-      }, scriptUrl);
+      const contentType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+      const isBinary = Buffer.isBuffer(req.body);
 
-      if (gasResult?.found && gasResult?.user) {
-        matchedUser = gasResult.user;
-        // Cache hanya setelah akun berhasil ditemukan di Spreadsheet.
-        const existingIndex = db.users.findIndex(u =>
-          String(u.id || '') === String(matchedUser.id || '')
-        );
-        if (existingIndex >= 0) db.users[existingIndex] = matchedUser;
-        else db.users.push(matchedUser);
-        saveDatabase();
+      // Primary path: binary image from browser/mobile -> GAS resumable session -> Drive.
+      if (isBinary) {
+        const buffer = req.body as Buffer;
+        if (!buffer.length) {
+          return res.status(400).json({ success: false, status: 'error', message: 'Data gambar kosong.' });
+        }
+        if (!/^image\/(?:png|jpe?g|webp|gif)$/i.test(contentType)) {
+          return res.status(400).json({ success: false, status: 'error', message: 'Format foto tidak didukung.' });
+        }
+        if (buffer.length > 4 * 1024 * 1024) {
+          return res.status(413).json({ success: false, status: 'error', message: 'Ukuran foto maksimal 4 MB.' });
+        }
+
+        const decodeHeader = (value: unknown, fallback: string) => {
+          const raw = String(value || '').trim();
+          if (!raw) return fallback;
+          try { return decodeURIComponent(raw); } catch { return raw; }
+        };
+        const filename = decodeHeader(req.headers['x-file-name'], `KTA_${Date.now()}.jpg`).slice(0, 160);
+        const category = decodeHeader(req.headers['x-file-category'], 'MEMBER_AVATAR').toUpperCase();
+        const requestedScriptUrl = decodeHeader(req.headers['x-script-url'], '');
+
+        const uploadSession = await forwardToGoogleAppsScript({
+          action: 'GET_UPLOAD_URL',
+          fileName: filename,
+          mimeType: contentType,
+          category
+        }, requestedScriptUrl);
+
+        if (!uploadSession?.success || !uploadSession?.uploadUrl) {
+          throw new Error(uploadSession?.message || 'Google Apps Script tidak mengembalikan upload URL Google Drive.');
+        }
+
+        const driveResponse = await fetch(String(uploadSession.uploadUrl), {
+          method: 'PUT',
+          headers: {
+            'Content-Type': contentType,
+            'Content-Length': String(buffer.length)
+          },
+          body: buffer,
+          redirect: 'follow'
+        });
+
+        const driveText = await driveResponse.text();
+        let driveData: any = null;
+        try { driveData = driveText ? JSON.parse(driveText) : null; } catch {}
+        if (!driveResponse.ok) {
+          throw new Error(`Google Drive upload HTTP ${driveResponse.status}${driveData?.error?.message ? `: ${driveData.error.message}` : ''}`);
+        }
+
+        const fileId = String(driveData?.id || '').trim();
+        if (!fileId) {
+          throw new Error('Google Drive tidak mengembalikan file ID setelah upload.');
+        }
+
+        const finalized = await forwardToGoogleAppsScript({
+          action: 'FINALIZE_UPLOAD',
+          fileId,
+          fileName: filename,
+          mimeType: contentType,
+          category
+        }, requestedScriptUrl);
+
+        if (!finalized?.success || !finalized?.url) {
+          throw new Error(finalized?.message || 'Google Apps Script gagal menyelesaikan upload foto.');
+        }
+
+        return res.json({
+          success: true,
+          status: 'success',
+          action: 'FINALIZE_UPLOAD',
+          fileId: finalized.fileId || fileId,
+          url: finalized.url,
+          directUrl: finalized.directUrl || finalized.url,
+          viewUrl: finalized.viewUrl || null,
+          folderId: finalized.folderId || uploadSession.folderId || null,
+          category,
+          filename: finalized.fileName || filename,
+          message: finalized.message || 'Foto berhasil disimpan ke Google Drive.'
+        });
       }
-    } catch (gasError) {
-      console.warn('[Auth] Gagal membaca Users dari Google Spreadsheet:', gasError);
+
+      // Compatibility path for an older browser that still posts JSON Base64.
+      // New SPWNAPPS clients do not use this path.
+      const body = req.body || {};
+      const { base64, filename, category, scriptUrl } = body;
+      const value = String(base64 || '').trim();
+      if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
+        return res.status(400).json({ success: false, status: 'error', message: 'Data gambar tidak valid.' });
+      }
+      if (value.length > 12 * 1024 * 1024) {
+        return res.status(413).json({ success: false, status: 'error', message: 'Data gambar terlalu besar.' });
+      }
+      const result = await forwardToGoogleAppsScript({
+        action: 'UPLOAD_IMAGE',
+        base64: value,
+        filename: String(filename || `image_${Date.now()}.jpg`).trim(),
+        category: String(category || 'MEMBER_AVATAR').trim().toUpperCase()
+      }, scriptUrl);
+      if (!result || result.success === false || !result.url) {
+        return res.status(502).json({ success: false, status: 'error', message: result?.message || 'Google Apps Script tidak mengembalikan URL foto.' });
+      }
+      return res.json({
+        success: true, status: 'success', action: 'UPLOAD_IMAGE', fileId: result.fileId || null,
+        url: result.url, directUrl: result.directUrl || result.url, viewUrl: result.viewUrl || null,
+        category: result.category || category || 'MEMBER_AVATAR', filename: result.filename || filename || null,
+        message: result.message || 'Foto berhasil disimpan ke Google Drive'
+      });
+    } catch (error: any) {
+      console.error('[Upload Image] Error:', error);
+      const message = error?.message || 'Upload foto gagal.';
+      const statusMatch = message.match(/HTTP (\d{3})/i);
+      const upstreamStatus = statusMatch ? Number(statusMatch[1]) : 502;
+      return res.status(upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 502).json({ success: false, status: 'error', message });
     }
   }
-
-  // Kompatibilitas data lama yang menyimpan kredensial pada member cache.
-  // Tetap hanya menerima passwordHash, bukan password plaintext.
-  if (!matchedUser) {
-    const member = db.members.find(m =>
-      (m.email && String(m.email).toLowerCase() === cleanUser) ||
-      (m.nationalMemberNumber && String(m.nationalMemberNumber).toLowerCase() === cleanUser)
-    );
-    if (member && member.passwordHash) {
-      matchedUser = {
-        id: member.userId || `USER-${String(member.id || '').replace(/^SPW-/, '')}`,
-        username: member.email.split('@')[0],
-        email: member.email,
-        name: member.fullName,
-        role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
-        jurisdictionName: member.provinceId === '00' ? 'Kwartir Nasional' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
-        jurisdictionId: member.provinceId === '00' ? '00' : member.regencyId,
-        avatarUrl: member.avatarUrl,
-        memberId: member.id,
-        passwordHash: member.passwordHash
-      };
-    }
-  }
-
-  if (!matchedUser || !matchedUser.passwordHash || !verifyPassword(rawPass, String(matchedUser.passwordHash))) {
-    console.warn(`[Auth] Failed login attempt for user: ${cleanUser}`);
-    return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid.' });
-  }
-
-  const token = createSession(matchedUser);
-
-  db.auditLogs.unshift({
-    id: `log-${Date.now()}`,
-    userId: matchedUser.id,
-    userName: matchedUser.name,
-    userRole: matchedUser.role,
-    action: 'LOGIN',
-    targetType: 'AUTH',
-    targetId: matchedUser.id,
-    description: `Login berhasil sebagai ${matchedUser.role} (${matchedUser.jurisdictionName || 'Nasional'})`,
-    timestamp: new Date().toISOString()
-  });
-  if (db.auditLogs.length > 500) db.auditLogs.pop();
-  saveDatabase();
-
-  const sanitizedUser = {
-    id: matchedUser.id,
-    username: matchedUser.username,
-    name: matchedUser.name,
-    email: matchedUser.email,
-    role: matchedUser.role,
-    jurisdictionName: matchedUser.jurisdictionName,
-    jurisdictionId: matchedUser.jurisdictionId,
-    avatarUrl: matchedUser.avatarUrl,
-    memberId: matchedUser.memberId
-  };
-
-  res.json({ success: true, token, user: sanitizedUser });
-});
-
-// GET /api/auth/me - Verify current session token
-app.get('/api/auth/me', (req, res) => {
-  const session = getSessionUser(req);
-  if (!session) {
-    return res.status(401).json({ success: false, message: 'Sesi tidak valid atau telah kedaluwarsa.' });
-  }
-  res.json({
-    success: true,
-    user: {
-      id: session.userId,
-      username: session.username,
-      name: session.name,
-      role: session.role,
-      jurisdictionName: session.jurisdictionName,
-      jurisdictionId: session.jurisdictionId,
-      avatarUrl: session.avatarUrl,
-      memberId: session.memberId
-    }
-  });
-});
-
-// POST /api/auth/logout - Invalidate session
-app.post('/api/auth/logout', (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1]?.trim();
-    // Sessions are stateless. Clearing the bearer token on the client is the
-    // logout action; persistent revocation would require a shared session store.
-  }
-  res.json({ success: true, message: 'Berhasil keluar.' });
-});
-
-// POST /api/auth/change-password
-app.post('/api/auth/change-password', (req, res) => {
-  const session = getSessionUser(req);
-  if (!session) {
-    return res.status(401).json({ success: false, message: 'Harap masuk terlebih dahulu.' });
-  }
-  const { currentPassword, newPassword } = req.body || {};
-  if (!currentPassword || !newPassword || newPassword.length < 6) {
-    return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
-  }
-
-  const user = db.users.find(u => u.id === session.userId);
-  if (!user || !verifyPassword(currentPassword, user.passwordHash)) {
-    return res.status(400).json({ success: false, message: 'Kata sandi saat ini tidak sesuai.' });
-  }
-
-  user.passwordHash = hashPassword(newPassword);
-  saveDatabase();
-
-  res.json({ success: true, message: 'Kata sandi berhasil diperbarui.' });
-});
+);
 
 // POST /api/auth/register - Public new member registration
 app.post('/api/auth/register', async (req, res) => {
