@@ -594,9 +594,13 @@ class SpreadsheetService {
         }
       }
       throw lastError || new Error('Gagal membaca Spreadsheet');
-    } catch (error) {
-      console.warn(`[Spreadsheet] Gagal membaca sheet ${sheetName} melalui Google Apps Script.`, error);
-      return [];
+    } catch (error: any) {
+      const message = error?.message || `Gagal membaca sheet ${sheetName}`;
+      console.error(`[Spreadsheet] Gagal membaca sheet ${sheetName} melalui Google Apps Script:`, message);
+      // PENTING: jangan mengubah kegagalan READ menjadi [] karena [] akan
+      // terlihat seperti Spreadsheet kosong dan membuat Dashboard mempertahankan
+      // cache lama. Error harus naik ke syncFromSpreadsheet() agar status menjadi ERROR.
+      throw new Error(`Gagal membaca sheet ${sheetName}: ${message}`);
     }
   }
 
@@ -939,7 +943,11 @@ class SpreadsheetService {
         // Google Spreadsheet adalah source of truth. Snapshot yang berhasil
         // dibaca menggantikan cache anggota, sehingga penghapusan/perubahan
         // dari perangkat lain juga hilang dari browser pada polling berikutnya.
-        if (importedMembers.length > 0) {
+        // Snapshot Anggota yang berhasil dibaca adalah source of truth.
+        // Bahkan jika sheet benar-benar kosong, cache harus ikut menjadi kosong.
+        // Kondisi READ gagal tidak pernah sampai di sini karena fetchSheetRows()
+        // sekarang melempar error, bukan mengembalikan [] saat gagal.
+        {
           const merged = [...importedMembers];
           const mergedUsers = [...existingUsers];
 
@@ -1007,13 +1015,16 @@ class SpreadsheetService {
           // Kirim notifikasi jika terdeteksi pendaftaran anggota baru dari perangkat lain
           if (this.lastKnownMemberCount > 0 && newlyDiscoveredMembers.length > 0) {
             newlyDiscoveredMembers.forEach(nm => {
-              storage.addNotification(
-                'user-superadmin-rohadi',
-                `Pendaftaran Anggota Baru (${nm.krida})`,
-                `Kak ${nm.fullName} (${nm.districtName || 'Kecamatan'}, ${nm.regencyName}) baru saja mendaftar online. Data langsung sinkron secara real-time.`,
-                'SUCCESS',
-                '/members'
-              );
+              storage.addNotification({
+                id: `sync-new-member-${nm.id}-${Date.now()}`,
+                userId: 'user-superadmin-rohadi',
+                title: `Pendaftaran Anggota Baru (${nm.krida})`,
+                message: `Kak ${nm.fullName} (${nm.districtName || 'Kecamatan'}, ${nm.regencyName}) baru saja mendaftar online. Data langsung sinkron secara real-time.`,
+                type: 'SUCCESS',
+                link: '/members',
+                isRead: false,
+                createdAt: new Date().toISOString()
+              });
             });
           }
           this.lastKnownMemberCount = importedMembers.length;
