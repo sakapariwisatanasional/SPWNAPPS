@@ -1338,63 +1338,87 @@ app.post('/api/auth/login', async (req, res) => {
 
   const cleanUser = String(username).trim().toLowerCase();
   const rawPass = String(password);
+  let matchedUser: any = null;
+  let persistentAuthSucceeded = false;
+  let persistentAuthError = '';
 
-  // 1. Coba cache/server DB terlebih dahulu.
-  let matchedUser: any = db.users.find(u =>
-    (u.username && String(u.username).toLowerCase() === cleanUser) ||
-    (u.email && String(u.email).toLowerCase() === cleanUser)
-  );
+  // Sumber autentikasi utama: Google Apps Script -> Sheet Users.
+  // Jangan menggunakan cache db.users lebih dahulu karena cache Vercel dapat
+  // berisi kredensial/data lama dan bukan sumber kebenaran yang persisten.
+  try {
+    const gasResult = await forwardToGoogleAppsScript({
+      action: 'AUTH_LOGIN',
+      username: cleanUser,
+      password: rawPass
+    }, scriptUrl);
 
-  // 2. Sumber autentikasi utama adalah Sheet Users.
-  // Ini membuat login tetap bekerja setelah logout/cold start Vercel,
-  // karena akun tidak bergantung pada LocalStorage atau memory server.
-  if (!matchedUser) {
-    try {
-      const gasResult = await forwardToGoogleAppsScript({
-        action: 'AUTH_GET_USER',
-        identifier: cleanUser
-      }, scriptUrl);
+    if (gasResult?.success !== false && gasResult?.status !== 'error' && gasResult?.user) {
+      matchedUser = gasResult.user;
+      persistentAuthSucceeded = true;
 
-      if (gasResult?.found && gasResult?.user) {
-        matchedUser = gasResult.user;
-        // Cache hanya setelah akun berhasil ditemukan di Spreadsheet.
-        const existingIndex = db.users.findIndex(u =>
-          String(u.id || '') === String(matchedUser.id || '')
-        );
-        if (existingIndex >= 0) db.users[existingIndex] = matchedUser;
-        else db.users.push(matchedUser);
-        saveDatabase();
-      }
-    } catch (gasError) {
-      console.warn('[Auth] Gagal membaca Users dari Google Spreadsheet:', gasError);
+      // Cache hanya setelah autentikasi persisten berhasil.
+      const existingIndex = db.users.findIndex(u =>
+        String(u.id || '') === String(matchedUser.id || '')
+      );
+      if (existingIndex >= 0) db.users[existingIndex] = { ...db.users[existingIndex], ...matchedUser };
+      else db.users.push(matchedUser);
+      saveDatabase();
+    } else {
+      persistentAuthError = String(gasResult?.message || 'Autentikasi Google Spreadsheet gagal.');
     }
+  } catch (gasError: any) {
+    persistentAuthError = gasError?.message || String(gasError);
+    console.warn('[Auth] AUTH_LOGIN Google Apps Script gagal:', persistentAuthError);
   }
 
-  // Kompatibilitas data lama yang menyimpan kredensial pada member cache.
-  // Tetap hanya menerima passwordHash, bukan password plaintext.
-  if (!matchedUser) {
-    const member = db.members.find(m =>
-      (m.email && String(m.email).toLowerCase() === cleanUser) ||
-      (m.nationalMemberNumber && String(m.nationalMemberNumber).toLowerCase() === cleanUser)
+  // Jika Google Apps Script secara eksplisit menolak kredensial/status akun,
+  // jangan pernah jatuh kembali ke cache lokal karena dapat menghidupkan akun
+  // lama atau password lama. Fallback lokal hanya untuk gangguan infrastruktur.
+  const explicitAuthFailure = /tidak valid|invalid|kata sandi|password|username|nama pengguna|belum disetujui|pending|ditolak|akun.*(tidak|belum)|credentials/i.test(persistentAuthError);
+  if (!persistentAuthSucceeded && explicitAuthFailure) {
+    const isPending = /belum disetujui|pending|menunggu.*persetujuan/i.test(persistentAuthError);
+    return res.status(isPending ? 403 : 401).json({
+      success: false,
+      message: isPending ? 'Akun belum disetujui administrator.' : (persistentAuthError || 'Kombinasi nama pengguna atau kata sandi tidak valid.')
+    });
+  }
+
+  // Kompatibilitas untuk akun legacy/server-only ketika layanan Google Apps
+  // Script benar-benar tidak dapat dihubungi. Tetap hanya menerima passwordHash.
+  if (!matchedUser && !persistentAuthSucceeded) {
+    matchedUser = db.users.find(u =>
+      (u.username && String(u.username).toLowerCase() === cleanUser) ||
+      (u.email && String(u.email).toLowerCase() === cleanUser)
     );
-    if (member && member.passwordHash) {
-      matchedUser = {
-        id: member.userId || `USER-${String(member.id || '').replace(/^SPW-/, '')}`,
-        username: member.email.split('@')[0],
-        email: member.email,
-        name: member.fullName,
-        role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
-        jurisdictionName: member.provinceId === '00' ? 'Kwartir Nasional' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
-        jurisdictionId: member.provinceId === '00' ? '00' : member.regencyId,
-        avatarUrl: member.avatarUrl,
-        memberId: member.id,
-        passwordHash: member.passwordHash
-      };
+
+    if (matchedUser && (!matchedUser.passwordHash || !verifyPassword(rawPass, String(matchedUser.passwordHash)))) {
+      matchedUser = null;
+    }
+
+    // Kompatibilitas data lama yang menyimpan kredensial pada member cache.
+    if (!matchedUser) {
+      const member = db.members.find(m =>
+        (m.email && String(m.email).toLowerCase() === cleanUser) ||
+        (m.nationalMemberNumber && String(m.nationalMemberNumber).toLowerCase() === cleanUser)
+      );
+      if (member && member.passwordHash && verifyPassword(rawPass, String(member.passwordHash))) {
+        matchedUser = {
+          id: member.userId || `USER-${String(member.id || '').replace(/^SPW-/, '')}`,
+          username: member.email.split('@')[0],
+          email: member.email,
+          name: member.fullName,
+          role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
+          jurisdictionName: member.provinceId === '00' ? 'Kwartir Nasional' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
+          jurisdictionId: member.provinceId === '00' ? '00' : member.regencyId,
+          avatarUrl: member.avatarUrl,
+          memberId: member.id
+        };
+      }
     }
   }
 
-  if (!matchedUser || !matchedUser.passwordHash || !verifyPassword(rawPass, String(matchedUser.passwordHash))) {
-    console.warn(`[Auth] Failed login attempt for user: ${cleanUser}`);
+  if (!matchedUser) {
+    console.warn(`[Auth] Failed login attempt for user: ${cleanUser}. Persistent auth error: ${persistentAuthError || 'unknown'}`);
     return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid.' });
   }
 
@@ -2423,7 +2447,11 @@ app.post('/api/mutate', async (req, res) => {
           const allowed = [
             'fullName', 'nikMasked', 'gender', 'birthPlace', 'birthDate',
             'phone', 'email', 'address', 'educationLevel', 'occupation',
-            'bio', 'avatarUrl'
+            'bio', 'avatarUrl',
+            'provinceId', 'provinceName',
+            'regencyId', 'regencyName',
+            'districtId', 'districtName',
+            'krida', 'currentPosition'
           ];
           const safeMember: any = { id: existingMember.id };
           for (const key of allowed) {
