@@ -123,11 +123,12 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   useEffect(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlVerifyId = urlParams.get('verifyId') || urlParams.get('nta') || urlParams.get('id') || urlParams.get('kta');
+      const urlVerifyId = urlParams.get('verifyId') || urlParams.get('memberId') || urlParams.get('nta') || urlParams.get('id') || urlParams.get('kta');
       if (urlVerifyId) {
         const term = urlVerifyId.trim();
         setVerifyInput(term);
-        executeVerification(term);
+        // Kirim URL lengkap ke service agar verifyId DAN memberId dapat dicoba.
+        executeVerification(window.location.href);
       }
     } catch (e) {
       console.warn('URL verify param error', e);
@@ -884,15 +885,16 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
         onClose={() => setIsScannerOpen(false)}
         localMembers={members}
         onScanSuccess={(scannedMember, result) => {
+          // Scanner sudah memverifikasi ke Spreadsheet. Tampilkan record remote yang
+          // dikembalikan, bukan record lokal lama.
           setSearchedMember(scannedMember);
           setVerificationMeta(result);
-          setVerifyInput(scannedMember.nationalMemberNumber || scannedMember.verificationToken || scannedMember.id);
+          setVerifyInput(scannedMember.nationalMemberNumber || scannedMember.id || scannedMember.userId || '');
           setNotFound(false);
-          // Scroll to verification card
-          const el = document.getElementById('verifikasi-kta');
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth' });
-          }
+          setIsScannerOpen(false);
+          window.requestAnimationFrame(() => {
+            verificationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
         }}
       />
     </div>
