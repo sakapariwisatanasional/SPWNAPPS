@@ -1978,6 +1978,177 @@ app.get('/api/spreadsheet-data', async (req, res) => {
   }
 });
 
+// Public KTA verification endpoint.
+// IMPORTANT: this endpoint NEVER depends on the visitor's localStorage.
+// It reads the authoritative Google Spreadsheet from the server-side
+// configuration (or the configured public Spreadsheet as a fallback), so a QR
+// scanned on a new phone/tablet/incognito browser can still resolve the member.
+function normalizeVerifyValue(value: unknown): string {
+  return String(value ?? '')
+    .replace(/^['"`]+|['"`]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function compactVerifyValue(value: unknown): string {
+  return normalizeVerifyValue(value).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function digitVerifyValue(value: unknown): string {
+  return normalizeVerifyValue(value).replace(/\D/g, '');
+}
+
+function verifyIdentifierMatches(a: unknown, b: unknown): boolean {
+  const aa = normalizeVerifyValue(a);
+  const bb = normalizeVerifyValue(b);
+  if (!aa || !bb) return false;
+  if (aa.toLowerCase() === bb.toLowerCase()) return true;
+  if (compactVerifyValue(aa) === compactVerifyValue(bb)) return true;
+  const ad = digitVerifyValue(aa);
+  const bd = digitVerifyValue(bb);
+  if (ad && bd) {
+    if (ad === bd) return true;
+    if (ad.replace(/^0+/, '') === bd.replace(/^0+/, '')) return true;
+  }
+  return false;
+}
+
+function extractVerificationCandidates(req: express.Request): string[] {
+  const values: string[] = [];
+  const add = (value: unknown) => {
+    const v = normalizeVerifyValue(value);
+    if (!v) return;
+    if (!values.some(existing => verifyIdentifierMatches(existing, v))) values.push(v);
+  };
+
+  ['verifyId', 'memberId', 'id', 'nta', 'kta', 'userId', 'verificationToken', 'token'].forEach(key => add(req.query?.[key]));
+
+  const raw = normalizeVerifyValue(req.query?.url || req.query?.q || '');
+  if (raw) {
+    try {
+      const url = new URL(raw, 'https://sakapariwisata-nasional.vercel.app');
+      ['verifyId', 'memberId', 'id', 'nta', 'kta', 'userId', 'verificationToken', 'token'].forEach(key => add(url.searchParams.get(key)));
+      const match = url.pathname.match(/\/verify\/?([^/?#]+)?/i);
+      if (match?.[1]) add(decodeURIComponent(match[1]));
+    } catch {
+      add(raw);
+    }
+  }
+
+  return values;
+}
+
+function publicMemberFromRow(row: Record<string, any>, index: number) {
+  const fullName = getColVal(row, ['Nama Lengkap', 'Nama', 'nama_lengkap', 'Full Name', 'Name', 'col_2']) || `Anggota ${index + 1}`;
+  const kta = getColVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'col_1']);
+  const id = getColVal(row, ['ID', 'id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']) || `sheet-member-${index + 1}`;
+  const userId = getColVal(row, ['User ID', 'ID User', 'user_id', 'userId']);
+  const email = getColVal(row, ['Email', 'email', 'E-mail', 'col_3']);
+  const phone = getColVal(row, ['Nomor WA', 'Nomor WhatsApp', 'No WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_4']);
+  const province = getColVal(row, ['Kwartir Daerah (Provinsi)', 'Kwartir Daerah', 'Kwarda', 'Provinsi', 'province', 'col_5']);
+  const regency = getColVal(row, ['Kwartir Cabang (Kab/Kota)', 'Kwartir Cabang', 'Kwarcab', 'Kabupaten/Kota', 'Kabupaten', 'Kota', 'regency', 'col_6']);
+  const district = getColVal(row, ['Kecamatan', 'Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'Ranting', 'districtName', 'col_7']);
+  const jabatan = getColVal(row, ['Jabatan', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi / Jabatan Kepengurusan', 'Posisi', 'currentPosition', 'current_position', 'col_8']);
+  const krida = getColVal(row, ['Krida', 'Peminatan Krida', 'Peminatan Krida Saka Pariwisata', 'col_9']);
+  const status = (getColVal(row, ['Status', 'Status Keanggotaan', 'status', 'col_10']) || 'ACTIVE').toUpperCase();
+  const photo = cleanDriveUrl(getColVal(row, ['Foto URL', 'Foto', 'Avatar', 'Link Foto', 'col_11']));
+  const registeredAt = getColVal(row, ['Tanggal Daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'tanggal_daftar', 'col_12']);
+  const verificationToken = getColVal(row, ['Verification Token', 'Token Verifikasi', 'verificationToken', 'verification_token']);
+  const linkVerification = getColVal(row, ['Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'col_13']);
+
+  return {
+    id,
+    userId: userId || `user-${id}`,
+    nationalMemberNumber: kta || undefined,
+    fullName,
+    email,
+    phone,
+    provinceName: province || 'Kwartir Nasional',
+    regencyName: regency || 'Pusat Nasional',
+    districtName: district || 'Nasional',
+    currentPosition: jabatan || 'Anggota Saka Pariwisata',
+    krida: krida || 'Krida Pemandu',
+    status: status === 'PENDING' ? 'PENDING' : status,
+    avatarUrl: photo,
+    registeredAt: registeredAt || new Date().toISOString(),
+    verificationToken: verificationToken || `VERIFY-SP-${digitVerifyValue(kta || id)}`,
+    verificationLink: linkVerification || '',
+    verifiedFrom: 'Google Spreadsheet'
+  };
+}
+
+app.get('/api/verify-member', async (req, res) => {
+  const candidates = extractVerificationCandidates(req);
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+
+  if (candidates.length === 0) {
+    return res.status(400).json({ success: false, found: false, code: 'MISSING_IDENTIFIER', message: 'Nomor KTA atau ID anggota tidak diberikan.' });
+  }
+
+  try {
+    // Server-side configured GAS URL is authoritative. Do not accept scriptUrl
+    // from the public browser, because QR verification must not depend on a
+    // device-local configuration or on an arbitrary external endpoint.
+    const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
+      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+
+    let rows: Record<string, any>[] = [];
+    let source = 'GOOGLE_APPS_SCRIPT';
+
+    if (scriptUrl) {
+      const separator = scriptUrl.includes('?') ? '&' : '?';
+      const upstreamUrl = `${scriptUrl}${separator}sheet=Anggota&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+      const upstream = await fetch(upstreamUrl, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0', Pragma: 'no-cache' },
+        redirect: 'follow'
+      });
+      const text = await upstream.text();
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch {}
+      if (!upstream.ok) throw new Error(`Google Apps Script HTTP ${upstream.status}${data?.message ? `: ${data.message}` : ''}`);
+      rows = Array.isArray(data) ? data : Array.isArray(data?.rows) ? data.rows : Array.isArray(data?.data) ? data.data : Array.isArray(data?.records) ? data.records : [];
+      if (!rows.length && data?.status === 'error') throw new Error(data?.message || 'Google Apps Script gagal membaca sheet Anggota.');
+    } else {
+      // Fallback for deployments where the Spreadsheet is published/readable by
+      // GViz. This also makes verification resilient when GAS configuration is
+      // temporarily absent, while still avoiding localStorage entirely.
+      source = 'GOOGLE_SPREADSHEET_GVIZ';
+      rows = await fetchSheetGViz('Anggota');
+    }
+
+    if (!rows.length) {
+      return res.status(502).json({ success: false, found: false, code: 'SHEET_UNAVAILABLE', message: 'Sheet Anggota tidak dapat dibaca dari server. Periksa koneksi Google Apps Script dan izin Spreadsheet.' });
+    }
+
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
+      const member = publicMemberFromRow(row, index);
+      const link = member.verificationLink;
+      const identifiers = [
+        member.id,
+        member.userId,
+        member.nationalMemberNumber,
+        member.verificationToken,
+        link,
+        getColVal(row, ['NIK', 'NIK Tersamar', 'NIK Masked']),
+        member.email
+      ];
+      const matched = candidates.some(candidate => identifiers.some(value => verifyIdentifierMatches(value, candidate)));
+      if (matched) {
+        return res.json({ success: true, found: true, source, member, matchedBy: candidates.find(candidate => identifiers.some(value => verifyIdentifierMatches(value, candidate))) || candidates[0], fetchedAt: new Date().toISOString() });
+      }
+    }
+
+    return res.status(404).json({ success: true, found: false, code: 'MEMBER_NOT_FOUND', message: 'Nomor Anggota Tidak Ditemukan. Data KTA tidak ditemukan pada Google Spreadsheet terbaru.', candidates, count: rows.length, fetchedAt: new Date().toISOString() });
+  } catch (error: any) {
+    console.error('[KTA VERIFY API] error:', error);
+    return res.status(502).json({ success: false, found: false, code: 'VERIFICATION_UPSTREAM_ERROR', message: error?.message || 'Gagal membaca data anggota dari Google Spreadsheet.' });
+  }
+});
+
 // Central Data GET with strict Privacy and Role Enforcement
 app.get('/api/data', async (req, res) => {
   const session = getSessionUser(req);
