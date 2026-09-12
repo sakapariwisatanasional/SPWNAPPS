@@ -1562,7 +1562,8 @@ app.post('/api/auth/register', async (req, res) => {
     const registrationScriptUrl =
       normalizeManualAppsScriptUrl(scriptUrl) ||
       normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
-      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) ||
+      normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
 
     console.log(`[Register][${requestId}] START`, {
       hasMemberData: Boolean(memberData),
@@ -1832,8 +1833,11 @@ app.get('/api/config', (req, res) => {
       config: {
         // Web App URL bukan credential rahasia; browser pengguna membutuhkannya
         // agar dapat melakukan sinkronisasi langsung ke Google Apps Script.
+        // Member baru tidak boleh bergantung pada localStorage/browser.
+        // Berikan endpoint produksi server-side sebagai default publik.
         scriptUrl: normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
-          normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) || '',
+          normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) ||
+          normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL) || '',
         spreadsheetId: db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID,
         spreadsheetUrl: db.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
         status: db.config.status || 'CONNECTED',
