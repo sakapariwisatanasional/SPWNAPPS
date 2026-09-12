@@ -1844,64 +1844,45 @@ class SpreadsheetService {
   }
 
   /**
-   * Upload gambar base64 langsung ke Google Drive melalui Apps Script Web App
+   * Upload gambar ke Google Drive melalui binary upload.
+   * String data:image/... tetap didukung untuk kompatibilitas komponen lama.
+   * Data URL hanya dikonversi menjadi Blob di browser; yang dikirim ke server
+   * adalah binary/octet-stream, bukan JSON Base64.
    */
   public async uploadImageToDrive(
-    base64Data: string, 
-    filename: string, 
+    imageData: string | Blob | File,
+    filename: string,
     category: 'MEMBER_AVATAR' | 'TOUR_PACKAGES' | 'CULINARY_SOUVENIRS' | 'DOCUMENTS' | 'KTA_CARD' | 'ACTIVITIES' = 'MEMBER_AVATAR'
   ): Promise<{ success: boolean; url?: string; directUrl?: string; fileId?: string; viewUrl?: string; folderId?: string; message: string }> {
     const scriptUrl = this.getEffectiveAppsScriptUrl();
-    if (!scriptUrl) {
-      return {
-        success: false,
-        message: 'Google Apps Script Web App URL belum dipasang. Harap pasang Web App URL di Pengaturan API.'
-      };
-    }
-
-    const value = String(base64Data || '').trim();
-    if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
-      return { success: false, message: 'Data foto tidak valid.' };
-    }
-
+    if (!scriptUrl) return { success:false, message:'Google Apps Script Web App URL belum dipasang. Harap pasang URL /exec di Pengaturan API.' };
     try {
-      // Gunakan proxy aplikasi agar browser dapat menerima response JSON dari GAS.
-      // Proxy juga meneruskan URL GAS yang dipilih Super Admin dan memvalidasi
-      // hasil upload sebelum frontend melanjutkan pendaftaran.
-      const response = await fetch('/api/upload-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        cache: 'no-store',
-        body: JSON.stringify({
-          base64: value,
-          filename,
-          category,
-          scriptUrl
-        })
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data?.success === false || !data?.url) {
-        throw new Error(data?.message || `Upload foto gagal (HTTP ${response.status}).`);
+      let blob: Blob;
+      if (imageData instanceof Blob) {
+        blob = imageData;
+      } else {
+        const value = String(imageData || '').trim();
+        if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) return { success:false, message:'Data foto tidak valid.' };
+        const binaryResponse = await fetch(value);
+        blob = await binaryResponse.blob();
       }
-
+      if (!blob.size) return { success:false, message:'Berkas foto kosong.' };
+      if (blob.size > 4 * 1024 * 1024) return { success:false, message:'Foto terlalu besar. Maksimal 4 MB.' };
+      const mimeType = String(blob.type || 'image/jpeg').toLowerCase();
+      if (!/^image\/(?:jpeg|jpg|png|webp|gif)$/i.test(mimeType)) return { success:false, message:'Format foto tidak didukung. Gunakan JPG, PNG, atau WEBP.' };
+      const safeFilename = String(filename || `KTA_${Date.now()}.jpg`).replace(/[\\/:*?"<>|#%]+/g, '_').slice(0,160);
+      const response = await fetch('/api/upload-image', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/octet-stream', 'X-Upload-Mime-Type':mimeType, 'X-Upload-Filename':safeFilename, 'X-Upload-Category':category, 'X-Script-Url':scriptUrl },
+        credentials:'same-origin', cache:'no-store', body:blob
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success !== true || !data?.url) throw new Error(data?.message || `Upload foto gagal (HTTP ${response.status}).`);
       const directUrl = String(data.url || data.directUrl || '').trim();
-      return {
-        success: true,
-        url: directUrl,
-        directUrl,
-        fileId: data.fileId,
-        viewUrl: data.viewUrl,
-        folderId: data.folderId,
-        message: data.message || `Foto ${filename} berhasil disimpan ke folder Google Drive.`
-      };
-    } catch (err: any) {
-      console.error('Failed to upload image to Drive:', err);
-      return {
-        success: false,
-        message: `Gagal mengunggah foto ke Google Drive: ${err.message}`
-      };
+      return { success:true, url:directUrl, directUrl, fileId:data.fileId, viewUrl:data.viewUrl, folderId:data.folderId, message:data.message || `Foto ${safeFilename} berhasil disimpan ke Google Drive.` };
+    } catch (err:any) {
+      console.error('Failed to upload binary image to Drive:', err);
+      return { success:false, message:`Gagal mengunggah foto ke Google Drive: ${err?.message || String(err)}` };
     }
   }
 
