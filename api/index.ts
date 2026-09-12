@@ -621,11 +621,7 @@ const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
 
 // URL Google Apps Script TIDAK boleh ditentukan oleh source code.
 // Super Admin mengisinya melalui Dashboard > Pengaturan API.
-// Production GAS endpoint. Keep a server-side fallback so registration works
-// from a completely new device/browser even when /api/config has no persisted
-// value (Vercel filesystem is not a durable database).
-const DEFAULT_APPS_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekQK_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
+const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjx4ulbjan8kBkDuD_plO8Dx5NsekQK_uP6BgNuC-0YKZLeOTHPPgO73pyNJFkD08lw/exec';
 
 function normalizeManualAppsScriptUrl(raw: unknown): string {
   const value = String(raw || '').trim().replace(/\s+/g, '');
@@ -1137,40 +1133,62 @@ if (!IS_VERCEL) {
 
 // Proxy mutation to Google Apps Script Web App
 async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
-  // Prioritas MUTLAK: URL yang dikirim aplikasi dari Dashboard.
-  // Environment/default hanya dipertahankan sebagai kompatibilitas server lama,
-  // tetapi tidak digunakan jika URL manual belum diberikan.
-  const manualUrl = normalizeManualAppsScriptUrl(requestedScriptUrl);
-  const configuredUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
-  const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-  const scriptUrl = manualUrl || configuredUrl || envUrl || DEFAULT_APPS_SCRIPT_URL;
+  // Browser mobile dapat membawa URL deployment lama dari localStorage.
+  // Jangan biarkan URL lama tersebut menjadi satu-satunya sumber endpoint.
+  // Server mencoba URL yang diminta terlebih dahulu, lalu URL konfigurasi,
+  // ENV Vercel, dan terakhir URL produksi yang ditanam sebagai fallback.
+  const candidates = [
+    normalizeManualAppsScriptUrl(requestedScriptUrl),
+    normalizeManualAppsScriptUrl(db.config.scriptUrl),
+    normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL),
+    DEFAULT_APPS_SCRIPT_URL
+  ].filter(Boolean).filter((url, index, arr) => arr.indexOf(url) === index);
 
-  if (!scriptUrl) {
-    throw new Error('Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.');
+  if (candidates.length === 0) {
+    throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
   }
 
   const gasPayload = { ...payload };
   delete gasPayload.scriptUrl;
 
-  const res = await fetch(scriptUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(gasPayload)
-  });
+  let lastError = '';
 
-  const text = await res.text();
-  let data: any = null;
-  try { data = text ? JSON.parse(text) : null; } catch {}
+  for (const scriptUrl of candidates) {
+    try {
+      const res = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gasPayload),
+        redirect: 'follow'
+      });
 
-  if (!res.ok) {
-    throw new Error(`Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`);
+      const text = await res.text();
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch {}
+
+      if (!res.ok) {
+        lastError = `Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`;
+        // Deployment lama yang sudah dihapus/nonaktif biasanya menghasilkan 404.
+        // Coba endpoint cadangan berikutnya agar HP tidak terjebak URL localStorage lama.
+        if (res.status === 404 || res.status === 410) continue;
+        throw new Error(lastError);
+      }
+
+      if (data?.status === 'error' || data?.success === false) {
+        throw new Error(data.message || 'Google Apps Script menolak permintaan.');
+      }
+
+      console.log(`[GAS Forward] ${payload.action} berhasil melalui ${scriptUrl}`);
+      return data || { status: 'success' };
+    } catch (err: any) {
+      lastError = err?.message || String(err);
+      // Hanya fallback untuk deployment URL yang tidak ditemukan. Error lain
+      // (mis. permission/Drive/Spreadsheet) harus langsung dikembalikan.
+      if (!/HTTP (404|410)/i.test(lastError)) throw err;
+    }
   }
-  if (data?.status === 'error' || data?.success === false) {
-    throw new Error(data.message || 'Google Apps Script menolak permintaan.');
-  }
 
-  console.log(`[GAS Forward] ${payload.action} berhasil.`, data || 'OK');
-  return data || { status: 'success' };
+  throw new Error(lastError || 'Google Apps Script Web App tidak dapat dihubungi.');
 }
 
 // ==========================================
@@ -1412,7 +1430,11 @@ app.post('/api/auth/register', async (req, res) => {
 
   try {
     const { memberData, password, photoData, photoUrl, photoFileName, scriptUrl } = req.body || {};
-    const registrationScriptUrl = normalizeManualAppsScriptUrl(scriptUrl);
+    const registrationScriptUrl =
+      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) ||
+      normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
+      DEFAULT_APPS_SCRIPT_URL ||
+      normalizeManualAppsScriptUrl(scriptUrl);
 
     console.log(`[Register][${requestId}] START`, {
       hasMemberData: Boolean(memberData),
@@ -1682,7 +1704,9 @@ app.get('/api/config', (req, res) => {
       config: {
         // Web App URL bukan credential rahasia; browser pengguna membutuhkannya
         // agar dapat melakukan sinkronisasi langsung ke Google Apps Script.
-        scriptUrl: db.config.scriptUrl || DEFAULT_APPS_SCRIPT_URL,
+        scriptUrl: normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) ||
+          normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
+          DEFAULT_APPS_SCRIPT_URL,
         spreadsheetId: db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID,
         spreadsheetUrl: db.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
         status: db.config.status || 'CONNECTED',
@@ -1728,7 +1752,7 @@ app.post('/api/config', (req, res) => {
 // The actual source of truth remains the Google Spreadsheet via Apps Script.
 app.get('/api/kta-settings', async (req, res) => {
   try {
-    const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl) || DEFAULT_APPS_SCRIPT_URL;
+    const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
     if (!scriptUrl) {
       return res.status(503).json({
         success: false,
