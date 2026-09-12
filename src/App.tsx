@@ -294,14 +294,25 @@ export default function App() {
     const handleMemberSynced = () => {
       if (!cancelled) void spreadsheetService.syncFromSpreadsheet(true).catch(() => {});
     };
+    const handleGasConfigUpdated = () => {
+      if (cancelled) return;
+      setCloudSync(spreadsheetService.getSyncState());
+      // URL GAS baru langsung dipakai seluruh service pada tab ini.
+      void spreadsheetService.syncFromSpreadsheet(true).then(() => {
+        if (!cancelled) refreshAll();
+      }).catch(() => {});
+    };
+
     window.addEventListener('saka:cloud-data-updated', handleCloudUpdate as EventListener);
     window.addEventListener('saka:member-synced', handleMemberSynced as EventListener);
+    window.addEventListener('saka:gas-config-updated', handleGasConfigUpdated as EventListener);
 
     return () => {
       cancelled = true;
       unsubscribe();
       window.removeEventListener('saka:cloud-data-updated', handleCloudUpdate as EventListener);
       window.removeEventListener('saka:member-synced', handleMemberSynced as EventListener);
+      window.removeEventListener('saka:gas-config-updated', handleGasConfigUpdated as EventListener);
       unsubscribeSyncState();
     };
   }, []);
