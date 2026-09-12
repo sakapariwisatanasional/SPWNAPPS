@@ -15,7 +15,10 @@ export interface SpreadsheetConfig {
   scriptUrl?: string; // Optional Google Apps Script Web App URL for direct POST writes
   lastSyncedAt?: string;
   autoSync: boolean;
-  autoRefreshIntervalSeconds?: number; // Real-time polling frequency (default: 5 seconds)
+  autoRefreshIntervalSeconds?: number; // Near-real-time polling frequency (default: 5 seconds)
+  syncOnStartup?: boolean;
+  syncOnFocus?: boolean;
+  syncOnOnline?: boolean;
   status: 'CONNECTED' | 'SYNCING' | 'ERROR' | 'IDLE';
   lastError?: string;
 }
@@ -49,6 +52,9 @@ class SpreadsheetService {
   private isLiveSyncActive = false;
   private memberSyncInFlight = new Map<string, Promise<{ success: boolean; synced: boolean; message: string; requestId?: string; row?: number | null }>>();
   private lastKnownMemberCount = 0;
+  private _handleFocus: (() => void) | null = null;
+  private _handleOnline: (() => void) | null = null;
+  private _handleVisibility: (() => void) | null = null;
   private syncState = {
     isSaving: false,
     lastSavedTime: null as string | null,
@@ -56,7 +62,9 @@ class SpreadsheetService {
     error: null as string | null,
     isLivePolling: true,
     lastLiveCheck: null as string | null,
-    pollingIntervalSeconds: 5
+    pollingIntervalSeconds: 5,
+    consecutiveErrors: 0,
+    lastSyncDurationMs: 0
   };
 
   constructor() {
@@ -64,7 +72,9 @@ class SpreadsheetService {
     this.syncState.pollingIntervalSeconds = this.config.autoRefreshIntervalSeconds || 5;
     this.initBroadcastChannel();
     this.initAutoSync();
-    this.startLiveSyncEngine((this.config.autoRefreshIntervalSeconds || 5) * 1000); // Poll every 5 seconds for near-real-time cloud data
+    if (this.config.autoSync !== false) {
+      this.startLiveSyncEngine((this.config.autoRefreshIntervalSeconds || 5) * 1000);
+    }
     this.fetchServerConfig().catch(() => {});
   }
 
@@ -131,47 +141,53 @@ class SpreadsheetService {
   }
 
   public startLiveSyncEngine(intervalMs: number = 5000) {
-    if (this.liveSyncTimer) {
-      clearInterval(this.liveSyncTimer);
-      this.liveSyncTimer = null;
-    }
+    if (this.liveSyncTimer) clearInterval(this.liveSyncTimer);
+    this.liveSyncTimer = null;
     this.isLiveSyncActive = true;
-    this.syncState.pollingIntervalSeconds = Math.round(intervalMs / 1000);
+    const safeInterval = Math.max(3000, Math.min(60000, intervalMs));
+    this.syncState.pollingIntervalSeconds = Math.round(safeInterval / 1000);
 
-    // Live polling hanya untuk membaca perubahan dari cloud. Jangan langsung
-    // melakukan reconciliation 1,2 detik setelah login karena pada beberapa
-    // browser itu beradu dengan proses inisialisasi sesi aplikasi.
-    // Penulisan anggota TIDAK bergantung pada polling ini; CREATE memakai
-    // POST UPSERT_MEMBER -> CHECK_RECORD secara langsung.
+    const run = () => {
+      if (this.config.autoSync === false) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      void this.syncFromSpreadsheet(true).catch(() => {});
+    };
 
-    // Interval polling tetap aktif untuk perubahan dari perangkat lain.
-    this.liveSyncTimer = setInterval(() => {
-      if (this.config.autoSync !== false) {
-        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-          this.syncFromSpreadsheet(true).catch(() => {});
-        }
-      }
-    }, intervalMs);
+    this.liveSyncTimer = setInterval(run, safeInterval);
 
-    // 3. Listen for window focus, visibility change, and online status for instant sync
     if (typeof window !== 'undefined') {
-      const handleFocusOrVisible = () => {
-        if (this.config.autoSync !== false && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
-          this.syncFromSpreadsheet(true).catch(() => {});
-        }
+      const handleFocus = () => {
+        if (this.config.syncOnFocus !== false) run();
       };
+      const handleOnline = () => {
+        if (this.config.syncOnOnline !== false) run();
+      };
+      const handleVisibility = () => {
+        if (document.visibilityState === 'visible' && this.config.syncOnFocus !== false) run();
+      };
+      window.removeEventListener('focus', this._handleFocus as any);
+      window.removeEventListener('online', this._handleOnline as any);
+      document.removeEventListener('visibilitychange', this._handleVisibility as any);
+      this._handleFocus = handleFocus;
+      this._handleOnline = handleOnline;
+      this._handleVisibility = handleVisibility;
+      window.addEventListener('focus', handleFocus);
+      window.addEventListener('online', handleOnline);
+      document.addEventListener('visibilitychange', handleVisibility);
 
-      window.addEventListener('focus', handleFocusOrVisible);
-      window.addEventListener('online', handleFocusOrVisible);
-      document.addEventListener('visibilitychange', handleFocusOrVisible);
+      if (this.config.syncOnStartup !== false) {
+        window.setTimeout(run, 150);
+      }
     }
   }
 
   public stopLiveSyncEngine() {
     this.isLiveSyncActive = false;
-    if (this.liveSyncTimer) {
-      clearInterval(this.liveSyncTimer);
-      this.liveSyncTimer = null;
+    if (this.liveSyncTimer) { clearInterval(this.liveSyncTimer); this.liveSyncTimer = null; }
+    if (typeof window !== 'undefined') {
+      if (this._handleFocus) window.removeEventListener('focus', this._handleFocus);
+      if (this._handleOnline) window.removeEventListener('online', this._handleOnline);
+      if (this._handleVisibility) document.removeEventListener('visibilitychange', this._handleVisibility);
     }
   }
 
@@ -183,7 +199,10 @@ class SpreadsheetService {
         return {
           ...parsed,
           autoSync: parsed.autoSync !== undefined ? parsed.autoSync : true,
-          autoRefreshIntervalSeconds: parsed.autoRefreshIntervalSeconds || 5
+          autoRefreshIntervalSeconds: parsed.autoRefreshIntervalSeconds || 5,
+          syncOnStartup: parsed.syncOnStartup !== false,
+          syncOnFocus: parsed.syncOnFocus !== false,
+          syncOnOnline: parsed.syncOnOnline !== false
         };
       }
     } catch (e) {
@@ -196,8 +215,32 @@ class SpreadsheetService {
       scriptUrl: DEFAULT_APPS_SCRIPT_URL,
       autoSync: true,
       autoRefreshIntervalSeconds: 5,
+      syncOnStartup: true,
+      syncOnFocus: true,
+      syncOnOnline: true,
       status: 'CONNECTED'
     };
+  }
+
+  private updateRuntimeSyncState(patch: Partial<typeof this.syncState>) {
+    this.syncState = { ...this.syncState, ...patch };
+    this.notifySyncState();
+  }
+
+  public setAutoSync(enabled: boolean, intervalSeconds?: number): SpreadsheetConfig {
+    const nextInterval = Math.max(3, Math.min(60, Number(intervalSeconds || this.config.autoRefreshIntervalSeconds || 5)));
+    const updated = this.saveConfig({
+      autoSync: Boolean(enabled),
+      autoRefreshIntervalSeconds: nextInterval
+    });
+    this.syncState.pollingIntervalSeconds = nextInterval;
+    if (enabled) {
+      this.startLiveSyncEngine(nextInterval * 1000);
+    } else {
+      this.stopLiveSyncEngine();
+    }
+    this.notifySyncState();
+    return updated;
   }
 
   public saveConfig(updates: Partial<SpreadsheetConfig>): SpreadsheetConfig {
@@ -205,8 +248,11 @@ class SpreadsheetService {
     localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
     this.notifySyncState();
 
-    // Persist to central server so ALL devices and browsers share this configuration
-    if (typeof window !== 'undefined') {
+    // Hanya konfigurasi operasional yang benar-benar perlu dibagikan ke server.
+    // Status runtime (SYNCING/ERROR/CONNECTED), lastError, dan lastSyncedAt
+    // tidak diposting setiap beberapa detik karena akan membuat dashboard
+    // menulis konfigurasi server terus-menerus saat polling.
+    if (typeof window !== 'undefined' && (updates.autoSync !== undefined || updates.autoRefreshIntervalSeconds !== undefined || updates.syncOnStartup !== undefined || updates.syncOnFocus !== undefined || updates.syncOnOnline !== undefined || updates.spreadsheetId !== undefined || updates.spreadsheetUrl !== undefined || updates.scriptUrl !== undefined)) {
       try {
         const token = storage.getAuthToken();
         const headers: Record<string, string> = {
@@ -247,7 +293,12 @@ class SpreadsheetService {
     return {
       ...this.syncState,
       autoSync: this.config.autoSync !== false,
-      hasScriptUrl: Boolean(this.config.scriptUrl && this.config.scriptUrl.trim().length > 0)
+      hasScriptUrl: Boolean(this.config.scriptUrl && this.config.scriptUrl.trim().length > 0),
+      intervalSeconds: this.config.autoRefreshIntervalSeconds || 5,
+      syncOnStartup: this.config.syncOnStartup !== false,
+      syncOnFocus: this.config.syncOnFocus !== false,
+      syncOnOnline: this.config.syncOnOnline !== false,
+      lastSyncedAt: this.config.lastSyncedAt || null
     };
   }
 
@@ -499,18 +550,28 @@ class SpreadsheetService {
     if (!scriptUrl || !scriptUrl.trim()) return [];
 
     try {
-      const gasUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}`;
-      const response = await fetch(gasUrl, {
-        method: 'GET',
-        cache: 'no-store'
-      });
-      if (!response.ok) return [];
-      const data = await response.json();
-      if (Array.isArray(data)) return data;
-      if (Array.isArray(data?.rows)) return data.rows;
-      if (Array.isArray(data?.data)) return data.data;
-      if (Array.isArray(data?.records)) return data.records;
-      return [];
+      let lastError: any = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const gasUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}&nocache=1`;
+          const response = await fetch(gasUrl, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, max-age=0' }
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
+          if (Array.isArray(data)) return data;
+          if (Array.isArray(data?.rows)) return data.rows;
+          if (Array.isArray(data?.data)) return data.data;
+          if (Array.isArray(data?.records)) return data.records;
+          return [];
+        } catch (e) {
+          lastError = e;
+          if (attempt < 3) await new Promise(r => setTimeout(r, 250 * attempt));
+        }
+      }
+      throw lastError || new Error('Gagal membaca Spreadsheet');
     } catch (error) {
       console.warn(`[Spreadsheet] Gagal membaca sheet ${sheetName} melalui Google Apps Script.`, error);
       return [];
@@ -623,7 +684,7 @@ class SpreadsheetService {
 
     this.isSyncing = true;
     if (!silent) {
-      this.saveConfig({ status: 'SYNCING' });
+      this.updateRuntimeSyncState({ isSaving: false });
     }
 
     try {
@@ -1177,22 +1238,24 @@ class SpreadsheetService {
         }));
       }
 
+      this.updateRuntimeSyncState({ consecutiveErrors: 0, error: null });
+
       const successMsg = `Berhasil menyinkronkan database spreadsheet. ${memberCount} data anggota terbaca (${addedMemberCount} data baru ditambahkan).`;
-      this.saveConfig({
-        lastSyncedAt: new Date().toISOString(),
-        status: 'CONNECTED',
-        lastError: undefined
-      });
+      const syncedAt = new Date().toISOString();
+      this.config.lastSyncedAt = syncedAt;
+      this.config.status = 'CONNECTED';
+      this.config.lastError = undefined;
+      try { localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config)); } catch {}
 
       this.isSyncing = false;
       return { success: true, count: memberCount, message: successMsg };
     } catch (err: any) {
       this.isSyncing = false;
       console.error('Sync failed:', err);
-      this.saveConfig({
-        status: 'ERROR',
-        lastError: err.message || 'Gagal terhubung ke Google Spreadsheet'
-      });
+      this.config.status = 'ERROR';
+      this.config.lastError = err.message || 'Gagal terhubung ke Google Spreadsheet';
+      this.updateRuntimeSyncState({ consecutiveErrors: this.syncState.consecutiveErrors + 1, error: this.config.lastError });
+      try { localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config)); } catch {}
       return {
         success: false,
         count: 0,
@@ -1469,11 +1532,11 @@ class SpreadsheetService {
             }) + ' WIB';
             this.syncState.lastSavedAction = `Data ${member.fullName || 'anggota'} terverifikasi di Spreadsheet (SYNCED)`;
             this.syncState.error = null;
-            this.saveConfig({
-              status: 'CONNECTED',
-              lastSyncedAt: new Date().toISOString(),
-              lastError: undefined
-            });
+            const syncedAt = new Date().toISOString();
+            this.config.status = 'CONNECTED';
+            this.config.lastSyncedAt = syncedAt;
+            this.config.lastError = undefined;
+            try { localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config)); } catch {}
             this.notifySyncState();
 
             if (typeof window !== 'undefined') {
@@ -1481,6 +1544,10 @@ class SpreadsheetService {
                 detail: { memberId: member.id, requestId, row: check.row, status: 'SYNCED' }
               }));
             }
+
+            // Baca ulang snapshot Spreadsheet setelah write terverifikasi agar
+            // Dashboard selalu menampilkan nilai yang benar-benar tersimpan.
+            void this.syncFromSpreadsheet(true).catch(() => {});
 
             return {
               success: true,
@@ -1765,11 +1832,11 @@ class SpreadsheetService {
         body: JSON.stringify(payload)
       });
 
-      this.saveConfig({
-        lastSyncedAt: new Date().toISOString(),
-        status: 'CONNECTED',
-        lastError: undefined
-      });
+      const syncedAt = new Date().toISOString();
+      this.config.lastSyncedAt = syncedAt;
+      this.config.status = 'CONNECTED';
+      this.config.lastError = undefined;
+      try { localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config)); } catch {}
 
       this.isPushing = false;
       return {
@@ -1844,45 +1911,64 @@ class SpreadsheetService {
   }
 
   /**
-   * Upload gambar ke Google Drive melalui binary upload.
-   * String data:image/... tetap didukung untuk kompatibilitas komponen lama.
-   * Data URL hanya dikonversi menjadi Blob di browser; yang dikirim ke server
-   * adalah binary/octet-stream, bukan JSON Base64.
+   * Upload gambar base64 langsung ke Google Drive melalui Apps Script Web App
    */
   public async uploadImageToDrive(
-    imageData: string | Blob | File,
-    filename: string,
+    base64Data: string, 
+    filename: string, 
     category: 'MEMBER_AVATAR' | 'TOUR_PACKAGES' | 'CULINARY_SOUVENIRS' | 'DOCUMENTS' | 'KTA_CARD' | 'ACTIVITIES' = 'MEMBER_AVATAR'
   ): Promise<{ success: boolean; url?: string; directUrl?: string; fileId?: string; viewUrl?: string; folderId?: string; message: string }> {
     const scriptUrl = this.getEffectiveAppsScriptUrl();
-    if (!scriptUrl) return { success:false, message:'Google Apps Script Web App URL belum dipasang. Harap pasang URL /exec di Pengaturan API.' };
+    if (!scriptUrl) {
+      return {
+        success: false,
+        message: 'Google Apps Script Web App URL belum dipasang. Harap pasang Web App URL di Pengaturan API.'
+      };
+    }
+
+    const value = String(base64Data || '').trim();
+    if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) {
+      return { success: false, message: 'Data foto tidak valid.' };
+    }
+
     try {
-      let blob: Blob;
-      if (imageData instanceof Blob) {
-        blob = imageData;
-      } else {
-        const value = String(imageData || '').trim();
-        if (!/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value)) return { success:false, message:'Data foto tidak valid.' };
-        const binaryResponse = await fetch(value);
-        blob = await binaryResponse.blob();
-      }
-      if (!blob.size) return { success:false, message:'Berkas foto kosong.' };
-      if (blob.size > 4 * 1024 * 1024) return { success:false, message:'Foto terlalu besar. Maksimal 4 MB.' };
-      const mimeType = String(blob.type || 'image/jpeg').toLowerCase();
-      if (!/^image\/(?:jpeg|jpg|png|webp|gif)$/i.test(mimeType)) return { success:false, message:'Format foto tidak didukung. Gunakan JPG, PNG, atau WEBP.' };
-      const safeFilename = String(filename || `KTA_${Date.now()}.jpg`).replace(/[\\/:*?"<>|#%]+/g, '_').slice(0,160);
+      // Gunakan proxy aplikasi agar browser dapat menerima response JSON dari GAS.
+      // Proxy juga meneruskan URL GAS yang dipilih Super Admin dan memvalidasi
+      // hasil upload sebelum frontend melanjutkan pendaftaran.
       const response = await fetch('/api/upload-image', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/octet-stream', 'X-Upload-Mime-Type':mimeType, 'X-Upload-Filename':safeFilename, 'X-Upload-Category':category, 'X-Script-Url':scriptUrl },
-        credentials:'same-origin', cache:'no-store', body:blob
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({
+          base64: value,
+          filename,
+          category,
+          scriptUrl
+        })
       });
+
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || data?.success !== true || !data?.url) throw new Error(data?.message || `Upload foto gagal (HTTP ${response.status}).`);
+      if (!response.ok || data?.success === false || !data?.url) {
+        throw new Error(data?.message || `Upload foto gagal (HTTP ${response.status}).`);
+      }
+
       const directUrl = String(data.url || data.directUrl || '').trim();
-      return { success:true, url:directUrl, directUrl, fileId:data.fileId, viewUrl:data.viewUrl, folderId:data.folderId, message:data.message || `Foto ${safeFilename} berhasil disimpan ke Google Drive.` };
-    } catch (err:any) {
-      console.error('Failed to upload binary image to Drive:', err);
-      return { success:false, message:`Gagal mengunggah foto ke Google Drive: ${err?.message || String(err)}` };
+      return {
+        success: true,
+        url: directUrl,
+        directUrl,
+        fileId: data.fileId,
+        viewUrl: data.viewUrl,
+        folderId: data.folderId,
+        message: data.message || `Foto ${filename} berhasil disimpan ke folder Google Drive.`
+      };
+    } catch (err: any) {
+      console.error('Failed to upload image to Drive:', err);
+      return {
+        success: false,
+        message: `Gagal mengunggah foto ke Google Drive: ${err.message}`
+      };
     }
   }
 
