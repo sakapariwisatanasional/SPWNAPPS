@@ -373,10 +373,10 @@ export async function verifyMemberUniversal(
   localMembers?: Member[],
   options?: { authoritativeRemote?: boolean }
 ): Promise<VerificationResult> {
+  const candidates = getVerificationCandidates(rawInput);
   const { cleanQuery } = normalizeNtaQuery(rawInput);
-  const authoritativeRemote = options?.authoritativeRemote === true;
 
-  if (!cleanQuery && getVerificationCandidates(rawInput).length === 0) {
+  if (candidates.length === 0) {
     return {
       found: false,
       member: null,
@@ -387,18 +387,65 @@ export async function verifyMemberUniversal(
     };
   }
 
-  if (authoritativeRemote) {
-    const candidates = getVerificationCandidates(rawInput);
+  // PUBLIC QR VERIFICATION MUST GO THROUGH THE SERVER.
+  // The server knows the authoritative GAS URL and therefore does not depend on
+  // localStorage/configuration that may not exist on the visitor's phone.
+  if (options?.authoritativeRemote === true && typeof window !== 'undefined') {
+    let lastError = '';
     for (const candidate of candidates) {
-      const remoteMatch = await searchMemberInRemoteSpreadsheet(candidate);
-      if (remoteMatch) {
-        return {
-          found: true,
-          member: remoteMatch,
-          source: 'GOOGLE_SPREADSHEET',
-          searchTerm: rawInput,
-          normalizedTerm: normalizeNtaQuery(candidate).cleanQuery
-        };
+      try {
+        const params = new URLSearchParams();
+        params.set('verifyId', candidate);
+        params.set('_t', String(Date.now()));
+        params.set('_r', String(Math.floor(Math.random() * 1000000)));
+        const response = await fetch(`/api/verify-member?${params.toString()}`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+            'Pragma': 'no-cache'
+          }
+        });
+        const text = await response.text();
+        let data: any = null;
+        try { data = text ? JSON.parse(text) : null; } catch {}
+
+        if (data?.found && data?.member) {
+          const member = data.member as Member;
+          // Normalize server profile into the same Member shape used by the UI.
+          const normalizedMember: Member = {
+            ...member,
+            id: String(member.id || ''),
+            userId: String(member.userId || `user-${member.id || 'member'}`),
+            nationalMemberNumber: member.nationalMemberNumber ? String(member.nationalMemberNumber) : undefined,
+            fullName: String(member.fullName || 'Anggota'),
+            email: String(member.email || ''),
+            phone: String(member.phone || ''),
+            provinceName: String(member.provinceName || 'Kwartir Nasional'),
+            regencyName: String(member.regencyName || 'Pusat Nasional'),
+            districtName: String(member.districtName || 'Nasional'),
+            currentPosition: String(member.currentPosition || 'Anggota Saka Pariwisata'),
+            krida: (member.krida || 'Krida Pemandu') as any,
+            status: (member.status || 'ACTIVE') as any,
+            avatarUrl: String(member.avatarUrl || ''),
+            registeredAt: String(member.registeredAt || ''),
+            verificationToken: String(member.verificationToken || '')
+          };
+          return {
+            found: true,
+            member: normalizedMember,
+            source: 'GOOGLE_SPREADSHEET',
+            searchTerm: rawInput,
+            normalizedTerm: normalizeNtaQuery(candidate).cleanQuery
+          };
+        }
+
+        if (response.status >= 500) {
+          lastError = data?.message || `Server verifikasi HTTP ${response.status}`;
+          continue;
+        }
+      } catch (error: any) {
+        lastError = error?.message || 'Gagal menghubungi server verifikasi.';
       }
     }
 
@@ -408,10 +455,11 @@ export async function verifyMemberUniversal(
       source: 'NONE',
       searchTerm: rawInput,
       normalizedTerm: cleanQuery,
-      message: 'Data anggota tidak ditemukan pada Google Spreadsheet terbaru. Pencarian sudah menggunakan Nomor KTA, ID Anggota, dan Member ID Users.'
+      message: lastError || 'Data anggota tidak ditemukan pada Google Spreadsheet terbaru. Pencarian sudah menggunakan Nomor KTA, ID Anggota, Member ID, dan token verifikasi.'
     };
   }
 
+  // Non-public/internal fallback for existing application flows.
   const localMatch = searchMemberLocally(rawInput, localMembers);
   if (localMatch) {
     return {
