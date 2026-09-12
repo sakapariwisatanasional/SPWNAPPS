@@ -611,6 +611,44 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Binary image upload:
+// Browser -> Node/Vercel -> GAS creates Drive resumable session
+// -> Node/Vercel streams binary to Google Drive -> GAS finalizes permission.
+// Base64 is intentionally NOT used on the primary upload path.
+app.post(
+  '/api/upload-image',
+  express.raw({ type: ['application/octet-stream', 'image/*'], limit: '4mb' }),
+  async (req, res) => {
+    const requestId = `UP-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+    try {
+      const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from([]);
+      const filenameHeader = String(req.header('x-upload-filename') || '').trim();
+      const mimeType = String(req.header('x-upload-mime-type') || req.header('content-type') || '').trim().toLowerCase();
+      const category = String(req.header('x-upload-category') || 'MEMBER_AVATAR').trim().toUpperCase();
+      if (!body.length) return res.status(400).json({ success:false, status:'error', requestId, message:'Berkas foto kosong.' });
+      if (body.length > 4 * 1024 * 1024) return res.status(413).json({ success:false, status:'error', requestId, message:'Foto terlalu besar. Maksimal 4 MB untuk jalur upload mobile.' });
+      if (!/^image\/(?:jpeg|jpg|png|webp|gif)$/i.test(mimeType)) return res.status(415).json({ success:false, status:'error', requestId, message:'Format foto tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
+      const safeFilename = (filenameHeader || `KTA_${Date.now()}.jpg`).replace(/[\\/:*?"<>|#%]+/g, '_').slice(0,160);
+      const sessionResult = await forwardToGoogleAppsScript({ action:'GET_UPLOAD_URL', fileName:safeFilename, mimeType, category });
+      const uploadUrl = String(sessionResult?.uploadUrl || '').trim();
+      if (!uploadUrl) throw new Error(sessionResult?.message || 'Google Apps Script tidak mengembalikan URL upload Drive.');
+      const driveResponse = await fetch(uploadUrl, { method:'PUT', headers:{ 'Content-Type':mimeType, 'Content-Length':String(body.length) }, body });
+      const driveText = await driveResponse.text();
+      let driveData:any = null;
+      try { driveData = driveText ? JSON.parse(driveText) : null; } catch { driveData = null; }
+      if (!driveResponse.ok || !driveData?.id) throw new Error(`Google Drive upload HTTP ${driveResponse.status}` + (driveData?.error?.message ? `: ${driveData.error.message}` : ''));
+      const fileId = String(driveData.id);
+      const finalized = await forwardToGoogleAppsScript({ action:'FINALIZE_UPLOAD', fileId, fileName:safeFilename, mimeType, category });
+      const finalUrl = String(finalized?.url || finalized?.directUrl || `https://drive.google.com/uc?export=view&id=${fileId}`).trim();
+      console.log(`[Upload][${requestId}] Drive upload successful`, { fileId, filename:safeFilename, bytes:body.length });
+      return res.json({ success:true, status:'success', action:'UPLOAD_IMAGE', requestId, fileId, url:finalUrl, directUrl:String(finalized?.directUrl || finalUrl), viewUrl:String(finalized?.viewUrl || `https://drive.google.com/uc?export=view&id=${fileId}`), folderId:finalized?.folderId || null, filename:safeFilename, category, message:'Foto berhasil disimpan ke Google Drive.' });
+    } catch (error:any) {
+      console.error(`[Upload][${requestId}] Error:`, error);
+      return res.status(502).json({ success:false, status:'error', requestId, message:error?.message || 'Upload foto gagal.' });
+    }
+  }
+);
+
 // ------------------------------------------
 // AUTHENTICATION ROUTES
 // ------------------------------------------
