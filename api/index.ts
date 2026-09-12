@@ -643,8 +643,11 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-this-session-secret';
 const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
 
-// URL Google Apps Script TIDAK boleh ditentukan oleh source code.
-// Super Admin mengisinya melalui Dashboard > Pengaturan API.
+// URL produksi Google Apps Script yang baru diberikan dan aktif.
+// Dipakai sebagai fallback agar login tetap bekerja pada perangkat yang masih
+// menyimpan URL deployment GAS lama di localStorage/cache.
+const DEFAULT_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
 
 function normalizeManualAppsScriptUrl(raw: unknown): string {
   const value = String(raw || '').trim().replace(/\s+/g, '');
@@ -1163,10 +1166,12 @@ async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unkn
   const requested = normalizeManualAppsScriptUrl(requestedScriptUrl);
   const configured = normalizeManualAppsScriptUrl(db.config.scriptUrl);
   const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-  // Prioritas mutlak: URL yang dikirim halaman aktif (hasil Dashboard), lalu
-  // konfigurasi server. ENV hanya menjadi bootstrap opsional; tidak ada URL GAS
-  // tertentu yang ditanam permanen di source code.
-  const candidates = [requested, configured, envUrl]
+  const defaultUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
+  // Perangkat lama dapat membawa URL deployment GAS lama. Semua kandidat tetap
+  // dicoba; URL produksi terbaru menjadi fallback terakhir agar sistem lama tidak
+  // langsung diputus dan deployment baru tetap dapat mengambil alih bila URL lama
+  // mengembalikan 404/410.
+  const candidates = [requested, configured, envUrl, defaultUrl]
     .filter(Boolean)
     .filter((url, index, arr) => arr.indexOf(url) === index);
 
