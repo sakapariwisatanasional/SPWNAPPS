@@ -179,20 +179,28 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
           </section>}
 
           {side==='BACK' && <section className="p-4 rounded-2xl border border-purple-200 bg-purple-50/60 space-y-3">
-            <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 font-bold text-purple-950"><Eye/><span>5. QR Penandatangan Digital</span></div><label className="text-xs font-bold flex items-center gap-2 text-purple-950"><input type="checkbox" checked={settings.showBarcode!==false} onChange={e=>setSettings(s=>({...s,showBarcode:e.target.checked}))}/> Tampilkan QR</label></div>
+            <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 font-bold text-purple-950"><Eye/><span>5. QR Penandatangan Digital</span></div><label className="text-xs font-bold flex items-center gap-2 text-purple-950"><input type="checkbox" checked={(settings as any).showSignerQrCode !== false} onChange={e=>setSettings(s=>({...s,showSignerQrCode:e.target.checked}))}/> Tampilkan QR Penandatangan</label></div>
             <p className="text-[10px] text-purple-900/70">QR belakang khusus untuk pejabat yang ditunjuk SuperAdmin. QR membuka profil verifikasi pejabat tersebut.</p>
             <label className="block text-[10px] font-bold text-purple-950">Penandatangan
-              <select value={(settings as any).signerMemberId || ''} onChange={e=>{const id=e.target.value; const m=activeMembers.find(x=>x.id===id); setSettings(s=>({...s,signerMemberId:id,signerName:m?.fullName || s.signerName,signerTitle:m?.currentPosition || s.signerTitle,signerSubtitle:m ? `${m.provinceName || ''}${m.provinceName && m.regencyName ? ' · ' : ''}${m.regencyName || ''}` : s.signerSubtitle}));}} className={input}>
+              <select value={(settings as any).signerMemberId || ''} onChange={e=>{const id=e.target.value; const m=activeMembers.find(x=>x.id===id); setSettings(s=>({...s,signerMemberId:id,signerName:m?.fullName || s.signerName,signerTitle:m?.currentPosition || s.signerTitle,signerSubtitle: ''}));}} className={input}>
                 <option value="">Pilih anggota yang berwenang</option>
                 {activeMembers.map(m=><option key={m.id} value={m.id}>{m.fullName} — {m.currentPosition || 'Tanpa jabatan'}{m.provinceName ? ` · ${m.provinceName}` : ''}</option>)}
               </select>
             </label>
-            <div className="p-3 rounded-xl bg-white border border-purple-100 text-[10px] text-slate-600">{signerMember ? <><strong>{signerMember.fullName}</strong> · {signerMember.currentPosition || 'Tanpa jabatan'}<br/>{signerMember.nationalMemberNumber || signerMember.id}</> : 'Belum ada penandatangan yang dipilih.'}</div>
+            <div className="p-3 rounded-xl bg-white border border-purple-100 text-[10px] text-slate-600">{signerMember ? <><strong>{signerMember.fullName}</strong><br/>{signerMember.currentPosition || 'Tanpa jabatan'}</> : 'Belum ada penandatangan yang dipilih.'}</div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <label className="text-[9px] font-bold">X{numberInput((settings as any).signerQrX??68,v=>setSettings(s=>({...s,signerQrX:v})))}</label>
-              <label className="text-[9px] font-bold">Y{numberInput((settings as any).signerQrY??62,v=>setSettings(s=>({...s,signerQrY:v})))}</label>
-              <label className="text-[9px] font-bold">Ukuran{numberInput((settings as any).signerQrSize??18,v=>setSettings(s=>({...s,signerQrSize:v})))}</label>
-              <label className="text-[9px] font-bold">Margin{numberInput((settings as any).signerQrPadding??2,v=>setSettings(s=>({...s,signerQrPadding:v})))}</label>
+              <label className="text-[9px] font-bold">X QR{numberInput((settings as any).signerQrX??68,v=>setSettings(s=>({...s,signerQrX:v})))}</label>
+              <label className="text-[9px] font-bold">Y QR{numberInput((settings as any).signerQrY??62,v=>setSettings(s=>({...s,signerQrY:v})))}</label>
+              <label className="text-[9px] font-bold">Ukuran QR{numberInput((settings as any).signerQrSize??18,v=>setSettings(s=>({...s,signerQrSize:v})))}</label>
+              <label className="text-[9px] font-bold">Margin QR{numberInput((settings as any).signerQrPadding??2,v=>setSettings(s=>({...s,signerQrPadding:v})))}</label>
+            </div>
+            <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-2">
+              <div className="text-[10px] font-black text-purple-950">Tanggal Penerbitan</div>
+              <input value={settings.issueLocationDate || ''} onChange={e=>setSettings(s=>({...s,issueLocationDate:e.target.value}))} className={input} placeholder="Contoh: Jakarta, 14 Agustus 2026"/>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-[9px] font-bold">X Tanggal{numberInput((settings as any).issueLocationDateX??5,v=>setSettings(s=>({...s,issueLocationDateX:v})))}</label>
+                <label className="text-[9px] font-bold">Y Tanggal{numberInput((settings as any).issueLocationDateY??70,v=>setSettings(s=>({...s,issueLocationDateY:v})))}</label>
+              </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               <label className="text-[9px] font-bold">Latar QR<input type="color" value={(settings as any).signerQrBackgroundColor??'#ffffff'} onChange={e=>setSettings(s=>({...s,signerQrBackgroundColor:e.target.value}))} className="h-9 w-full rounded"/></label>
@@ -214,7 +222,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
 
           <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
             <div className="flex items-center gap-2 font-bold"><Type/><span>9. Teks Sistem Kartu</span></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2"><label className="text-[10px] font-bold">Judul Organisasi<input value={settings.frontOrganizationTitle} onChange={e=>setSettings(s=>({...s,frontOrganizationTitle:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Subjudul<input value={settings.frontOrganizationSubtitle} onChange={e=>setSettings(s=>({...s,frontOrganizationSubtitle:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Masa Berlaku<input value={settings.frontValidityText} onChange={e=>setSettings(s=>({...s,frontValidityText:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Header Belakang<input value={settings.backHeaderTitle} onChange={e=>setSettings(s=>({...s,backHeaderTitle:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Nama Penandatangan<input value={settings.signerName} onChange={e=>setSettings(s=>({...s,signerName:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Jabatan Penandatangan<input value={settings.signerTitle} onChange={e=>setSettings(s=>({...s,signerTitle:e.target.value}))} className={input}/></label></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2"><label className="text-[10px] font-bold">Judul Organisasi<input value={settings.frontOrganizationTitle} onChange={e=>setSettings(s=>({...s,frontOrganizationTitle:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Subjudul<input value={settings.frontOrganizationSubtitle} onChange={e=>setSettings(s=>({...s,frontOrganizationSubtitle:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Masa Berlaku<input value={settings.frontValidityText} onChange={e=>setSettings(s=>({...s,frontValidityText:e.target.value}))} className={input}/></label><label className="text-[10px] font-bold">Header Belakang<input value={settings.backHeaderTitle} onChange={e=>setSettings(s=>({...s,backHeaderTitle:e.target.value}))} className={input}/></label><div className="md:col-span-2 p-3 rounded-xl bg-slate-50 border text-[10px] text-slate-600">Nama dan jabatan penandatangan mengikuti anggota yang dipilih pada <strong>QR Penandatangan Digital</strong>. Data wilayah penandatangan tidak ditampilkan pada KTA.</div></div>
             <label className="text-[10px] font-bold">Ketentuan Belakang<textarea value={settings.terms.join('\n')} onChange={e=>setSettings(s=>({...s,terms:e.target.value.split('\n')}))} className={input+' min-h-24'}/></label>
           </section>
 
