@@ -549,7 +549,7 @@ export default function App() {
                   members={members}
                   onOpenFormModal={(item, kind) => {
                     setEditingCulinaryItem(item || null);
-                    setCulinaryFormInitialKind(kind || 'KULINER');
+                    if (!item) setCulinaryFormInitialKind(kind || 'KULINER');
                     setIsCulinaryFormOpen(true);
                   }}
                   onSelectItemDetail={(item) => setSelectedCulinaryDetail(item)}
