@@ -529,9 +529,8 @@ export default function App() {
                   onOpenEditPhotoModal={(m) => setEditingPhotoMember(m)}
                   onOpenEditMemberModal={(m) => setEditingMember(m)}
                   onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
-                  onOpenCulinaryFormModal={(item, kind) => {
+                  onOpenCulinaryFormModal={(item) => {
                     setEditingCulinaryItem(item || null);
-                    if (!item) setCulinaryFormInitialKind(kind || 'KULINER');
                     setIsCulinaryFormOpen(true);
                   }}
                   onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
@@ -546,9 +545,10 @@ export default function App() {
                 <CulinarySouvenirGallerySection
                   items={culinaryItems}
                   currentUser={currentUser}
+                  members={members}
                   onOpenFormModal={(item, kind) => {
                     setEditingCulinaryItem(item || null);
-                    if (!item) setCulinaryFormInitialKind(kind || 'KULINER');
+                    setCulinaryFormInitialKind(kind || 'KULINER');
                     setIsCulinaryFormOpen(true);
                   }}
                   onSelectItemDetail={(item) => setSelectedCulinaryDetail(item)}
