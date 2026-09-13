@@ -284,10 +284,9 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // Spreadsheet adalah sumber data utama. LocalStorage hanya dipakai sebagai
-  // cache/session, sehingga browser pengunjung tidak bergantung pada data lama
-  // saat pertama kali membuka landing page. Setelah konfigurasi pusat terbaca,
-  // tarik snapshot terbaru dari Google Spreadsheet lalu teruskan polling live.
+  // Google Spreadsheet melalui GAS adalah sumber data utama.
+  // Domain data tidak lagi di-hydrate dari localStorage; browser menunggu
+  // snapshot cloud pertama sebelum menampilkan data anggota/konten.
   useEffect(() => {
     let cancelled = false;
 
@@ -309,13 +308,18 @@ export default function App() {
         await spreadsheetService.fetchServerConfig();
         if (cancelled) return;
 
+        await storage.hydrateKtaSettings();
+
         // IMPORTANT: do not call refreshAll() before the first successful cloud
         // snapshot. The storage service deliberately hides the old local data
         // cache until hydration succeeds, preventing stale mobile data from
         // flashing on screen after a deployment or server-side deletion.
+        // Google Spreadsheet/GAS is the authoritative source for domain data.
+        // Public/member browsers use the sanitized server snapshot (which is
+        // hydrated from GAS); Super Admin/operator views can read the raw
+        // spreadsheet snapshot through the protected GAS proxy.
         const role = storage.getCurrentUser()?.role || currentUser?.role || 'PUBLIC';
         if (role === 'PUBLIC' || role === 'MEMBER') {
-          // Public/member clients receive the sanitized /api/data snapshot.
           await storage.syncWithServer();
         } else {
           await spreadsheetService.syncFromSpreadsheet(true);
