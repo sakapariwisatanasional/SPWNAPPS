@@ -35,7 +35,6 @@ export interface DashboardViewProps {
   auditLogs?: any[];
   onNavigate?: (view: string) => void;
   onVerifyMember?: (id: string) => void;
-  onOpenCulinaryFormModal?: (item?: any, kind?: any) => void;
   [key: string]: any;
 }
 
@@ -115,7 +114,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   auditLogs = [],
   onNavigate,
   onVerifyMember,
-  onOpenCulinaryFormModal,
 }) => {
   const [searchPending, setSearchPending] = useState('');
   const [selectedKwardaFilter, setSelectedKwardaFilter] = useState('ALL');
@@ -512,7 +510,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           activities={safeActivities}
           currentUser={currentUser || ({} as any)}
           onSelectTab={handleNavigate}
-          onOpenCulinaryFormModal={onOpenCulinaryFormModal}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -523,6 +520,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <CulinarySouvenirGallerySection
               items={safeCulinaryItems}
               currentUser={currentUser}
+              members={safeMembers}
               onOpenFormModal={onOpenCulinaryFormModal}
             />
           </div>
