@@ -185,17 +185,11 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
             const qrPx = Math.max(36, Math.round(Math.min(widthPx, heightPx) * (qrPercent / 100)));
             return (
               <div
-                className={`absolute ${onPreviewSettingsChange ? 'cursor-move select-none ring-1 ring-transparent hover:ring-emerald-400/80' : ''}`}
+                className={`absolute ${onPreviewSettingsChange ? 'cursor-move select-none' : ''}`}
                 onPointerDown={handleQrPointerDown}
                 title={onPreviewSettingsChange ? 'Seret untuk memindahkan QR Code' : undefined}
                 style={{
                   left: `${qrX}%`, top: `${qrY}%`, width: `${qrPercent}%`, aspectRatio: '1 / 1',
-                  padding: `${Math.max(0, Number(settings.qrPadding ?? 2))}px`,
-                  boxSizing: 'border-box',
-                  background: settings.qrBackgroundColor || '#ffffff',
-                  border: `${Math.max(0, Number(settings.qrBorderWidth ?? 1))}px solid ${settings.qrBorderColor || '#ffffff'}`,
-                  borderRadius: `${Math.max(0, Number(settings.qrBorderRadius ?? 6))}px`,
-                  overflow: 'hidden',
                   touchAction: 'none'
                 }}
               >
@@ -207,6 +201,8 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
                   borderWidth={0}
                   borderRadius={0}
                   borderColor="transparent"
+                  margin={4}
+                  lightColor="#ffffff"
                 />
               </div>
             );
@@ -243,10 +239,9 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
             const qrX = Math.max(0, Math.min(100 - qrPercent, Number((settings as any).signerQrX ?? 68)));
             const qrY = Math.max(0, Math.min(100 - qrPercent, Number((settings as any).signerQrY ?? 62)));
             const qrPx = Math.max(36, Math.round(Math.min(widthPx, heightPx) * (qrPercent / 100)));
-            const padding = Math.max(0, Number((settings as any).signerQrPadding ?? 2));
             return <div className="absolute flex flex-col items-center gap-1" style={{left:`${qrX}%`,top:`${qrY}%`,width:`${qrPercent}%`,aspectRatio:'1 / 1'}}>
-              <div style={{width:'100%',height:'100%',padding:`${padding}px`,boxSizing:'border-box',background:(settings as any).signerQrBackgroundColor || '#ffffff',border:`${Math.max(0,Number((settings as any).signerQrBorderWidth ?? 0))}px solid ${(settings as any).signerQrBorderColor || '#ffffff'}`,borderRadius:`${Math.max(0,Number((settings as any).signerQrBorderRadius ?? 0))}px`,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <KtaQrCode member={signer} size={Math.max(24, qrPx - padding * 2)} showLabel={false} interactive={false} margin={0} lightColor="rgba(255,255,255,0)" />
+              <div style={{width:'100%',height:'100%',overflow:'visible',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <KtaQrCode member={signer} size={Math.max(24, qrPx)} showLabel={false} interactive={false} margin={4} lightColor="#ffffff" />
               </div>
             </div>;
           })()}
