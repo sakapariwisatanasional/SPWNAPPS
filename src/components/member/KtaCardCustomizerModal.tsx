@@ -1,4 +1,3 @@
-```tsx
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   X,
@@ -2919,4 +2918,3 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 const CreditCardIcon = () => (
   <LayoutTemplate className="w-4 h-4" />
 );
-```
