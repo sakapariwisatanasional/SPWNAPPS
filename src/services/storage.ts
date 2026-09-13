@@ -418,7 +418,7 @@ class StorageService {
         : INITIAL_MEMBERS;
 
       if (!Array.isArray(parsed)) {
-        return INITIAL_MEMBERS;
+        return [];
       }
 
       const cleaned = parsed.map((member: any) => {
@@ -3256,236 +3256,205 @@ class StorageService {
   // SERVER SYNCHRONIZATION
   // =========================================================
 
-  public async syncWithServer():
-    Promise<boolean> {
-    const token =
-      this.getAuthToken();
+  /**
+   * Sinkronisasi snapshot dari server.
+   *
+   * Prinsip Cloud-First:
+   * - Respons server adalah sumber kebenaran untuk data cloud.
+   * - Array kosong dari server tetap harus ditulis ke localStorage.
+   * - localStorage hanya menjadi cache/offline snapshot, bukan sumber data
+   *   yang boleh mengalahkan snapshot server.
+   * - Pending member writes tetap dipertahankan agar perubahan lokal yang
+   *   belum selesai tidak langsung hilang ketika sync berlangsung.
+   */
+  public async syncWithServer(): Promise<boolean> {
+    const token = this.getAuthToken();
 
     try {
-      const headers:
-        Record<string, string> =
-        {};
+      const headers: Record<string, string> = {};
 
       if (token) {
-        headers.Authorization =
-          `Bearer ${token}`;
+        headers.Authorization = `Bearer ${token}`;
       }
 
-      const response =
-        await fetch(
-          '/api/data',
-          {
-            method: 'GET',
-            headers,
-            credentials:
-              'include',
-            cache:
-              'no-store'
-          }
-        );
+      const response = await fetch('/api/data', {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+        cache: 'no-store',
+      });
 
       if (!response.ok) {
         return false;
       }
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
-      if (
-        !data ||
-        !Array.isArray(
-          data.members
-        )
-      ) {
+      if (!data || !Array.isArray(data.members)) {
         return false;
       }
 
-      // Lindungi perubahan profil yang masih pending.
-      if (
-        data.members.length > 0
-      ) {
-        const pending =
-          this.getPendingMemberWrites();
+      // -------------------------------------------------------
+      // MEMBERS
+      // -------------------------------------------------------
+      // Penting: jangan gunakan `length > 0` di sini.
+      // Jika server mengirim [], cache lokal HARUS ikut menjadi [].
+      const pending = this.getPendingMemberWrites();
 
-        const protectedMembers =
-          (
-            data.members as Member[]
-          ).map(
-            (
-              serverMember: Member
-            ) => {
-              const entry =
-                pending[
-                  serverMember.id
-                ] ||
-                Object.values(
-                  pending
-                ).find(
-                  (p: any) =>
-                    p?.member &&
-                    (
-                      (
-                        serverMember.nationalMemberNumber &&
-                        p.member
-                          .nationalMemberNumber ===
-                          serverMember.nationalMemberNumber
-                      ) ||
-                      (
-                        serverMember.email &&
-                        String(
-                          p.member.email ||
-                            ''
-                        ).toLowerCase() ===
-                        String(
-                          serverMember.email ||
-                            ''
-                        ).toLowerCase()
-                      )
-                    )
-                );
+      const protectedMembers = (data.members as Member[]).map(
+        (serverMember: Member) => {
+          const entry =
+            pending[serverMember.id] ||
+            Object.values(pending).find((p: any) => {
+              if (!p?.member) return false;
 
-              return entry?.member
-                ? {
-                    ...serverMember,
-                    ...entry.member
-                  }
-                : serverMember;
-            }
+              const sameNationalNumber =
+                !!serverMember.nationalMemberNumber &&
+                p.member.nationalMemberNumber ===
+                  serverMember.nationalMemberNumber;
+
+              const sameEmail =
+                !!serverMember.email &&
+                String(p.member.email || '').toLowerCase() ===
+                  String(serverMember.email || '').toLowerCase();
+
+              return sameNationalNumber || sameEmail;
+            });
+
+          return entry?.member
+            ? {
+                ...serverMember,
+                ...entry.member,
+              }
+            : serverMember;
+        }
+      );
+
+      // Selalu tulis snapshot, termasuk ketika array kosong.
+      this.setMembers(protectedMembers);
+
+      // -------------------------------------------------------
+      // USERS
+      // -------------------------------------------------------
+      // Untuk keamanan, jangan menghapus daftar user lokal hanya karena
+      // endpoint publik mengembalikan [] kepada non-Super Admin.
+      // Tetapi bila server memang memberikan daftar users, gunakan snapshot
+      // server tersebut sebagai sumber kebenaran.
+      if (Array.isArray(data.users) && data.users.length > 0) {
+        const serverUsers = data.users as CurrentUser[];
+        this.setUsers(serverUsers);
+
+        const roleByMemberId = new Map<string, CurrentUser>();
+
+        serverUsers.forEach((user: any) => {
+          const memberId = String(user?.memberId || '').trim();
+          if (memberId) {
+            roleByMemberId.set(memberId, user);
+          }
+        });
+
+        const currentMembers = this.getMembers();
+
+        const mergedMembers = currentMembers.map((member: any) => {
+          const user = roleByMemberId.get(
+            String(member?.id || '').trim()
           );
 
-        this.setMembers(
-          protectedMembers
+          if (!user) {
+            return member;
+          }
+
+          const role = String(user.role || 'MEMBER').toUpperCase();
+
+          const isOperator =
+            role === 'ADMIN_PROVINCE' ||
+            role === 'ADMIN_REGENCY' ||
+            role === 'ADMIN_BRANCH';
+
+          if (!isOperator) {
+            return {
+              ...member,
+              isOperator: false,
+              operatorRole: undefined,
+              operatorJurisdictionId: undefined,
+              operatorJurisdictionName: undefined,
+            };
+          }
+
+          return {
+            ...member,
+            isOperator: true,
+            operatorRole: role,
+            operatorJurisdictionId:
+              user.jurisdictionId || undefined,
+            operatorJurisdictionName:
+              user.jurisdictionName || undefined,
+          };
+        });
+
+        this.setMembers(mergedMembers);
+      }
+
+      // -------------------------------------------------------
+      // TOURS
+      // -------------------------------------------------------
+      // Hanya sinkronkan bila API memang mengirim field tersebut.
+      // Array kosong tetap valid dan harus menggantikan cache lama.
+      if (Array.isArray(data.tours)) {
+        this.setTourPackages(data.tours as TourPackage[]);
+      }
+
+      // -------------------------------------------------------
+      // ACTIVITIES
+      // -------------------------------------------------------
+      if (Array.isArray(data.activities)) {
+        this.setActivities(data.activities as Activity[]);
+      }
+
+      // -------------------------------------------------------
+      // CULINARY / SOUVENIRS
+      // -------------------------------------------------------
+      if (Array.isArray(data.culinaryItems)) {
+        this.setCulinarySouvenirs(
+          data.culinaryItems as CulinarySouvenirItem[]
         );
       }
 
-      if (
-        Array.isArray(
-          data.users
-        ) &&
-        data.users.length > 0
-      ) {
-        const serverUsers =
-          data.users as CurrentUser[];
-
-        this.setUsers(
-          serverUsers
-        );
-
-        const roleByMemberId =
-          new Map<
-            string,
-            CurrentUser
-          >();
-
-        serverUsers.forEach(
-          (user: any) => {
-            const mid =
-              String(
-                user?.memberId ||
-                  ''
-              ).trim();
-
-            if (mid) {
-              roleByMemberId.set(
-                mid,
-                user
-              );
-            }
-          }
-        );
-
-        const currentMembers =
-          this.getMembers();
-
-        if (
-          Array.isArray(
-            currentMembers
-          ) &&
-          currentMembers.length >
-            0
-        ) {
-          const mergedMembers =
-            currentMembers.map(
-              (member: any) => {
-                const user =
-                  roleByMemberId.get(
-                    String(
-                      member?.id ||
-                        ''
-                    ).trim()
-                  );
-
-                if (!user) {
-                  return member;
-                }
-
-                const role =
-                  String(
-                    user.role ||
-                      'MEMBER'
-                  ).toUpperCase();
-
-                const isOperator =
-                  role ===
-                    'ADMIN_PROVINCE' ||
-                  role ===
-                    'ADMIN_REGENCY' ||
-                  role ===
-                    'ADMIN_BRANCH';
-
-                if (!isOperator) {
-                  return {
-                    ...member,
-                    isOperator:
-                      false,
-                    operatorRole:
-                      undefined,
-                    operatorJurisdictionId:
-                      undefined,
-                    operatorJurisdictionName:
-                      undefined
-                  };
-                }
-
-                return {
-                  ...member,
-                  isOperator:
-                    true,
-                  operatorRole:
-                    role,
-                  operatorJurisdictionId:
-                    user.jurisdictionId ||
-                    undefined,
-                  operatorJurisdictionName:
-                    user.jurisdictionName ||
-                    undefined
-                };
-              }
-            );
-
-          this.setMembers(
-            mergedMembers
+      // -------------------------------------------------------
+      // KRIDA MODULES
+      // -------------------------------------------------------
+      if (Array.isArray(data.kridaModules)) {
+        try {
+          localStorage.setItem(
+            'saka_krida_modules',
+            JSON.stringify(data.kridaModules)
+          );
+        } catch (error) {
+          console.warn(
+            '[Storage] Gagal menyimpan kridaModules:',
+            error
           );
         }
       }
 
-      if (
-        Array.isArray(
-          data.auditLogs
-        )
-      ) {
+      // -------------------------------------------------------
+      // AUDIT LOGS
+      // -------------------------------------------------------
+      if (Array.isArray(data.auditLogs)) {
         try {
           localStorage.setItem(
             STORAGE_KEYS.AUDIT_LOGS,
-            JSON.stringify(
-              data.auditLogs
-            )
+            JSON.stringify(data.auditLogs)
           );
-        } catch {}
+        } catch (error) {
+          console.warn(
+            '[Storage] Gagal menyimpan auditLogs:',
+            error
+          );
+        }
       }
 
       this.notify();
-
       return true;
     } catch (error) {
       console.warn(
@@ -3493,9 +3462,12 @@ class StorageService {
         error
       );
 
+      // Jangan menghapus cache ketika jaringan gagal. Cache hanya boleh
+      // diganti oleh respons server yang valid.
       return false;
     }
   }
+
 }
 
 export const storage =
