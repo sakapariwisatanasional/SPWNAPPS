@@ -7,7 +7,8 @@ import {
   Skill, 
   AuditLog, 
   CurrentUser, 
-  CulinarySouvenirItem 
+  CulinarySouvenirItem,
+  ProductKind 
 } from './types';
 import { storage } from './services/storage';
 import { DEFAULT_PUBLIC_USER } from './data/initialData';
@@ -74,11 +75,11 @@ import { SpreadsheetSyncModal } from './components/database/SpreadsheetSyncModal
 import { MemberFormModal } from './components/member/MemberFormModal';
 import { TourPackageFormModal } from './components/tourism/TourPackageFormModal';
 import { TourPackageDetailModal } from './components/tourism/TourPackageDetailModal';
+import { ActivityDetailModal } from './components/activities/ActivityDetailModal';
+import { ActivityFormModal } from './components/activities/ActivityFormModal';
 import { KtaCardCustomizerModal } from './components/member/KtaCardCustomizerModal';
 import { CulinarySouvenirFormModal } from './components/culinary/CulinarySouvenirFormModal';
 import { CulinarySouvenirDetailModal } from './components/culinary/CulinarySouvenirDetailModal';
-import { ActivityFormModal } from './components/activities/ActivityFormModal';
-import { ActivityDetailModal } from './components/activities/ActivityDetailModal';
 import { MemberPhotoEditModal } from './components/member/MemberPhotoEditModal';
 import { AdminEditMemberModal } from './components/member/AdminEditMemberModal';
 import { KtaPrintPdfModal } from './components/member/KtaPrintPdfModal';
@@ -184,11 +185,9 @@ export default function App() {
   const [editingTour, setEditingTour] = useState<TourPackage | null>(null);
   const [isEditKtaModalOpen, setIsEditKtaModalOpen] = useState(false);
   const [isCulinaryFormOpen, setIsCulinaryFormOpen] = useState(false);
+  const [culinaryFormInitialKind, setCulinaryFormInitialKind] = useState<ProductKind>('KULINER');
   const [editingCulinaryItem, setEditingCulinaryItem] = useState<CulinarySouvenirItem | null>(null);
   const [selectedCulinaryDetail, setSelectedCulinaryDetail] = useState<CulinarySouvenirItem | null>(null);
-  const [selectedActivityDetail, setSelectedActivityDetail] = useState<Activity | null>(null);
-  const [isActivityFormOpen, setIsActivityFormOpen] = useState(false);
-  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [editingPhotoMember, setEditingPhotoMember] = useState<Member | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [printingKtaMember, setPrintingKtaMember] = useState<Member | null>(null);
@@ -197,6 +196,9 @@ export default function App() {
   const [verifyingMember, setVerifyingMember] = useState<Member | null>(null);
   const [transferringMember, setTransferringMember] = useState<Member | null>(null);
   const [selectedTourDetail, setSelectedTourDetail] = useState<TourPackage | null>(null);
+  const [selectedActivityDetail, setSelectedActivityDetail] = useState<Activity | null>(null);
+  const [isActivityFormOpen, setIsActivityFormOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [liveSyncToast, setLiveSyncToast] = useState<{ message: string; visible: boolean } | null>(null);
 
@@ -470,13 +472,6 @@ export default function App() {
             onClose={() => setSelectedCulinaryDetail(null)}
           />
         )}
-
-        {selectedActivityDetail && (
-          <ActivityDetailModal
-            activity={selectedActivityDetail}
-            onClose={() => setSelectedActivityDetail(null)}
-          />
-        )}
       </div>
     );
   }
@@ -621,18 +616,6 @@ export default function App() {
               <ActivitiesView
                 currentUser={currentUser}
                 activities={activities}
-                onOpenFormModal={() => {
-                  setEditingActivity(null);
-                  setIsActivityFormOpen(true);
-                }}
-                onViewDetail={(a) => setSelectedActivityDetail(a)}
-                onEditActivity={(a) => {
-                  setEditingActivity(a);
-                  setIsActivityFormOpen(true);
-                }}
-                onDeleteActivity={(aId) => {
-                  storage.deleteActivity(aId, currentUser);
-                }}
               />
             )}
 
@@ -671,6 +654,11 @@ export default function App() {
                 onOpenEditMemberModal={(m) => setEditingMember(m)}
                 onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
                 onOpenQuickShareModal={(m) => setQuickSharingMember(m)}
+                onOpenCulinaryFormModal={(kind) => {
+                  setEditingCulinaryItem(null);
+                  setCulinaryFormInitialKind(kind || 'KULINER');
+                  setIsCulinaryFormOpen(true);
+                }}
               />
             )}
           </div>
@@ -736,7 +724,7 @@ export default function App() {
           setIsTourFormModalOpen(false);
           setEditingTour(null);
         }}
-        tourToEdit={editingTour}
+        editTour={editingTour}
         currentUser={currentUser}
         onSuccess={() => {
           setIsTourFormModalOpen(false);
@@ -744,28 +732,6 @@ export default function App() {
           setTours(storage.getTourPackages());
         }}
       />
-
-      <ActivityFormModal
-        isOpen={isActivityFormOpen}
-        onClose={() => {
-          setIsActivityFormOpen(false);
-          setEditingActivity(null);
-        }}
-        activityToEdit={editingActivity}
-        currentUser={currentUser}
-        onSuccess={() => {
-          setIsActivityFormOpen(false);
-          setEditingActivity(null);
-          setActivities(storage.getActivities());
-        }}
-      />
-
-      {selectedActivityDetail && (
-        <ActivityDetailModal
-          activity={selectedActivityDetail}
-          onClose={() => setSelectedActivityDetail(null)}
-        />
-      )}
 
       {isEditKtaModalOpen && (
         <KtaCardCustomizerModal
@@ -821,15 +787,18 @@ export default function App() {
 
       <CulinarySouvenirFormModal
         isOpen={isCulinaryFormOpen}
-        itemToEdit={editingCulinaryItem}
+        editItem={editingCulinaryItem}
+        initialKind={culinaryFormInitialKind}
         currentUser={currentUser}
         onClose={() => {
           setIsCulinaryFormOpen(false);
           setEditingCulinaryItem(null);
+          setCulinaryFormInitialKind('KULINER');
         }}
         onSuccess={() => {
           setIsCulinaryFormOpen(false);
           setEditingCulinaryItem(null);
+          setCulinaryFormInitialKind('KULINER');
           setCulinaryItems(storage.getCulinarySouvenirs());
         }}
       />
@@ -840,6 +809,27 @@ export default function App() {
           onClose={() => setSelectedCulinaryDetail(null)}
         />
       )}
+      {selectedActivityDetail && (
+        <ActivityDetailModal
+          activity={selectedActivityDetail}
+          onClose={() => setSelectedActivityDetail(null)}
+        />
+      )}
+
+      <ActivityFormModal
+        isOpen={isActivityFormOpen}
+        initialActivity={editingActivity}
+        currentUser={currentUser}
+        onClose={() => {
+          setIsActivityFormOpen(false);
+          setEditingActivity(null);
+        }}
+        onSuccess={() => {
+          setIsActivityFormOpen(false);
+          setEditingActivity(null);
+          setActivities(storage.getActivities());
+        }}
+      />
 
       <MemberTransferModal
         isOpen={!!transferringMember}
