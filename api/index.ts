@@ -1302,6 +1302,16 @@ app.post('/api/upload-image', express.raw({ type: ['application/octet-stream', '
     const requestedScriptUrl = normalizeManualAppsScriptUrl(req.headers['x-script-url']);
     const filenameHeader = String(req.headers['x-file-name'] || '').trim();
     const category = String(req.headers['x-file-category'] || 'MEMBER_AVATAR').trim().toUpperCase();
+    const session = getSessionUser(req);
+    const privilegedUploadCategories = new Set(['TOUR_PACKAGES', 'CULINARY_SOUVENIRS', 'DOCUMENTS', 'KTA_CARD', 'ACTIVITIES']);
+    if (privilegedUploadCategories.has(category) && session?.role !== 'SUPER_ADMIN' &&
+        !CONTENT_ADMIN_ROLES.includes(session?.role || '')) {
+      return res.status(403).json({ success: false, message: 'Anda tidak memiliki wewenang mengunggah aset pada kategori ini.' });
+    }
+    if (category === 'MEMBER_AVATAR' && session?.role === 'PUBLIC') {
+      // Avatar publik hanya dipakai pada alur pendaftaran anggota baru.
+      // Tidak membuka kategori aset administratif kepada anonymous user.
+    }
     const filename = (() => {
       try { return decodeURIComponent(filenameHeader); } catch { return filenameHeader; }
     })().replace(/[^a-zA-Z0-9._-]/g, '_') || `image_${Date.now()}.jpg`;
@@ -2063,11 +2073,17 @@ app.put('/api/kta-settings', async (req, res) => {
 // depends on Google Apps Script redirect/CORS behaviour. The active GAS URL is
 // supplied by the SuperAdmin-configured runtime setting.
 app.get('/api/spreadsheet-data', async (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Akses spreadsheet mentah hanya tersedia untuk Super Admin Nasional.' });
+  }
+
   const sheet = String(req.query?.sheet || 'Anggota').trim() || 'Anggota';
-  const requestedScriptUrl = normalizeManualAppsScriptUrl(req.query?.scriptUrl);
+  // The browser may not choose an arbitrary Apps Script deployment. The
+  // server-side configured deployment is the only upstream allowed here.
   const configuredScriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
   const envScriptUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-  const scriptUrl = requestedScriptUrl || configuredScriptUrl || envScriptUrl;
+  const scriptUrl = configuredScriptUrl || envScriptUrl;
 
   if (!scriptUrl) {
     return res.status(400).json({
@@ -2320,35 +2336,40 @@ app.get('/api/data', async (req, res) => {
     }
   }
 
-  // Mask member data for public viewers to prevent data leaks
-  const sanitizedMembers = db.members.map(m => {
-    if (isSuperAdmin || isOperator) {
-      return m; // Full data for authorized administration
-    }
-    // Public directory data only:
-    return {
-      id: m.id,
-      nationalMemberNumber: m.nationalMemberNumber,
-      fullName: m.fullName,
-      nikMasked: m.nikMasked || '3201********0001',
-      avatarUrl: m.avatarUrl,
-      gender: m.gender,
-      provinceName: m.provinceName,
-      regencyName: m.regencyName,
-      districtName: m.districtName,
-      provinceId: m.provinceId,
-      regencyId: m.regencyId,
-      districtId: m.districtId,
-      krida: m.krida,
-      currentPosition: m.currentPosition,
-      joinYear: m.joinYear,
-      status: m.status,
-      registeredAt: m.registeredAt,
-      verificationToken: m.verificationToken,
-      skills: m.skills,
-      certifications: m.certifications
-    };
+  // Strict member privacy policy:
+  // - SUPER_ADMIN: seluruh anggota
+  // - ADMIN wilayah: hanya anggota dalam jurisdiction-nya
+  // - MEMBER: profil sendiri secara penuh + direktori publik anggota lain
+  // - PUBLIC: hanya field direktori publik, tanpa token/email/credential internal
+  const publicMember = (m: any) => ({
+    id: m.id,
+    fullName: m.fullName,
+    avatarUrl: m.avatarUrl,
+    gender: m.gender,
+    provinceName: m.provinceName,
+    regencyName: m.regencyName,
+    districtName: m.districtName,
+    provinceId: m.provinceId,
+    regencyId: m.regencyId,
+    districtId: m.districtId,
+    krida: m.krida,
+    currentPosition: m.currentPosition,
+    joinYear: m.joinYear,
+    status: m.status
   });
+
+  const sanitizedMembers = db.members
+    .filter(m => {
+      if (isSuperAdmin) return true;
+      if (isOperator) return memberBelongsToAdminJurisdiction(m, session);
+      return true;
+    })
+    .map(m => {
+      if (isSuperAdmin || isOperator) return m;
+      if (session?.role === 'MEMBER' && String(m.id || '') === String(session.memberId || '')) return m;
+      return publicMember(m);
+    });
+
 
   // Only return users list if Super Admin
   const sanitizedUsers = isSuperAdmin 
@@ -2376,8 +2397,6 @@ app.get('/api/data', async (req, res) => {
     ? db.config
     : {
         status: db.config.status || 'CONNECTED',
-        autoSync: db.config.autoSync,
-        autoRefreshIntervalSeconds: db.config.autoRefreshIntervalSeconds || 6,
         lastSyncedAt: db.config.lastSyncedAt
       };
 
@@ -2442,6 +2461,35 @@ const ADMIN_ROLE_LABELS: Record<string, string> = {
 
 function normalizeText(value: unknown): string {
   return String(value ?? '').trim().toLowerCase();
+}
+
+function memberBelongsToAdminJurisdiction(member: any, session: any): boolean {
+  if (!session || session.role === 'SUPER_ADMIN') return true;
+  if (!CONTENT_ADMIN_ROLES.includes(session.role)) return false;
+
+  const allowedId = normalizeText(session.jurisdictionId);
+  const allowedName = normalizeText(session.jurisdictionName);
+  if (!allowedId && !allowedName) return false;
+
+  const provinceId = normalizeText(member?.provinceId);
+  const regencyId = normalizeText(member?.regencyId);
+  const districtId = normalizeText(member?.districtId);
+  const provinceName = normalizeText(member?.provinceName);
+  const regencyName = normalizeText(member?.regencyName);
+  const districtName = normalizeText(member?.districtName);
+  const branchName = normalizeText(member?.branchName);
+
+  if (session.role === 'ADMIN_PROVINCE') {
+    return (allowedId && provinceId === allowedId) || (allowedName && provinceName === allowedName);
+  }
+  if (session.role === 'ADMIN_REGENCY') {
+    return (allowedId && regencyId === allowedId) || (allowedName && regencyName === allowedName);
+  }
+  if (session.role === 'ADMIN_BRANCH') {
+    return (allowedId && districtId === allowedId) ||
+      (allowedName && (districtName === allowedName || branchName === allowedName));
+  }
+  return false;
 }
 
 function contentBelongsToAdminJurisdiction(content: any, session: any): boolean {
