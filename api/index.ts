@@ -2478,21 +2478,29 @@ app.post('/api/admin/assign', async (req, res) => {
   if (!CONTENT_ADMIN_ROLES.includes(role)) return res.status(400).json({ success:false, message:'Tingkat Admin tidak valid.' });
   if (!jurisdictionId && !jurisdictionName) return res.status(400).json({ success:false, message:'Wilayah kewenangan wajib dipilih.' });
 
+  // Jangan bergantung pada cache db.members/db.users untuk menentukan apakah
+  // anggota ada. Pada deployment serverless, cache dapat kosong pada cold start
+  // walaupun data anggota dan akun sudah ada di Google Spreadsheet.
   const targetMember = db.members.find(m => String(m.id || '') === memberId);
   const targetUser = db.users.find(u =>
     (userId && String(u.id || '') === userId) ||
     (memberId && String(u.memberId || '') === memberId)
   );
-  if (!targetMember && !targetUser) return res.status(404).json({ success:false, message:'Member/akun pengguna tidak ditemukan.' });
 
   const resolvedMemberId = memberId || String(targetUser?.memberId || targetMember?.id || '');
+  if (!resolvedMemberId && !userId) {
+    return res.status(400).json({ success:false, message:'Member yang akan dijadikan Admin belum memiliki ID yang valid.' });
+  }
+
   const resolvedUserId = String(targetUser?.id || userId || '');
   const resolvedName = String(targetMember?.fullName || targetUser?.name || '').trim();
   const resolvedEmail = String(targetMember?.email || targetUser?.email || '').trim();
   const resolvedUsername = String(targetUser?.username || resolvedEmail || '').trim();
-  if (!resolvedUserId) return res.status(409).json({ success:false, message:'Akun login member belum ditemukan pada sheet Users.' });
-
   const now = new Date().toISOString();
+
+  // GAS mencari akun berdasarkan username/email/memberId. Karena memberId
+  // merupakan kunci utama yang dikirim dari Dashboard, akun tetap dapat
+  // ditemukan walaupun db.users lokal belum tersinkron pada instance Vercel.
   const userPayload = {
     id: resolvedUserId, username: resolvedUsername, email: resolvedEmail,
     name: resolvedName, role, jurisdictionName, jurisdictionId,
@@ -2501,19 +2509,59 @@ app.post('/api/admin/assign', async (req, res) => {
     passwordHash: targetUser?.passwordHash || '', createdAt: targetUser?.createdAt || now
   };
 
-  const gasResult = await forwardToGoogleAppsScript({ action:'ASSIGN_ADMIN', user:userPayload, assignedBy:session.name || session.username || 'Super Admin' }, requestScriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '');
+  const gasResult = await forwardToGoogleAppsScript(
+    { action:'ASSIGN_ADMIN', user:userPayload, assignedBy:session.name || session.username || 'Super Admin' },
+    requestScriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || ''
+  );
   if (gasResult?.success === false || gasResult?.status === 'error') return res.status(502).json(gasResult);
 
-  const idx = db.users.findIndex(u => String(u.id || '') === resolvedUserId);
-  const saved = { ...(idx >= 0 ? db.users[idx] : targetUser || {}), ...userPayload, operatorRole:role, operatorJurisdictionId:jurisdictionId, operatorJurisdictionName:jurisdictionName, operatorAssignedAt:now, operatorAssignedBy:session.name || session.username || 'Super Admin' };
+  // Gunakan identitas yang dikembalikan GAS sebagai sumber kebenaran setelah
+  // penulisan berhasil. Ini penting jika userId lokal kosong/stale.
+  const confirmedUser = gasResult?.user && typeof gasResult.user === 'object' ? gasResult.user : {};
+  const finalUserId = String(confirmedUser.id || resolvedUserId || '');
+  const finalMemberId = String(confirmedUser.memberId || resolvedMemberId || '');
+  const finalName = String(confirmedUser.name || resolvedName || 'Member');
+
+  const idx = db.users.findIndex(u =>
+    (finalUserId && String(u.id || '') === finalUserId) ||
+    (finalMemberId && String(u.memberId || '') === finalMemberId)
+  );
+  const saved = {
+    ...(idx >= 0 ? db.users[idx] : targetUser || {}),
+    ...userPayload,
+    id: finalUserId || userPayload.id,
+    memberId: finalMemberId || userPayload.memberId,
+    name: finalName,
+    role,
+    jurisdictionName,
+    jurisdictionId,
+    operatorRole:role,
+    operatorJurisdictionId:jurisdictionId,
+    operatorJurisdictionName:jurisdictionName,
+    operatorAssignedAt:now,
+    operatorAssignedBy:session.name || session.username || 'Super Admin'
+  };
   if (idx >= 0) db.users[idx] = saved; else db.users.push(saved);
-  if (targetMember) {
-    const mi = db.members.findIndex(m => String(m.id || '') === resolvedMemberId);
-    if (mi >= 0) db.members[mi] = { ...db.members[mi], isOperator:true, operatorRole:role, operatorJurisdictionId:jurisdictionId, operatorJurisdictionName:jurisdictionName, operatorAssignedAt:now, operatorAssignedBy:session.name || session.username || 'Super Admin' };
+
+  const mi = db.members.findIndex(m => String(m.id || '') === finalMemberId);
+  if (mi >= 0) {
+    db.members[mi] = {
+      ...db.members[mi],
+      isOperator:true,
+      operatorRole:role,
+      operatorJurisdictionId:jurisdictionId,
+      operatorJurisdictionName:jurisdictionName,
+      operatorAssignedAt:now,
+      operatorAssignedBy:session.name || session.username || 'Super Admin'
+    };
   }
   saveDatabase();
 
-  return res.json({ success:true, status:'success', message:`${resolvedName || 'Member'} berhasil ditetapkan sebagai ${ADMIN_ROLE_LABELS[role]}.`, user:{ id:resolvedUserId, memberId:resolvedMemberId, name:resolvedName, role, jurisdictionId, jurisdictionName } });
+  return res.json({
+    success:true, status:'success',
+    message:`${finalName} berhasil ditetapkan sebagai ${ADMIN_ROLE_LABELS[role]}.`,
+    user:{ id:finalUserId, memberId:finalMemberId, name:finalName, role, jurisdictionId, jurisdictionName }
+  });
 });
 
 app.post('/api/admin/revoke', async (req, res) => {
@@ -2524,17 +2572,17 @@ app.post('/api/admin/revoke', async (req, res) => {
   const memberId = String(body.memberId || '').trim();
   const userId = String(body.userId || '').trim();
   const targetUser = db.users.find(u => (userId && String(u.id || '') === userId) || (memberId && String(u.memberId || '') === memberId));
-  if (!targetUser) return res.status(404).json({ success:false, message:'Akun Admin tidak ditemukan.' });
-  if (targetUser.role === 'SUPER_ADMIN') return res.status(400).json({ success:false, message:'Akun SuperAdmin tidak dapat dicabut melalui menu ini.' });
-  const resolvedMemberId = String(targetUser.memberId || memberId || '');
-  const gasResult = await forwardToGoogleAppsScript({ action:'REVOKE_ADMIN', userId:String(targetUser.id || ''), memberId:resolvedMemberId, assignedBy:session.name || session.username || 'Super Admin' }, requestScriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '');
+  const resolvedMemberId = String(targetUser?.memberId || memberId || '');
+  if (!targetUser && !resolvedMemberId && !userId) return res.status(400).json({ success:false, message:'Akun Admin yang akan dicabut belum memiliki identitas yang valid.' });
+  if (targetUser?.role === 'SUPER_ADMIN') return res.status(400).json({ success:false, message:'Akun SuperAdmin tidak dapat dicabut melalui menu ini.' });
+  const gasResult = await forwardToGoogleAppsScript({ action:'REVOKE_ADMIN', userId:String(targetUser?.id || userId || ''), memberId:resolvedMemberId, assignedBy:session.name || session.username || 'Super Admin' }, requestScriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '');
   if (gasResult?.success === false || gasResult?.status === 'error') return res.status(502).json(gasResult);
-  const idx = db.users.findIndex(u => String(u.id || '') === String(targetUser.id || ''));
+  const idx = db.users.findIndex(u => String(u.id || '') === String(targetUser?.id || userId || ''));
   if (idx >= 0) db.users[idx] = { ...db.users[idx], role:'MEMBER', jurisdictionName:'', jurisdictionId:'' };
   const mi = db.members.findIndex(m => String(m.id || '') === resolvedMemberId);
   if (mi >= 0) db.members[mi] = { ...db.members[mi], isOperator:false, operatorRole:undefined, operatorJurisdictionId:undefined, operatorJurisdictionName:undefined, operatorAssignedAt:undefined, operatorAssignedBy:undefined };
   saveDatabase();
-  return res.json({ success:true, status:'success', message:'Status Admin dicabut. Akun kembali menjadi Member.', user:{ id:targetUser.id, memberId:resolvedMemberId, role:'MEMBER', jurisdictionId:'', jurisdictionName:'' } });
+  return res.json({ success:true, status:'success', message:'Status Admin dicabut. Akun kembali menjadi Member.', user:{ id:targetUser?.id || userId || '', memberId:resolvedMemberId, role:'MEMBER', jurisdictionId:'', jurisdictionName:'' } });
 });
 
 // Central Mutation API - Receives any create/update/delete with Server Role Enforcement
