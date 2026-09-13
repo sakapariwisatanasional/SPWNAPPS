@@ -125,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-20 shadow-xs">
+    <header className="app-header h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-20 shadow-xs">
       
       {/* Left Area: Mobile Hamburger + Logo / Desktop Search */}
       <div className="flex items-center gap-2.5 sm:gap-4 flex-1 max-w-xl">

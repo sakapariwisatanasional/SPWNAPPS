@@ -58,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const content = (
-    <div className="w-72 sm:w-80 lg:w-64 h-full bg-slate-950 text-white flex flex-col flex-shrink-0 border-r border-slate-800 select-none shadow-2xl z-20 relative">
+    <div className="app-sidebar w-72 sm:w-80 lg:w-64 h-full bg-slate-950 text-white flex flex-col flex-shrink-0 border-r border-slate-800 select-none shadow-2xl z-20 relative">
       {/* Subtle Purple Glow Overlay */}
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-purple-900/20 to-transparent pointer-events-none" />
 
