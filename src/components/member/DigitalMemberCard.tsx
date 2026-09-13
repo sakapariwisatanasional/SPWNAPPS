@@ -1,10 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { RotateCw, FileDown, Sliders } from 'lucide-react';
-import { Member, KtaCardSettings, KtaDataFieldConfig } from '../../types';
-import { SakaLogo, formatDriveImageUrl } from '../common/SakaLogo';
+import {
+  Member,
+  KtaCardSettings,
+  KtaDataFieldConfig
+} from '../../types';
+import {
+  SakaLogo,
+  formatDriveImageUrl
+} from '../common/SakaLogo';
 import { Barcode } from '../common/Barcode';
-import { storage, DEFAULT_KTA_SETTINGS } from '../../services/storage';
-import { KtaQrCode, getMemberVerificationUrl } from './KtaQrCode';
+import {
+  storage,
+  DEFAULT_KTA_SETTINGS
+} from '../../services/storage';
+import {
+  KtaQrCode,
+  getMemberVerificationUrl
+} from './KtaQrCode';
 
 interface Props {
   member: Member;
@@ -16,7 +29,9 @@ interface Props {
   showControls?: boolean;
   allowAdminEdit?: boolean;
   previewSettings?: KtaCardSettings;
-  onPreviewSettingsChange?: (settings: KtaCardSettings) => void;
+  onPreviewSettingsChange?: (
+    settings: KtaCardSettings
+  ) => void;
 }
 
 const valueOf = (
@@ -26,7 +41,8 @@ const valueOf = (
   const values: Record<string, any> = {
     fullName: member.fullName,
     id: member.id,
-    nationalMemberNumber: member.nationalMemberNumber,
+    nationalMemberNumber:
+      member.nationalMemberNumber,
     currentPosition: member.currentPosition,
     provinceName: member.provinceName,
     regencyName: member.regencyName,
@@ -67,45 +83,69 @@ export const DigitalMemberCard: React.FC<Props> = ({
   ): KtaCardSettings => {
     const merged = {
       ...DEFAULT_KTA_SETTINGS,
-      ...(value && typeof value === 'object' ? value : {})
+      ...(value &&
+      typeof value === 'object'
+        ? value
+        : {})
     } as KtaCardSettings;
 
     return {
       ...merged,
-      logos: Array.isArray(merged.logos) ? merged.logos : [],
-      dataFields: Array.isArray(merged.dataFields) ? merged.dataFields : [],
-      textElements: Array.isArray(merged.textElements)
+      logos: Array.isArray(merged.logos)
+        ? merged.logos
+        : [],
+      dataFields: Array.isArray(
+        merged.dataFields
+      )
+        ? merged.dataFields
+        : [],
+      textElements: Array.isArray(
+        merged.textElements
+      )
         ? merged.textElements
         : [],
-      terms: Array.isArray(merged.terms) ? merged.terms : []
+      terms: Array.isArray(merged.terms)
+        ? merged.terms
+        : []
     };
   };
 
-  const [settings, setSettings] = useState<KtaCardSettings>(() =>
-    normalizeSettings(
-      previewSettings || storage.getKtaSettings()
-    )
-  );
+  const [settings, setSettings] =
+    useState<KtaCardSettings>(() =>
+      normalizeSettings(
+        previewSettings ||
+          storage.getKtaSettings()
+      )
+    );
 
-  const [flipped, setFlipped] = useState(false);
+  const [flipped, setFlipped] =
+    useState(false);
 
   useEffect(() => {
     if (previewSettings) {
-      setSettings(normalizeSettings(previewSettings));
+      setSettings(
+        normalizeSettings(previewSettings)
+      );
       return;
     }
 
     let disposed = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let timer:
+      | ReturnType<typeof setInterval>
+      | null = null;
 
     const applyLocal = () =>
       setSettings(
-        normalizeSettings(storage.getKtaSettings())
+        normalizeSettings(
+          storage.getKtaSettings()
+        )
       );
 
     const applyRemote = async () => {
       try {
-        const { spreadsheetService } = await import(
+        const {
+          spreadsheetService
+        } = await import(
           '../../services/spreadsheetService'
         );
 
@@ -113,7 +153,9 @@ export const DigitalMemberCard: React.FC<Props> = ({
           await spreadsheetService.refreshKtaSettings();
 
         if (!disposed && remote) {
-          setSettings(normalizeSettings(remote));
+          setSettings(
+            normalizeSettings(remote)
+          );
         }
       } catch (error) {
         console.warn(
@@ -126,13 +168,18 @@ export const DigitalMemberCard: React.FC<Props> = ({
     applyLocal();
     void applyRemote();
 
-    const unsub = storage.subscribe(applyLocal);
+    const unsub =
+      storage.subscribe(applyLocal);
 
     const evt = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
+      const detail = (
+        e as CustomEvent
+      ).detail;
 
       if (detail) {
-        setSettings(normalizeSettings(detail));
+        setSettings(
+          normalizeSettings(detail)
+        );
       }
     };
 
@@ -187,86 +234,127 @@ export const DigitalMemberCard: React.FC<Props> = ({
 
   const members = storage.getMembers();
 
-  const dataFields = Array.isArray(settings?.dataFields)
+  const dataFields = Array.isArray(
+    settings?.dataFields
+  )
     ? settings.dataFields
     : [];
 
-  const textElements = Array.isArray(settings?.textElements)
+  const textElements = Array.isArray(
+    settings?.textElements
+  )
     ? settings.textElements
     : [];
 
-  const logos = Array.isArray(settings?.logos)
+  const logos = Array.isArray(
+    settings?.logos
+  )
     ? settings.logos
     : [];
 
-  const terms = Array.isArray(settings?.terms)
+  const terms = Array.isArray(
+    settings?.terms
+  )
     ? settings.terms
     : [];
 
   /*
-   * ---------------------------------------------------------
+   * =========================================================
    * PENANDATANGAN
-   * ---------------------------------------------------------
+   * =========================================================
    *
    * signerMemberId menjadi sumber identitas utama.
    *
-   * Nama dan jabatan TIDAK lagi bergantung pada
-   * signerName / signerTitle yang mungkin merupakan data lama.
+   * Nama dan jabatan diambil langsung dari anggota
+   * yang dipilih sebagai signerMemberId.
+   *
+   * signerName / signerTitle hanya menjadi fallback
+   * untuk kompatibilitas data lama.
+   * =========================================================
    */
+
   const signerMemberId = String(
-    (settings as any)?.signerMemberId || ''
+    (settings as any)?.signerMemberId ||
+      ''
   );
 
   const signerMember = signerMemberId
     ? members.find(
-        m => String(m.id) === signerMemberId
+        m =>
+          String(m.id) ===
+          signerMemberId
       )
     : undefined;
 
   const signerName =
     signerMember?.fullName ||
-    String((settings as any)?.signerName || '');
+    String(
+      (settings as any)?.signerName ||
+        ''
+    );
 
   const signerTitle =
     signerMember?.currentPosition ||
-    String((settings as any)?.signerTitle || '');
+    String(
+      (settings as any)?.signerTitle ||
+        ''
+    );
 
   const ratio = Math.max(
     0.45,
     (settings?.widthMm || 85.6) /
-      Math.max(settings?.heightMm || 53.98, 1)
+      Math.max(
+        settings?.heightMm || 53.98,
+        1
+      )
   );
 
   const widthPx = 380;
   const heightPx = widthPx / ratio;
 
   const photo =
-    formatDriveImageUrl(member.avatarUrl) ||
+    formatDriveImageUrl(
+      member.avatarUrl
+    ) ||
     member.avatarUrl;
 
-  const frontFields = dataFields.filter(
-    f => f.side === 'FRONT' && f.visible
-  );
+  const frontFields =
+    dataFields.filter(
+      f =>
+        f.side === 'FRONT' &&
+        f.visible
+    );
 
-  const backFields = dataFields.filter(
-    f => f.side === 'BACK' && f.visible
-  );
+  const backFields =
+    dataFields.filter(
+      f =>
+        f.side === 'BACK' &&
+        f.visible
+    );
 
-  const frontTexts = textElements.filter(
-    t => t.side === 'FRONT'
-  );
+  const frontTexts =
+    textElements.filter(
+      t => t.side === 'FRONT'
+    );
 
-  const backTexts = textElements.filter(
-    t => t.side === 'BACK'
-  );
+  const backTexts =
+    textElements.filter(
+      t => t.side === 'BACK'
+    );
 
-  const frontLogos = logos.filter(
-    l => l.side === 'FRONT' && l.url
-  );
+  const frontLogos =
+    logos.filter(
+      l =>
+        l.side === 'FRONT' &&
+        l.url
+    );
 
-  const backLogos = logos.filter(
-    l => l.side === 'BACK' && l.url
-  );
+  const backLogos =
+    logos.filter(
+      l =>
+        l.side === 'BACK' &&
+        l.url
+    );
 
   const bgFront =
     settings.frontBackgroundUrl ||
@@ -284,13 +372,21 @@ export const DigitalMemberCard: React.FC<Props> = ({
   const updatePreviewSetting = (
     patch: Partial<KtaCardSettings>
   ) => {
-    if (!onPreviewSettingsChange) return;
+    if (!onPreviewSettingsChange) {
+      return;
+    }
 
     onPreviewSettingsChange({
       ...settings,
       ...patch
     });
   };
+
+  /*
+   * =========================================================
+   * DRAG QR DEPAN
+   * =========================================================
+   */
 
   const handleQrPointerDown = (
     e: React.PointerEvent<HTMLDivElement>
@@ -338,17 +434,22 @@ export const DigitalMemberCard: React.FC<Props> = ({
       5,
       Math.min(
         60,
-        Number(settings.qrSize ?? 22)
+        Number(
+          settings.qrSize ?? 22
+        )
       )
     );
 
-    const move = (ev: PointerEvent) => {
+    const move = (
+      ev: PointerEvent
+    ) => {
       const nextX = Math.max(
         0,
         Math.min(
           100 - qrPercent,
           startQrX +
-            ((ev.clientX - startX) /
+            ((ev.clientX -
+              startX) /
               rect.width) *
               100
         )
@@ -359,15 +460,20 @@ export const DigitalMemberCard: React.FC<Props> = ({
         Math.min(
           100 - qrPercent,
           startQrY +
-            ((ev.clientY - startY) /
+            ((ev.clientY -
+              startY) /
               rect.height) *
               100
         )
       );
 
       updatePreviewSetting({
-        qrX: Number(nextX.toFixed(2)),
-        qrY: Number(nextY.toFixed(2))
+        qrX: Number(
+          nextX.toFixed(2)
+        ),
+        qrY: Number(
+          nextY.toFixed(2)
+        )
       });
     };
 
@@ -395,6 +501,12 @@ export const DigitalMemberCard: React.FC<Props> = ({
     );
   };
 
+  /*
+   * =========================================================
+   * RENDER DATA FIELD
+   * =========================================================
+   */
+
   const renderField = (
     f: KtaDataFieldConfig
   ) => {
@@ -404,7 +516,8 @@ export const DigitalMemberCard: React.FC<Props> = ({
     );
 
     const text =
-      f.textTransform === 'uppercase'
+      f.textTransform ===
+      'uppercase'
         ? raw.toUpperCase()
         : raw;
 
@@ -431,8 +544,8 @@ export const DigitalMemberCard: React.FC<Props> = ({
               1.15
           ),
           letterSpacing: `${
-            (f as any).letterSpacing ??
-            0
+            (f as any)
+              .letterSpacing ?? 0
           }px`,
           whiteSpace:
             (f as any).whiteSpace ===
@@ -452,10 +565,12 @@ export const DigitalMemberCard: React.FC<Props> = ({
               style={{
                 opacity: 0.75,
                 marginRight: 5,
-                fontSize: Math.max(
-                  7,
-                  f.fontSize * 0.68
-                )
+                fontSize:
+                  Math.max(
+                    7,
+                    f.fontSize *
+                      0.68
+                  )
               }}
             >
               {f.label}:
@@ -467,7 +582,15 @@ export const DigitalMemberCard: React.FC<Props> = ({
     );
   };
 
-  const renderText = (t: any) => (
+  /*
+   * =========================================================
+   * RENDER TEXT CUSTOM
+   * =========================================================
+   */
+
+  const renderText = (
+    t: any
+  ) => (
     <div
       key={t.id}
       className="absolute overflow-hidden"
@@ -500,6 +623,12 @@ export const DigitalMemberCard: React.FC<Props> = ({
     </div>
   );
 
+  /*
+   * =========================================================
+   * RENDER LOGOS
+   * =========================================================
+   */
+
   const renderLogos = (
     logoItems: any[]
   ) => (
@@ -508,8 +637,9 @@ export const DigitalMemberCard: React.FC<Props> = ({
         <img
           key={l.id}
           src={
-            formatDriveImageUrl(l.url) ||
-            l.url
+            formatDriveImageUrl(
+              l.url
+            ) || l.url
           }
           alt={l.name}
           className="absolute pointer-events-none"
@@ -528,6 +658,12 @@ export const DigitalMemberCard: React.FC<Props> = ({
     </>
   );
 
+  /*
+   * =========================================================
+   * BACKGROUND
+   * =========================================================
+   */
+
   const bgStyle = (
     url?: string,
     color?: string
@@ -538,7 +674,8 @@ export const DigitalMemberCard: React.FC<Props> = ({
       ? `linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("${formatDriveImageUrl(url) || url}")`
       : undefined,
     backgroundSize: 'cover',
-    backgroundPosition: 'center'
+    backgroundPosition:
+      'center'
   });
 
   return (
@@ -599,6 +736,10 @@ export const DigitalMemberCard: React.FC<Props> = ({
                 <SakaLogo size={38} />
               </div>
             )}
+
+            {/* =================================================
+                HEADER ORGANISASI
+            ================================================== */}
 
             <div
               className="absolute overflow-hidden"
@@ -716,6 +857,13 @@ export const DigitalMemberCard: React.FC<Props> = ({
               }
             </div>
 
+            {/* =================================================
+                FOTO ANGGOTA
+
+                Border kuning dihilangkan.
+                Default border sekarang putih.
+            ================================================== */}
+
             {settings.showPhoto && (
               <div
                 className="absolute overflow-hidden bg-slate-800"
@@ -746,10 +894,16 @@ export const DigitalMemberCard: React.FC<Props> = ({
                   }px`,
                   borderStyle:
                     'solid',
+
+                  /*
+                   * PERUBAHAN:
+                   * Tidak lagi menggunakan #fcd34d
+                   * sebagai default border foto.
+                   */
                   borderColor:
                     (settings as any)
                       .photoBorderColor ??
-                    '#fcd34d'
+                    '#ffffff'
                 }}
               >
                 <img
@@ -765,6 +919,10 @@ export const DigitalMemberCard: React.FC<Props> = ({
                 />
               </div>
             )}
+
+            {/* =================================================
+                QR CODE DEPAN
+            ================================================== */}
 
             {settings.showQrCode &&
               (() => {
@@ -869,6 +1027,10 @@ export const DigitalMemberCard: React.FC<Props> = ({
                   </div>
                 );
               })()}
+
+            {/* =================================================
+                BARCODE DEPAN
+            ================================================== */}
 
             {(settings as any)
               .showBarcodeFront !==
@@ -983,13 +1145,25 @@ export const DigitalMemberCard: React.FC<Props> = ({
               </div>
             )}
 
+            {/* =================================================
+                DATA FIELD DEPAN
+            ================================================== */}
+
             {frontFields.map(
               renderField
             )}
 
+            {/* =================================================
+                TEKS CUSTOM DEPAN
+            ================================================== */}
+
             {frontTexts.map(
               renderText
             )}
+
+            {/* =================================================
+                TEKS MASA BERLAKU
+            ================================================== */}
 
             <div
               className="absolute overflow-hidden"
@@ -1046,17 +1220,23 @@ export const DigitalMemberCard: React.FC<Props> = ({
               }
             </div>
 
-            {settings.showKridaBadge &&
-              member.krida && (
-                <div className="absolute right-[4%] bottom-[5%] px-2 py-1 rounded-full bg-amber-400 text-slate-950 text-[7px] font-black uppercase">
-                  {member.krida}
-                </div>
-              )}
+            {/*
+             * =================================================
+             * BADGE KRIDA DIHAPUS
+             * =================================================
+             *
+             * Blok berikut sengaja tidak dirender:
+             *
+             * settings.showKridaBadge
+             *
+             * sehingga kotak kuning dan teks Krida
+             * tidak lagi muncul di depan KTA.
+             */}
           </div>
 
           {/* =====================================================
               BELAKANG KTA
-              
+
               URUTAN:
               1. Ketentuan
               2. Tempat & tanggal
@@ -1082,6 +1262,10 @@ export const DigitalMemberCard: React.FC<Props> = ({
             {renderLogos(
               backLogos
             )}
+
+            {/* =================================================
+                HEADER BELAKANG
+            ================================================== */}
 
             <div
               className="absolute overflow-hidden"
@@ -1199,6 +1383,10 @@ export const DigitalMemberCard: React.FC<Props> = ({
               }
             </div>
 
+            {/* =================================================
+                KETENTUAN
+            ================================================== */}
+
             <div
               className="absolute overflow-hidden"
               style={{
@@ -1259,9 +1447,17 @@ export const DigitalMemberCard: React.FC<Props> = ({
               )}
             </div>
 
+            {/* =================================================
+                DATA FIELD BELAKANG
+            ================================================== */}
+
             {backFields.map(
               renderField
             )}
+
+            {/* =================================================
+                TEKS CUSTOM BELAKANG
+            ================================================== */}
 
             {backTexts.map(
               renderText
@@ -1271,7 +1467,6 @@ export const DigitalMemberCard: React.FC<Props> = ({
                 1. TEMPAT & TANGGAL
 
                 Default Y = 62
-                QR default Y = 70
             ================================================== */}
 
             <div
@@ -1334,131 +1529,130 @@ export const DigitalMemberCard: React.FC<Props> = ({
             {/* =================================================
                 2. QR PENANDATANGAN
 
-                Default Y = 70
-
                 Tidak ada:
+                - badge
+                - ShieldCheck
                 - background dekoratif
                 - border
-                - radius
                 - label
-                - ShieldCheck
+                - "Tanda Tangan Terverifikasi"
             ================================================== */}
 
             {(
               settings as any
-            ).showSignerQrCode !== false &&
-              signerMember && (
-                (() => {
-                  const qrPercent =
-                    Math.max(
-                      8,
-                      Math.min(
-                        35,
-                        Number(
-                          (settings as any)
-                            .signerQrSize ??
-                          18
-                        )
-                      )
-                    );
-
-                  const qrX =
-                    Math.max(
-                      0,
-                      Math.min(
-                        100 -
-                          qrPercent,
-                        Number(
-                          (settings as any)
-                            .signerQrX ??
-                          68
-                        )
-                      )
-                    );
-
-                  const qrY =
-                    Math.max(
-                      0,
-                      Math.min(
-                        100 -
-                          qrPercent,
-                        Number(
-                          (settings as any)
-                            .signerQrY ??
-                          70
-                        )
-                      )
-                    );
-
-                  const qrPx =
-                    Math.max(
-                      36,
-                      Math.round(
-                        Math.min(
-                          widthPx,
-                          heightPx
-                        ) *
-                          (qrPercent /
-                            100)
-                      )
-                    );
-
-                  const qrMargin =
-                    Math.max(
-                      0,
+            ).showSignerQrCode !==
+              false &&
+              signerMember &&
+              (() => {
+                const qrPercent =
+                  Math.max(
+                    8,
+                    Math.min(
+                      35,
                       Number(
                         (settings as any)
-                          .signerQrPadding ??
-                        2
+                          .signerQrSize ??
+                        18
                       )
-                    );
-
-                  return (
-                    <div
-                      className="absolute"
-                      style={{
-                        left: `${qrX}%`,
-                        top: `${qrY}%`,
-                        width: `${qrPercent}%`,
-                        aspectRatio:
-                          '1 / 1',
-                        display: 'flex',
-                        alignItems:
-                          'center',
-                        justifyContent:
-                          'center'
-                      }}
-                    >
-                      <KtaQrCode
-                        member={
-                          signerMember
-                        }
-                        size={Math.max(
-                          24,
-                          qrPx
-                        )}
-                        showLabel={false}
-                        interactive={false}
-                        borderWidth={0}
-                        borderRadius={0}
-                        borderColor="transparent"
-                        margin={
-                          qrMargin
-                        }
-                        lightColor="#ffffff"
-                      />
-                    </div>
+                    )
                   );
-                })()
-              )}
+
+                const qrX =
+                  Math.max(
+                    0,
+                    Math.min(
+                      100 -
+                        qrPercent,
+                      Number(
+                        (settings as any)
+                          .signerQrX ??
+                        68
+                      )
+                    )
+                  );
+
+                const qrY =
+                  Math.max(
+                    0,
+                    Math.min(
+                      100 -
+                        qrPercent,
+                      Number(
+                        (settings as any)
+                          .signerQrY ??
+                        70
+                      )
+                    )
+                  );
+
+                const qrPx =
+                  Math.max(
+                    36,
+                    Math.round(
+                      Math.min(
+                        widthPx,
+                        heightPx
+                      ) *
+                        (qrPercent /
+                          100)
+                    )
+                  );
+
+                const qrMargin =
+                  Math.max(
+                    0,
+                    Number(
+                      (settings as any)
+                        .signerQrPadding ??
+                      2
+                    )
+                  );
+
+                return (
+                  <div
+                    className="absolute"
+                    style={{
+                      left: `${qrX}%`,
+                      top: `${qrY}%`,
+                      width: `${qrPercent}%`,
+                      aspectRatio:
+                        '1 / 1',
+                      display:
+                        'flex',
+                      alignItems:
+                        'center',
+                      justifyContent:
+                        'center'
+                    }}
+                  >
+                    <KtaQrCode
+                      member={
+                        signerMember
+                      }
+                      size={Math.max(
+                        24,
+                        qrPx
+                      )}
+                      showLabel={false}
+                      interactive={false}
+                      borderWidth={0}
+                      borderRadius={0}
+                      borderColor="transparent"
+                      margin={
+                        qrMargin
+                      }
+                      lightColor="#ffffff"
+                    />
+                  </div>
+                );
+              })()}
 
             {/* =================================================
                 3 & 4. NAMA + JABATAN
 
                 Default Y = 88
 
-                Nama dan jabatan selalu berasal dari
-                signerMemberId.
+                Nama dan jabatan berasal dari signerMemberId.
             ================================================== */}
 
             {signerMember && (
@@ -1546,6 +1740,10 @@ export const DigitalMemberCard: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* =====================================================
+          CONTROL
+      ====================================================== */}
+
       {showControls && (
         <div className="flex items-center gap-2">
           <button
@@ -1556,7 +1754,10 @@ export const DigitalMemberCard: React.FC<Props> = ({
             className="px-3 py-1.5 bg-slate-800 text-white rounded-xl text-xs font-semibold"
           >
             <RotateCw className="inline w-3.5 h-3.5 mr-1" />
-            Lihat {flipped ? 'Depan' : 'Belakang'}
+            Lihat{' '}
+            {flipped
+              ? 'Depan'
+              : 'Belakang'}
           </button>
 
           {onPrintPdf && (
