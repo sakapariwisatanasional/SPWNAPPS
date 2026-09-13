@@ -64,7 +64,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
               className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
             >
               <ShoppingBag className="w-3.5 h-3.5" />
-              Ajukan Cinderamata
+              Ajukan Kriya
             </button>
           </div>
         )}

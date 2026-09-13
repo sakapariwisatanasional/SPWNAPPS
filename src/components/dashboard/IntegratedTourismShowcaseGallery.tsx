@@ -60,6 +60,7 @@ interface IntegratedTourismShowcaseGalleryProps {
   onViewTourDetail?: (tour: TourPackage) => void;
   onSelectMember?: (member: Member) => void;
   onSelectTab?: (tab: string) => void;
+  onOpenCulinaryFormModal?: (item?: CulinarySouvenirItem, kind?: 'KULINER' | 'CINDERAMATA') => void;
 }
 
 export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcaseGalleryProps> = ({
@@ -70,7 +71,8 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
   currentUser = {} as CurrentUser,
   onViewTourDetail,
   onSelectMember,
-  onSelectTab
+  onSelectTab,
+  onOpenCulinaryFormModal
 }) => {
   // Normalize all collection props at component boundary. A failed live-sync must never
   // turn a Dashboard collection into undefined/null and crash a useMemo/filter render.
@@ -723,6 +725,27 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                   Dukungan nyata bagi UMKM, pemandu lokal, kuliner khas, dan pengrajin cinderamata di bawah binaan Kwartir se-Indonesia.
                 </p>
               </div>
+
+              {String(currentUser?.role || '').toUpperCase() === 'MEMBER' && onOpenCulinaryFormModal && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenCulinaryFormModal(undefined, 'KULINER')}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                  >
+                    <Utensils className="w-3.5 h-3.5" />
+                    Ajukan Kuliner
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenCulinaryFormModal(undefined, 'CINDERAMATA')}
+                    className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                  >
+                    <Gift className="w-3.5 h-3.5" />
+                    Ajukan Kriya
+                  </button>
+                </div>
+              )}
 
               {/* Product Search */}
               <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 w-full md:w-80 shadow-2xs focus-within:border-purple-500 focus-within:bg-white transition-all">
