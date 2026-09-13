@@ -1664,12 +1664,15 @@ class StorageService {
       return [];
     }
 
-    return getDistrictsForRegency(regency  /** Kompatibilitas untuk UI lama: fitur Branch/Gudep tidak digunakan. */
-  public getBranches(..._args: any[]): Branch[] {
-    return [];
+    return getDistrictsForRegency(regencyId);
   }
 
-Id);
+  /**
+   * Kompatibilitas untuk UI lama.
+   * Fitur Branch/Gudep sudah tidak digunakan.
+   */
+  public getBranches(..._args: any[]): any[] {
+    return [];
   }
 
   public getSkills(): Skill[] {
