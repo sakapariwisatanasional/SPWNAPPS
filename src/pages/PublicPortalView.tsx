@@ -73,6 +73,61 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   const [talentCategoryFilter, setTalentCategoryFilter] = useState<string>('ALL');
   const [talentSkillFilter, setTalentSkillFilter] = useState<string>('ALL');
 
+  // --- Public member showcase ---
+  // Only a small rotating sample is exposed publicly. Full member data remains
+  // available through the existing verification/profile flow.
+  const familyMemberSignature = useMemo(() => {
+    return (Array.isArray(members) ? members : [])
+      .filter(m =>
+        m.status === 'ACTIVE' &&
+        !!(m.nationalMemberNumber || m.ktaNumber || m.ktaId) &&
+        !!m.avatarUrl
+      )
+      .map(m => m.id)
+      .sort()
+      .join('|');
+  }, [members]);
+
+  const familyShowcaseMembers = useMemo(() => {
+    const active = (Array.isArray(members) ? members : []).filter(m =>
+      m.status === 'ACTIVE' &&
+      !!(m.nationalMemberNumber || m.ktaNumber || m.ktaId) &&
+      !!m.avatarUrl
+    );
+
+    // Randomize only when the eligible member set changes.
+    // This prevents the order from being reshuffled on every render.
+    const shuffled = [...active];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }, [familyMemberSignature]);
+
+  const [familyShowcaseIndex, setFamilyShowcaseIndex] = useState(0);
+
+  useEffect(() => {
+    setFamilyShowcaseIndex(0);
+  }, [familyShowcaseMembers.length]);
+
+  useEffect(() => {
+    if (familyShowcaseMembers.length <= 1) return;
+
+    const timer = window.setInterval(() => {
+      setFamilyShowcaseIndex(current =>
+        current + 1 >= familyShowcaseMembers.length ? 0 : current + 1
+      );
+    }, 4500);
+
+    return () => window.clearInterval(timer);
+  }, [familyShowcaseMembers.length]);
+
+  const familyShowcaseMember =
+    familyShowcaseMembers.length > 0
+      ? familyShowcaseMembers[familyShowcaseIndex % familyShowcaseMembers.length]
+      : null;
+
   // Perform universal verification
   const executeVerification = async (termToVerify: string) => {
     const term = termToVerify.trim();
@@ -204,7 +259,18 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   const activeTalentCount = (Array.isArray(members) ? members : []).filter(m => m.status === 'ACTIVE' && m.skills && m.skills.length > 0).length;
 
   return (
-    <div className="space-y-12 pb-20">
+    <>
+      <style>{`
+        @keyframes familySlideUp {
+          from { opacity: 0; transform: translateY(100%); }
+          65% { opacity: 1; transform: translateY(-2%); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-\\[familySlideUp_0\\.65s_ease-out\\] { animation: none !important; }
+        }
+      `}</style>
+      <div className="space-y-12 pb-20">
       {/* 1. HERO BANNER: Portal Publik Saka Pariwisata */}
       <div className="bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 rounded-3xl p-8 sm:p-12 text-white shadow-2xl border border-purple-900/50 relative overflow-hidden">
         {/* Ambient Glow Background & Watermark */}
@@ -453,168 +519,116 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
         )}
       </section>
 
-      {/* 4. SECTION 2: DIREKTORI KEAHLIAN & TALENT POOL PARIWISATA */}
-      <section id="talent-pool" className="space-y-6 pt-4 scroll-mt-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-200">
-          <div>
-            <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs uppercase tracking-wider">
-              <Award className="w-4 h-4" />
-              <span>Pangkalan Data Kompetensi Resmi</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-extrabold font-heading text-slate-900 mt-1">
-              Direktori Keahlian & Talent Pool Pariwisata
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Daftar pemandu wisata, fotografer, penyuluh, dan praktisi kepariwisataan anggota Saka Pariwisata bersertifikasi
-            </p>
-          </div>
-        </div>
-
-        {/* Talent Filters */}
-        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            {/* Search Input */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
-              <Search className="w-4 h-4 text-slate-400 flex-shrink-0" />
-              <input
-                type="text"
-                value={talentSearchQuery}
-                onChange={(e) => setTalentSearchQuery(e.target.value)}
-                placeholder="Cari nama talenta, keahlian, kota..."
-                className="bg-transparent outline-none w-full text-slate-800 placeholder:text-slate-400"
-              />
-            </div>
-
-            {/* Category Dropdown */}
-            <div>
-              <select
-                value={talentCategoryFilter}
-                onChange={(e) => {
-                  setTalentCategoryFilter(e.target.value);
-                  setTalentSkillFilter('ALL');
-                }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none font-medium text-slate-700 focus:border-emerald-500"
-              >
-                <option value="ALL">Semua Kategori Bidang</option>
-                {skillCategories.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Specific Skill Dropdown */}
-            <div>
-              <select
-                value={talentSkillFilter}
-                onChange={(e) => setTalentSkillFilter(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none font-medium text-slate-700 focus:border-emerald-500"
-              >
-                <option value="ALL">Semua Jenis Keahlian Khusus</option>
-                {skills
-                  .filter(s => talentCategoryFilter === 'ALL' || s.category === talentCategoryFilter)
-                  .map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Talents Grid */}
-        {filteredTalents.length === 0 ? (
-          <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 text-slate-400">
-            <Award className="w-12 h-12 mx-auto text-slate-300 stroke-1 mb-2" />
-            <p className="font-bold text-slate-700 text-sm">Tidak ada talenta keahlian yang cocok.</p>
-            <p className="text-xs text-slate-400 mt-1">Coba gunakan filter kategori lain atau reset kata pencarian.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredTalents.map((member) => (
-              <div
-                key={member.id}
-                className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-              >
-                <div className="space-y-3">
-                  {/* Header Profile */}
-                  <div className="flex items-start gap-3.5">
-                    <img
-                      src={member.avatarUrl}
-                      alt={member.fullName}
-                      className="w-14 h-14 rounded-2xl object-cover border-2 border-emerald-500 shadow-xs flex-shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="font-bold text-sm text-slate-900 truncate font-heading">
-                          {member.fullName}
-                        </h4>
-                        <BadgeCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" title="Anggota Terverifikasi" />
-                      </div>
-                      <p className="text-[11px] font-mono font-bold text-purple-700 truncate">
-                        {member.nationalMemberNumber || 'Anggota Resmi'}
-                      </p>
-                      <p className="text-[11px] font-semibold text-slate-700 truncate mt-0.5">
-                        {member.currentPosition || 'Anggota Saka Pariwisata'}
-                      </p>
-                      <p className="text-[10px] text-slate-500 truncate">
-                        {member.provinceId === '00' || member.provinceName?.toLowerCase().includes('nasional')
-                          ? 'Kwartir Nasional'
-                          : (member.regencyName ? `Kwarcab ${member.regencyName}` : `Kwarda ${member.provinceName}`)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Skills List */}
-                  <div className="space-y-1.5 pt-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Kompetensi & Keahlian:
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {member.skills?.map((s) => (
-                        <span
-                          key={s.id}
-                          className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-semibold"
-                        >
-                          {s.skillName}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Certifications if any */}
-                  {member.certifications && member.certifications.length > 0 && (
-                    <div className="space-y-1 pt-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Sertifikasi Resmi:
-                      </p>
-                      <div className="space-y-1">
-                        {member.certifications.slice(0, 2).map((cert) => (
-                          <div key={cert.id} className="text-[10px] text-slate-600 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
-                            <Award className="w-3 h-3 text-purple-600 flex-shrink-0" />
-                            <span className="truncate font-medium">{cert.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+      {/* 4. SECTION 2: KELUARGA SAKA PARIWISATA */}
+      <section id="talent-pool" className="space-y-5 pt-4 scroll-mt-6">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-5 sm:p-7">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+              <div className="max-w-xl">
+                <div className="inline-flex items-center gap-2 text-purple-700 font-extrabold text-[11px] uppercase tracking-wider">
+                  <Users className="w-4 h-4" />
+                  <span>Keluarga Saka Pariwisata</span>
                 </div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold font-heading text-slate-900 mt-1">
+                  Keluarga Saka Pariwisata
+                </h2>
+                <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
+                  Terhubung dari berbagai wilayah Indonesia.
+                </p>
 
-                {/* Card Action */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">
-                    Krida: <strong className="text-slate-600">{member.krida || 'Krida Pemandu'}</strong>
+                <div className="flex flex-wrap items-center gap-2 mt-4">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-800 text-xs font-bold">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {activeTalentCount} anggota aktif
                   </span>
-                  <button
-                    onClick={() => onOpenVerifyModal(member)}
-                    className="px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold rounded-xl text-xs border border-purple-200 transition-colors cursor-pointer flex items-center gap-1.5"
-                  >
-                    <span>Verifikasi KTA</span>
-                    <ExternalLink className="w-3 h-3 text-purple-600" />
-                  </button>
+                  <span className="text-[11px] text-slate-400">
+                    Menampilkan beberapa anggota secara bergantian
+                  </span>
                 </div>
               </div>
-            ))}
+
+              <div className="w-full lg:w-[390px]">
+                {familyShowcaseMember ? (
+                  <div
+                    key={familyShowcaseMember.id}
+                    className="relative overflow-hidden rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 via-white to-slate-50 p-4 shadow-sm animate-[familySlideUp_0.65s_ease-out]"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <img
+                        src={familyShowcaseMember.avatarUrl}
+                        alt=""
+                        className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md flex-shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-extrabold text-sm text-slate-900 truncate">
+                            {familyShowcaseMember.fullName}
+                          </h3>
+                          <BadgeCheck
+                            className="w-4 h-4 text-emerald-600 flex-shrink-0"
+                            title="Anggota aktif terverifikasi"
+                          />
+                        </div>
+                        <p className="text-[11px] font-semibold text-slate-600 truncate mt-0.5">
+                          {familyShowcaseMember.currentPosition || 'Anggota Saka Pariwisata'}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                          {familyShowcaseMember.provinceId === '00' ||
+                          familyShowcaseMember.provinceName?.toLowerCase().includes('nasional')
+                            ? 'Kwartir Nasional'
+                            : [familyShowcaseMember.regencyName, familyShowcaseMember.provinceName]
+                                .filter(Boolean)
+                                .join(' · ') || 'Indonesia'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-purple-700">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        KTA Digital Terverifikasi
+                      </div>
+                      <button
+                        onClick={() => onOpenVerifyModal(familyShowcaseMember)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-extrabold transition-colors cursor-pointer"
+                      >
+                        Lihat profil
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+                    <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                    <p className="text-xs font-bold text-slate-600">
+                      Anggota aktif belum tersedia untuk ditampilkan.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        )}
+
+          {familyShowcaseMembers.length > 1 && (
+            <div className="px-5 sm:px-7 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+              <span className="text-[10px] font-semibold text-slate-400">
+                Profil anggota berganti otomatis
+              </span>
+              <div className="flex items-center gap-1">
+                {familyShowcaseMembers.slice(0, Math.min(familyShowcaseMembers.length, 8)).map((member, index) => (
+                  <span
+                    key={member.id}
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                      index === familyShowcaseIndex % Math.min(familyShowcaseMembers.length, 8)
+                        ? 'bg-purple-600 w-4'
+                        : 'bg-slate-300'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* 5. SECTION 3: VERIFIKASI KEANGGOTAAN SAKA PARIWISATA */}
@@ -898,5 +912,6 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
         }}
       />
     </div>
+    </>
   );
 };
