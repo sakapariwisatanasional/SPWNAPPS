@@ -48,6 +48,7 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
 
   const [settings, setSettings] = useState<KtaCardSettings>(() => normalizeSettings(previewSettings || storage.getKtaSettings()));
   const [flipped, setFlipped] = useState(false);
+  const members = storage.getMembers();
 
   useEffect(() => {
     if (previewSettings) {
@@ -248,6 +249,23 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
       </div>
     </div>
 
-    {showControls && <div className="flex items-center gap-2"><button type="button" onClick={()=>setFlipped(v=>!v)} className="px-3 py-1.5 bg-slate-800 text-white rounded-xl text-xs font-semibold"><RotateCw className="inline w-3.5 h-3.5 mr-1"/>Lihat {flipped?'Depan':'Belakang'}</button>{onPrintPdf&&<button type="button" onClick={()=>onPrintPdf(member)} className="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-semibold"><FileDown className="inline w-3.5 h-3.5 mr-1"/>PDF</button>}{allowAdminEdit&&onEditCard&&<button type="button" onClick={onEditCard} className="px-3 py-1.5 bg-purple-800 text-white rounded-xl text-xs font-semibold"><Sliders className="inline w-3.5 h-3.5 mr-1"/>Atur Desain</button>}</div>}
+    {showControls && (
+      <div className="w-full max-w-[380px] flex flex-wrap items-center justify-center gap-2">
+        <button type="button" onClick={() => setFlipped(v => !v)} className="px-3 py-1.5 bg-slate-800 text-white rounded-xl text-xs font-semibold">
+          <RotateCw className="inline w-3.5 h-3.5 mr-1" />
+          Lihat {flipped ? 'Depan' : 'Belakang'}
+        </button>
+        {onPrintPdf && (
+          <button type="button" onClick={() => onPrintPdf(member)} className="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-semibold">
+            <FileDown className="inline w-3.5 h-3.5 mr-1" />PDF
+          </button>
+        )}
+        {allowAdminEdit && onEditCard && (
+          <button type="button" onClick={onEditCard} className="px-3 py-1.5 bg-purple-800 text-white rounded-xl text-xs font-semibold">
+            <Sliders className="inline w-3.5 h-3.5 mr-1" />Atur Desain
+          </button>
+        )}
+      </div>
+    )}
   </div>;
 };
