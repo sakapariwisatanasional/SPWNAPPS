@@ -11,7 +11,6 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Member } from '../../types';
-import { SakaLogo } from '../common/SakaLogo';
 
 export interface KtaQrCodeProps {
   member: Member;
@@ -150,9 +149,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
     <>
       {/* Container QR Code Kartu */}
       <div 
-        className={`flex flex-col items-center flex-shrink-0 bg-white p-1 rounded-xl shadow-md border border-purple-200/50 transition-all ${
-          interactive ? 'hover:scale-105 hover:shadow-lg cursor-pointer group/qr relative' : ''
-        } ${className}`}
+        className={`flex flex-col items-center flex-shrink-0 ${interactive ? 'cursor-pointer relative' : ''} ${className}`}
         onClick={(e) => {
           if (!interactive) return;
           e.stopPropagation();
@@ -166,33 +163,21 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
               src={qrDataUrl} 
               alt="QR Code KTA" 
               style={{ width: `${size}px`, height: `${size}px` }}
-              className="object-contain rounded-lg"
+              className="block object-contain"
             />
           ) : (
             <div 
               style={{ width: `${size}px`, height: `${size}px` }} 
-              className="bg-slate-100 rounded-lg flex items-center justify-center animate-pulse"
+              className="flex items-center justify-center"
             >
               <QrCode className="w-4 h-4 text-slate-400" />
             </div>
           )}
 
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="bg-white rounded-full shadow-xs border border-purple-100 flex items-center justify-center"
-              style={{
-                width: Math.max(14, Math.round(size * 0.18)),
-                height: Math.max(14, Math.round(size * 0.18)),
-                padding: Math.max(2, Math.round(size * 0.025))
-              }}
-            >
-              <SakaLogo size={Math.max(9, Math.round(size * 0.13))} />
-            </div>
-          </div>
         </div>
 
         {showLabel && (
-          <span className="text-[7px] font-bold text-purple-900 tracking-wider font-mono mt-0.5 uppercase">
+          <span className="text-[7px] font-bold tracking-wider font-mono mt-0.5 uppercase">
             Profil KTA
           </span>
         )}
