@@ -57,11 +57,13 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
   onSuccess
 }) => {
   const provinces = storage.getProvinces();
+  const currentMember = useMemo(() => currentUser.memberId ? storage.getMembers().find(m => m.id === currentUser.memberId) : undefined, [currentUser.memberId]);
 
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
   const isProvinceAdmin = currentUser.role === 'ADMIN_PROVINCE';
   const isRegencyAdmin = currentUser.role === 'ADMIN_REGENCY';
   const isBranchAdmin = currentUser.role === 'ADMIN_BRANCH';
+  const isMember = currentUser.role === 'MEMBER';
 
   // Allowed scales based on role
   const availableLevels = useMemo(() => {
@@ -137,8 +139,10 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
       setCategory(initialActivity.category || CATEGORY_OPTIONS[0]);
       
       // Ensure level respects role
-      const initialLvl = initialActivity.organizerLevel || 'PROVINSI';
-      if (!isSuperAdmin && (initialLvl === 'NASIONAL' || initialLvl === 'INTERNASIONAL')) {
+      const initialLvl = initialActivity.organizerLevel || (isMember ? 'RANTING' : 'PROVINSI');
+      if (isMember) {
+        setOrganizerLevel('RANTING');
+      } else if (!isSuperAdmin && (initialLvl === 'NASIONAL' || initialLvl === 'INTERNASIONAL')) {
         setOrganizerLevel(isProvinceAdmin ? 'PROVINSI' : 'KABUPATEN');
       } else {
         setOrganizerLevel(initialLvl);
@@ -222,10 +226,16 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
         'Membawa perlengkapan kegiatan ramah lingkungan'
       ]);
       setContactPerson(currentUser.name);
-      setContactPhone('081299881122');
+      setContactPhone(currentMember?.phone || '');
       setContactEmail(currentUser.email);
+      if (isMember && currentMember) {
+        setProvinceId(currentMember.provinceId || '32');
+        setProvinceName(currentMember.provinceName || 'Jawa Barat');
+        setRegencyId(currentMember.regencyId || '');
+        setRegencyName(currentMember.regencyName || '');
+      }
     }
-  }, [initialActivity, isOpen, currentUser, isSuperAdmin, isProvinceAdmin, isRegencyAdmin]);
+  }, [initialActivity, isOpen, currentUser, currentMember, isMember, isSuperAdmin, isProvinceAdmin, isRegencyAdmin]);
 
   if (!isOpen) return null;
 
@@ -263,7 +273,7 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
     setRequirements(requirements.filter((_, i) => i !== idx));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
@@ -278,17 +288,24 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
       return;
     }
 
+    if (isMember && organizerLevel !== 'RANTING') {
+      alert('Anggota hanya dapat mengajukan kegiatan pada tingkat Ranting/Kecamatan sesuai wilayahnya.');
+      return;
+    }
+
     setIsSubmitting(true);
 
-    const activityPayload: Partial<Activity> = {
+    const activityPayload = {
       title,
       category,
       organizerLevel,
       organizerName,
-      provinceId,
-      provinceName,
-      regencyId,
-      regencyName,
+      provinceId: isMember ? (currentMember?.provinceId || provinceId) : (currentMember?.provinceId || provinceId),
+      provinceName: isMember ? (currentMember?.provinceName || provinceName) : (currentMember?.provinceName || provinceName),
+      regencyId: isMember ? (currentMember?.regencyId || regencyId) : (currentMember?.regencyId || regencyId),
+      regencyName: isMember ? (currentMember?.regencyName || regencyName) : (currentMember?.regencyName || regencyName),
+      districtId: currentMember?.districtId || (initialActivity as any)?.districtId || '',
+      districtName: currentMember?.districtName || (initialActivity as any)?.districtName || '',
       locationName,
       locationAddress,
       startDate,
@@ -304,14 +321,20 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
       contactPerson,
       contactPhone,
       contactEmail,
-      isPublic: true,
-      status: 'OPEN_REGISTRATION'
+      isPublic: false,
+      status: 'OPEN_REGISTRATION' as Activity['status'],
+      uploadedByRole: isMember ? 'MEMBER' : (isSuperAdmin ? 'SUPER_ADMIN' : currentUser.role),
+      uploadedByName: currentUser.name,
+      uploadedByMemberId: currentUser.memberId || currentUser.id,
+      contentStatus: (isMember ? 'SUBMITTED' : 'APPROVED_PUBLISHED') as NonNullable<Activity['contentStatus']>,
+      adminApprovalStatus: (isMember ? 'PENDING' : 'APPROVED') as NonNullable<Activity['adminApprovalStatus']>,
+      superAdminApprovalStatus: (isMember ? 'PENDING' : (isSuperAdmin ? 'APPROVED' : 'PENDING')) as NonNullable<Activity['superAdminApprovalStatus']>
     };
 
     if (initialActivity) {
-      storage.updateActivity(initialActivity.id, activityPayload);
+      await storage.updateActivity(initialActivity.id, activityPayload, currentUser);
     } else {
-      storage.addActivity(activityPayload);
+      await storage.addActivity(activityPayload);
     }
 
     setIsSubmitting(false);
@@ -342,7 +365,7 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
                     ? 'bg-amber-400 text-amber-950' 
                     : 'bg-emerald-400 text-emerald-950'
                 }`}>
-                  {isSuperAdmin ? 'Super Admin Kwarnas' : `Operator ${currentUser.jurisdictionName || 'Wilayah'}`}
+                  {isSuperAdmin ? 'Super Admin Kwarnas' : isMember ? 'Anggota Saka Pariwisata' : `Operator ${currentUser.jurisdictionName || 'Wilayah'}`}
                 </span>
               </div>
             </div>
