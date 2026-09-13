@@ -30,6 +30,40 @@ const TAB_ROUTES: Record<string, string> = {
   'audit-logs': '/audit'
 };
 
+const PUBLIC_TABS = new Set([
+  'landing',
+  'tours',
+  'culinary-souvenirs',
+  'skills',
+  'krida-modules',
+  'activities',
+  'verify-portal'
+]);
+
+const ADMIN_ROLES = new Set([
+  'ADMIN_BRANCH',
+  'ADMIN_REGENCY',
+  'ADMIN_PROVINCE',
+  'SUPER_ADMIN'
+]);
+
+function canAccessTab(tab: string, role: string): boolean {
+  const normalizedRole = role || 'PUBLIC';
+  if (PUBLIC_TABS.has(tab)) return true;
+  if (tab === 'my-card') return normalizedRole !== 'PUBLIC';
+  if (tab === 'dashboard' || tab === 'members') return ADMIN_ROLES.has(normalizedRole);
+  if (tab === 'territories') return normalizedRole === 'ADMIN_PROVINCE' || normalizedRole === 'SUPER_ADMIN';
+  if (tab === 'audit-logs') return normalizedRole === 'SUPER_ADMIN';
+  return false;
+}
+
+function getSafeTabForRole(role: string): string {
+  const normalizedRole = role || 'PUBLIC';
+  if (normalizedRole === 'MEMBER') return 'my-card';
+  if (ADMIN_ROLES.has(normalizedRole)) return 'dashboard';
+  return 'landing';
+}
+
 const ROUTE_TO_TAB: Record<string, string> = {
   '/': 'landing',
   '/landing': 'landing',
@@ -275,7 +309,13 @@ export default function App() {
       try {
         await spreadsheetService.fetchServerConfig();
         if (cancelled) return;
-        await spreadsheetService.syncFromSpreadsheet(true);
+        if ((currentUser?.role || 'PUBLIC') === 'PUBLIC') {
+          // Public users receive only the sanitized /api/data payload. They never
+          // need direct access to raw Spreadsheet rows.
+          await storage.syncWithServer();
+        } else {
+          await spreadsheetService.syncFromSpreadsheet(true);
+        }
         if (!cancelled) refreshAll();
       } catch (error) {
         console.warn('[App] Sinkronisasi awal Spreadsheet gagal:', error);
@@ -294,7 +334,7 @@ export default function App() {
       if (!cancelled) setCloudSync(spreadsheetService.getSyncState());
     });
     const handleMemberSynced = () => {
-      if (cancelled) return;
+      if (cancelled || (currentUser?.role || 'PUBLIC') === 'PUBLIC') return;
       void spreadsheetService.syncFromSpreadsheet(true)
         .then(() => {
           if (!cancelled) refreshAll();
@@ -304,7 +344,7 @@ export default function App() {
         });
     };
     const handleGasConfigUpdated = () => {
-      if (cancelled) return;
+      if (cancelled || (currentUser?.role || 'PUBLIC') === 'PUBLIC') return;
       setCloudSync(spreadsheetService.getSyncState());
       // URL GAS baru langsung dipakai seluruh service pada tab ini.
       void spreadsheetService.syncFromSpreadsheet(true).then(() => {
@@ -324,7 +364,7 @@ export default function App() {
       window.removeEventListener('saka:gas-config-updated', handleGasConfigUpdated as EventListener);
       unsubscribeSyncState();
     };
-  }, []);
+  }, [currentUser?.role]);
 
   useEffect(() => {
     // Menjaga status sinkronisasi tetap tersedia di root untuk komponen dashboard
@@ -345,6 +385,22 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Frontend route guard: menyembunyikan menu saja bukan authorization.
+  // Jika pengguna mencoba membuka URL sensitif secara langsung, route ditolak
+  // sebelum halaman sensitif dirender dan diarahkan ke halaman yang sesuai role.
+  useEffect(() => {
+    const role = currentUser?.role || 'PUBLIC';
+    if (canAccessTab(currentTab, role)) return;
+
+    const safeTab = getSafeTabForRole(role);
+    const safePath = TAB_ROUTES[safeTab] || '/';
+    setCurrentTab(safeTab);
+    setSearchQuery('');
+    if (typeof window !== 'undefined' && window.location.pathname !== safePath) {
+      window.history.replaceState(null, '', safePath);
+    }
+  }, [currentTab, currentUser?.role]);
 
   // QR/Barcode URL verification ditangani sepenuhnya oleh PublicPortalView.
   // App.tsx hanya menentukan route /verify agar tidak ada dua proses verifikasi
@@ -472,6 +528,23 @@ export default function App() {
             onClose={() => setSelectedCulinaryDetail(null)}
           />
         )}
+      </div>
+    );
+  }
+
+  // Defensive render guard. The effect above also rewrites the URL, but this
+  // prevents a sensitive component from rendering during the transition frame.
+  if (!canAccessTab(currentTab, userRole)) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-3xl border border-violet-500/30 bg-slate-800/80 p-6 text-center shadow-2xl">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-300">
+            <span className="text-2xl">🔒</span>
+          </div>
+          <h2 className="text-lg font-black">Akses Terbatas</h2>
+          <p className="mt-2 text-sm text-slate-300">Halaman ini tidak tersedia untuk level akun Anda.</p>
+          <p className="mt-3 text-xs text-slate-500">Anda akan diarahkan ke halaman yang sesuai.</p>
+        </div>
       </div>
     );
   }
