@@ -39,6 +39,7 @@ interface CulinarySouvenirFormModalProps {
   onClose: () => void;
   currentUser: CurrentUser;
   editItem?: CulinarySouvenirItem | null;
+  initialKind?: ProductKind;
   onSuccess: (savedItem: CulinarySouvenirItem) => void;
 }
 
@@ -77,6 +78,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
   onClose,
   currentUser,
   editItem,
+  initialKind = 'KULINER',
   onSuccess
 }) => {
   const members = storage.getMembers();
@@ -135,12 +137,18 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       setSelectedKrida(memberKrida);
       
       let initCategory: KridaProductCategory = 'Kuliner & Minuman Daerah';
-      let initKind: ProductKind = 'KULINER';
+      let initKind: ProductKind = initialKind;
       let initUnit = 'per porsi';
       let initPrice = 25000;
       let initLabel = 'Makanan Tradisional Khas';
 
-      if (memberKrida === 'Krida Pemandu') {
+      if (memberKrida === 'Krida Kuliner & Cinderamata' && initialKind === 'CINDERAMATA') {
+        initCategory = 'Kriya & Cinderamata Khas';
+        initKind = 'CINDERAMATA';
+        initUnit = 'per pcs';
+        initPrice = 50000;
+        initLabel = 'Cinderamata / Kerajinan Khas Daerah';
+      } else if (memberKrida === 'Krida Pemandu') {
         initCategory = 'Pemanduan & Paket Wisata';
         initKind = 'CINDERAMATA';
         initUnit = 'per grup / trip';
@@ -185,7 +193,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       setRegencyId(initReg);
       setDistrictId(initDist);
     }
-  }, [isOpen, editItem, currentMember, currentUser]);
+  }, [isOpen, editItem, currentMember, currentUser, initialKind]);
 
   // Update regencies when province changes
   useEffect(() => {
@@ -213,7 +221,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
 
   const isOperator = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
@@ -268,14 +276,14 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
 
     try {
       if (editItem) {
-        const updated = storage.updateCulinarySouvenir(editItem.id, payload, currentUser);
+        const updated = await storage.updateCulinarySouvenir(editItem.id, payload, currentUser);
         if (updated) {
           setIsSubmitting(false);
           onSuccess(updated);
           onClose();
         }
       } else {
-        const created = storage.addCulinarySouvenir(payload, currentUser);
+        const created = await storage.addCulinarySouvenir(payload, currentUser);
         setIsSubmitting(false);
         onSuccess(created);
         onClose();
