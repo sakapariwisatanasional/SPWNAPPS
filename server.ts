@@ -288,33 +288,55 @@ initializeUsersAndSuperAdmin();
 
 // GViz API fetcher helper
 async function fetchSheetGViz(sheetName: string): Promise<Record<string, any>[]> {
-  const spreadsheetId = db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID;
-  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}`;
+  // Google Apps Script adalah sumber data otoritatif aplikasi.
+  // Jangan membaca GViz/Spreadsheet secara langsung di server karena hasilnya
+  // dapat berbeda dari deployment GAS yang menjadi backend aplikasi.
+  const configured = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+  const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+  const defaultUrl = DEFAULT_APPS_SCRIPT_URL;
+  const scriptUrl = configured || envUrl || defaultUrl;
+
   try {
-    const res = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
-    if (!res.ok) return [];
+    const separator = scriptUrl.includes('?') ? '&' : '?';
+    const url = `${scriptUrl}${separator}sheet=${encodeURIComponent(sheetName)}&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, max-age=0',
+        'Pragma': 'no-cache'
+      },
+      redirect: 'follow'
+    });
+
     const text = await res.text();
-    const jsonStart = text.indexOf('{');
-    const jsonEnd = text.lastIndexOf('}');
-    if (jsonStart === -1 || jsonEnd === -1) return [];
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch {}
 
-    const json = JSON.parse(text.substring(jsonStart, jsonEnd + 1));
-    if (!json.table || !json.table.rows) return [];
+    if (!res.ok) {
+      throw new Error(`Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`);
+    }
+    if (data?.status === 'error' || data?.success === false) {
+      throw new Error(data?.message || `GAS gagal membaca sheet ${sheetName}.`);
+    }
 
-    const cols = (json.table.cols || []).map((c: any, i: number) => (c && c.label && c.label.trim()) || `col_${i}`);
-    return json.table.rows.map((row: any) => {
-      const item: Record<string, any> = {};
-      if (row.c) {
-        row.c.forEach((cell: any, idx: number) => {
-          const key = cols[idx] || `col_${idx}`;
-          item[key] = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : cell.f || '') : '';
-        });
-      }
-      return item;
-    }).filter((r: any) => Object.values(r).some(v => v !== '' && v !== null && v !== undefined));
+    const rows = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.rows) ? data.rows
+      : Array.isArray(data?.data) ? data.data
+      : Array.isArray(data?.records) ? data.records
+      : null;
+
+    if (!rows) {
+      throw new Error(`Respons GAS untuk sheet ${sheetName} tidak berisi array data yang valid.`);
+    }
+
+    return rows;
   } catch (err) {
-    console.warn(`[Sync] GViz fetch error for ${sheetName}:`, err);
-    return [];
+    console.warn(`[Sync] GAS fetch error for ${sheetName}:`, err);
+    // An empty sheet is valid; a failed request is not. Propagate the error so
+    // the API never replaces a good snapshot with an accidental empty cache.
+    throw err;
   }
 }
 
@@ -361,7 +383,7 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
   try {
     // 1. Sync Anggota
     const memberRows = await fetchSheetGViz('Anggota');
-    if (memberRows && memberRows.length > 0) {
+    if (Array.isArray(memberRows)) {
       const importedMembers = memberRows.map((row, idx) => {
         const fullName = getColVal(row, ['Nama Lengkap', 'Nama', 'Full Name', 'col_2']) || `Anggota ${idx + 1}`;
         const kta = getColVal(row, ['Nomor KTA', 'Nomor Anggota', 'NTA', 'KTA', 'No KTA', 'col_1']);
@@ -431,7 +453,7 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
 
     // 2. Sync Paket_Wisata
     const tourRows = await fetchSheetGViz('Paket_Wisata');
-    if (tourRows && tourRows.length > 0) {
+    if (Array.isArray(tourRows)) {
       db.tours = tourRows.map((row, idx) => {
         const id = getColVal(row, ['ID', 'id', 'col_0']) || `tour-sheet-${idx + 1}`;
         const title = getColVal(row, ['Nama Paket', 'title', 'col_1']) || `Paket Wisata ${idx + 1}`;
@@ -481,7 +503,7 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
 
     // 3. Sync Kuliner_Cinderamata
     const culinaryRows = await fetchSheetGViz('Kuliner_Cinderamata');
-    if (culinaryRows && culinaryRows.length > 0) {
+    if (Array.isArray(culinaryRows)) {
       db.culinaryItems = culinaryRows.map((row, idx) => {
         const id = getColVal(row, ['ID', 'id', 'col_0']) || `prod-sheet-${idx + 1}`;
         const name = getColVal(row, ['Nama Produk', 'name', 'col_1']) || `Produk Saka ${idx + 1}`;
@@ -526,7 +548,7 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
 
     // 4. Sync Agenda_Kegiatan
     const actRows = await fetchSheetGViz('Agenda_Kegiatan');
-    if (actRows && actRows.length > 0) {
+    if (Array.isArray(actRows)) {
       db.activities = actRows.map((row, idx) => {
         const id = getColVal(row, ['ID', 'id', 'col_0']) || `act-sheet-${idx + 1}`;
         const title = getColVal(row, ['Nama Agenda', 'Judul Kegiatan', 'Nama Kegiatan', 'title', 'col_1']) || `Kegiatan Saka ${idx + 1}`;
@@ -1140,7 +1162,19 @@ function serverMemberBelongsToAdminJurisdiction(member: any, session: any): bool
   return false;
 }
 
-app.get('/api/data', (req, res) => {
+app.get('/api/data', async (req, res) => {
+  // Always obtain the authoritative snapshot from GAS before responding.
+  // This prevents a new phone/tablet/desktop from inheriting an old in-memory
+  // server snapshot.
+  const syncResult = await syncFromGoogleSpreadsheet();
+  if (!syncResult.success) {
+    return res.status(502).json({
+      success: false,
+      message: 'Gagal mengambil data terbaru dari Google Spreadsheet melalui GAS.',
+      source: 'google-apps-script'
+    });
+  }
+
   const session = getSessionUser(req);
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
   const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
