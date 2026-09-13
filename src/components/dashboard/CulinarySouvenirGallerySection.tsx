@@ -23,7 +23,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
     const rawList = Array.isArray(items) && items.length > 0 ? items : culinaryItems;
     return (Array.isArray(rawList) ? rawList : []).filter((item) => {
       if (!item) return false;
-      const role = currentUser?.role;
+      const role = String(currentUser?.role || '').toUpperCase();
       if (role === 'SUPER_ADMIN' || ['ADMIN_PROVINCE','ADMIN_REGENCY','ADMIN_BRANCH'].includes(role)) return true;
       if (role === 'MEMBER') {
         return item.status === 'APPROVED' || item.authorMemberId === (currentUser.memberId || currentUser.id);
