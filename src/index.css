@@ -269,3 +269,62 @@
     transition-duration: .01ms !important;
   }
 }
+
+
+/* =========================================================
+   PUBLIC KTA VERIFICATION — MOBILE INPUT FIX
+   ---------------------------------------------------------
+   The generic .app-main form-control rule above intentionally
+   makes inputs white. The public KTA verification field is a
+   dark/gradient hero control, so it must be explicitly scoped
+   here and override that generic rule.
+   ========================================================= */
+.app-main #verifikasi-kta .kta-verification-input {
+  background: rgba(255, 255, 255, 0.10) !important;
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #e9d5ff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  min-height: 42px;
+  width: 100%;
+  min-width: 0;
+  opacity: 1 !important;
+  appearance: none;
+  -webkit-appearance: none;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 2;
+  box-shadow: none !important;
+}
+
+.app-main #verifikasi-kta .kta-verification-input::placeholder {
+  color: rgba(233, 213, 255, 0.55) !important;
+  -webkit-text-fill-color: rgba(233, 213, 255, 0.55) !important;
+  opacity: 1 !important;
+}
+
+.app-main #verifikasi-kta .kta-verification-input:focus {
+  background: rgba(255, 255, 255, 0.14) !important;
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 640px) {
+  .app-main #verifikasi-kta .kta-verification-input {
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+    min-height: 44px;
+    padding: 0 !important;
+    touch-action: manipulation;
+  }
+
+  .app-main #verifikasi-kta form > div:first-child {
+    min-height: 56px;
+  }
+}
