@@ -1070,7 +1070,7 @@ class SpreadsheetService {
       // 2. Sinkronisasi Data Paket Wisata jika sheet tersedia
       try {
         const tourRows = await this.fetchSheetRows('Paket_Wisata');
-        if (tourRows && tourRows.length > 0) {
+        if (Array.isArray(tourRows)) {
           const existingTours = storage.getTourPackages();
           const mergedTours: TourPackage[] = [];
 
@@ -1133,6 +1133,8 @@ class SpreadsheetService {
             }
           });
 
+          // Spreadsheet adalah source of truth. Jika sheet valid dan kosong,
+          // cache lokal juga harus dikosongkan agar data lama tidak muncul lagi.
           storage.setTourPackages(mergedTours);
         }
       } catch (e) {
@@ -1142,7 +1144,7 @@ class SpreadsheetService {
       // 3. Sinkronisasi Data Kuliner & Cinderamata jika sheet tersedia
       try {
         const culinaryRows = await this.fetchSheetRows('Kuliner_Cinderamata');
-        if (culinaryRows && culinaryRows.length > 0) {
+        if (Array.isArray(culinaryRows)) {
           const existingCulinary = storage.getCulinarySouvenirs();
           const mergedCulinary: CulinarySouvenirItem[] = [];
 
@@ -1195,6 +1197,7 @@ class SpreadsheetService {
             }
           });
 
+          // Sheet valid + kosong berarti tidak ada produk tersimpan di cloud.
           storage.setCulinarySouvenirs(mergedCulinary);
         }
       } catch (e) {
@@ -1204,7 +1207,7 @@ class SpreadsheetService {
       // 4. Sinkronisasi Data Agenda & Kegiatan jika sheet tersedia
       try {
         const activityRows = await this.fetchSheetRows('Agenda_Kegiatan');
-        if (activityRows && activityRows.length > 0) {
+        if (Array.isArray(activityRows)) {
           const existingActivities = storage.getActivities();
           const mergedActivities: Activity[] = [];
 
@@ -1269,6 +1272,7 @@ class SpreadsheetService {
             }
           });
 
+          // Sheet valid + kosong harus menimpa cache lokal dengan array kosong.
           storage.setActivities(mergedActivities);
         }
       } catch (e) {
