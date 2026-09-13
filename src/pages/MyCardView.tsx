@@ -12,7 +12,7 @@ import {
   Send,
   UserCheck
 } from 'lucide-react';
-import { Member, CurrentUser } from '../types';
+import { Member, CurrentUser, ProductKind } from '../types';
 import { DigitalMemberCard } from '../components/member/DigitalMemberCard';
 import { getMemberVerificationUrl } from '../components/member/KtaQrCode';
 import QRCode from 'qrcode';
@@ -26,6 +26,7 @@ interface MyCardViewProps {
   onOpenEditMemberModal?: (member: Member) => void;
   onOpenPrintPdfModal?: (member: Member) => void;
   onOpenQuickShareModal?: (member: Member) => void;
+  onOpenCulinaryFormModal?: (kind?: ProductKind) => void;
 }
 
 export const MyCardView: React.FC<MyCardViewProps> = ({
@@ -36,7 +37,8 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
   onOpenEditPhotoModal,
   onOpenEditMemberModal,
   onOpenPrintPdfModal,
-  onOpenQuickShareModal
+  onOpenQuickShareModal,
+  onOpenCulinaryFormModal
 }) => {
   // 1. Deteksi identitas anggota dari query parameter hasil scan Google Lens / kamera HP
   const targetMember = useMemo(() => {
@@ -259,6 +261,27 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
               <Sliders className="w-4 h-4" />
               <span>Desain KTA</span>
             </button>
+          )}
+
+          {isStrictOwner && onOpenCulinaryFormModal && (
+            <>
+              <button
+                type="button"
+                onClick={() => onOpenCulinaryFormModal('KULINER')}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm"
+              >
+                <span>🍽️</span>
+                <span>Ajukan Kuliner</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenCulinaryFormModal('CINDERAMATA')}
+                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-white rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm"
+              >
+                <span>🎁</span>
+                <span>Ajukan Cinderamata</span>
+              </button>
+            </>
           )}
         </div>
       </div>
