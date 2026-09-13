@@ -1118,38 +1118,58 @@ app.get('/api/verify-member', async (req, res) => {
 });
 
 // Central Data GET with strict Privacy and Role Enforcement
+const SERVER_CONTENT_ADMIN_ROLES = ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
+function serverNormalizeText(value: unknown): string { return String(value ?? '').trim().toLowerCase(); }
+function serverMemberBelongsToAdminJurisdiction(member: any, session: any): boolean {
+  if (!session || session.role === 'SUPER_ADMIN') return true;
+  if (!SERVER_CONTENT_ADMIN_ROLES.includes(session.role)) return false;
+  const allowedId = serverNormalizeText(session.jurisdictionId);
+  const allowedName = serverNormalizeText(session.jurisdictionName);
+  const provinceId = serverNormalizeText(member?.provinceId);
+  const regencyId = serverNormalizeText(member?.regencyId);
+  const districtId = serverNormalizeText(member?.districtId);
+  const provinceName = serverNormalizeText(member?.provinceName);
+  const regencyName = serverNormalizeText(member?.regencyName);
+  const districtName = serverNormalizeText(member?.districtName);
+  const branchName = serverNormalizeText(member?.branchName);
+  if (session.role === 'ADMIN_PROVINCE') return (allowedId && provinceId === allowedId) || (allowedName && provinceName === allowedName);
+  if (session.role === 'ADMIN_REGENCY') return (allowedId && regencyId === allowedId) || (allowedName && regencyName === allowedName);
+  if (session.role === 'ADMIN_BRANCH') return (allowedId && districtId === allowedId) || (allowedName && (districtName === allowedName || branchName === allowedName));
+  return false;
+}
+
 app.get('/api/data', (req, res) => {
   const session = getSessionUser(req);
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
   const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
-  // Mask member data for public viewers to prevent data leaks
-  const sanitizedMembers = db.members.map(m => {
-    if (isSuperAdmin || isOperator) {
-      return m; // Full data for authorized administration
-    }
-    // Public directory data only:
-    return {
-      id: m.id,
-      nationalMemberNumber: m.nationalMemberNumber,
-      fullName: m.fullName,
-      nikMasked: m.nikMasked || '3201********0001',
-      avatarUrl: m.avatarUrl,
-      gender: m.gender,
-      provinceName: m.provinceName,
-      regencyName: m.regencyName,
-      branchName: m.branchName,
-      gugusDepan: m.gugusDepan,
-      krida: m.krida,
-      currentPosition: m.currentPosition,
-      joinYear: m.joinYear,
-      status: m.status,
-      registeredAt: m.registeredAt,
-      verificationToken: m.verificationToken,
-      skills: m.skills,
-      certifications: m.certifications
-    };
+  // Strict member privacy policy. Never send the full member object to a
+  // regional admin outside its jurisdiction, and never expose credentials to public users.
+  const publicMember = (m: any) => ({
+    id: m.id,
+    fullName: m.fullName,
+    avatarUrl: m.avatarUrl,
+    gender: m.gender,
+    provinceName: m.provinceName,
+    regencyName: m.regencyName,
+    districtName: m.districtName,
+    provinceId: m.provinceId,
+    regencyId: m.regencyId,
+    districtId: m.districtId,
+    krida: m.krida,
+    currentPosition: m.currentPosition,
+    joinYear: m.joinYear,
+    status: m.status
   });
+
+  const sanitizedMembers = db.members
+    .filter(m => isSuperAdmin || (isOperator && serverMemberBelongsToAdminJurisdiction(m, session)) || !isOperator)
+    .map(m => {
+      if (isSuperAdmin || isOperator) return m;
+      if (session?.role === 'MEMBER' && String(m.id || '') === String(session.memberId || '')) return m;
+      return publicMember(m);
+    });
+
 
   // Only return users list if Super Admin
   const sanitizedUsers = isSuperAdmin 
@@ -1177,8 +1197,6 @@ app.get('/api/data', (req, res) => {
     ? db.config
     : {
         status: db.config.status || 'CONNECTED',
-        autoSync: db.config.autoSync,
-        autoRefreshIntervalSeconds: db.config.autoRefreshIntervalSeconds || 6,
         lastSyncedAt: db.config.lastSyncedAt
       };
 
