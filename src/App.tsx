@@ -545,8 +545,9 @@ export default function App() {
                 <CulinarySouvenirGallerySection
                   items={culinaryItems}
                   currentUser={currentUser}
-                  onOpenFormModal={(item) => {
+                  onOpenFormModal={(item, kind) => {
                     setEditingCulinaryItem(item || null);
+                    if (!item) setCulinaryFormInitialKind(kind || 'KULINER');
                     setIsCulinaryFormOpen(true);
                   }}
                   onSelectItemDetail={(item) => setSelectedCulinaryDetail(item)}
