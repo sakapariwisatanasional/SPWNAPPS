@@ -147,6 +147,8 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   signerVerifiedFontSize: 7,
   signerVerifiedColor: '#ffffff',
   signerName: 'Reza Pahlevi',
+  signerNameXOffset: 0,
+  signerNameYOffset: 0,
   signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
   signerSubtitle: '',
   showStamp: false
