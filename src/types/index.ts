@@ -436,7 +436,7 @@ export interface KtaCardSettings {
   backHeaderTitle: string; backHeaderSubtitle: string; terms: string[]; issueLocationDate: string;
   barcodeType: KtaBarcodeType; barcodeCustomValue?: string; showBarcode?: boolean;
   barcodeX?: number; barcodeY?: number; barcodeWidth?: number; barcodeHeight?: number; barcodeShowText?: boolean;
-  signerMemberId?: string;
+  signerMemberId?: string; showSignerQrCode?: boolean; showSignerVerified?: boolean; signerVerifiedX?: number; signerVerifiedY?: number; signerVerifiedWidth?: number; signerVerifiedFontSize?: number; signerVerifiedColor?: string;
   signerQrX?: number; signerQrY?: number; signerQrSize?: number; signerQrPadding?: number; signerQrBackgroundColor?: string; signerQrBorderWidth?: number; signerQrBorderColor?: string; signerQrBorderRadius?: number;
   barcodeCaption?: string;
   showBarcodeFront?: boolean; barcodeFrontCustomValue?: string; barcodeFrontX?: number; barcodeFrontY?: number; barcodeFrontWidth?: number; barcodeFrontHeight?: number; barcodeFrontShowText?: boolean; barcodeFrontCaption?: string; barcodeFrontCaptionX?: number; barcodeFrontCaptionY?: number; barcodeFrontCaptionWidth?: number; barcodeFrontCaptionFontSize?: number; barcodeFrontCaptionFontWeight?: 'normal'|'medium'|'bold'|'black'; barcodeFrontCaptionColor?: string; barcodeFrontCaptionAlign?: 'left'|'center'|'right'; barcodeFrontCaptionLineHeight?: number; barcodeFrontCaptionLetterSpacing?: number;
