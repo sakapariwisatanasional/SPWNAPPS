@@ -144,6 +144,19 @@ class StorageService {
   private listeners: (() => void)[] = [];
   private mutationListeners: ((event: any) => void)[] = [];
 
+  // Cloud-first domain state.
+  // These collections are populated from Google Apps Script / Spreadsheet
+  // snapshots and are intentionally NOT hydrated from browser localStorage.
+  // localStorage remains reserved for session/configuration-only concerns.
+  private cloudMembers: Member[] = [];
+  private cloudTours: TourPackage[] = [];
+  private cloudActivities: Activity[] = [];
+  private cloudCulinarySouvenirs: CulinarySouvenirItem[] = [];
+  private cloudUsers: CurrentUser[] = [];
+  private cloudAuditLogs: AuditLog[] = [];
+  private pendingMemberWrites: Record<string, { status: string; timestamp: number; member: Member }> = {};
+  private ktaSettings: KtaCardSettings = { ...DEFAULT_KTA_SETTINGS, logos: [], dataFields: [], textElements: [], terms: [] };
+
   constructor() {
     this.initDefaultData();
   }
@@ -161,12 +174,8 @@ class StorageService {
         );
       }
 
-      if (!localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS)) {
-        localStorage.setItem(
-          STORAGE_KEYS.KTA_SETTINGS,
-          JSON.stringify(DEFAULT_KTA_SETTINGS)
-        );
-      }
+      // KTA settings are hydrated from the GAS-backed central endpoint.
+      // No browser-local KTA snapshot is created.
     } catch (error) {
       console.error(
         'Gagal menginisialisasi pengaturan KTA:',
@@ -404,58 +413,7 @@ class StorageService {
   // =========================================================
 
   public getMembers(): Member[] {
-    if (typeof window === 'undefined') {
-      return INITIAL_MEMBERS;
-    }
-
-    try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.MEMBERS
-      );
-
-      const parsed = data
-        ? JSON.parse(data)
-        : INITIAL_MEMBERS;
-
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-
-      const cleaned = parsed.map((member: any) => {
-        if (!member || typeof member !== 'object') {
-          return member;
-        }
-
-        const cleanMember = { ...member };
-
-        delete cleanMember.gugusDepan;
-
-        return cleanMember as Member;
-      });
-
-      const hadLegacyFields = parsed.some(
-        (member: any) =>
-          member &&
-          typeof member === 'object' &&
-          'gugusDepan' in member
-      );
-
-      if (hadLegacyFields) {
-        localStorage.setItem(
-          STORAGE_KEYS.MEMBERS,
-          JSON.stringify(cleaned)
-        );
-      }
-
-      return cleaned as Member[];
-    } catch (error) {
-      console.error(
-        'Gagal membaca data anggota:',
-        error
-      );
-
-      return INITIAL_MEMBERS;
-    }
+    return [...this.cloudMembers];
   }
 
   /**
@@ -552,44 +510,15 @@ class StorageService {
     }
   }
 
-  public setMembers(
-    members: Member[]
-  ) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      const cleanedMembers =
-        members.map((member: any) => {
-          if (
-            !member ||
-            typeof member !== 'object'
-          ) {
-            return member;
-          }
-
-          const cleanMember = {
-            ...member
-          };
-
-          delete cleanMember.gugusDepan;
-
-          return cleanMember;
-        });
-
-      localStorage.setItem(
-        STORAGE_KEYS.MEMBERS,
-        JSON.stringify(cleanedMembers)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan data anggota:',
-        error
-      );
-    }
+  public setMembers(members: Member[]) {
+    const cleanedMembers = (Array.isArray(members) ? members : []).map((member: any) => {
+      if (!member || typeof member !== 'object') return member;
+      const cleanMember = { ...member };
+      delete cleanMember.gugusDepan;
+      return cleanMember;
+    });
+    this.cloudMembers = cleanedMembers as Member[];
+    this.notify();
   }
 
   public saveMembers(
@@ -602,60 +531,13 @@ class StorageService {
    * Snapshot perubahan profil yang belum dikonfirmasi
    * oleh live-sync Spreadsheet.
    */
-  public getPendingMemberWrites(): Record<
-    string,
-    {
-      status: string;
-      timestamp: number;
-      member: Member;
-    }
-  > {
-    if (typeof window === 'undefined') {
-      return {};
-    }
-
-    try {
-      const raw =
-        localStorage.getItem(
-          STORAGE_KEYS.PENDING_MEMBER_WRITES
-        );
-
-      const parsed = raw
-        ? JSON.parse(raw)
-        : {};
-
-      return parsed &&
-        typeof parsed === 'object'
-        ? parsed
-        : {};
-    } catch {
-      return {};
-    }
+  public getPendingMemberWrites(): Record<string, { status: string; timestamp: number; member: Member }> {
+    return { ...this.pendingMemberWrites };
   }
 
-  public clearPendingMemberWrite(
-    memberId: string
-  ) {
-    if (
-      typeof window === 'undefined' ||
-      !memberId
-    ) {
-      return;
-    }
-
-    try {
-      const map =
-        this.getPendingMemberWrites();
-
-      if (map[memberId]) {
-        delete map[memberId];
-
-        localStorage.setItem(
-          STORAGE_KEYS.PENDING_MEMBER_WRITES,
-          JSON.stringify(map)
-        );
-      }
-    } catch {}
+  public clearPendingMemberWrite(memberId: string) {
+    if (!memberId) return;
+    delete this.pendingMemberWrites[memberId];
   }
 
   /**
@@ -779,32 +661,15 @@ class StorageService {
 
     const markPendingWrite =
       (pending: boolean) => {
-        try {
-          const raw =
-            localStorage.getItem(
-              STORAGE_KEYS.PENDING_MEMBER_WRITES
-            );
-
-          const map =
-            raw ? JSON.parse(raw) : {};
-
-          if (pending) {
-            map[memberId] = {
-              status: 'PENDING',
-              timestamp: Date.now(),
-              member: {
-                ...updatedMember
-              }
-            };
-          } else {
-            delete map[memberId];
-          }
-
-          localStorage.setItem(
-            STORAGE_KEYS.PENDING_MEMBER_WRITES,
-            JSON.stringify(map)
-          );
-        } catch {}
+        if (pending) {
+          this.pendingMemberWrites[memberId] = {
+            status: 'PENDING',
+            timestamp: Date.now(),
+            member: { ...updatedMember }
+          };
+        } else {
+          delete this.pendingMemberWrites[memberId];
+        }
       };
 
     markPendingWrite(true);
@@ -868,15 +733,8 @@ class StorageService {
     const logs =
       this.getAuditLogs();
 
-    localStorage.setItem(
-      STORAGE_KEYS.AUDIT_LOGS,
-      JSON.stringify(
-        [audit, ...logs].slice(
-          0,
-          500
-        )
-      )
-    );
+    this.cloudAuditLogs = [audit, ...logs].slice(0, 500);
+
 
     this.notify();
 
@@ -2467,202 +2325,102 @@ class StorageService {
   // KTA CARD SETTINGS
   // =========================================================
 
-  public getKtaSettings():
-    KtaCardSettings {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return DEFAULT_KTA_SETTINGS;
-    }
-
-    try {
-      const data =
-        localStorage.getItem(
-          STORAGE_KEYS.KTA_SETTINGS
-        );
-
-      if (data) {
-        const parsedData =
-          JSON.parse(data);
-
-        const merged = {
-          ...DEFAULT_KTA_SETTINGS,
-          ...(parsedData &&
-          typeof parsedData ===
-            'object'
-            ? parsedData
-            : {})
-        } as KtaCardSettings;
-
-        return {
-          ...merged,
-          logos:
-            Array.isArray(
-              merged.logos
-            )
-              ? merged.logos
-              : [],
-          dataFields:
-            Array.isArray(
-              merged.dataFields
-            )
-              ? merged.dataFields
-              : [],
-          textElements:
-            Array.isArray(
-              merged.textElements
-            )
-              ? merged.textElements
-              : [],
-          terms:
-            Array.isArray(
-              merged.terms
-            )
-              ? merged.terms
-              : []
-        };
-      }
-    } catch (error) {
-      console.error(
-        'Gagal membaca pengaturan KTA:',
-        error
-      );
-    }
-
-    return DEFAULT_KTA_SETTINGS;
+  public getKtaSettings(): KtaCardSettings {
+    return {
+      ...this.ktaSettings,
+      logos: Array.isArray(this.ktaSettings.logos) ? [...this.ktaSettings.logos] : [],
+      dataFields: Array.isArray(this.ktaSettings.dataFields) ? [...this.ktaSettings.dataFields] : [],
+      textElements: Array.isArray(this.ktaSettings.textElements) ? [...this.ktaSettings.textElements] : [],
+      terms: Array.isArray(this.ktaSettings.terms) ? [...this.ktaSettings.terms] : []
+    };
   }
 
-  public saveKtaSettings(
-    settings: KtaCardSettings
-  ) {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return;
-    }
+  /**
+   * Hydrate KTA layout from the GAS-backed central endpoint.
+   * localStorage is deliberately not consulted.
+   */
+  public async hydrateKtaSettings(): Promise<KtaCardSettings> {
+    if (typeof window === 'undefined') return this.getKtaSettings();
 
     try {
-      const merged = {
-        ...DEFAULT_KTA_SETTINGS,
-        ...(settings &&
-        typeof settings ===
-          'object'
-          ? settings
-          : {})
-      } as KtaCardSettings;
+      const response = await fetch('/api/kta-settings', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0' }
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const updatedSettings:
-        KtaCardSettings = {
-        ...merged,
-        logos:
-          Array.isArray(
-            merged.logos
-          )
-            ? merged.logos
-            : [],
-        dataFields:
-          Array.isArray(
-            merged.dataFields
-          )
-            ? merged.dataFields
-            : [],
-        textElements:
-          Array.isArray(
-            merged.textElements
-          )
-            ? merged.textElements
-            : [],
-        terms:
-          Array.isArray(
-            merged.terms
-          )
-            ? merged.terms
-            : []
-      };
-
-      localStorage.setItem(
-        STORAGE_KEYS.KTA_SETTINGS,
-        JSON.stringify(
-          updatedSettings
-        )
-      );
-
-      this.notify();
-
-      window.dispatchEvent(
-        new CustomEvent(
-          'saka:kta-settings-updated',
-          {
-            detail:
-              updatedSettings
-          }
-        )
-      );
+      const result = await response.json();
+      if (result?.success && result?.settings && typeof result.settings === 'object') {
+        this.setKtaSettingsInMemory(result.settings);
+      }
     } catch (error) {
-      console.error(
-        'Gagal menyimpan pengaturan KTA:',
-        error
-      );
+      console.warn('[Storage] Gagal memuat pengaturan KTA dari GAS:', error);
     }
+
+    return this.getKtaSettings();
+  }
+
+  private setKtaSettingsInMemory(settings: KtaCardSettings) {
+    const merged = {
+      ...DEFAULT_KTA_SETTINGS,
+      ...(settings && typeof settings === 'object' ? settings : {})
+    } as KtaCardSettings;
+
+    this.ktaSettings = {
+      ...merged,
+      logos: Array.isArray(merged.logos) ? merged.logos : [],
+      dataFields: Array.isArray(merged.dataFields) ? merged.dataFields : [],
+      textElements: Array.isArray(merged.textElements) ? merged.textElements : [],
+      terms: Array.isArray(merged.terms) ? merged.terms : []
+    };
+
+    this.notify();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('saka:kta-settings-updated', {
+        detail: this.getKtaSettings()
+      }));
+    }
+  }
+
+  public saveKtaSettings(settings: KtaCardSettings) {
+    this.setKtaSettingsInMemory(settings);
+
+    if (typeof window === 'undefined') return;
+
+    const token = this.getAuthToken();
+    void fetch('/api/kta-settings', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        settings: this.getKtaSettings()
+      })
+    }).then(async response => {
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.message || `HTTP ${response.status}`);
+      }
+      return response.json().catch(() => null);
+    }).catch(error => {
+      console.error('[Storage] Gagal menyimpan pengaturan KTA ke GAS:', error);
+    });
   }
 
   // =========================================================
   // TOUR PACKAGES
   // =========================================================
 
-  public getTourPackages():
-    TourPackage[] {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return INITIAL_TOUR_PACKAGES;
-    }
-
-    try {
-      const data =
-        localStorage.getItem(
-          STORAGE_KEYS.TOURS
-        );
-
-      return data
-        ? JSON.parse(data)
-        : INITIAL_TOUR_PACKAGES;
-    } catch (error) {
-      console.error(
-        'Gagal membaca paket wisata:',
-        error
-      );
-
-      return INITIAL_TOUR_PACKAGES;
-    }
+  public getTourPackages(): TourPackage[] {
+    return [...this.cloudTours];
   }
 
-  public setTourPackages(
-    tours: TourPackage[]
-  ) {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.TOURS,
-        JSON.stringify(tours)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan paket wisata:',
-        error
-      );
-    }
+  public setTourPackages(tours: TourPackage[]) {
+    this.cloudTours = Array.isArray(tours) ? [...tours] : [];
+    this.notify();
   }
 
   public deleteTourPackage(
@@ -2775,59 +2533,13 @@ class StorageService {
   // ACTIVITIES
   // =========================================================
 
-  public getActivities():
-    Activity[] {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return INITIAL_ACTIVITIES;
-    }
-
-    try {
-      const data =
-        localStorage.getItem(
-          STORAGE_KEYS.ACTIVITIES
-        );
-
-      return data
-        ? JSON.parse(data)
-        : INITIAL_ACTIVITIES;
-    } catch (error) {
-      console.error(
-        'Gagal membaca kegiatan:',
-        error
-      );
-
-      return INITIAL_ACTIVITIES;
-    }
+  public getActivities(): Activity[] {
+    return [...this.cloudActivities];
   }
 
-  public setActivities(
-    activities: Activity[]
-  ) {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.ACTIVITIES,
-        JSON.stringify(
-          activities
-        )
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan kegiatan:',
-        error
-      );
-    }
+  public setActivities(activities: Activity[]) {
+    this.cloudActivities = Array.isArray(activities) ? [...activities] : [];
+    this.notify();
   }
 
   public deleteActivity(
@@ -2941,57 +2653,13 @@ class StorageService {
   // CULINARY & SOUVENIRS
   // =========================================================
 
-  public getCulinarySouvenirs():
-    CulinarySouvenirItem[] {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return INITIAL_CULINARY_SOUVENIRS;
-    }
-
-    try {
-      const data =
-        localStorage.getItem(
-          STORAGE_KEYS.CULINARY_SOUVENIRS
-        );
-
-      return data
-        ? JSON.parse(data)
-        : INITIAL_CULINARY_SOUVENIRS;
-    } catch (error) {
-      console.error(
-        'Gagal membaca data kuliner dan cinderamata:',
-        error
-      );
-
-      return INITIAL_CULINARY_SOUVENIRS;
-    }
+  public getCulinarySouvenirs(): CulinarySouvenirItem[] {
+    return [...this.cloudCulinarySouvenirs];
   }
 
-  public setCulinarySouvenirs(
-    items: CulinarySouvenirItem[]
-  ) {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.CULINARY_SOUVENIRS,
-        JSON.stringify(items)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan data kuliner dan cinderamata:',
-        error
-      );
-    }
+  public setCulinarySouvenirs(items: CulinarySouvenirItem[]) {
+    this.cloudCulinarySouvenirs = Array.isArray(items) ? [...items] : [];
+    this.notify();
   }
 
   // =========================================================
@@ -3057,89 +2725,26 @@ class StorageService {
   // AUDIT LOGS
   // =========================================================
 
-  public getAuditLogs():
-    AuditLog[] {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return INITIAL_AUDIT_LOGS;
-    }
+  public getAuditLogs(): AuditLog[] {
+    return [...this.cloudAuditLogs];
+  }
 
-    try {
-      const data =
-        localStorage.getItem(
-          STORAGE_KEYS.AUDIT_LOGS
-        );
-
-      return data
-        ? JSON.parse(data)
-        : INITIAL_AUDIT_LOGS;
-    } catch (error) {
-      console.error(
-        'Gagal membaca audit logs:',
-        error
-      );
-
-      return INITIAL_AUDIT_LOGS;
-    }
+  public setAuditLogs(logs: AuditLog[]) {
+    this.cloudAuditLogs = Array.isArray(logs) ? [...logs] : [];
+    this.notify();
   }
 
   // =========================================================
   // USERS & AUTH
   // =========================================================
 
-  public getUsers():
-    CurrentUser[] {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return DEMO_USERS;
-    }
-
-    try {
-      const data =
-        localStorage.getItem(
-          STORAGE_KEYS.USERS
-        );
-
-      return data
-        ? JSON.parse(data)
-        : DEMO_USERS;
-    } catch (error) {
-      console.error(
-        'Gagal membaca data users:',
-        error
-      );
-
-      return DEMO_USERS;
-    }
+  public getUsers(): CurrentUser[] {
+    return [...this.cloudUsers];
   }
 
-  public setUsers(
-    users: CurrentUser[]
-  ) {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEYS.USERS,
-        JSON.stringify(users)
-      );
-
-      this.notify();
-    } catch (error) {
-      console.error(
-        'Gagal menyimpan users:',
-        error
-      );
-    }
+  public setUsers(users: CurrentUser[]) {
+    this.cloudUsers = Array.isArray(users) ? [...users] : [];
+    this.notify();
   }
 
   public saveUsers(
@@ -3261,11 +2866,10 @@ class StorageService {
    *
    * Prinsip Cloud-First:
    * - Respons server adalah sumber kebenaran untuk data cloud.
-   * - Array kosong dari server tetap harus ditulis ke localStorage.
-   * - localStorage hanya menjadi cache/offline snapshot, bukan sumber data
-   *   yang boleh mengalahkan snapshot server.
-   * - Pending member writes tetap dipertahankan agar perubahan lokal yang
-   *   belum selesai tidak langsung hilang ketika sync berlangsung.
+   * - Array kosong dari server tetap menggantikan in-memory cloud state.
+   * - Domain data tidak pernah dibaca atau dipulihkan dari localStorage.
+   * - Pending member writes hanya hidup selama sesi browser dan menunggu
+   *   konfirmasi dari snapshot Google Spreadsheet.
    */
   public async syncWithServer(): Promise<boolean> {
     const token = this.getAuthToken();
@@ -3423,35 +3027,14 @@ class StorageService {
       // -------------------------------------------------------
       // KRIDA MODULES
       // -------------------------------------------------------
-      if (Array.isArray(data.kridaModules)) {
-        try {
-          localStorage.setItem(
-            'saka_krida_modules',
-            JSON.stringify(data.kridaModules)
-          );
-        } catch (error) {
-          console.warn(
-            '[Storage] Gagal menyimpan kridaModules:',
-            error
-          );
-        }
-      }
+      // Krida modules are currently static application content.
+      // Do not persist cloud snapshots into browser localStorage.
 
       // -------------------------------------------------------
       // AUDIT LOGS
       // -------------------------------------------------------
       if (Array.isArray(data.auditLogs)) {
-        try {
-          localStorage.setItem(
-            STORAGE_KEYS.AUDIT_LOGS,
-            JSON.stringify(data.auditLogs)
-          );
-        } catch (error) {
-          console.warn(
-            '[Storage] Gagal menyimpan auditLogs:',
-            error
-          );
-        }
+        this.setAuditLogs(data.auditLogs as AuditLog[]);
       }
 
       this.notify();
