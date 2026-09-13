@@ -344,66 +344,41 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
           </div>
         </div>
 
-        {/* Location Selector Bar & Quick Preset Pills */}
-        <div className="relative z-10 space-y-2.5">
-          <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
-            <span className="text-purple-200 font-semibold flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-teal-300" />
-              <span>Pilih Destinasi untuk Menyesuaikan Rekomendasi Pemandu & Produk Daerah:</span>
-            </span>
-
-            {/* Province Dropdown */}
-            <div className="flex items-center gap-2">
-              <select
-                aria-label="Pilih Provinsi Destinasi"
-                value={userLocation.regionName}
-                onChange={(e) => handleProvinceDropdownChange(e.target.value)}
-                className="bg-slate-950/80 text-white text-xs border border-purple-700/60 rounded-xl px-3 py-1.5 outline-none focus:border-teal-400 cursor-pointer"
-              >
-                {(Array.isArray(PROVINCES_DATA) ? PROVINCES_DATA : []).filter(p => p.id !== '00').map((prov) => (
-                  <option key={prov.id} value={prov.name} className="bg-slate-900 text-white">
-                    {prov.name} ({prov.island})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Quick Clickable Destination Preset Buttons */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {POPULAR_DESTINATIONS.map((preset) => {
-              const isActive = userLocation.regionName === preset.provinceName && !selectedTourForMatching;
-              return (
-                <button
-                  key={preset.label}
-                  onClick={() => handleSelectDestinationPreset(preset)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
-                    isActive 
-                      ? 'bg-gradient-to-r from-teal-400 to-emerald-400 text-slate-950 font-bold shadow-md shadow-emerald-950/50 scale-102' 
-                      : 'bg-white/10 hover:bg-white/20 text-purple-100 border border-white/15'
-                  }`}
-                >
-                  <MapPin className={`w-3 h-3 ${isActive ? 'text-slate-950' : 'text-teal-300'}`} />
-                  <span>{preset.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Alert if Tour is currently locking the matching context */}
-          {selectedTourForMatching && (
-            <div className="p-2.5 bg-teal-950/70 border border-teal-600/50 rounded-xl flex items-center justify-between text-xs text-teal-200">
-              <div className="flex items-center gap-2 truncate">
+        {/* Compact location context — destination is selected from the directory/tour cards.
+            No quick-region buttons are shown here to keep the interface simple. */}
+        <div className="relative z-10">
+          {selectedTourForMatching ? (
+            <div className="p-2.5 bg-teal-950/70 border border-teal-600/50 rounded-xl flex items-center justify-between gap-3 text-xs text-teal-200">
+              <div className="flex items-center gap-2 min-w-0">
                 <Compass className="w-4 h-4 text-teal-300 flex-shrink-0" />
                 <span className="truncate">
-                  Rekomendasi disesuaikan untuk paket: <strong className="text-white">{selectedTourForMatching.title}</strong> ({selectedTourForMatching.regencyName}, {selectedTourForMatching.provinceName})
+                  Rekomendasi untuk <strong className="text-white">{selectedTourForMatching.title}</strong>
+                  <span className="hidden sm:inline"> · {selectedTourForMatching.regencyName}, {selectedTourForMatching.provinceName}</span>
                 </span>
               </div>
               <button
                 onClick={() => setSelectedTourForMatching(null)}
-                className="text-xs font-bold text-teal-300 hover:text-white underline ml-3 flex-shrink-0 cursor-pointer"
+                className="text-xs font-bold text-teal-300 hover:text-white underline flex-shrink-0 cursor-pointer"
               >
                 Gunakan Lokasi Umum
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <MapPin className="w-3.5 h-3.5 text-teal-300 flex-shrink-0" />
+                <span className="text-purple-100 truncate">
+                  Rekomendasi berdasarkan <strong className="text-white">{userLocation.city ? `${userLocation.city}, ` : ''}{userLocation.regionName}</strong>
+                </span>
+              </div>
+              <button
+                onClick={handleTriggerIpDetect}
+                disabled={isDetectingIp}
+                title="Perbarui lokasi otomatis"
+                className="p-1.5 rounded-lg text-purple-200 hover:text-white hover:bg-white/10 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+              >
+                <Globe className={`w-3.5 h-3.5 ${isDetectingIp ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isDetectingIp ? 'Mendeteksi...' : 'Perbarui lokasi'}</span>
               </button>
             </div>
           )}
