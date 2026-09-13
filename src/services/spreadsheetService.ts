@@ -591,7 +591,8 @@ class SpreadsheetService {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache, no-store, max-age=0',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            ...(storage.getAuthToken() ? { 'Authorization': `Bearer ${storage.getAuthToken()}` } : {})
           }
         });
 
