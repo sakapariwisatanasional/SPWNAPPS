@@ -111,7 +111,7 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
 
         <button
           onClick={onOpenTourFormModal}
-          className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-md shadow-emerald-950/20 transition-all cursor-pointer w-fit"
+          className="px-4 py-2.5 bg-gradient-to-r from-purple-700 to-violet-600 hover:from-purple-600 hover:to-violet-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-md shadow-purple-950/20 transition-all cursor-pointer w-fit"
         >
           <Plus className="w-4 h-4" />
           <span>Ajukan Paket Wisata Baru</span>
