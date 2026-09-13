@@ -232,7 +232,7 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
             <div style={{fontSize:`${(settings as any).issueLocationDateFontSize ?? 7}px`}}>{settings.issueLocationDate}</div>
           </div>
           <div className="absolute overflow-hidden" style={{left:`${(settings as any).signerX ?? 5}%`,top:`${(settings as any).signerY ?? 76}%`,width:`${(settings as any).signerWidth ?? 55}%`,color:(settings as any).signerColor ?? '#ffffff',textAlign:(settings as any).signerAlign ?? 'left',lineHeight:Number((settings as any).signerLineHeight ?? 1.2),letterSpacing:`${(settings as any).signerLetterSpacing ?? 0}px`,whiteSpace:'normal',wordBreak:'break-word'}}>
-            <div style={{fontSize:`${(settings as any).signerNameFontSize ?? 9}px`,fontWeight:700}}>{settings.signerName}</div>
+            <div style={{position:'relative',left:`${(settings as any).signerNameXOffset ?? 0}%`,top:`${(settings as any).signerNameYOffset ?? 0}%`,fontSize:`${(settings as any).signerNameFontSize ?? 9}px`,fontWeight:700}}>{settings.signerName}</div>
             <div style={{fontSize:`${(settings as any).signerTitleFontSize ?? 7}px`}}>{settings.signerTitle}</div>
           </div>
           {(settings as any).showSignerQrCode !== false && (() => {
