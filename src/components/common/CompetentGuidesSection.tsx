@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   MapPin, 
   Search, 
@@ -67,6 +67,9 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('grid');
   const [sortBy, setSortBy] = useState<'competency' | 'name' | 'city'>('competency');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [showDirectory, setShowDirectory] = useState<boolean>(false);
+  const [showcaseIndex, setShowcaseIndex] = useState<number>(0);
+  const [showcaseKey, setShowcaseKey] = useState<number>(0);
   const itemsPerPage = viewMode === 'grid' ? 6 : 8;
 
   // Sync controlled / internal state
@@ -80,8 +83,6 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
       setInternalProvinceId(pId);
     }
   };
-
-  // Popular province quick filter buttons (wrap naturally, no horizontal scroll)
 
   const kridaFilterList: { id: string; label: string; badge: string; color: string }[] = [
     { id: 'ALL', label: 'Semua Spesialisasi', badge: 'Semua Krida', color: 'slate' },
@@ -193,6 +194,39 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
 
     return list;
   }, [members, currentProvinceId, selectedKrida, searchQuery, sortBy]);
+
+  // Public showcase: only active members with a KTA number and a photo are rotated.
+  // The full directory remains available only when the visitor explicitly opens it or searches/filters.
+  const showcaseMembers = useMemo(() => {
+    const eligible = members.filter((m) =>
+      m.status === 'ACTIVE' &&
+      Boolean((m.nationalMemberNumber || '').trim()) &&
+      Boolean((m.avatarUrl || '').trim())
+    );
+
+    // Deterministic shuffle per loaded member set, so React re-renders do not reshuffle the card.
+    const shuffled = [...eligible];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }, [members]);
+
+  useEffect(() => {
+    if (showDirectory || showcaseMembers.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setShowcaseIndex((current) => (current + 1) % showcaseMembers.length);
+      setShowcaseKey((current) => current + 1);
+    }, 4500);
+    return () => window.clearInterval(timer);
+  }, [showDirectory, showcaseMembers.length]);
+
+  useEffect(() => {
+    if (showcaseIndex >= showcaseMembers.length) setShowcaseIndex(0);
+  }, [showcaseIndex, showcaseMembers.length]);
+
+  const showcaseMember = showcaseMembers[showcaseIndex];
 
   // Pagination calculation
   const totalPages = Math.max(1, Math.ceil(filteredMembers.length / itemsPerPage));
@@ -321,6 +355,7 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => {
+                  setShowDirectory(true);
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
@@ -352,7 +387,7 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
               </div>
               <select
                 value={currentProvinceId}
-                onChange={(e) => handleProvinceSelect(e.target.value)}
+                onChange={(e) => { setShowDirectory(true); handleProvinceSelect(e.target.value); }}
                 className={`w-full pl-10 pr-8 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold outline-none border cursor-pointer appearance-none ${
                   isDark
                     ? 'bg-slate-900 border-slate-700 text-white focus:border-purple-500'
@@ -378,7 +413,7 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
               </div>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => { setShowDirectory(true); setSortBy(e.target.value as any); }}
                 className={`w-full pl-8 pr-6 py-2.5 rounded-2xl text-xs font-semibold outline-none border cursor-pointer appearance-none ${
                   isDark
                     ? 'bg-slate-900 border-slate-700 text-white focus:border-purple-500'
@@ -392,8 +427,7 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
             </div>
           </div>
 
-          {/* Wilayah cepat dihapus agar form tetap ringkas.
-              Filter wilayah utama di atas tetap menjadi satu-satunya kontrol wilayah. */}
+          {/* Quick region presets removed: one province selector is the only region control. */}
 
           {/* Row 3: Krida Filter Pills & View Switcher (WRAPPED NATURALLY) */}
           <div className="pt-2 border-t border-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -406,6 +440,7 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
                     key={k.id}
                     type="button"
                     onClick={() => {
+                      setShowDirectory(true);
                       setSelectedKrida(k.id);
                       setCurrentPage(1);
                     }}
@@ -430,7 +465,7 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
             <div className="flex items-center gap-1 self-end sm:self-auto bg-slate-900/90 border border-slate-800 p-1 rounded-xl shrink-0">
               <button
                 type="button"
-                onClick={() => setViewMode('grid')}
+                onClick={() => { setShowDirectory(true); setViewMode('grid'); }}
                 className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   viewMode === 'grid'
                     ? 'bg-purple-600 text-white shadow-xs'
@@ -443,7 +478,7 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setViewMode('compact')}
+                onClick={() => { setShowDirectory(true); setViewMode('compact'); }}
                 className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   viewMode === 'compact'
                     ? 'bg-purple-600 text-white shadow-xs'
@@ -458,374 +493,181 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
           </div>
         </div>
 
-        {/* Member Preview Results */}
-        {filteredMembers.length === 0 ? (
-          <div className={`p-12 text-center rounded-3xl border space-y-4 ${
-            isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200'
+        {/* Keluarga Saka Pariwisata — public proof of active membership */}
+        {!showDirectory ? (
+          <div className={`relative overflow-hidden rounded-3xl border ${
+            isDark ? 'bg-slate-950/90 border-slate-800' : 'bg-white border-slate-200'
           }`}>
-            <Compass className="w-12 h-12 mx-auto text-slate-500 stroke-1" />
-            <div className="space-y-1">
-              <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                Tidak ada pemandu yang cocok dengan filter lokasi & kriteria
-              </h3>
-              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Coba pilih provinsi lain, hapus kata kunci pencarian, atau reset filter Krida.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                handleProvinceSelect('ALL');
-                setSelectedKrida('ALL');
-                setSearchQuery('');
-                setCurrentPage(1);
-              }}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <span>Reset Semua Filter</span>
-            </button>
-          </div>
-        ) : viewMode === 'grid' ? (
-          /* ================= GRID VIEW ================= */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {paginatedMembers.map((member) => {
-              const defaultAvatar = member.gender === 'PEREMPUAN'
-                ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80'
-                : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80';
-              const avatar = formatDriveImageUrl(member.avatarUrl) || member.avatarUrl || defaultAvatar;
-              const topSkills = (member.skills || []).slice(0, 3);
-              const topCert = member.certifications?.[0];
-              const waLink = getWhatsAppLink(member);
-
-              return (
-                <div
-                  key={member.id}
-                  className={`rounded-3xl border transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1 shadow-xl ${
-                    isDark 
-                      ? 'bg-slate-950/90 border-slate-800 hover:border-purple-500/60 hover:shadow-purple-950/30' 
-                      : 'bg-white border-slate-200 hover:border-emerald-500/60 hover:shadow-emerald-950/15'
-                  }`}
-                >
-                  <div className="p-5 sm:p-6 space-y-4">
-                    {/* Top Identity Row */}
-                    <div className="flex items-start gap-4">
-                      {/* Avatar with Verified Ring */}
-                      <div className="relative shrink-0">
-                        <img
-                          src={avatar}
-                          alt={member.fullName}
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-500/40 group-hover:scale-105 transition-transform duration-300 shadow-md bg-slate-900"
-                          onError={(e) => {
-                            const img = e.target as HTMLImageElement;
-                            const directFallback = getDriveDirectFallbackUrl(member.avatarUrl);
-                            if (directFallback && img.src !== directFallback) {
-                              img.src = directFallback;
-                            } else if (img.src !== defaultAvatar) {
-                              img.src = defaultAvatar;
-                            }
-                          }}
-                        />
-                        <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md border-2 border-slate-950" title="KTA Terverifikasi">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                        </div>
-                      </div>
-
-                      {/* Info & Region */}
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                            member.krida === 'Krida Pemandu'
-                              ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
-                              : member.krida === 'Krida Penyuluh'
-                              ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60'
-                              : member.krida === 'Krida Mice & Event'
-                              ? 'bg-purple-950/80 text-purple-300 border border-purple-800/60'
-                              : 'bg-rose-950/80 text-rose-300 border border-rose-800/60'
-                          }`}>
-                            {member.krida || 'Kader Pariwisata'}
-                          </span>
-                        </div>
-
-                        <h3 className={`font-bold text-base font-heading truncate leading-snug group-hover:text-purple-300 transition-colors ${
-                          isDark ? 'text-white' : 'text-slate-900'
-                        }`}>
-                          {member.fullName}
-                        </h3>
-
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
-                          <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                          <span className="truncate font-medium">
-                            {member.districtName ? `${member.districtName}, ` : ''}{member.regencyName} • {member.provinceName}
-                          </span>
-                        </div>
-
-                        <p className="text-[11px] text-slate-400 font-mono">
-                          NTA: <span className="text-slate-300 font-semibold">{member.nationalMemberNumber || 'Terdaftar'}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Bio Snippet */}
-                    <p className={`text-xs line-clamp-2 leading-relaxed italic ${
-                      isDark ? 'text-slate-300' : 'text-slate-600'
-                    }`}>
-                      "{member.bio || member.occupation || 'Kader aktif Saka Pariwisata berpengalaman dalam kepemanduan objek daya tarik wisata lokal.'}"
-                    </p>
-
-                    {/* Verified Competencies & SKK Badges */}
-                    <div className="space-y-2 pt-2 border-t border-slate-800/40">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                        <Award className="w-3 h-3 text-amber-400" />
-                        <span>Keahlian & Sertifikasi Kompetensi</span>
-                      </p>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {topSkills.map((sk) => (
-                          <span
-                            key={sk.id}
-                            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 border ${
-                              isDark 
-                                ? 'bg-slate-900 border-slate-750 text-slate-200' 
-                                : 'bg-slate-100 border-slate-200 text-slate-700'
-                            }`}
-                          >
-                            <BadgeCheck className="w-3 h-3 text-emerald-400 shrink-0" />
-                            <span className="truncate max-w-[150px]">{sk.skillName}</span>
-                          </span>
-                        ))}
-
-                        {topCert && (
-                          <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-amber-950/60 border border-amber-800/60 text-amber-300 flex items-center gap-1">
-                            <Star className="w-3 h-3 text-amber-400 shrink-0" />
-                            <span className="truncate max-w-[150px]">{topCert.name}</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card Actions Footer */}
-                  <div className={`p-4 rounded-b-3xl border-t flex items-center justify-between gap-2 ${
-                    isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    {/* View KTA Modal */}
-                    <button
-                      type="button"
-                      onClick={() => onOpenVerifyModal(member)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                        isDark 
-                          ? 'text-slate-300 hover:text-white hover:bg-slate-800' 
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                      }`}
-                      title="Lihat Profil KTA & SKK Lengkap"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Detail KTA</span>
-                    </button>
-
-                    {/* Direct Contact Buttons */}
-                    <div className="flex items-center gap-1.5">
-                      {member.phone && (
-                        <a
-                          href={`tel:${member.phone}`}
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                            isDark 
-                              ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
-                              : 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-700'
-                          }`}
-                          title={`Telepon: ${member.phone}`}
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-
-                      <a
-                        href={waLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-950/30 transition-all flex items-center gap-1.5 cursor-pointer"
-                        title="Hubungi langsung via WhatsApp"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5 fill-white" />
-                        <span>Chat WA</span>
-                        <ExternalLink className="w-3 h-3 opacity-80" />
-                      </a>
-                    </div>
-                  </div>
+            <style>{`
+              @keyframes spwnapps-member-rise {
+                from { opacity: 0; transform: translateY(28px); }
+                to { opacity: 1; transform: translateY(0); }
+              }
+              .spwnapps-member-rise { animation: spwnapps-member-rise 650ms cubic-bezier(.22,1,.36,1) both; }
+            `}</style>
+            <div className="p-5 sm:p-7 lg:p-8">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+                <div>
+                  <p className={`text-[11px] font-extrabold uppercase tracking-[0.16em] ${isDark ? 'text-purple-300' : 'text-emerald-700'}`}>
+                    Keluarga Saka Pariwisata
+                  </p>
+                  <h3 className={`mt-1 text-xl sm:text-2xl font-extrabold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    Terhubung dari berbagai wilayah Indonesia.
+                  </h3>
+                  <p className={`mt-1 text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Beberapa anggota ditampilkan bergantian sebagai gambaran nyata komunitas Saka Pariwisata.
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          /* ================= COMPACT LIST VIEW ================= */
-          <div className="space-y-3">
-            {paginatedMembers.map((member) => {
-              const defaultAvatar = member.gender === 'PEREMPUAN'
-                ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80'
-                : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80';
-              const avatar = formatDriveImageUrl(member.avatarUrl) || member.avatarUrl || defaultAvatar;
-              const topSkills = (member.skills || []).slice(0, 3);
-              const waLink = getWhatsAppLink(member);
-
-              return (
-                <div
-                  key={member.id}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                    isDark 
-                      ? 'bg-slate-950/90 border-slate-800 hover:border-purple-500/50 hover:bg-slate-900/60' 
-                      : 'bg-white border-slate-200 hover:border-emerald-500/50 hover:bg-slate-50'
-                  }`}
-                >
-                  {/* Left: Avatar & Identity */}
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="relative shrink-0">
-                      <img
-                        src={avatar}
-                        alt={member.fullName}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        className="w-12 h-12 rounded-xl object-cover border border-purple-500/40 bg-slate-900"
-                        onError={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          const directFallback = getDriveDirectFallbackUrl(member.avatarUrl);
-                          if (directFallback && img.src !== directFallback) {
-                            img.src = directFallback;
-                          } else if (img.src !== defaultAvatar) {
-                            img.src = defaultAvatar;
-                          }
-                        }}
-                      />
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center border border-slate-950" title="KTA Terverifikasi">
-                        <CheckCircle2 className="w-2.5 h-2.5" />
-                      </div>
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className={`font-bold text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {member.fullName}
-                        </h4>
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${
-                          member.krida === 'Krida Pemandu'
-                            ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
-                            : member.krida === 'Krida Penyuluh'
-                            ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60'
-                            : member.krida === 'Krida Mice & Event'
-                            ? 'bg-purple-950/80 text-purple-300 border border-purple-800/60'
-                            : 'bg-rose-950/80 text-rose-300 border border-rose-800/60'
-                        }`}>
-                          {member.krida || 'Pariwisata'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5 flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
-                          <span>{member.regencyName}, {member.provinceName}</span>
-                        </span>
-                        <span className="text-slate-600">•</span>
-                        <span className="font-mono text-[11px] text-slate-300">
-                          NTA: {member.nationalMemberNumber || 'Aktif'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Center: Top Skills pills */}
-                  <div className="hidden lg:flex items-center gap-1.5 flex-wrap max-w-sm">
-                    {topSkills.map((sk) => (
-                      <span
-                        key={sk.id}
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
-                          isDark 
-                            ? 'bg-slate-900 border-slate-800 text-slate-300' 
-                            : 'bg-slate-100 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {sk.skillName}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => onOpenVerifyModal(member)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
-                        isDark 
-                          ? 'border-slate-800 text-slate-300 hover:bg-slate-900' 
-                          : 'border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-                      <span>KTA</span>
-                    </button>
-
-                    <a
-                      href={waLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5 fill-white" />
-                      <span>Chat WA</span>
-                      <ExternalLink className="w-3 h-3 opacity-80" />
-                    </a>
-                  </div>
+                <div className={`self-start sm:self-auto px-3 py-2 rounded-xl border text-xs font-bold ${isDark ? 'bg-slate-900 border-slate-800 text-emerald-300' : 'bg-emerald-50 border-emerald-100 text-emerald-700'}`}>
+                  {showcaseMembers.length} anggota dengan KTA
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Pagination Controls - Simple, Clean, Non-blocking */}
-        {totalPages > 1 && (
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800/60">
-            <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-              Menampilkan <strong>{((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredMembers.length)}</strong> dari <strong>{filteredMembers.length}</strong> kader
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 transition-all ${
-                  currentPage === 1
-                    ? 'opacity-40 cursor-not-allowed border-slate-800 text-slate-500'
-                    : isDark 
-                      ? 'border-slate-700 text-slate-200 hover:bg-slate-900 cursor-pointer' 
-                      : 'border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer'
-                }`}
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Sebelumnya</span>
-              </button>
-
-              <div className={`px-3 py-1.5 rounded-xl text-xs font-bold ${isDark ? 'bg-slate-900 text-purple-300 border border-slate-800' : 'bg-slate-100 text-emerald-800 border border-slate-200'}`}>
-                Halaman {currentPage} / {totalPages}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 transition-all ${
-                  currentPage === totalPages
-                    ? 'opacity-40 cursor-not-allowed border-slate-800 text-slate-500'
-                    : isDark 
-                      ? 'border-slate-700 text-slate-200 hover:bg-slate-900 cursor-pointer' 
-                      : 'border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer'
-                }`}
-              >
-                <span>Selanjutnya</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+              {showcaseMember ? (
+                <div key={showcaseKey} className="spwnapps-member-rise">
+                  <div className={`max-w-3xl mx-auto rounded-3xl border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="relative shrink-0 mx-auto sm:mx-0">
+                      <img
+                        src={formatDriveImageUrl(showcaseMember.avatarUrl) || showcaseMember.avatarUrl}
+                        alt={showcaseMember.fullName}
+                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-2 border-purple-500/40 bg-slate-900"
+                        loading="eager"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          const fallback = getDriveDirectFallbackUrl(showcaseMember.avatarUrl);
+                          if (fallback && img.src !== fallback) img.src = fallback;
+                        }}
+                      />
+                      <span className="absolute -right-1 -bottom-1 w-7 h-7 rounded-full bg-emerald-500 border-2 border-slate-950 text-white flex items-center justify-center" title="KTA Terverifikasi">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </span>
+                    </div>
+
+                    <div className="min-w-0 flex-1 text-center sm:text-left">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <h4 className={`text-lg sm:text-xl font-extrabold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          {showcaseMember.fullName}
+                        </h4>
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                          <ShieldCheck className="w-3 h-3" /> KTA Terverifikasi
+                        </span>
+                      </div>
+                      <p className={`mt-1 text-sm font-semibold ${isDark ? 'text-purple-300' : 'text-emerald-700'}`}>
+                        {showcaseMember.currentPosition || showcaseMember.krida || 'Anggota Saka Pariwisata'}
+                      </p>
+                      <p className={`mt-1 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <MapPin className="inline w-3.5 h-3.5 mr-1 text-rose-400" />
+                        {showcaseMember.regencyName || showcaseMember.districtName || showcaseMember.provinceName || 'Indonesia'}
+                        {showcaseMember.provinceName ? ` · ${showcaseMember.provinceName}` : ''}
+                      </p>
+                      <div className="mt-3 flex flex-wrap justify-center sm:justify-start gap-1.5">
+                        {(showcaseMember.skills || []).slice(0, 3).map((skill) => (
+                          <span key={skill.id} className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border ${isDark ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
+                            {skill.skillName}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenVerifyModal(showcaseMember)}
+                      className="shrink-0 mx-auto sm:mx-0 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-all"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Lihat Profil
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className={`py-10 text-center text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Belum ada anggota aktif yang memenuhi syarat untuk ditampilkan.</div>
+              )}
+
+              {showcaseMembers.length > 1 && (
+                <div className="mt-5 flex items-center justify-center gap-1.5" aria-label="Anggota yang sedang ditampilkan">
+                  {showcaseMembers.slice(0, Math.min(showcaseMembers.length, 7)).map((member, index) => (
+                    <span key={member.id} className={`w-1.5 h-1.5 rounded-full transition-all ${index === showcaseIndex ? 'bg-purple-400 w-4' : 'bg-slate-600'}`} />
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowDirectory(true)}
+                  className={`px-4 py-2.5 rounded-xl border text-xs font-bold inline-flex items-center gap-2 cursor-pointer transition-all ${isDark ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  Jelajahi daftar anggota
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className={`text-base font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Daftar Anggota</h3>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Menampilkan hasil sesuai pencarian dan filter Anda.</p>
+              </div>
+              <button type="button" onClick={() => setShowDirectory(false)} className={`px-3 py-2 rounded-xl border text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-900' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                <ChevronLeft className="w-3.5 h-3.5" /> Kembali
+              </button>
+            </div>
+
+            {/* Member Preview Results */}
+            {filteredMembers.length === 0 ? (
+              <div className={`p-12 text-center rounded-3xl border space-y-4 ${isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200'}`}>
+                <Compass className="w-12 h-12 mx-auto text-slate-500 stroke-1" />
+                <div className="space-y-1">
+                  <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Tidak ada anggota yang cocok</h3>
+                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Coba ubah pencarian atau filter wilayah/krida.</p>
+                </div>
+                <button type="button" onClick={() => { handleProvinceSelect('ALL'); setSelectedKrida('ALL'); setSearchQuery(''); setCurrentPage(1); }} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5">Reset Semua Filter</button>
+              </div>
+            ) : viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedMembers.map((member) => {
+                  const defaultAvatar = member.gender === 'PEREMPUAN' ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80';
+                  const avatar = formatDriveImageUrl(member.avatarUrl) || member.avatarUrl || defaultAvatar;
+                  const topSkills = (member.skills || []).slice(0, 3);
+                  const topCert = member.certifications?.[0];
+                  const waLink = getWhatsAppLink(member);
+                  return (
+                    <div key={member.id} className={`rounded-3xl border transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1 shadow-xl ${isDark ? 'bg-slate-950/90 border-slate-800 hover:border-purple-500/60 hover:shadow-purple-950/30' : 'bg-white border-slate-200 hover:border-emerald-500/60 hover:shadow-emerald-950/15'}`}>
+                      <div className="p-5 sm:p-6 space-y-4">
+                        <div className="flex items-start gap-4">
+                          <div className="relative shrink-0"><img src={avatar} alt={member.fullName} loading="lazy" referrerPolicy="no-referrer" className="w-16 h-16 rounded-2xl object-cover border border-purple-500/40 bg-slate-900" onError={(e) => { const img=e.currentTarget; const directFallback=getDriveDirectFallbackUrl(member.avatarUrl); if(directFallback && img.src!==directFallback) img.src=directFallback; }} /><div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md border-2 border-slate-950"><CheckCircle2 className="w-3.5 h-3.5" /></div></div>
+                          <div className="flex-1 min-w-0"><span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-950/80 text-purple-300 border border-purple-800/60">{member.krida || 'Kader Pariwisata'}</span><h3 className={`mt-1 font-bold text-base font-heading truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{member.fullName}</h3><div className="mt-1 flex items-center gap-1 text-xs text-slate-400"><MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" /><span className="truncate">{member.districtName ? `${member.districtName}, ` : ''}{member.regencyName} • {member.provinceName}</span></div></div>
+                        </div>
+                        <p className={`text-xs line-clamp-2 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{member.bio || member.occupation || 'Kader aktif Saka Pariwisata.'}</p>
+                        <div className="flex flex-wrap gap-1.5">{topSkills.map((sk)=><span key={sk.id} className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${isDark ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>{sk.skillName}</span>)}{topCert && <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-amber-950/60 border border-amber-800/60 text-amber-300">{topCert.name}</span>}</div>
+                      </div>
+                      <div className={`p-4 rounded-b-3xl border-t flex items-center justify-between gap-2 ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}><button type="button" onClick={()=>onOpenVerifyModal(member)} className={`px-3 py-2 rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 ${isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'}`}><ShieldCheck className="w-3.5 h-3.5 text-purple-400" />Detail KTA</button><a href={waLink} target="_blank" rel="noopener noreferrer" className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"><MessageCircle className="w-3.5 h-3.5 fill-white" />Chat WA<ExternalLink className="w-3 h-3 opacity-80" /></a></div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {paginatedMembers.map((member) => {
+                  const defaultAvatar = member.gender === 'PEREMPUAN' ? 'https://images.unsplash.com/photo-1544005313-94ddf0288f2d?w=300&auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80';
+                  const avatar = formatDriveImageUrl(member.avatarUrl) || member.avatarUrl || defaultAvatar;
+                  const waLink = getWhatsAppLink(member);
+                  return <div key={member.id} className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${isDark ? 'bg-slate-950/90 border-slate-800' : 'bg-white border-slate-200'}`}><div className="flex items-center gap-3.5 min-w-0"><img src={avatar} alt={member.fullName} loading="lazy" referrerPolicy="no-referrer" className="w-12 h-12 rounded-xl object-cover border border-purple-500/40" /><div className="min-w-0"><h3 className={`font-bold text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{member.fullName}</h3><p className="text-xs text-slate-400 truncate">{member.currentPosition || member.krida} · {member.regencyName || member.provinceName}</p></div></div><div className="flex items-center gap-2"><button type="button" onClick={()=>onOpenVerifyModal(member)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 cursor-pointer ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-900' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><ShieldCheck className="w-3.5 h-3.5 text-purple-400" />KTA</button>{member.phone && <a href={`tel:${member.phone}`} className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-white border border-slate-200 text-slate-700'}`}><Phone className="w-3.5 h-3.5" /></a>}<a href={waLink} target="_blank" rel="noopener noreferrer" className="px-3.5 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5 fill-white" />Chat WA</a></div></div>
+                })}
+              </div>
+            )}
+
+            {totalPages > 1 && (
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800/60">
+                <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Menampilkan <strong>{((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredMembers.length)}</strong> dari <strong>{filteredMembers.length}</strong> kader</div>
+                <div className="flex items-center gap-2"><button type="button" onClick={()=>setCurrentPage(p=>Math.max(1,p-1))} disabled={currentPage===1} className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 ${currentPage===1?'opacity-40 cursor-not-allowed border-slate-800 text-slate-500':isDark?'border-slate-700 text-slate-200 hover:bg-slate-900 cursor-pointer':'border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer'}`}><ChevronLeft className="w-3.5 h-3.5" />Sebelumnya</button><div className={`px-3 py-1.5 rounded-xl text-xs font-bold ${isDark?'bg-slate-900 text-purple-300 border border-slate-800':'bg-slate-100 text-emerald-800 border border-slate-200'}`}>Halaman {currentPage} / {totalPages}</div><button type="button" onClick={()=>setCurrentPage(p=>Math.min(totalPages,p+1))} disabled={currentPage===totalPages} className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 ${currentPage===totalPages?'opacity-40 cursor-not-allowed border-slate-800 text-slate-500':isDark?'border-slate-700 text-slate-200 hover:bg-slate-900 cursor-pointer':'border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer'}`}>Selanjutnya<ChevronRight className="w-3.5 h-3.5" /></button></div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>
