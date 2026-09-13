@@ -51,6 +51,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [selectedProvinceId, setSelectedProvinceId] = useState('00');
   const [selectedRegencyId, setSelectedRegencyId] = useState('00.00');
   const [selectedDistrictId, setSelectedDistrictId] = useState('00.00.00');
+  const [isTerritoryPickerOpen, setIsTerritoryPickerOpen] = useState(false);
   
   const [krida, setKrida] = useState<KridaType>('Krida Pemandu');
   const [joinYear, setJoinYear] = useState(2024);
@@ -647,76 +648,135 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Struktur Wilayah Organisasi */}
+          {/* Section 2: Wilayah — compact picker */}
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between pb-1 border-b border-slate-200">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
                 <MapPin className="w-4 h-4 text-emerald-600" />
-                <span>2. Wilayah Kwartir & Ranting</span>
+                <span>2. Wilayah</span>
               </div>
               {isRegencyOperator && (
                 <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-300">
                   <Lock className="w-3 h-3 text-amber-700" />
-                  Kwartir Cabang Terkunci
+                  Wilayah terkunci
                 </span>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Provinsi (Kwarda) {isRegencyOperator && <span className="text-amber-700 text-[10px]">(Terkunci)</span>} *
-                </label>
-                <select
-                  disabled={isRegencyOperator || isProvinceAdmin || isBranchAdmin}
-                  value={selectedProvinceId}
-                  onChange={(e) => setSelectedProvinceId(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-xl outline-none text-slate-800 ${
-                    isRegencyOperator || isProvinceAdmin || isBranchAdmin
-                      ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
-                      : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
-                  }`}
-                >
-                  {provinces.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} (Kode {p.code})</option>
-                  ))}
-                </select>
-              </div>
+            {(() => {
+              const currentProvince = provinces.find(p => p.id === selectedProvinceId);
+              const currentRegency = regencies.find(r => r.id === selectedRegencyId);
+              const currentDistrict = districts.find(d => d.id === selectedDistrictId);
+              const territorySummary = [
+                currentProvince?.name,
+                currentRegency?.name,
+                currentDistrict?.name
+              ].filter(Boolean).join(' · ');
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Kabupaten/Kota (Kwarcab) {isRegencyOperator && <span className="text-amber-700 text-[10px] font-bold">(Khusus Wilayah Anda)</span>} *
-                </label>
-                <select
-                  disabled={isRegencyOperator || isBranchAdmin}
-                  value={selectedRegencyId}
-                  onChange={(e) => setSelectedRegencyId(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-xl outline-none font-semibold ${
-                    isRegencyOperator || isBranchAdmin
-                      ? 'bg-amber-50/80 border-amber-300 text-amber-950 cursor-not-allowed'
-                      : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800'
-                  }`}
-                >
-                  {regencies.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name} (Kode {r.code})</option>
-                  ))}
-                </select>
-              </div>
+              const territoryLocked = isRegencyOperator || isProvinceAdmin || isBranchAdmin;
+              const regencyLocked = isRegencyOperator || isBranchAdmin;
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Kecamatan *</label>
-                <select
-                  value={selectedDistrictId}
-                  onChange={(e) => setSelectedDistrictId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800"
-                >
-                  {districts.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name} (Kode {d.code})</option>
-                  ))}
-                </select>
-              </div>
+              return (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => !territoryLocked && setIsTerritoryPickerOpen(v => !v)}
+                    className={`w-full text-left rounded-2xl border px-4 py-3 transition-all flex items-center gap-3 ${
+                      territoryLocked
+                        ? 'bg-slate-100 border-slate-200 cursor-default'
+                        : isTerritoryPickerOpen
+                          ? 'bg-purple-50 border-purple-300 shadow-sm'
+                          : 'bg-white border-slate-200 hover:border-purple-300 hover:bg-purple-50/40 cursor-pointer'
+                    }`}
+                  >
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      territoryLocked ? 'bg-slate-200 text-slate-500' : 'bg-purple-100 text-purple-700'
+                    }`}>
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Wilayah terpilih</div>
+                      <div className="text-sm font-bold text-slate-800 truncate">
+                        {territorySummary || 'Pilih wilayah'}
+                      </div>
+                    </div>
+                    {!territoryLocked && (
+                      <span className="text-xs font-bold text-purple-700 flex-shrink-0">
+                        {isTerritoryPickerOpen ? 'Tutup' : 'Ubah'}
+                      </span>
+                    )}
+                    {territoryLocked && <Lock className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                  </button>
 
-            </div>
+                  {!territoryLocked && isTerritoryPickerOpen && (
+                    <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">Provinsi</label>
+                          <select
+                            value={selectedProvinceId}
+                            onChange={(e) => setSelectedProvinceId(e.target.value)}
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none text-xs text-slate-800 focus:ring-2 focus:ring-purple-500/15 focus:border-purple-400"
+                          >
+                            {provinces.map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">Kabupaten / Kota</label>
+                          <select
+                            disabled={regencyLocked}
+                            value={selectedRegencyId}
+                            onChange={(e) => setSelectedRegencyId(e.target.value)}
+                            className={`w-full px-3 py-2.5 border rounded-xl outline-none text-xs ${
+                              regencyLocked
+                                ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                                : 'bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-purple-500/15 focus:border-purple-400'
+                            }`}
+                          >
+                            {regencies.map((r) => (
+                              <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">Kecamatan</label>
+                          <select
+                            value={selectedDistrictId}
+                            onChange={(e) => setSelectedDistrictId(e.target.value)}
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none text-xs text-slate-800 focus:ring-2 focus:ring-purple-500/15 focus:border-purple-400"
+                          >
+                            {districts.map((d) => (
+                              <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <p className="text-[10px] text-slate-400">Pilih dari atas ke bawah agar pilihan wilayah mengikuti struktur Kwartir.</p>
+                        <button
+                          type="button"
+                          onClick={() => setIsTerritoryPickerOpen(false)}
+                          className="px-3 py-1.5 rounded-lg bg-purple-700 text-white text-[10px] font-bold hover:bg-purple-800 transition-colors flex-shrink-0"
+                        >
+                          Selesai
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {territoryLocked && (
+                    <p className="text-[10px] text-slate-400 px-1">
+                      Wilayah ditentukan otomatis sesuai hak akses akun Anda.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Section 3: Kepramukaan & Krida */}
