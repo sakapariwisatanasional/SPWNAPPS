@@ -2454,8 +2454,6 @@ function contentBelongsToAdminJurisdiction(content: any, session: any): boolean 
 }
 
 // Content moderation helpers
-const CONTENT_ADMIN_ROLES_UNUSED = CONTENT_ADMIN_ROLES;
- = ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
 const isContentAdmin = (session: any) => !!session && CONTENT_ADMIN_ROLES.includes(session.role);
 const isContentReviewer = (session: any) => !!session && (session.role === 'SUPER_ADMIN' || isContentAdmin(session));
 
