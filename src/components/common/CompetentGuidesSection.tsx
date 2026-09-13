@@ -515,7 +515,7 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
                     Terhubung dari berbagai wilayah Indonesia.
                   </h3>
                   <p className={`mt-1 text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Beberapa anggota ditampilkan bergantian sebagai gambaran nyata komunitas Saka Pariwisata.
+                    Satu keluarga. Satu semangat. Satu gerakan.
                   </p>
                 </div>
                 <div className={`self-start sm:self-auto px-3 py-2 rounded-xl border text-xs font-bold ${isDark ? 'bg-slate-900 border-slate-800 text-emerald-300' : 'bg-emerald-50 border-emerald-100 text-emerald-700'}`}>
