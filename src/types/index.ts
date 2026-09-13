@@ -242,6 +242,8 @@ export interface Activity {
   provinceName: string;
   regencyId?: string;
   regencyName: string;
+  districtId?: string;
+  districtName?: string;
   scope?: string;
   
   startDate: string;
@@ -259,9 +261,19 @@ export interface Activity {
   contactEmail?: string;
   feeType?: 'GRATIS' | 'BERBAYAR' | 'SUBSIDI';
   feeAmount?: number;
-  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'ADMIN_BRANCH' | 'OPERATOR';
+  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'ADMIN_BRANCH' | 'OPERATOR' | 'MEMBER';
   uploadedByName?: string;
+  uploadedByMemberId?: string;
   uploadedAt?: string;
+  // Moderasi konten: terpisah dari status pelaksanaan event.
+  contentStatus?: 'SUBMITTED' | 'APPROVED_PUBLISHED' | 'REJECTED';
+  adminApprovalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminApprovedAt?: string;
+  adminApprovedBy?: string;
+  superAdminApprovalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  superAdminApprovedAt?: string;
+  superAdminApprovedBy?: string;
+  rejectionReason?: string;
   registrationLink?: string;
   featured?: boolean;
 }
