@@ -56,3 +56,156 @@
   background: rgba(124,58,237,.16);
   border-color: rgba(167,139,250,.28);
 }
+
+/* =========================================================
+   SPWNAPPS UI SYSTEM v2
+   Presentation-only layer: preserves existing routes, state,
+   services and business logic while unifying the visual language.
+   ========================================================= */
+:root {
+  --spwn-primary: #7c3aed;
+  --spwn-primary-strong: #6d28d9;
+  --spwn-primary-soft: #f5f3ff;
+  --spwn-ink: #0f172a;
+  --spwn-muted: #64748b;
+  --spwn-border: #e2e8f0;
+  --spwn-surface: #ffffff;
+  --spwn-bg: #f8fafc;
+  --spwn-success: #059669;
+  --spwn-warning: #d97706;
+  --spwn-danger: #dc2626;
+  --spwn-radius-card: 1rem;
+  --spwn-radius-control: .75rem;
+}
+
+html { background: var(--spwn-bg); }
+body {
+  background: var(--spwn-bg);
+  color: var(--spwn-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button, input, select, textarea { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(124,58,237,.24);
+  outline-offset: 2px;
+}
+
+/* App chrome */
+.app-shell { background: #f8fafc !important; }
+.app-sidebar {
+  background: #0b0a12 !important;
+  border-right-color: #211d2d !important;
+  box-shadow: 12px 0 40px rgba(15, 23, 42, .08) !important;
+}
+.app-sidebar nav button {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.app-sidebar nav button:hover {
+  background: rgba(124,58,237,.10) !important;
+  color: #ede9fe !important;
+}
+.app-sidebar nav button[class*="bg-purple-600/20"] {
+  background: rgba(124,58,237,.16) !important;
+  color: #ddd6fe !important;
+  border-left: 3px solid #8b5cf6 !important;
+  border-radius: .75rem !important;
+}
+.app-sidebar nav button[class*="bg-emerald-600/15"] {
+  background: rgba(124,58,237,.16) !important;
+  color: #ddd6fe !important;
+  border-left: 3px solid #8b5cf6 !important;
+}
+.app-header {
+  background: rgba(255,255,255,.94) !important;
+  border-bottom-color: #e2e8f0 !important;
+  box-shadow: 0 1px 12px rgba(15,23,42,.04) !important;
+  backdrop-filter: blur(16px);
+}
+.app-main { background: #f8fafc; }
+
+/* Consistent surfaces across admin pages */
+.app-main .bg-white {
+  box-shadow: 0 1px 2px rgba(15,23,42,.025), 0 8px 24px rgba(15,23,42,.035);
+}
+.app-main .rounded-3xl,
+.app-main .rounded-2xl {
+  border-color: #e2e8f0;
+}
+.app-main table thead {
+  background: #f8fafc;
+}
+.app-main table th {
+  color: #64748b;
+  font-size: .69rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.app-main input:not([type="checkbox"]):not([type="radio"]),
+.app-main select,
+.app-main textarea {
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.app-main input:not([type="checkbox"]):not([type="radio"]):focus,
+.app-main select:focus,
+.app-main textarea:focus {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139,92,246,.12) !important;
+  background: #fff !important;
+}
+
+/* Make primary actions consistently purple while preserving status colors. */
+.app-main button[class*="bg-purple-600"],
+.app-main button[class*="bg-purple-700"],
+.app-main button[class*="from-purple-700"] {
+  box-shadow: 0 6px 16px rgba(109,40,217,.12);
+}
+
+/* Page headings */
+.app-main h1, .app-main h2, .app-main h3 {
+  letter-spacing: -.015em;
+}
+
+/* Better mobile page rhythm */
+@media (max-width: 1023px) {
+  .app-main { padding-bottom: 5.5rem !important; }
+}
+@media (max-width: 640px) {
+  .app-main { padding-left: .875rem !important; padding-right: .875rem !important; }
+  .app-main .rounded-3xl { border-radius: 1.25rem !important; }
+  .app-main .rounded-2xl { border-radius: 1rem !important; }
+}
+
+/* Mobile bottom navigation: one brand color, stronger active state. */
+.app-mobile-nav {
+  box-shadow: 0 -8px 28px rgba(15,23,42,.08) !important;
+  border-top-color: #e2e8f0 !important;
+}
+.app-mobile-nav button[class*="text-purple-700"] {
+  background: #f5f3ff !important;
+  border-radius: .875rem !important;
+}
+
+/* Shared micro-interaction */
+.app-main button, .app-main a {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 160ms;
+}
+.app-main button:active { transform: translateY(0); }
+
+/* Scrollbar */
+.custom-scrollbar { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.custom-scrollbar::-webkit-scrollbar { width: 7px; height: 7px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}
