@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   X,
+  Eye,
   Save,
   RotateCcw,
   Upload,
@@ -10,7 +11,6 @@ import {
   LayoutTemplate,
   Type,
   Image as ImageIcon,
-  Eye,
   MapPin,
   RefreshCw,
 } from 'lucide-react';
@@ -40,10 +40,6 @@ interface Props {
   onSuccess?: () => void;
 }
 
-/* =========================================================
-   FIELD OPTIONS
-========================================================= */
-
 const FIELD_OPTIONS: Array<{
   value: KtaMemberFieldKey;
   label: string;
@@ -64,10 +60,6 @@ const FIELD_OPTIONS: Array<{
   { value: 'status', label: 'Status' },
 ];
 
-/* =========================================================
-   CARD PRESETS
-========================================================= */
-
 const PRESETS: Record<
   KtaCardPreset,
   {
@@ -83,21 +75,18 @@ const PRESETS: Record<
     height: 53.98,
     radius: 3.18,
   },
-
   KTP: {
     label: 'KTP / ID-1',
     width: 85.6,
     height: 53.98,
     radius: 3.18,
   },
-
   SIM: {
     label: 'SIM',
     width: 85.6,
     height: 53.98,
     radius: 3.18,
   },
-
   CUSTOM: {
     label: 'Ukuran Custom',
     width: 85.6,
@@ -106,72 +95,198 @@ const PRESETS: Record<
   },
 };
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
 const clone = <T,>(value: T): T => {
   return JSON.parse(JSON.stringify(value));
 };
 
+/**
+ * Normalisasi pengaturan KTA.
+ *
+ * Selain memastikan collection aman, fungsi ini melakukan migrasi
+ * layout belakang versi lama:
+ *
+ * Versi lama:
+ * - QR       Y = 62
+ * - tanggal  Y = 70
+ * - signer   Y = 76
+ *
+ * Versi baru:
+ * - tanggal  Y = 58
+ * - QR       Y = 68
+ * - signer   Y = 86
+ *
+ * Migrasi hanya dilakukan jika ketiga nilai masih merupakan
+ * kombinasi default lama. Jika SuperAdmin sudah mengatur sendiri,
+ * nilai tersebut tidak disentuh.
+ */
 const normalizeKtaSettings = (
-  value?: Partial<KtaCardSettings> | null,
+  value: KtaCardSettings
 ): KtaCardSettings => {
-  const base = clone(DEFAULT_KTA_SETTINGS);
+  const source: any = value || {};
 
-  const merged = {
-    ...base,
-    ...(value && typeof value === 'object' ? value : {}),
-  } as KtaCardSettings;
+  const merged: any = {
+    ...clone(DEFAULT_KTA_SETTINGS),
+    ...source,
 
-  return {
-    ...merged,
-
-    dataFields: Array.isArray(merged.dataFields)
-      ? merged.dataFields
+    dataFields: Array.isArray(source.dataFields)
+      ? source.dataFields
       : [],
 
-    textElements: Array.isArray(merged.textElements)
-      ? merged.textElements
+    textElements: Array.isArray(source.textElements)
+      ? source.textElements
       : [],
 
-    logos: Array.isArray(merged.logos)
-      ? merged.logos
+    logos: Array.isArray(source.logos)
+      ? source.logos
       : [],
 
-    terms: Array.isArray(merged.terms)
-      ? merged.terms
+    terms: Array.isArray(source.terms)
+      ? source.terms
       : [],
   };
-};
 
-/* =========================================================
-   COMPONENT
-========================================================= */
+  /**
+   * Migrasi layout belakang lama.
+   *
+   * Hanya migrasikan kombinasi nilai yang memang berasal dari
+   * layout lama agar posisi manual milik SuperAdmin tidak hilang.
+   */
+  const oldQrY = Number(source.signerQrY);
+  const oldDateY = Number(source.issueLocationDateY);
+  const oldSignerY = Number(source.signerY);
+
+  const isLegacyBackLayout =
+    oldQrY === 62 &&
+    oldDateY === 70 &&
+    oldSignerY === 76;
+
+  if (isLegacyBackLayout) {
+    merged.issueLocationDateY = 58;
+    merged.signerQrY = 68;
+    merged.signerY = 86;
+  }
+
+  /**
+   * Jika pengaturan lama tidak memiliki signerY,
+   * gunakan posisi baru.
+   */
+  if (
+    merged.signerY === undefined ||
+    merged.signerY === null
+  ) {
+    merged.signerY = 86;
+  }
+
+  /**
+   * Default posisi baru tanggal.
+   */
+  if (
+    merged.issueLocationDateY === undefined ||
+    merged.issueLocationDateY === null
+  ) {
+    merged.issueLocationDateY = 58;
+  }
+
+  /**
+   * Default posisi baru QR penandatangan.
+   */
+  if (
+    merged.signerQrY === undefined ||
+    merged.signerQrY === null
+  ) {
+    merged.signerQrY = 68;
+  }
+
+  /**
+   * Default horizontal.
+   */
+  if (
+    merged.issueLocationDateX === undefined ||
+    merged.issueLocationDateX === null
+  ) {
+    merged.issueLocationDateX = 5;
+  }
+
+  if (
+    merged.signerQrX === undefined ||
+    merged.signerQrX === null
+  ) {
+    merged.signerQrX = 68;
+  }
+
+  if (
+    merged.signerQrSize === undefined ||
+    merged.signerQrSize === null
+  ) {
+    merged.signerQrSize = 18;
+  }
+
+  if (
+    merged.signerQrPadding === undefined ||
+    merged.signerQrPadding === null
+  ) {
+    merged.signerQrPadding = 2;
+  }
+
+  if (
+    merged.signerNameXOffset === undefined ||
+    merged.signerNameXOffset === null
+  ) {
+    merged.signerNameXOffset = 0;
+  }
+
+  if (
+    merged.signerNameYOffset === undefined ||
+    merged.signerNameYOffset === null
+  ) {
+    merged.signerNameYOffset = 0;
+  }
+
+  /**
+   * Pengaturan lama Tanda Tangan Terverifikasi
+   * tidak lagi digunakan oleh designer.
+   *
+   * Nilainya dipaksa false supaya renderer yang masih
+   * memiliki kompatibilitas lama tidak menampilkan badge tersebut.
+   */
+  merged.showSignerVerified = false;
+
+  return merged as KtaCardSettings;
+};
 
 export const KtaCardCustomizerModal: React.FC<Props> = ({
   isOpen,
   onClose,
   onSuccess,
 }) => {
-  const [settings, setSettings] = useState<KtaCardSettings>(() =>
-    normalizeKtaSettings(DEFAULT_KTA_SETTINGS),
-  );
+  const [settings, setSettings] =
+    useState<KtaCardSettings>(() =>
+      normalizeKtaSettings(DEFAULT_KTA_SETTINGS)
+    );
 
-  const [side, setSide] = useState<KtaCardSide>('FRONT');
+  const [side, setSide] =
+    useState<KtaCardSide>('FRONT');
 
-  const [isSaving, setIsSaving] = useState(false);
-  const [loadingRemote, setLoadingRemote] = useState(false);
-  const [message, setMessage] = useState('');
+  const [isSaving, setIsSaving] =
+    useState(false);
 
-  const [regionProvinceId, setRegionProvinceId] = useState('');
-  const [regionRegencyId, setRegionRegencyId] = useState('');
-  const [regionDistrictId, setRegionDistrictId] = useState('');
-  const [regionBusy, setRegionBusy] = useState(false);
+  const [loadingRemote, setLoadingRemote] =
+    useState(false);
 
-  /* =======================================================
-     DATA
-  ======================================================= */
+  const [message, setMessage] =
+    useState('');
+
+  const [regionProvinceId, setRegionProvinceId] =
+    useState('');
+
+  const [regionRegencyId, setRegionRegencyId] =
+    useState('');
+
+  const [regionDistrictId, setRegionDistrictId] =
+    useState('');
+
+  const [regionBusy, setRegionBusy] =
+    useState(false);
 
   const provinces = storage.getProvinces();
 
@@ -185,26 +300,20 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
   const members = storage.getMembers();
 
-  const safeMembers = Array.isArray(members)
-    ? members
-    : [];
-
-  const activeMembers = safeMembers.filter(
-    member =>
-      String(member.status || '').toUpperCase() === 'ACTIVE',
+  const activeMembers = members.filter(
+    (member) =>
+      String(member.status || '').toUpperCase() ===
+      'ACTIVE'
   );
 
   const signerMember = activeMembers.find(
-    member =>
-      member.id === (settings as any).signerMemberId,
+    (member) =>
+      member.id ===
+      (settings as any).signerMemberId
   );
 
-  /* =======================================================
-     PREVIEW MEMBER
-  ======================================================= */
-
   const previewMember: Member =
-    safeMembers[0] ||
+    members[0] ||
     ({
       id: 'SPW-000001',
       userId: 'user-01',
@@ -213,325 +322,237 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
       nikMasked: '',
       avatarUrl:
         'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300',
-
       gender: 'LAKI_LAKI',
       birthPlace: 'Jakarta',
       birthDate: '2000-08-14',
-
       phone: '081234567890',
       email: 'admin@sakapariwisata.id',
-
       address: '',
-
       provinceId: '00',
       provinceName: 'Kwartir Nasional',
-
       regencyId: '00.00',
       regencyName: 'Kwartir Nasional (Pusat)',
-
       districtId: '00.00.00',
       districtName: 'Nasional',
-
       branchId: 'branch-nasional',
       branchName: 'PANDU NUSANTARA',
-
       gugusDepan: 'PANDU NUSANTARA',
-
       joinYear: 2024,
-
       currentPosition: 'Andalan Nasional',
-
       krida: 'Krida Mice & Event',
-
       status: 'ACTIVE',
-
       educationLevel: 'S1',
       occupation: 'Pimpinan Saka',
-
       bio: '',
       skills: [],
       certifications: [],
       locationHistory: [],
-
       registeredAt: new Date().toISOString(),
-
       verificationToken: 'preview',
     } as Member);
-
-  /* =======================================================
-     LOAD SETTINGS
-  ======================================================= */
 
   useEffect(() => {
     if (!isOpen) return;
 
-    let mounted = true;
+    setSettings(
+      normalizeKtaSettings(
+        storage.getKtaSettings()
+      )
+    );
 
     setMessage('');
+    setLoadingRemote(true);
 
-    const loadSettings = async () => {
-      setLoadingRemote(true);
-
-      try {
-        const localSettings = storage.getKtaSettings();
-
-        if (mounted) {
+    spreadsheetService
+      .refreshKtaSettings()
+      .then((remote) => {
+        if (remote) {
           setSettings(
-            normalizeKtaSettings(localSettings),
+            normalizeKtaSettings(remote)
           );
         }
-
-        const remote =
-          await spreadsheetService.refreshKtaSettings();
-
-        if (mounted && remote) {
-          setSettings(
-            normalizeKtaSettings(remote),
-          );
-        }
-      } catch (error) {
-        console.warn(
-          '[KTA Customizer] Gagal memuat konfigurasi:',
-          error,
-        );
-      } finally {
-        if (mounted) {
-          setLoadingRemote(false);
-        }
-      }
-    };
-
-    void loadSettings();
-
-    return () => {
-      mounted = false;
-    };
+      })
+      .finally(() => {
+        setLoadingRemote(false);
+      });
   }, [isOpen]);
 
-  /* =======================================================
-     SAFE COLLECTIONS
-  ======================================================= */
-
-  const safeDataFields = Array.isArray(settings?.dataFields)
+  const safeDataFields = Array.isArray(
+    settings?.dataFields
+  )
     ? settings.dataFields
     : [];
 
-  const safeTextElements = Array.isArray(settings?.textElements)
+  const safeTextElements = Array.isArray(
+    settings?.textElements
+  )
     ? settings.textElements
     : [];
 
-  const safeLogos = Array.isArray(settings?.logos)
+  const safeLogos = Array.isArray(
+    settings?.logos
+  )
     ? settings.logos
     : [];
-
-  /* =======================================================
-     CURRENT SIDE
-  ======================================================= */
 
   const sideFields = useMemo(
     () =>
       safeDataFields.filter(
-        field => field.side === side,
+        (field) => field.side === side
       ),
-    [safeDataFields, side],
+    [safeDataFields, side]
   );
 
   const sideTexts = useMemo(
     () =>
       safeTextElements.filter(
-        text => text.side === side,
+        (text) => text.side === side
       ),
-    [safeTextElements, side],
+    [safeTextElements, side]
   );
 
   const sideLogos = useMemo(
     () =>
       safeLogos.filter(
-        logo => logo.side === side,
+        (logo) => logo.side === side
       ),
-    [safeLogos, side],
+    [safeLogos, side]
   );
 
-  /* =======================================================
-     DO NOT RENDER WHEN CLOSED
-  ======================================================= */
-
-  if (!isOpen) {
-    return null;
-  }
-
-  /* =======================================================
-     UPDATE HELPERS
-  ======================================================= */
+  if (!isOpen) return null;
 
   const updateField = (
     id: string,
-    patch: Partial<KtaDataFieldConfig>,
+    patch: Partial<KtaDataFieldConfig>
   ) => {
-    setSettings(current => ({
+    setSettings((current) => ({
       ...current,
-
       dataFields: current.dataFields.map(
-        field =>
+        (field) =>
           field.id === id
             ? {
                 ...field,
                 ...patch,
               }
-            : field,
+            : field
       ),
     }));
   };
 
   const updateText = (
     id: string,
-    patch: Partial<KtaTextElement>,
+    patch: Partial<KtaTextElement>
   ) => {
-    setSettings(current => ({
+    setSettings((current) => ({
       ...current,
-
       textElements: current.textElements.map(
-        text =>
+        (text) =>
           text.id === id
             ? {
                 ...text,
                 ...patch,
               }
-            : text,
+            : text
       ),
     }));
   };
 
   const updateLogo = (
     id: string,
-    patch: Partial<KtaLogoElement>,
+    patch: Partial<KtaLogoElement>
   ) => {
-    setSettings(current => ({
+    setSettings((current) => ({
       ...current,
-
       logos: current.logos.map(
-        logo =>
+        (logo) =>
           logo.id === id
             ? {
                 ...logo,
                 ...patch,
               }
-            : logo,
+            : logo
       ),
     }));
   };
 
-  /* =======================================================
-     ADD FIELD
-  ======================================================= */
-
   const addField = () => {
-    const currentSideCount =
-      settings.dataFields.filter(
-        field => field.side === side,
-      ).length;
+    setSettings((current) => {
+      const position =
+        current.dataFields.filter(
+          (field) => field.side === side
+        ).length;
 
-    const newField: KtaDataFieldConfig = {
-      id: `field-${Date.now()}`,
-      field: 'fullName',
-      label: 'NAMA',
-      side,
-      visible: true,
+      const newField: KtaDataFieldConfig = {
+        id: `field-${Date.now()}`,
+        field: 'fullName',
+        label: 'NAMA',
+        side,
+        visible: true,
+        x: 35,
+        y: 50 + position * 8,
+        width: 50,
+        fontSize: 11,
+        fontWeight: 'bold',
+        color: '#ffffff',
+        textTransform: 'none',
+        align: 'left',
+      };
 
-      x: 35,
-      y: 50 + currentSideCount * 8,
-
-      width: 50,
-
-      fontSize: 11,
-      fontWeight: 'bold',
-
-      color: '#ffffff',
-
-      textTransform: 'none',
-      align: 'left',
-    };
-
-    setSettings(current => ({
-      ...current,
-      dataFields: [
-        ...current.dataFields,
-        newField,
-      ],
-    }));
+      return {
+        ...current,
+        dataFields: [
+          ...current.dataFields,
+          newField,
+        ],
+      };
+    });
   };
-
-  /* =======================================================
-     ADD TEXT
-  ======================================================= */
 
   const addText = () => {
-    const newText: KtaTextElement = {
-      id: `text-${Date.now()}`,
-      text: 'TEKS KUSTOM',
-      side,
-
-      x: 5,
-      y: 88,
-
-      width: 90,
-
-      fontSize: 8,
-      fontWeight: 'bold',
-
-      color: '#ffffff',
-
-      align: 'left',
-      textTransform: 'none',
-    };
-
-    setSettings(current => ({
+    setSettings((current) => ({
       ...current,
-
       textElements: [
         ...current.textElements,
-        newText,
+        {
+          id: `text-${Date.now()}`,
+          text: 'TEKS KUSTOM',
+          side,
+          x: 5,
+          y: 88,
+          width: 90,
+          fontSize: 8,
+          fontWeight: 'bold',
+          color: '#ffffff',
+          align: 'left',
+          textTransform: 'none',
+        },
       ],
     }));
   };
-
-  /* =======================================================
-     ADD LOGO
-  ======================================================= */
 
   const addLogo = () => {
-    const newLogo: KtaLogoElement = {
-      id: `logo-${Date.now()}`,
-      name: 'Logo Baru',
-      url: '',
-      side,
-
-      x: 70,
-      y: 6,
-
-      width: 22,
-      height: 22,
-
-      opacity: 1,
-      objectFit: 'contain',
-    };
-
-    setSettings(current => ({
+    setSettings((current) => ({
       ...current,
-
       logos: [
         ...current.logos,
-        newLogo,
+        {
+          id: `logo-${Date.now()}`,
+          name: 'Logo Baru',
+          url: '',
+          side,
+          x: 70,
+          y: 6,
+          width: 22,
+          height: 22,
+          opacity: 1,
+          objectFit: 'contain',
+        },
       ],
     }));
   };
 
-  /* =======================================================
-     FILE → DATA URL
-  ======================================================= */
-
   const fileToDataUrl = (
-    file: File,
+    file: File
   ): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -544,16 +565,12 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
       reader.readAsDataURL(file);
     });
 
-  /* =======================================================
-     UPLOAD ASSET
-  ======================================================= */
-
   const uploadAsset = async (
     file: File,
-    kind: 'logo' | 'background',
+    kind: 'logo' | 'background'
   ) => {
     setMessage(
-      'Mengunggah aset ke Google Drive...',
+      'Mengunggah aset ke Google Drive...'
     );
 
     try {
@@ -564,9 +581,9 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
           data,
           `KTA_${kind}_${Date.now()}_${file.name.replace(
             /[^a-zA-Z0-9._-]/g,
-            '_',
+            '_'
           )}`,
-          'KTA_CARD',
+          'KTA_CARD'
         );
 
       if (
@@ -575,7 +592,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
       ) {
         throw new Error(
           result.message ||
-            'Upload gambar gagal.',
+            'Upload gagal'
         );
       }
 
@@ -583,21 +600,17 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
     } catch (error: any) {
       setMessage(
         error?.message ||
-          'Upload aset gagal.',
+          'Upload aset gagal.'
       );
 
       return '';
     }
   };
 
-  /* =======================================================
-     HANDLE ASSET UPLOAD
-  ======================================================= */
-
   const handleAssetUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
     kind: 'logo' | 'background',
-    id?: string,
+    id?: string
   ) => {
     const file =
       event.target.files?.[0];
@@ -611,154 +624,111 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
     if (!url) return;
 
-    if (kind === 'logo' && id) {
+    if (
+      kind === 'logo' &&
+      id
+    ) {
       updateLogo(id, {
         url,
       });
     }
 
     if (kind === 'background') {
-      setSettings(current => ({
+      setSettings((current) => ({
         ...current,
-
         ...(side === 'FRONT'
           ? {
-              frontBackgroundUrl: url,
+              frontBackgroundUrl:
+                url,
             }
           : {
-              backBackgroundUrl: url,
+              backBackgroundUrl:
+                url,
             }),
       }));
     }
 
     setMessage(
-      'Aset berhasil diunggah.',
+      'Aset berhasil diunggah.'
     );
   };
 
-  /* =======================================================
-     APPLY PRESET
-  ======================================================= */
-
   const applyPreset = (
-    preset: KtaCardPreset,
+    preset: KtaCardPreset
   ) => {
-    const selected =
+    const presetData =
       PRESETS[preset];
 
-    setSettings(current => ({
+    setSettings((current) => ({
       ...current,
-
       preset,
-
       widthMm:
-        selected.width,
-
+        presetData.width,
       heightMm:
-        selected.height,
-
+        presetData.height,
       cornerRadiusMm:
-        selected.radius,
+        presetData.radius,
     }));
   };
-
-  /* =======================================================
-     SAVE
-  ======================================================= */
 
   const handleSave = async () => {
     setIsSaving(true);
 
     setMessage(
-      'Menyimpan pengaturan KTA pusat...',
+      'Menyimpan pengaturan KTA pusat...'
     );
 
     try {
-      const nextSettings = {
+      /**
+       * Selalu paksa badge lama tidak aktif.
+       * Ini mencegah renderer lama yang masih memiliki
+       * kompatibilitas terhadap properti tersebut
+       * menampilkan "Tanda Tangan Terverifikasi".
+       */
+      const next: any = {
         ...settings,
-
-        /*
-         * Konfigurasi baru bagian belakang:
-         *
-         * Tempat & tanggal
-         *       ↓
-         * QR Penandatangan
-         *       ↓
-         * Nama
-         * Jabatan
-         *
-         * Nilai default hanya digunakan jika
-         * konfigurasi lama belum mempunyai posisi.
-         */
-
-        issueLocationDateY:
-          (settings as any)
-            .issueLocationDateY ?? 60,
-
-        signerQrY:
-          (settings as any)
-            .signerQrY ?? 70,
-
-        signerY:
-          (settings as any)
-            .signerY ?? 84,
-
-        /*
-         * Tanda "PENANDATANGAN TERVERIFIKASI"
-         * sengaja dimatikan.
-         */
         showSignerVerified: false,
-
         lastUpdated:
           new Date().toISOString(),
       };
 
       const result =
         await spreadsheetService.saveKtaSettings(
-          nextSettings,
+          next
         );
 
-      if (!result.success) {
+      if (result.success) {
+        setSettings(
+          normalizeKtaSettings(next)
+        );
+
         setMessage(
-          result.message ||
-            'Pengaturan KTA gagal disimpan.',
+          'Pengaturan KTA berhasil disimpan ke Google Spreadsheet.'
         );
 
-        return;
+        setTimeout(() => {
+          onSuccess?.();
+          onClose();
+        }, 900);
+      } else {
+        setMessage(
+          result.message
+        );
       }
-
-      setSettings(
-        normalizeKtaSettings(
-          nextSettings,
-        ),
-      );
-
-      setMessage(
-        'Pengaturan KTA berhasil disimpan ke Google Spreadsheet.',
-      );
-
-      setTimeout(() => {
-        onSuccess?.();
-        onClose();
-      }, 900);
     } catch (error: any) {
       setMessage(
         error?.message ||
-          'Terjadi kesalahan saat menyimpan pengaturan KTA.',
+          'Gagal menyimpan pengaturan KTA.'
       );
     } finally {
       setIsSaving(false);
     }
   };
 
-  /* =======================================================
-     RESET
-  ======================================================= */
-
   const handleReset = () => {
     if (
       !confirm(
-        'Reset seluruh desain KTA ke standar nasional?',
+        'Reset seluruh desain KTA ke standar nasional?'
       )
     ) {
       return;
@@ -766,27 +736,26 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
     setSettings(
       normalizeKtaSettings(
-        DEFAULT_KTA_SETTINGS,
-      ),
+        DEFAULT_KTA_SETTINGS
+      )
+    );
+
+    setMessage(
+      'Desain KTA dikembalikan ke standar.'
     );
   };
-
-  /* =======================================================
-     GENERATE NTA
-  ======================================================= */
 
   const handleGenerateByRegion = () => {
     if (!regionProvinceId) {
       alert(
-        'Pilih provinsi terlebih dahulu.',
+        'Pilih provinsi terlebih dahulu.'
       );
-
       return;
     }
 
     if (
       !confirm(
-        'Generate NTA untuk anggota yang belum memiliki nomor? Nomor yang sudah ada tidak akan diubah.',
+        'Generate NTA untuk anggota yang belum memiliki nomor? Nomor yang sudah ada tidak diubah.'
       )
     ) {
       return;
@@ -801,58 +770,49 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
           regionRegencyId ||
             undefined,
           regionDistrictId ||
-            undefined,
+            undefined
         );
 
       alert(
-        `Selesai. ${result.updated} anggota diberi NTA baru, ${result.skipped} dilewati.`,
+        `Selesai. ${result.updated} anggota diberi NTA baru, ${result.skipped} dilewati.`
       );
     } finally {
       setRegionBusy(false);
     }
   };
 
-  /* =======================================================
-     UI HELPERS
-  ======================================================= */
-
   const input =
     'w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500';
 
   const numberInput = (
     value: number,
-    onChange: (value: number) => void,
+    onChange: (value: number) => void
   ) => (
     <input
       type="number"
       min={0}
       max={100}
-      value={value}
-      onChange={event =>
+      value={
+        Number.isFinite(value)
+          ? value
+          : 0
+      }
+      onChange={(event) =>
         onChange(
-          Number(event.target.value),
+          Number(event.target.value)
         )
       }
       className={input}
     />
   );
 
-  /* =======================================================
-     RENDER
-  ======================================================= */
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/80 backdrop-blur-sm">
       <div className="bg-white w-full max-w-7xl max-h-[96vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
 
-        {/* =================================================
-            HEADER
-        ================================================= */}
-
+        {/* HEADER */}
         <div className="p-5 bg-gradient-to-r from-slate-950 via-purple-950 to-emerald-950 text-white flex items-center justify-between">
-
           <div className="flex items-center gap-3">
-
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
               <LayoutTemplate />
             </div>
@@ -864,11 +824,10 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
               <p className="text-xs text-slate-300">
                 Atur ukuran, data anggota, logo,
-                latar depan/belakang, QR,
-                serta teks kartu secara visual.
+                latar depan/belakang, dan teks
+                kartu secara visual.
               </p>
             </div>
-
           </div>
 
           <button
@@ -877,139 +836,108 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
           >
             <X />
           </button>
-
         </div>
 
-        {/* =================================================
-            MAIN
-        ================================================= */}
-
+        {/* CONTENT */}
         <div className="grid grid-cols-1 xl:grid-cols-12 flex-1 min-h-0">
 
-          {/* =================================================
-              LEFT PANEL
-          ================================================= */}
-
+          {/* LEFT */}
           <div className="xl:col-span-8 p-5 overflow-y-auto space-y-5">
 
-            {/* ===============================================
-                1. SIZE
-            =============================================== */}
-
+            {/* 1. SIZE */}
             <section className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-
               <div className="flex items-center gap-2 font-bold text-slate-800">
-                <LayoutTemplate className="w-4 h-4" />
-                <span>1. Ukuran Kartu</span>
+                <CreditCardIcon />
+                <span>
+                  1. Ukuran Kartu
+                </span>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {(
+                  Object.keys(
+                    PRESETS
+                  ) as KtaCardPreset[]
+                ).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() =>
+                      applyPreset(key)
+                    }
+                    className={`p-3 rounded-xl border text-left ${
+                      settings.preset === key
+                        ? 'border-purple-600 bg-purple-50'
+                        : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <b className="text-xs">
+                      {PRESETS[key].label}
+                    </b>
 
-                {(Object.keys(PRESETS) as KtaCardPreset[]).map(
-                  preset => (
-                    <button
-                      key={preset}
-                      onClick={() =>
-                        applyPreset(preset)
-                      }
-                      className={`p-3 rounded-xl border text-left ${
-                        settings.preset ===
-                        preset
-                          ? 'border-purple-600 bg-purple-50'
-                          : 'border-slate-200 bg-white'
-                      }`}
-                    >
-                      <b className="text-xs">
-                        {
-                          PRESETS[preset]
-                            .label
-                        }
-                      </b>
-
-                      <div className="text-[10px] text-slate-500 mt-1">
-                        {
-                          PRESETS[preset]
-                            .width
-                        }{' '}
-                        ×{' '}
-                        {
-                          PRESETS[preset]
-                            .height
-                        }{' '}
-                        mm
-                      </div>
-                    </button>
-                  ),
-                )}
-
+                    <div className="text-[10px] text-slate-500 mt-1">
+                      {PRESETS[key].width} ×{' '}
+                      {PRESETS[key].height}{' '}
+                      mm
+                    </div>
+                  </button>
+                ))}
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-
                 <label className="text-[10px] font-bold">
                   Lebar (mm)
-
                   {numberInput(
                     settings.widthMm,
-                    value =>
+                    (value) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
                           widthMm:
                             value,
                           preset:
                             'CUSTOM',
-                        }),
-                      ),
+                        })
+                      )
                   )}
                 </label>
 
                 <label className="text-[10px] font-bold">
                   Tinggi (mm)
-
                   {numberInput(
                     settings.heightMm,
-                    value =>
+                    (value) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
                           heightMm:
                             value,
                           preset:
                             'CUSTOM',
-                        }),
-                      ),
+                        })
+                      )
                   )}
                 </label>
 
                 <label className="text-[10px] font-bold">
                   Radius (mm)
-
                   {numberInput(
                     settings.cornerRadiusMm,
-                    value =>
+                    (value) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
                           cornerRadiusMm:
                             value,
-                        }),
-                      ),
+                        })
+                      )
                   )}
                 </label>
-
               </div>
-
             </section>
 
-            {/* ===============================================
-                2. SIDE
-            =============================================== */}
-
+            {/* 2. SIDE */}
             <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-
               <div className="flex items-center justify-between">
-
                 <div className="flex items-center gap-2 font-bold">
                   <Eye />
                   <span>
@@ -1018,7 +946,6 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                 </div>
 
                 <div className="flex p-1 bg-slate-100 rounded-xl">
-
                   <button
                     onClick={() =>
                       setSide('FRONT')
@@ -1044,21 +971,13 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   >
                     Belakang
                   </button>
-
                 </div>
-
               </div>
-
             </section>
 
-            {/* ===============================================
-                3. BACKGROUND
-            =============================================== */}
-
+            {/* 3. BACKGROUND */}
             <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-
               <div className="flex items-center justify-between">
-
                 <div className="flex items-center gap-2 font-bold">
                   <ImageIcon />
                   <span>
@@ -1070,29 +989,24 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                 </div>
 
                 <label className="px-3 py-2 rounded-lg bg-purple-900 text-white text-xs font-bold cursor-pointer">
-
                   <Upload className="inline w-3.5 h-3.5 mr-1" />
-
                   Upload Gambar
 
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={event =>
+                    onChange={(event) =>
                       handleAssetUpload(
                         event,
-                        'background',
+                        'background'
                       )
                     }
                   />
-
                 </label>
-
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-
                 <label className="text-[10px] font-bold">
                   URL Gambar
 
@@ -1104,26 +1018,23 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                         : settings.backBackgroundUrl ||
                           ''
                     }
-                    onChange={event =>
+                    onChange={(event) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
-
                           ...(side ===
                           'FRONT'
                             ? {
                                 frontBackgroundUrl:
-                                  event
-                                    .target
+                                  event.target
                                     .value,
                               }
                             : {
                                 backBackgroundUrl:
-                                  event
-                                    .target
+                                  event.target
                                     .value,
                               }),
-                        }),
+                        })
                       )
                     }
                     className={input}
@@ -1142,26 +1053,23 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                         : settings.customBackgroundColorBack ||
                           '#111827'
                     }
-                    onChange={event =>
+                    onChange={(event) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
-
                           ...(side ===
                           'FRONT'
                             ? {
                                 customBackgroundColorFront:
-                                  event
-                                    .target
+                                  event.target
                                     .value,
                               }
                             : {
                                 customBackgroundColorBack:
-                                  event
-                                    .target
+                                  event.target
                                     .value,
                               }),
-                        }),
+                        })
                       )
                     }
                     className={input}
@@ -1180,35 +1088,27 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       settings.bgOpacity ??
                       0.1
                     }
-                    onChange={event =>
+                    onChange={(event) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
                           bgOpacity:
                             Number(
-                              event
-                                .target
-                                .value,
+                              event.target
+                                .value
                             ),
-                        }),
+                        })
                       )
                     }
                     className="w-full"
                   />
                 </label>
-
               </div>
-
             </section>
 
-            {/* ===============================================
-                4. LOGOS
-            =============================================== */}
-
+            {/* 4. LOGOS */}
             <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-
               <div className="flex items-center justify-between">
-
                 <div className="flex items-center gap-2 font-bold">
                   <ImageIcon />
                   <span>
@@ -1223,34 +1123,32 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   <Plus className="inline w-3.5 h-3.5 mr-1" />
                   Tambah Logo
                 </button>
-
               </div>
 
               {sideLogos.length === 0 && (
                 <p className="text-xs text-slate-400">
                   Belum ada logo tambahan.
+                  Anda dapat menambahkan
+                  beberapa logo dan mengatur
+                  posisi serta ukurannya.
                 </p>
               )}
 
-              {sideLogos.map(logo => (
+              {sideLogos.map((logo) => (
                 <div
                   key={logo.id}
                   className="grid grid-cols-12 gap-2 p-3 bg-slate-50 rounded-xl border"
                 >
-
                   <div className="col-span-4">
-
                     <input
                       value={logo.name}
-                      onChange={event =>
+                      onChange={(event) =>
                         updateLogo(
                           logo.id,
                           {
-                            name:
-                              event
-                                .target
-                                .value,
-                          },
+                            name: event.target
+                              .value,
+                          }
                         )
                       }
                       className={input}
@@ -1258,37 +1156,32 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     />
 
                     <label className="block mt-2 text-[10px] text-purple-800 font-bold cursor-pointer">
-
                       <Upload className="inline w-3 h-3 mr-1" />
-
                       Upload
 
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={event =>
+                        onChange={(event) =>
                           handleAssetUpload(
                             event,
                             'logo',
-                            logo.id,
+                            logo.id
                           )
                         }
                       />
-
                     </label>
 
                     <input
                       value={logo.url}
-                      onChange={event =>
+                      onChange={(event) =>
                         updateLogo(
                           logo.id,
                           {
-                            url:
-                              event
-                                .target
-                                .value,
-                          },
+                            url: event.target
+                              .value,
+                          }
                         )
                       }
                       className={
@@ -1296,22 +1189,20 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       }
                       placeholder="URL logo"
                     />
-
                   </div>
 
                   <div className="col-span-7 grid grid-cols-4 gap-2">
-
                     <label className="text-[9px] font-bold">
                       X
                       {numberInput(
                         logo.x,
-                        value =>
+                        (value) =>
                           updateLogo(
                             logo.id,
                             {
                               x: value,
-                            },
-                          ),
+                            }
+                          )
                       )}
                     </label>
 
@@ -1319,13 +1210,13 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       Y
                       {numberInput(
                         logo.y,
-                        value =>
+                        (value) =>
                           updateLogo(
                             logo.id,
                             {
                               y: value,
-                            },
-                          ),
+                            }
+                          )
                       )}
                     </label>
 
@@ -1333,14 +1224,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       Lebar
                       {numberInput(
                         logo.width,
-                        value =>
+                        (value) =>
                           updateLogo(
                             logo.id,
                             {
                               width:
                                 value,
-                            },
-                          ),
+                            }
+                          )
                       )}
                     </label>
 
@@ -1348,51 +1239,43 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       Tinggi
                       {numberInput(
                         logo.height,
-                        value =>
+                        (value) =>
                           updateLogo(
                             logo.id,
                             {
                               height:
                                 value,
-                            },
-                          ),
+                            }
+                          )
                       )}
                     </label>
-
                   </div>
 
                   <button
                     onClick={() =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
-
                           logos:
                             current.logos.filter(
-                              item =>
+                              (item) =>
                                 item.id !==
-                                logo.id,
+                                logo.id
                             ),
-                        }),
+                        })
                       )
                     }
                     className="col-span-1 self-start p-2 text-red-600"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
-
                 </div>
               ))}
-
             </section>
 
-            {/* ===============================================
-                5. FRONT HEADER
-            =============================================== */}
-
+            {/* FRONT HEADER */}
             {side === 'FRONT' && (
               <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-
                 <div className="flex items-center gap-2 font-bold">
                   <Type />
                   <span>
@@ -1402,10 +1285,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
-                  {/* TITLE */}
-
                   <div className="p-3 rounded-xl bg-slate-50 border space-y-2">
-
                     <div className="text-[10px] font-black uppercase">
                       SAKA PARIWISATA
                     </div>
@@ -1414,15 +1294,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       value={
                         settings.frontOrganizationTitle
                       }
-                      onChange={event =>
+                      onChange={(event) =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
                             frontOrganizationTitle:
-                              event
-                                .target
+                              event.target
                                 .value,
-                          }),
+                          })
                         )
                       }
                       className={input}
@@ -1430,94 +1309,85 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     />
 
                     <div className="grid grid-cols-4 gap-2">
-
                       <label className="text-[9px] font-bold">
                         X
                         {numberInput(
-                          (settings as any)
-                            .frontOrganizationTitleX ??
+                          settings.frontOrganizationTitleX ??
                             15,
-                          value =>
+                          (value) =>
                             setSettings(
-                              current => ({
+                              (current) => ({
                                 ...current,
                                 frontOrganizationTitleX:
                                   value,
-                              }),
-                            ),
+                              })
+                            )
                         )}
                       </label>
 
                       <label className="text-[9px] font-bold">
                         Y
                         {numberInput(
-                          (settings as any)
-                            .frontOrganizationTitleY ??
+                          settings.frontOrganizationTitleY ??
                             6,
-                          value =>
+                          (value) =>
                             setSettings(
-                              current => ({
+                              (current) => ({
                                 ...current,
                                 frontOrganizationTitleY:
                                   value,
-                              }),
-                            ),
+                              })
+                            )
                         )}
                       </label>
 
                       <label className="text-[9px] font-bold">
                         Lebar
                         {numberInput(
-                          (settings as any)
-                            .frontOrganizationTitleWidth ??
+                          settings.frontOrganizationTitleWidth ??
                             65,
-                          value =>
+                          (value) =>
                             setSettings(
-                              current => ({
+                              (current) => ({
                                 ...current,
                                 frontOrganizationTitleWidth:
                                   value,
-                              }),
-                            ),
+                              })
+                            )
                         )}
                       </label>
 
                       <label className="text-[9px] font-bold">
                         Font
                         {numberInput(
-                          (settings as any)
-                            .frontOrganizationTitleFontSize ??
+                          settings.frontOrganizationTitleFontSize ??
                             11,
-                          value =>
+                          (value) =>
                             setSettings(
-                              current => ({
+                              (current) => ({
                                 ...current,
                                 frontOrganizationTitleFontSize:
                                   value,
-                              }),
-                            ),
+                              })
+                            )
                         )}
                       </label>
-
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
-
                       <select
                         value={
-                          (settings as any)
-                            .frontOrganizationTitleFontWeight ??
+                          settings.frontOrganizationTitleFontWeight ??
                           'bold'
                         }
-                        onChange={event =>
+                        onChange={(event) =>
                           setSettings(
-                            current => ({
+                            (current) => ({
                               ...current,
                               frontOrganizationTitleFontWeight:
-                                event
-                                  .target
-                                  .value,
-                            }),
+                                event.target
+                                  .value as any,
+                            })
                           )
                         }
                         className={input}
@@ -1538,19 +1408,17 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
                       <select
                         value={
-                          (settings as any)
-                            .frontOrganizationTitleAlign ??
+                          settings.frontOrganizationTitleAlign ??
                           'left'
                         }
-                        onChange={event =>
+                        onChange={(event) =>
                           setSettings(
-                            current => ({
+                            (current) => ({
                               ...current,
                               frontOrganizationTitleAlign:
-                                event
-                                  .target
-                                  .value,
-                            }),
+                                event.target
+                                  .value as any,
+                            })
                           )
                         }
                         className={input}
@@ -1569,32 +1437,25 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       <input
                         type="color"
                         value={
-                          (settings as any)
-                            .frontOrganizationTitleColor ??
+                          settings.frontOrganizationTitleColor ??
                           '#ffffff'
                         }
-                        onChange={event =>
+                        onChange={(event) =>
                           setSettings(
-                            current => ({
+                            (current) => ({
                               ...current,
                               frontOrganizationTitleColor:
-                                event
-                                  .target
+                                event.target
                                   .value,
-                            }),
+                            })
                           )
                         }
                         className="h-9 w-full rounded"
                       />
-
                     </div>
-
                   </div>
 
-                  {/* SUBTITLE */}
-
                   <div className="p-3 rounded-xl bg-slate-50 border space-y-2">
-
                     <div className="text-[10px] font-black uppercase">
                       GERAKAN PRAMUKA INDONESIA
                     </div>
@@ -1603,15 +1464,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       value={
                         settings.frontOrganizationSubtitle
                       }
-                      onChange={event =>
+                      onChange={(event) =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
                             frontOrganizationSubtitle:
-                              event
-                                .target
+                              event.target
                                 .value,
-                          }),
+                          })
                         )
                       }
                       className={input}
@@ -1619,94 +1479,85 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     />
 
                     <div className="grid grid-cols-4 gap-2">
-
                       <label className="text-[9px] font-bold">
                         X
                         {numberInput(
-                          (settings as any)
-                            .frontOrganizationSubtitleX ??
+                          settings.frontOrganizationSubtitleX ??
                             15,
-                          value =>
+                          (value) =>
                             setSettings(
-                              current => ({
+                              (current) => ({
                                 ...current,
                                 frontOrganizationSubtitleX:
                                   value,
-                              }),
-                            ),
+                              })
+                            )
                         )}
                       </label>
 
                       <label className="text-[9px] font-bold">
                         Y
                         {numberInput(
-                          (settings as any)
-                            .frontOrganizationSubtitleY ??
+                          settings.frontOrganizationSubtitleY ??
                             12,
-                          value =>
+                          (value) =>
                             setSettings(
-                              current => ({
+                              (current) => ({
                                 ...current,
                                 frontOrganizationSubtitleY:
                                   value,
-                              }),
-                            ),
+                              })
+                            )
                         )}
                       </label>
 
                       <label className="text-[9px] font-bold">
                         Lebar
                         {numberInput(
-                          (settings as any)
-                            .frontOrganizationSubtitleWidth ??
+                          settings.frontOrganizationSubtitleWidth ??
                             70,
-                          value =>
+                          (value) =>
                             setSettings(
-                              current => ({
+                              (current) => ({
                                 ...current,
                                 frontOrganizationSubtitleWidth:
                                   value,
-                              }),
-                            ),
+                              })
+                            )
                         )}
                       </label>
 
                       <label className="text-[9px] font-bold">
                         Font
                         {numberInput(
-                          (settings as any)
-                            .frontOrganizationSubtitleFontSize ??
+                          settings.frontOrganizationSubtitleFontSize ??
                             8,
-                          value =>
+                          (value) =>
                             setSettings(
-                              current => ({
+                              (current) => ({
                                 ...current,
                                 frontOrganizationSubtitleFontSize:
                                   value,
-                              }),
-                            ),
+                              })
+                            )
                         )}
                       </label>
-
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
-
                       <select
                         value={
-                          (settings as any)
-                            .frontOrganizationSubtitleFontWeight ??
+                          settings.frontOrganizationSubtitleFontWeight ??
                           'normal'
                         }
-                        onChange={event =>
+                        onChange={(event) =>
                           setSettings(
-                            current => ({
+                            (current) => ({
                               ...current,
                               frontOrganizationSubtitleFontWeight:
-                                event
-                                  .target
-                                  .value,
-                            }),
+                                event.target
+                                  .value as any,
+                            })
                           )
                         }
                         className={input}
@@ -1727,19 +1578,17 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
                       <select
                         value={
-                          (settings as any)
-                            .frontOrganizationSubtitleAlign ??
+                          settings.frontOrganizationSubtitleAlign ??
                           'left'
                         }
-                        onChange={event =>
+                        onChange={(event) =>
                           setSettings(
-                            current => ({
+                            (current) => ({
                               ...current,
                               frontOrganizationSubtitleAlign:
-                                event
-                                  .target
-                                  .value,
-                            }),
+                                event.target
+                                  .value as any,
+                            })
                           )
                         }
                         className={input}
@@ -1758,157 +1607,175 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       <input
                         type="color"
                         value={
-                          (settings as any)
-                            .frontOrganizationSubtitleColor ??
+                          settings.frontOrganizationSubtitleColor ??
                           '#e5e7eb'
                         }
-                        onChange={event =>
+                        onChange={(event) =>
                           setSettings(
-                            current => ({
+                            (current) => ({
                               ...current,
                               frontOrganizationSubtitleColor:
-                                event
-                                  .target
+                                event.target
                                   .value,
-                            }),
+                            })
                           )
                         }
                         className="h-9 w-full rounded"
                       />
-
                     </div>
-
                   </div>
 
                 </div>
-
               </section>
             )}
 
-            {/* ===============================================
-                6. FRONT QR
-            =============================================== */}
-
+            {/* FRONT QR */}
             {side === 'FRONT' && (
               <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-
                 <div className="flex items-center justify-between">
-
                   <div className="flex items-center gap-2 font-bold">
                     <Eye />
                     <span>
-                      6. QR Code Depan
+                      6. QR / Barcode Depan
                     </span>
                   </div>
 
                   <label className="text-xs font-bold flex items-center gap-2">
-
                     <input
                       type="checkbox"
                       checked={
                         settings.showQrCode
                       }
-                      onChange={event =>
+                      onChange={(event) =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
                             showQrCode:
                               event.target
                                 .checked,
-                          }),
+                          })
                         )
                       }
                     />
 
                     Tampilkan QR
-
                   </label>
-
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
-
                   <label className="text-[9px] font-bold">
                     X
-
                     {numberInput(
-                      (settings as any)
-                        .qrX ?? 78,
-                      value =>
+                      settings.qrX ?? 78,
+                      (value) =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
                             qrX: value,
-                          }),
-                        ),
+                          })
+                        )
                     )}
                   </label>
 
                   <label className="text-[9px] font-bold">
                     Y
-
                     {numberInput(
-                      (settings as any)
-                        .qrY ?? 30,
-                      value =>
+                      settings.qrY ?? 30,
+                      (value) =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
                             qrY: value,
-                          }),
-                        ),
+                          })
+                        )
                     )}
                   </label>
 
                   <label className="text-[9px] font-bold">
                     Ukuran
-
                     {numberInput(
-                      (settings as any)
-                        .qrSize ?? 22,
-                      value =>
+                      settings.qrSize ?? 22,
+                      (value) =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
                             qrSize: value,
-                          }),
-                        ),
+                          })
+                        )
                     )}
                   </label>
-
                 </div>
-
               </section>
             )}
 
-            {/* ===============================================
-                7. BACK SIGNER / QR
-            =============================================== */}
-
+            {/* BACK SIGNER QR */}
             {side === 'BACK' && (
-              <section className="p-4 rounded-2xl border border-purple-200 bg-purple-50/60 space-y-4">
+              <section className="p-4 rounded-2xl border border-purple-200 bg-purple-50/60 space-y-3">
 
-                <div className="flex items-center gap-2 font-bold text-purple-950">
-                  <Eye />
-                  <span>
-                    5. QR Penandatangan KTA
-                  </span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 font-bold text-purple-950">
+                    <Eye />
+                    <span>
+                      5. QR Penandatangan Digital
+                    </span>
+                  </div>
+
+                  <label className="text-xs font-bold flex items-center gap-2 text-purple-950">
+                    <input
+                      type="checkbox"
+                      checked={
+                        (settings as any)
+                          .showSignerQrCode !==
+                        false
+                      }
+                      onChange={(event) =>
+                        setSettings(
+                          (current) => ({
+                            ...current,
+                            showSignerQrCode:
+                              event.target
+                                .checked,
+                            /**
+                             * Badge lama dipaksa
+                             * tetap nonaktif.
+                             */
+                            showSignerVerified:
+                              false,
+                          } as any)
+                        )
+                      }
+                    />
+
+                    Tampilkan QR Penandatangan
+                  </label>
+                </div>
+
+                <div className="p-3 rounded-xl bg-white border border-purple-100">
+                  <div className="text-[10px] font-black text-purple-950 mb-1">
+                    URUTAN BELAKANG KTA
+                  </div>
+
+                  <div className="text-[10px] text-slate-600 leading-5">
+                    <strong>1.</strong> Tempat &
+                    tanggal
+                    <br />
+                    <strong>2.</strong> QR Code
+                    <br />
+                    <strong>3.</strong> Nama
+                    penandatangan
+                    <br />
+                    <strong>4.</strong> Jabatan
+                    penandatangan
+                  </div>
                 </div>
 
                 <p className="text-[10px] text-purple-900/70">
-                  Bagian belakang KTA disusun
-                  otomatis dengan urutan:
-                  <strong>
-                    {' '}
-                    Tempat & tanggal → QR →
-                    Nama → Jabatan
-                  </strong>.
+                  QR belakang khusus untuk pejabat
+                  yang ditunjuk SuperAdmin. QR membuka
+                  profil verifikasi pejabat tersebut.
                 </p>
 
-                {/* SIGNER */}
-
                 <label className="block text-[10px] font-bold text-purple-950">
-
                   Penandatangan
 
                   <select
@@ -1917,101 +1784,234 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                         .signerMemberId ||
                       ''
                     }
-                    onChange={event => {
+                    onChange={(event) => {
                       const id =
-                        event.target
-                          .value;
+                        event.target.value;
 
                       const member =
                         activeMembers.find(
-                          item =>
-                            item.id ===
-                            id,
+                          (item) =>
+                            item.id === id
                         );
 
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
-
                           signerMemberId:
                             id,
-
                           signerName:
                             member?.fullName ||
                             current.signerName,
-
                           signerTitle:
                             member?.currentPosition ||
                             current.signerTitle,
-
                           signerSubtitle:
                             '',
-                        }),
+                          showSignerVerified:
+                            false,
+                        } as any)
                       );
                     }}
                     className={input}
                   >
-
                     <option value="">
-                      Pilih anggota yang berwenang
+                      Pilih anggota yang
+                      berwenang
                     </option>
 
                     {activeMembers.map(
-                      member => (
+                      (member) => (
                         <option
-                          key={
-                            member.id
-                          }
-                          value={
-                            member.id
-                          }
+                          key={member.id}
+                          value={member.id}
                         >
-                          {
-                            member.fullName
-                          }{' '}
-                          —{' '}
+                          {member.fullName} —{' '}
                           {member.currentPosition ||
                             'Tanpa jabatan'}
                           {member.provinceName
                             ? ` · ${member.provinceName}`
                             : ''}
                         </option>
-                      ),
+                      )
                     )}
-
                   </select>
-
                 </label>
 
                 <div className="p-3 rounded-xl bg-white border border-purple-100 text-[10px] text-slate-600">
-
                   {signerMember ? (
                     <>
                       <strong>
-                        {
-                          signerMember.fullName
-                        }
+                        {signerMember.fullName}
                       </strong>
 
                       <br />
 
-                      {
-                        signerMember.currentPosition ||
-                        'Tanpa jabatan'
-                      }
+                      {signerMember.currentPosition ||
+                        'Tanpa jabatan'}
                     </>
                   ) : (
                     'Belum ada penandatangan yang dipilih.'
                   )}
-
                 </div>
 
-                {/* DATE POSITION */}
-
+                {/* QR POSITION */}
                 <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-2">
-
                   <div className="text-[10px] font-black text-purple-950">
-                    1. Tempat & Tanggal
+                    Posisi QR Code
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <label className="text-[9px] font-bold">
+                      X QR
+                      {numberInput(
+                        (settings as any)
+                          .signerQrX ?? 68,
+                        (value) =>
+                          setSettings(
+                            (current) => ({
+                              ...current,
+                              signerQrX:
+                                value,
+                            })
+                          )
+                      )}
+                    </label>
+
+                    <label className="text-[9px] font-bold">
+                      Y QR
+                      {numberInput(
+                        (settings as any)
+                          .signerQrY ?? 68,
+                        (value) =>
+                          setSettings(
+                            (current) => ({
+                              ...current,
+                              signerQrY:
+                                value,
+                            })
+                          )
+                      )}
+                    </label>
+
+                    <label className="text-[9px] font-bold">
+                      Ukuran QR
+                      {numberInput(
+                        (settings as any)
+                          .signerQrSize ?? 18,
+                        (value) =>
+                          setSettings(
+                            (current) => ({
+                              ...current,
+                              signerQrSize:
+                                value,
+                            })
+                          )
+                      )}
+                    </label>
+
+                    <label className="text-[9px] font-bold">
+                      Margin QR
+                      {numberInput(
+                        (settings as any)
+                          .signerQrPadding ?? 2,
+                        (value) =>
+                          setSettings(
+                            (current) => ({
+                              ...current,
+                              signerQrPadding:
+                                value,
+                            })
+                          )
+                      )}
+                    </label>
+                  </div>
+                </div>
+
+                {/* SIGNER POSITION */}
+                <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-2">
+                  <div className="text-[10px] font-black text-purple-950">
+                    Posisi Nama & Jabatan
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <label className="text-[9px] font-bold">
+                      X Penandatangan
+                      {numberInput(
+                        (settings as any)
+                          .signerX ?? 5,
+                        (value) =>
+                          setSettings(
+                            (current) => ({
+                              ...current,
+                              signerX:
+                                value,
+                            } as any)
+                          )
+                      )}
+                    </label>
+
+                    <label className="text-[9px] font-bold">
+                      Y Penandatangan
+                      {numberInput(
+                        (settings as any)
+                          .signerY ?? 86,
+                        (value) =>
+                          setSettings(
+                            (current) => ({
+                              ...current,
+                              signerY:
+                                value,
+                            } as any)
+                          )
+                      )}
+                    </label>
+
+                    <label className="text-[9px] font-bold">
+                      X Nama
+                      {numberInput(
+                        (settings as any)
+                          .signerNameXOffset ??
+                          0,
+                        (value) =>
+                          setSettings(
+                            (current) => ({
+                              ...current,
+                              signerNameXOffset:
+                                value,
+                            })
+                          )
+                      )}
+                    </label>
+
+                    <label className="text-[9px] font-bold">
+                      Y Nama
+                      {numberInput(
+                        (settings as any)
+                          .signerNameYOffset ??
+                          0,
+                        (value) =>
+                          setSettings(
+                            (current) => ({
+                              ...current,
+                              signerNameYOffset:
+                                value,
+                            })
+                          )
+                      )}
+                    </label>
+                  </div>
+
+                  <p className="text-[9px] text-slate-500">
+                    Nama dan jabatan berada di bawah QR
+                    Code. X/Y Nama hanya menggeser nama
+                    tanpa memindahkan jabatan.
+                  </p>
+                </div>
+
+                {/* ISSUE DATE */}
+                <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-2">
+                  <div className="text-[10px] font-black text-purple-950">
+                    Tempat & Tanggal Penerbitan
                   </div>
 
                   <input
@@ -2019,15 +2019,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       settings.issueLocationDate ||
                       ''
                     }
-                    onChange={event =>
+                    onChange={(event) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
                           issueLocationDate:
-                            event
-                              .target
+                            event.target
                               .value,
-                        }),
+                        })
                       )
                     }
                     className={input}
@@ -2035,264 +2034,44 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   />
 
                   <div className="grid grid-cols-2 gap-2">
-
                     <label className="text-[9px] font-bold">
-                      X
-
+                      X Tanggal
                       {numberInput(
                         (settings as any)
                           .issueLocationDateX ??
                           5,
-                        value =>
+                        (value) =>
                           setSettings(
-                            current => ({
+                            (current) => ({
                               ...current,
                               issueLocationDateX:
                                 value,
-                            }),
-                          ),
+                            })
+                          )
                       )}
                     </label>
 
                     <label className="text-[9px] font-bold">
-                      Y
-
+                      Y Tanggal
                       {numberInput(
                         (settings as any)
                           .issueLocationDateY ??
-                          60,
-                        value =>
+                          58,
+                        (value) =>
                           setSettings(
-                            current => ({
+                            (current) => ({
                               ...current,
                               issueLocationDateY:
                                 value,
-                            }),
-                          ),
-                      )}
-                    </label>
-
-                  </div>
-
-                </div>
-
-                {/* QR POSITION */}
-
-                <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-3">
-
-                  <div className="flex items-center justify-between">
-
-                    <div className="text-[10px] font-black text-purple-950">
-                      2. QR Penandatangan
-                    </div>
-
-                    <label className="text-[9px] font-bold flex items-center gap-2">
-
-                      <input
-                        type="checkbox"
-                        checked={
-                          (settings as any)
-                            .showSignerQrCode !==
-                          false
-                        }
-                        onChange={event =>
-                          setSettings(
-                            current => ({
-                              ...current,
-                              showSignerQrCode:
-                                event
-                                  .target
-                                  .checked,
-                            }),
+                            })
                           )
-                        }
-                      />
-
-                      Tampilkan QR
-
+                      )}
                     </label>
-
                   </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-
-                    <label className="text-[9px] font-bold">
-                      X QR
-
-                      {numberInput(
-                        (settings as any)
-                          .signerQrX ??
-                          68,
-                        value =>
-                          setSettings(
-                            current => ({
-                              ...current,
-                              signerQrX:
-                                value,
-                            }),
-                          ),
-                      )}
-                    </label>
-
-                    <label className="text-[9px] font-bold">
-                      Y QR
-
-                      {numberInput(
-                        (settings as any)
-                          .signerQrY ??
-                          70,
-                        value =>
-                          setSettings(
-                            current => ({
-                              ...current,
-                              signerQrY:
-                                value,
-                            }),
-                          ),
-                      )}
-                    </label>
-
-                    <label className="text-[9px] font-bold">
-                      Ukuran QR
-
-                      {numberInput(
-                        (settings as any)
-                          .signerQrSize ??
-                          18,
-                        value =>
-                          setSettings(
-                            current => ({
-                              ...current,
-                              signerQrSize:
-                                value,
-                            }),
-                          ),
-                      )}
-                    </label>
-
-                    <label className="text-[9px] font-bold">
-                      Margin
-
-                      {numberInput(
-                        (settings as any)
-                          .signerQrPadding ??
-                          2,
-                        value =>
-                          setSettings(
-                            current => ({
-                              ...current,
-                              signerQrPadding:
-                                value,
-                            }),
-                          ),
-                      )}
-                    </label>
-
-                  </div>
-
                 </div>
 
-                {/* SIGNER NAME & POSITION */}
-
-                <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-3">
-
-                  <div className="text-[10px] font-black text-purple-950">
-                    3. Nama & Jabatan
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-
-                    <label className="text-[9px] font-bold">
-                      X Nama
-
-                      {numberInput(
-                        (settings as any)
-                          .signerX ??
-                          5,
-                        value =>
-                          setSettings(
-                            current => ({
-                              ...current,
-                              signerX:
-                                value,
-                            }),
-                          ),
-                      )}
-                    </label>
-
-                    <label className="text-[9px] font-bold">
-                      Y Nama
-
-                      {numberInput(
-                        (settings as any)
-                          .signerY ??
-                          84,
-                        value =>
-                          setSettings(
-                            current => ({
-                              ...current,
-                              signerY:
-                                value,
-                            }),
-                          ),
-                      )}
-                    </label>
-
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-
-                    <label className="text-[9px] font-bold">
-                      X Offset Nama
-
-                      {numberInput(
-                        (settings as any)
-                          .signerNameXOffset ??
-                          0,
-                        value =>
-                          setSettings(
-                            current => ({
-                              ...current,
-                              signerNameXOffset:
-                                value,
-                            }),
-                          ),
-                      )}
-                    </label>
-
-                    <label className="text-[9px] font-bold">
-                      Y Offset Nama
-
-                      {numberInput(
-                        (settings as any)
-                          .signerNameYOffset ??
-                          0,
-                        value =>
-                          setSettings(
-                            current => ({
-                              ...current,
-                              signerNameYOffset:
-                                value,
-                            }),
-                          ),
-                      )}
-                    </label>
-
-                  </div>
-
-                  <p className="text-[9px] text-slate-500">
-                    Nama dan jabatan berada
-                    setelah QR Code.
-                    Jabatan mengikuti data
-                    anggota yang dipilih.
-                  </p>
-
-                </div>
-
-                {/* QR COLOR */}
-
+                {/* QR STYLE */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-
                   <label className="text-[9px] font-bold">
                     Latar QR
 
@@ -2303,15 +2082,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                           .signerQrBackgroundColor ??
                         '#ffffff'
                       }
-                      onChange={event =>
+                      onChange={(event) =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
                             signerQrBackgroundColor:
-                              event
-                                .target
+                              event.target
                                 .value,
-                          }),
+                          })
                         )
                       }
                       className="h-9 w-full rounded"
@@ -2320,53 +2098,54 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
                   <label className="text-[9px] font-bold">
                     Border
-
                     {numberInput(
                       (settings as any)
                         .signerQrBorderWidth ??
                         0,
-                      value =>
+                      (value) =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
                             signerQrBorderWidth:
                               value,
-                          }),
-                        ),
+                          })
+                        )
                     )}
                   </label>
 
                   <label className="text-[9px] font-bold">
                     Radius
-
                     {numberInput(
                       (settings as any)
                         .signerQrBorderRadius ??
                         4,
-                      value =>
+                      (value) =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
                             signerQrBorderRadius:
                               value,
-                          }),
-                        ),
+                          })
+                        )
                     )}
                   </label>
-
                 </div>
 
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-[10px] text-emerald-900">
+                  <strong>
+                    Pengaturan aktif:
+                  </strong>{' '}
+                  Tempat & tanggal berada di atas,
+                  QR Code berada di bawahnya, kemudian
+                  nama dan jabatan penandatangan berada
+                  di bawah QR.
+                </div>
               </section>
             )}
 
-            {/* ===============================================
-                DATA FIELDS
-            =============================================== */}
-
+            {/* DATA MEMBERS */}
             <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-
               <div className="flex items-center justify-between">
-
                 <div className="flex items-center gap-2 font-bold">
                   <Type />
                   <span>
@@ -2381,47 +2160,38 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   <Plus className="inline w-3.5 h-3.5 mr-1" />
                   Tambah Data
                 </button>
-
               </div>
 
-              {sideFields.map(field => (
+              {sideFields.map((field) => (
                 <div
                   key={field.id}
                   className="p-3 bg-slate-50 rounded-xl border space-y-2"
                 >
-
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-
                     <select
-                      value={
-                        field.field
-                      }
-                      onChange={event => {
-                        const selected =
-                          event
-                            .target
-                            .value as KtaMemberFieldKey;
-
+                      value={field.field}
+                      onChange={(event) =>
                         updateField(
                           field.id,
                           {
                             field:
-                              selected,
-
+                              event.target
+                                .value as KtaMemberFieldKey,
                             label:
                               FIELD_OPTIONS.find(
-                                option =>
+                                (option) =>
                                   option.value ===
-                                  selected,
+                                  event.target
+                                    .value
                               )?.label ||
                               field.label,
-                          },
-                        );
-                      }}
+                          }
+                        )
+                      }
                       className={input}
                     >
                       {FIELD_OPTIONS.map(
-                        option => (
+                        (option) => (
                           <option
                             key={
                               option.value
@@ -2430,94 +2200,80 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                               option.value
                             }
                           >
-                            {
-                              option.label
-                            }
+                            {option.label}
                           </option>
-                        ),
+                        )
                       )}
                     </select>
 
                     <input
-                      value={
-                        field.label
-                      }
-                      onChange={event =>
+                      value={field.label}
+                      onChange={(event) =>
                         updateField(
                           field.id,
                           {
                             label:
-                              event
-                                .target
+                              event.target
                                 .value,
-                          },
+                          }
                         )
                       }
                       className={input}
                     />
 
                     <label className="flex items-center gap-2 text-xs font-bold">
-
                       <input
                         type="checkbox"
                         checked={
                           field.visible
                         }
-                        onChange={event =>
+                        onChange={(event) =>
                           updateField(
                             field.id,
                             {
                               visible:
-                                event
-                                  .target
+                                event.target
                                   .checked,
-                            },
+                            }
                           )
                         }
                       />
-
                       Tampilkan
-
                     </label>
 
                     <label className="flex items-center gap-2 text-xs font-bold">
-
                       <input
                         type="checkbox"
                         checked={
                           field.showLabel ??
                           false
                         }
-                        onChange={event =>
+                        onChange={(event) =>
                           updateField(
                             field.id,
                             {
                               showLabel:
-                                event
-                                  .target
+                                event.target
                                   .checked,
-                            },
+                            }
                           )
                         }
                       />
-
                       Label
-
                     </label>
 
                     <select
                       value={
                         field.fontWeight
                       }
-                      onChange={event =>
+                      onChange={(event) =>
                         updateField(
                           field.id,
                           {
                             fontWeight:
-                              event
-                                .target
+                              event.target
                                 .value as any,
-                          },
+                          }
                         )
                       }
                       className={input}
@@ -2541,35 +2297,32 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       value={
                         field.color
                       }
-                      onChange={event =>
+                      onChange={(event) =>
                         updateField(
                           field.id,
                           {
                             color:
-                              event
-                                .target
+                              event.target
                                 .value,
-                          },
+                          }
                         )
                       }
                       className="h-9 w-full rounded"
                     />
-
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-
                     <label className="text-[9px] font-bold">
                       X
                       {numberInput(
                         field.x,
-                        value =>
+                        (value) =>
                           updateField(
                             field.id,
                             {
                               x: value,
-                            },
-                          ),
+                            }
+                          )
                       )}
                     </label>
 
@@ -2577,13 +2330,13 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       Y
                       {numberInput(
                         field.y,
-                        value =>
+                        (value) =>
                           updateField(
                             field.id,
                             {
                               y: value,
-                            },
-                          ),
+                            }
+                          )
                       )}
                     </label>
 
@@ -2591,14 +2344,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       Lebar
                       {numberInput(
                         field.width,
-                        value =>
+                        (value) =>
                           updateField(
                             field.id,
                             {
                               width:
                                 value,
-                            },
-                          ),
+                            }
+                          )
                       )}
                     </label>
 
@@ -2606,14 +2359,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       Font
                       {numberInput(
                         field.fontSize,
-                        value =>
+                        (value) =>
                           updateField(
                             field.id,
                             {
                               fontSize:
                                 value,
-                            },
-                          ),
+                            }
+                          )
                       )}
                     </label>
 
@@ -2622,15 +2375,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                         field.align ||
                         'left'
                       }
-                      onChange={event =>
+                      onChange={(event) =>
                         updateField(
                           field.id,
                           {
                             align:
-                              event
-                                .target
+                              event.target
                                 .value as any,
-                          },
+                          }
                         )
                       }
                       className={input}
@@ -2649,16 +2401,15 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     <button
                       onClick={() =>
                         setSettings(
-                          current => ({
+                          (current) => ({
                             ...current,
-
                             dataFields:
                               current.dataFields.filter(
-                                item =>
+                                (item) =>
                                   item.id !==
-                                  field.id,
+                                  field.id
                               ),
-                          }),
+                          })
                         )
                       }
                       className="text-red-600 text-xs font-bold"
@@ -2666,22 +2417,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       <Trash2 className="inline w-4 h-4 mr-1" />
                       Hapus
                     </button>
-
                   </div>
-
                 </div>
               ))}
-
             </section>
 
-            {/* ===============================================
-                CUSTOM TEXT
-            =============================================== */}
-
+            {/* CUSTOM TEXT */}
             <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-
               <div className="flex items-center justify-between">
-
                 <div className="flex items-center gap-2 font-bold">
                   <Type />
                   <span>
@@ -2696,28 +2439,23 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   <Plus className="inline w-3.5 h-3.5 mr-1" />
                   Tambah Teks
                 </button>
-
               </div>
 
-              {sideTexts.map(text => (
+              {sideTexts.map((text) => (
                 <div
                   key={text.id}
                   className="grid grid-cols-12 gap-2 p-3 bg-slate-50 rounded-xl border"
                 >
-
                   <input
-                    value={
-                      text.text
-                    }
-                    onChange={event =>
+                    value={text.text}
+                    onChange={(event) =>
                       updateText(
                         text.id,
                         {
                           text:
-                            event
-                              .target
+                            event.target
                               .value,
-                        },
+                        }
                       )
                     }
                     className={
@@ -2731,13 +2469,13 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     X
                     {numberInput(
                       text.x,
-                      value =>
+                      (value) =>
                         updateText(
                           text.id,
                           {
                             x: value,
-                          },
-                        ),
+                          }
+                        )
                     )}
                   </label>
 
@@ -2745,13 +2483,13 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     Y
                     {numberInput(
                       text.y,
-                      value =>
+                      (value) =>
                         updateText(
                           text.id,
                           {
                             y: value,
-                          },
-                        ),
+                          }
+                        )
                     )}
                   </label>
 
@@ -2759,14 +2497,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     Lebar
                     {numberInput(
                       text.width,
-                      value =>
+                      (value) =>
                         updateText(
                           text.id,
                           {
                             width:
                               value,
-                          },
-                        ),
+                          }
+                        )
                     )}
                   </label>
 
@@ -2774,31 +2512,28 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     Font
                     {numberInput(
                       text.fontSize,
-                      value =>
+                      (value) =>
                         updateText(
                           text.id,
                           {
                             fontSize:
                               value,
-                          },
-                        ),
+                          }
+                        )
                     )}
                   </label>
 
                   <input
                     type="color"
-                    value={
-                      text.color
-                    }
-                    onChange={event =>
+                    value={text.color}
+                    onChange={(event) =>
                       updateText(
                         text.id,
                         {
                           color:
-                            event
-                              .target
+                            event.target
                               .value,
-                        },
+                        }
                       )
                     }
                     className="h-9 rounded"
@@ -2807,34 +2542,27 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   <button
                     onClick={() =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
-
                           textElements:
                             current.textElements.filter(
-                              item =>
+                              (item) =>
                                 item.id !==
-                                text.id,
+                                text.id
                             ),
-                        }),
+                        })
                       )
                     }
                     className="text-red-600"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
-
                 </div>
               ))}
-
             </section>
 
-            {/* ===============================================
-                SYSTEM TEXT
-            =============================================== */}
-
+            {/* SYSTEM TEXT */}
             <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-
               <div className="flex items-center gap-2 font-bold">
                 <Type />
                 <span>
@@ -2843,7 +2571,6 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-
                 <label className="text-[10px] font-bold">
                   Judul Organisasi
 
@@ -2851,15 +2578,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     value={
                       settings.frontOrganizationTitle
                     }
-                    onChange={event =>
+                    onChange={(event) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
                           frontOrganizationTitle:
-                            event
-                              .target
+                            event.target
                               .value,
-                        }),
+                        })
                       )
                     }
                     className={input}
@@ -2873,15 +2599,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     value={
                       settings.frontOrganizationSubtitle
                     }
-                    onChange={event =>
+                    onChange={(event) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
                           frontOrganizationSubtitle:
-                            event
-                              .target
+                            event.target
                               .value,
-                        }),
+                        })
                       )
                     }
                     className={input}
@@ -2895,15 +2620,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     value={
                       settings.frontValidityText
                     }
-                    onChange={event =>
+                    onChange={(event) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
                           frontValidityText:
-                            event
-                              .target
+                            event.target
                               .value,
-                        }),
+                        })
                       )
                     }
                     className={input}
@@ -2917,43 +2641,47 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     value={
                       settings.backHeaderTitle
                     }
-                    onChange={event =>
+                    onChange={(event) =>
                       setSettings(
-                        current => ({
+                        (current) => ({
                           ...current,
                           backHeaderTitle:
-                            event
-                              .target
+                            event.target
                               .value,
-                        }),
+                        })
                       )
                     }
                     className={input}
                   />
                 </label>
 
+                <div className="md:col-span-2 p-3 rounded-xl bg-slate-50 border text-[10px] text-slate-600">
+                  Nama dan jabatan penandatangan
+                  mengikuti anggota yang dipilih
+                  pada QR Penandatangan Digital.
+                  Data wilayah penandatangan tidak
+                  ditampilkan pada KTA.
+                </div>
               </div>
 
               <label className="text-[10px] font-bold">
-
                 Ketentuan Belakang
 
                 <textarea
                   value={
                     settings.terms.join(
-                      '\n',
+                      '\n'
                     )
                   }
-                  onChange={event =>
+                  onChange={(event) =>
                     setSettings(
-                      current => ({
+                      (current) => ({
                         ...current,
-
                         terms:
-                          event.target.value.split(
-                            '\n',
-                          ),
-                      }),
+                          event.target
+                            .value
+                            .split('\n'),
+                      })
                     )
                   }
                   className={
@@ -2961,45 +2689,35 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     ' min-h-24'
                   }
                 />
-
               </label>
-
             </section>
 
-            {/* ===============================================
-                NTA REGION
-            =============================================== */}
-
+            {/* NTA */}
             <section className="p-4 rounded-2xl border border-purple-200 bg-purple-50 space-y-3">
-
               <div className="flex items-center gap-2 font-bold text-purple-950">
-
                 <MapPin />
-
                 <span>
                   Penerbitan NTA berdasarkan wilayah
                 </span>
-
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-
                 <select
                   value={
                     regionProvinceId
                   }
-                  onChange={event => {
+                  onChange={(event) => {
                     setRegionProvinceId(
                       event.target
-                        .value,
+                        .value
                     );
 
                     setRegionRegencyId(
-                      '',
+                      ''
                     );
 
                     setRegionDistrictId(
-                      '',
+                      ''
                     );
                   }}
                   className={input}
@@ -3010,24 +2728,24 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
                   {provinces
                     .filter(
-                      province =>
+                      (province) =>
                         province.id !==
-                        '00',
+                        '00'
                     )
-                    .map(province => (
-                      <option
-                        key={
-                          province.id
-                        }
-                        value={
-                          province.id
-                        }
-                      >
-                        {
-                          province.name
-                        }
-                      </option>
-                    ))}
+                    .map(
+                      (province) => (
+                        <option
+                          key={
+                            province.id
+                          }
+                          value={
+                            province.id
+                          }
+                        >
+                          {province.name}
+                        </option>
+                      )
+                    )}
                 </select>
 
                 <select
@@ -3037,14 +2755,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   disabled={
                     !regionProvinceId
                   }
-                  onChange={event => {
+                  onChange={(event) => {
                     setRegionRegencyId(
                       event.target
-                        .value,
+                        .value
                     );
 
                     setRegionDistrictId(
-                      '',
+                      ''
                     );
                   }}
                   className={input}
@@ -3054,7 +2772,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   </option>
 
                   {regencies.map(
-                    regency => (
+                    (regency) => (
                       <option
                         key={
                           regency.id
@@ -3063,11 +2781,9 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                           regency.id
                         }
                       >
-                        {
-                          regency.name
-                        }
+                        {regency.name}
                       </option>
-                    ),
+                    )
                   )}
                 </select>
 
@@ -3078,10 +2794,10 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   disabled={
                     !regionRegencyId
                   }
-                  onChange={event =>
+                  onChange={(event) =>
                     setRegionDistrictId(
                       event.target
-                        .value,
+                        .value
                     )
                   }
                   className={input}
@@ -3091,7 +2807,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   </option>
 
                   {districts.map(
-                    district => (
+                    (district) => (
                       <option
                         key={
                           district.id
@@ -3100,14 +2816,11 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                           district.id
                         }
                       >
-                        {
-                          district.name
-                        }
+                        {district.name}
                       </option>
-                    ),
+                    )
                   )}
                 </select>
-
               </div>
 
               <button
@@ -3130,19 +2843,12 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
                 Generate NTA
               </button>
-
             </section>
-
           </div>
 
-          {/* =================================================
-              LIVE PREVIEW
-          ================================================= */}
-
+          {/* RIGHT PREVIEW */}
           <div className="xl:col-span-4 bg-slate-950 p-5 flex flex-col items-center justify-center gap-4 min-h-[500px]">
-
             <div className="text-center">
-
               <p className="text-xs font-bold text-emerald-400">
                 LIVE PREVIEW
               </p>
@@ -3154,41 +2860,29 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   ? 'Bagian Depan'
                   : 'Bagian Belakang'}
               </p>
-
             </div>
 
             <DigitalMemberCard
               member={previewMember}
-              previewSettings={
-                settings
-              }
+              previewSettings={settings}
               showControls={false}
             />
 
             <div className="w-full max-w-sm p-3 rounded-xl bg-white/5 border border-white/10 text-[10px] text-slate-300">
-
               {loadingRemote
                 ? 'Memuat konfigurasi pusat...'
                 : 'Perubahan di panel ini belum dipublikasikan sampai tombol Simpan ditekan.'}
-
             </div>
-
           </div>
-
         </div>
 
-        {/* =================================================
-            FOOTER
-        ================================================= */}
-
+        {/* FOOTER */}
         <div className="p-4 border-t bg-slate-50 flex items-center justify-between gap-3">
-
           <div className="text-xs font-semibold text-slate-600">
             {message}
           </div>
 
           <div className="flex gap-2">
-
             <button
               onClick={handleReset}
               className="px-4 py-2 text-xs font-bold"
@@ -3215,13 +2909,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                 ? 'Menyimpan...'
                 : 'Simpan Pengaturan KTA'}
             </button>
-
           </div>
-
         </div>
-
       </div>
     </div>
   );
 };
+
+const CreditCardIcon = () => (
+  <LayoutTemplate className="w-4 h-4" />
+);
 ```
