@@ -143,6 +143,7 @@ const DB_FILE = path.join(DATA_DIR, 'saka-database.json');
 
 const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
+const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
 
 function normalizeManualAppsScriptUrl(value: unknown): string {
   const url = String(value || '').trim();
@@ -188,7 +189,7 @@ let db: DatabaseSchema = {
   config: {
     spreadsheetId: DEFAULT_SPREADSHEET_ID,
     spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
-    scriptUrl: '',
+    scriptUrl: DEFAULT_APPS_SCRIPT_URL,
     autoSync: true,
     autoRefreshIntervalSeconds: 6,
     lastSyncedAt: new Date().toISOString(),
@@ -592,7 +593,7 @@ setInterval(() => {
 
 // Proxy mutation to Google Apps Script Web App
 async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
-  const scriptUrl = String(normalizeManualAppsScriptUrl(requestedScriptUrl || '') || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '').trim();
+  const scriptUrl = String(normalizeManualAppsScriptUrl(requestedScriptUrl || '') || normalizeManualAppsScriptUrl(db.config.scriptUrl) || normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) || DEFAULT_APPS_SCRIPT_URL).trim();
   if (!scriptUrl) throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
 
   const res = await fetch(scriptUrl, {
@@ -1059,7 +1060,8 @@ app.get('/api/verify-member', async (req, res) => {
     // from the public browser, because QR verification must not depend on a
     // device-local configuration or on an arbitrary external endpoint.
     const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
-      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) ||
+      DEFAULT_APPS_SCRIPT_URL;
 
     let rows: Record<string, any>[] = [];
     let source = 'GOOGLE_APPS_SCRIPT';
