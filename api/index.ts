@@ -1111,22 +1111,37 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
         const endD = getColVal(row, ['Tanggal Selesai', 'endDate', 'col_8']) || '2026-09-22';
         const feeType = (getColVal(row, ['Jenis Biaya', 'Biaya', 'col_9']) || 'GRATIS').toUpperCase();
         const fee = parseFloat(getColVal(row, ['Nominal Biaya', 'col_10'])) || 0;
-        const phone = getColVal(row, ['Kontak Narahubung', 'Kontak WA', 'phone', 'col_11']) || '081299881122';
+        const phone = getColVal(row, ['Kontak WA', 'Kontak Narahubung', 'phone', 'col_12']) || '081299881122';
+        const districtId = getColVal(row, ['ID Kecamatan', 'districtId', 'col_29']) || '';
+        const districtName = getColVal(row, ['Kecamatan', 'districtName', 'col_30']) || '';
+        const uploadedByName = getColVal(row, ['Uploaded By Name', 'uploadedByName', 'col_13']) || 'Pimpinan Saka Pariwisata';
+        const uploadedByMemberId = getColVal(row, ['Uploaded By Member ID', 'uploadedByMemberId', 'col_14']) || '';
+        const uploadedByRole = getColVal(row, ['Uploaded By Role', 'uploadedByRole', 'col_15']) || 'SUPER_ADMIN';
+        const contentStatus = (getColVal(row, ['Content Status', 'contentStatus', 'col_16']) || 'APPROVED_PUBLISHED').toUpperCase();
+        const adminApprovalStatus = (getColVal(row, ['Admin Approval Status', 'adminApprovalStatus', 'col_17']) || 'APPROVED').toUpperCase();
+        const superAdminApprovalStatus = (getColVal(row, ['Super Admin Approval Status', 'superAdminApprovalStatus', 'col_20']) || 'APPROVED').toUpperCase();
+        const rejectionReason = getColVal(row, ['Alasan Penolakan', 'rejectionReason', 'col_23']) || '';
+        const bannerUrl = getColVal(row, ['Foto Banner', 'Banner URL', 'bannerUrl', 'col_24']) || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200&auto=format&fit=crop&q=80';
+        const description = getColVal(row, ['Deskripsi', 'description', 'col_25']) || `Kegiatan resmi Saka Pariwisata: ${title}. Terbuka untuk seluruh anggota Gerakan Pramuka dan masyarakat.`;
 
         return {
           id,
           title,
           slug: id,
-          description: `Kegiatan resmi Saka Pariwisata: ${title}. Terbuka untuk seluruh anggota Gerakan Pramuka dan masyarakat.`,
-          bannerUrl: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200&auto=format&fit=crop&q=80',
+          description,
+          bannerUrl,
           coverImage: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200&auto=format&fit=crop&q=80',
           category,
           organizerLevel: scale.includes('INTER') ? 'INTERNASIONAL' : scale.includes('PROV') ? 'PROVINSI' : scale.includes('KAB') ? 'KABUPATEN' : 'NASIONAL',
           organizerName: organizer,
           locationName: location,
           locationAddress: `${location}, ${prov}`,
+          provinceId: getColVal(row, ['ID Provinsi', 'provinceId', 'col_27']) || '',
           provinceName: prov,
-          regencyName: 'Pusat Kegiatan',
+          regencyId: getColVal(row, ['ID Kabupaten/Kota', 'regencyId', 'col_28']) || '',
+          regencyName: getColVal(row, ['Kabupaten/Kota', 'regencyName', 'col_7']) || 'Pusat Kegiatan',
+          districtId,
+          districtName,
           startDate: startD.includes('Date(') ? '2026-09-18' : startD,
           endDate: endD.includes('Date(') ? '2026-09-22' : endD,
           timeString: '08:00 - 17:00 WIB',
@@ -1138,8 +1153,13 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
           contactPhone: phone,
           feeType: feeType.includes('SUBSIDI') ? 'SUBSIDI' : feeType.includes('BERBAYAR') ? 'BERBAYAR' : 'GRATIS',
           feeAmount: fee,
-          uploadedByName: 'Pimpinan Saka Pariwisata',
-          uploadedByRole: 'SUPER_ADMIN'
+          uploadedByName,
+          uploadedByMemberId: uploadedByMemberId || undefined,
+          uploadedByRole,
+          contentStatus,
+          adminApprovalStatus,
+          superAdminApprovalStatus,
+          rejectionReason: rejectionReason || undefined
         };
       });
     }
@@ -2365,7 +2385,7 @@ app.get('/api/data', async (req, res) => {
     members: sanitizedMembers,
     tours: db.tours.filter(t => isSuperAdmin || (isOperator && contentBelongsToAdminJurisdiction(t, session)) || (session?.role === 'MEMBER' && String(t.authorMemberId || t.ownerId || '') === String(session.memberId || '')) || t.status === 'APPROVED_PUBLISHED'),
     culinaryItems: db.culinaryItems.filter(c => isSuperAdmin || (isOperator && contentBelongsToAdminJurisdiction(c, session)) || (session?.role === 'MEMBER' && String(c.authorMemberId || '') === String(session.memberId || '')) || c.status === 'APPROVED'),
-    activities: db.activities,
+    activities: db.activities.filter(a => isSuperAdmin || (isOperator && contentBelongsToAdminJurisdiction(a, session)) || (session?.role === 'MEMBER' && String(a.uploadedByMemberId || '') === String(session.memberId || '')) || (a.contentStatus === 'APPROVED_PUBLISHED' && a.isPublic !== false)),
     kridaModules: db.kridaModules || [],
     users: sanitizedUsers,
     auditLogs: sanitizedAuditLogs,
@@ -2632,6 +2652,43 @@ app.post('/api/mutate', async (req, res) => {
     }
   }
 
+  // AGENDA KEGIATAN: MEMBER dapat mengajukan/mengubah miliknya sendiri.
+  // Admin wilayah hanya boleh meninjau konten di yurisdiksinya.
+  // Super Admin melakukan persetujuan akhir.
+  if (type === 'ACTIVITY') {
+    const isMember = session?.role === 'MEMBER';
+    if (['CREATE', 'UPDATE'].includes(action)) {
+      if (!session || (!isMember && !isContentReviewer(session))) {
+        return res.status(403).json({ success: false, message: 'Hanya anggota terdaftar atau administrator yang dapat mengelola agenda.' });
+      }
+      if (isMember && action === 'UPDATE') {
+        const existingActivity = db.activities.find(a => String(a.id || '') === String(payload?.id || ''));
+        if (!existingActivity) {
+          return res.status(404).json({ success: false, message: 'Agenda kegiatan tidak ditemukan.' });
+        }
+        if (String(existingActivity.uploadedByMemberId || '') !== String(session.memberId || '')) {
+          return res.status(403).json({ success: false, message: 'Anda hanya dapat mengubah agenda milik Anda sendiri.' });
+        }
+      }
+    } else if (['APPROVE_ADMIN', 'APPROVE_SUPER_ADMIN', 'REJECT'].includes(action)) {
+      if (!isContentReviewer(session)) {
+        return res.status(403).json({ success: false, message: 'Wewenang reviewer diperlukan untuk memoderasi agenda.' });
+      }
+      if (action === 'APPROVE_ADMIN' && !isContentAdmin(session)) {
+        return res.status(403).json({ success: false, message: 'Persetujuan tahap Admin hanya dapat dilakukan oleh Admin wilayah.' });
+      }
+      if (action === 'APPROVE_SUPER_ADMIN' && !isSuperAdmin) {
+        return res.status(403).json({ success: false, message: 'Persetujuan akhir hanya dapat dilakukan oleh Super Admin.' });
+      }
+    } else if (action === 'DELETE') {
+      if (!session || (!isMember && !isContentReviewer(session))) {
+        return res.status(403).json({ success: false, message: 'Wewenang administrator atau pemilik agenda diperlukan untuk menghapus agenda.' });
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'Aksi agenda tidak dikenal.' });
+    }
+  }
+
   if (!requestScriptUrl) {
     return res.status(400).json({
       success: false,
@@ -2801,7 +2858,32 @@ app.post('/api/mutate', async (req, res) => {
       const rowForTour = (x: any) => [x.id,x.title||'',x.slug||x.id,x.contentType||'PACKAGE',x.category||'',x.description||'',x.pricePerPerson||0,x.durationDays||0,x.locationAddress||'',x.provinceName||'',x.regencyName||'',x.districtName||'',x.ownerName||'',x.ownerId||'',x.ownerType||'MEMBER',x.contactPhone||'',x.contactEmail||'',x.coverImage||'',JSON.stringify(x.galleryImages||[]),JSON.stringify(x.facilities||[]),JSON.stringify(x.itinerary||[]),x.krida||'',x.authorMemberId||'',x.authorName||'',x.adminApprovalStatus||'PENDING',x.adminApprovedAt||'',x.adminApprovedBy||'',x.superAdminApprovalStatus||'PENDING',x.superAdminApprovedAt||'',x.superAdminApprovedBy||'',x.status||'SUBMITTED',x.submittedAt||now,x.publishedAt||'',x.rejectionReason||'',x.viewsCount||0,x.featured?'TRUE':'FALSE',now];
       if (action === 'CREATE' || action === 'UPDATE') {
         const idx = db.tours.findIndex(t => t.id === tour.id); const existing = idx >= 0 ? db.tours[idx] : null;
-        if (isMember) tour={...(existing||{}),...tour,id:tour.id||`tour-${Date.now()}`,ownerType:'MEMBER',ownerId:String(session.memberId||''),ownerName:session.name||tour.ownerName||'Anggota Saka Pariwisata',authorMemberId:String(session.memberId||''),authorName:session.name||tour.authorName||'Anggota Saka Pariwisata',krida:tour.krida||existing?.krida||'Krida Pemandu',status:'SUBMITTED',adminApprovalStatus:'PENDING',superAdminApprovalStatus:'PENDING',submittedAt:existing?.submittedAt||now,publishedAt:undefined,reviewedBy:undefined,rejectionReason:undefined}; else tour={...(existing||{}),...tour};
+        if (isMember) {
+          const memberRecord = db.members.find(m => String(m.id) === String(session.memberId || ''));
+          if (!memberRecord) return res.status(403).json({ success: false, message: 'Data anggota aktif tidak ditemukan.' });
+          tour = {
+            ...(existing || {}), ...tour,
+            id: tour.id || `tour-${Date.now()}`,
+            ownerType: 'MEMBER',
+            ownerId: String(session.memberId || ''),
+            ownerName: session.name || tour.ownerName || 'Anggota Saka Pariwisata',
+            authorMemberId: String(session.memberId || ''),
+            authorName: session.name || tour.authorName || 'Anggota Saka Pariwisata',
+            provinceId: memberRecord.provinceId,
+            provinceName: memberRecord.provinceName,
+            regencyId: memberRecord.regencyId,
+            regencyName: memberRecord.regencyName,
+            districtName: memberRecord.districtName,
+            krida: tour.krida || existing?.krida || 'Krida Pemandu',
+            status: 'SUBMITTED',
+            adminApprovalStatus: 'PENDING',
+            superAdminApprovalStatus: 'PENDING',
+            submittedAt: existing?.submittedAt || now,
+            publishedAt: undefined,
+            reviewedBy: undefined,
+            rejectionReason: undefined
+          };
+        } else tour={...(existing||{}),...tour};
         const ti=db.tours.findIndex(t=>t.id===tour.id); if(ti>=0) db.tours[ti]=tour; else db.tours.unshift(tour);
         await forwardMutation({action:'UPSERT_ROW',sheet:'Paket_Wisata',id:tour.id,rowData:rowForTour(tour)});
       } else if (['APPROVE_ADMIN','APPROVE_SUPER_ADMIN','REJECT'].includes(action)) {
@@ -2815,42 +2897,156 @@ app.post('/api/mutate', async (req, res) => {
     } else if (type === 'CULINARY') {
       let item={...(payload||{})}; const now=new Date().toISOString(); const isMember=session?.role==='MEMBER';
       const rowForCulinary=(x:any)=>[x.id,x.name||'',x.kind||'KULINER',x.krida||'Krida Kuliner & Cinderamata',x.priceEstimate||0,x.authorName||'',x.contactPhone||'',x.provinceName||'',x.regencyName||'',x.imageUrl||'',x.categoryLabel||'',x.description||'',x.kridaCategory||'',x.authorMemberId||'',x.authorNta||'',x.districtId||'',x.districtName||'',x.address||'',x.contactEmail||'',JSON.stringify(x.galleryImages||[]),JSON.stringify(x.tags||[]),x.adminApprovalStatus||'PENDING',x.adminApprovedAt||'',x.adminApprovedBy||'',x.superAdminApprovalStatus||'PENDING',x.superAdminApprovedAt||'',x.superAdminApprovedBy||'',x.status||'PENDING_APPROVAL',x.submittedAt||now,x.createdAt||now,x.rejectionReason||'',x.featured?'TRUE':'FALSE',now];
-      if(action==='CREATE'||action==='UPDATE'){const idx=db.culinaryItems.findIndex(c=>c.id===item.id);const existing=idx>=0?db.culinaryItems[idx]:null;if(isMember)item={...(existing||{}),...item,id:item.id||`culinary-${Date.now()}`,authorMemberId:String(session.memberId||''),authorName:session.name||item.authorName||'Anggota Saka Pariwisata',authorRole:'MEMBER',status:'PENDING_APPROVAL',adminApprovalStatus:'PENDING',superAdminApprovalStatus:'PENDING',submittedAt:existing?.submittedAt||now,rejectionReason:undefined};else item={...(existing||{}),...item};const ti=db.culinaryItems.findIndex(c=>c.id===item.id);if(ti>=0)db.culinaryItems[ti]=item;else db.culinaryItems.unshift(item);await forwardMutation({action:'UPSERT_ROW',sheet:'Kuliner_Cinderamata',id:item.id,rowData:rowForCulinary(item)});}
+      if(action==='CREATE'||action==='UPDATE'){const idx=db.culinaryItems.findIndex(c=>c.id===item.id);const existing=idx>=0?db.culinaryItems[idx]:null;if(isMember){const memberRecord=db.members.find(m=>String(m.id)===String(session.memberId||''));if(!memberRecord)return res.status(403).json({success:false,message:'Data anggota aktif tidak ditemukan.'});item={...(existing||{}),...item,id:item.id||`culinary-${Date.now()}`,authorMemberId:String(session.memberId||''),authorName:session.name||item.authorName||'Anggota Saka Pariwisata',authorRole:'MEMBER',provinceId:memberRecord.provinceId,provinceName:memberRecord.provinceName,regencyId:memberRecord.regencyId,regencyName:memberRecord.regencyName,districtId:memberRecord.districtId,districtName:memberRecord.districtName,status:'PENDING_APPROVAL',adminApprovalStatus:'PENDING',superAdminApprovalStatus:'PENDING',submittedAt:existing?.submittedAt||now,rejectionReason:undefined};}else item={...(existing||{}),...item};const ti=db.culinaryItems.findIndex(c=>c.id===item.id);if(ti>=0)db.culinaryItems[ti]=item;else db.culinaryItems.unshift(item);await forwardMutation({action:'UPSERT_ROW',sheet:'Kuliner_Cinderamata',id:item.id,rowData:rowForCulinary(item)});}
       else if(['APPROVE_ADMIN','APPROVE_SUPER_ADMIN','REJECT'].includes(action)){const idx=db.culinaryItems.findIndex(c=>c.id===item.id);if(idx<0)return res.status(404).json({success:false,message:'Posting kuliner/cinderamata tidak ditemukan.'});const current=db.culinaryItems[idx];if(action==='APPROVE_ADMIN' && !contentBelongsToAdminJurisdiction(current, session)) return res.status(403).json({success:false,message:'Posting ini berada di luar wilayah kewenangan Admin Anda.'});if(action==='APPROVE_ADMIN'){current.adminApprovalStatus='APPROVED';current.adminApprovedAt=now;current.adminApprovedBy=session.name||session.username||'Admin';current.status='PENDING_APPROVAL';}else if(action==='APPROVE_SUPER_ADMIN'){if(current.adminApprovalStatus!=='APPROVED')return res.status(409).json({success:false,message:'Konten belum disetujui Admin.'});current.superAdminApprovalStatus='APPROVED';current.superAdminApprovedAt=now;current.superAdminApprovedBy=session.name||session.username||'Super Admin';current.status='APPROVED';current.approvedAt=now;current.approvedBy=current.superAdminApprovedBy;current.approverRole='SUPER_ADMIN';current.rejectionReason=undefined;}else{current.status='REJECTED';current.rejectionReason=String(payload.rejectionReason||'Posting ditolak oleh reviewer.');if(isSuperAdmin)current.superAdminApprovalStatus='REJECTED';else current.adminApprovalStatus='REJECTED';}await forwardMutation({action:'UPSERT_ROW',sheet:'Kuliner_Cinderamata',id:current.id,rowData:rowForCulinary(current)});item=current;}
       else if(action==='DELETE'){db.culinaryItems=db.culinaryItems.filter(c=>c.id!==payload.id);await forwardMutation({action:'DELETE_ROW',sheet:'Kuliner_Cinderamata',id:payload.id});}
     } else if (type === 'ACTIVITY') {
-      const act = payload;
+      let act = { ...(payload || {}) };
+      const now = new Date().toISOString();
+      const isMember = session?.role === 'MEMBER';
+      const rowForActivity = (x: any) => [
+        x.id || '', x.title || '', x.category || '', x.organizerLevel || '', x.organizerName || '',
+        x.locationName || '', x.provinceName || '', x.regencyName || '', x.startDate || '', x.endDate || '',
+        x.feeType || 'GRATIS', x.feeAmount || 0, x.contactPhone || '',
+        x.uploadedByName || '', x.uploadedByMemberId || '', x.uploadedByRole || 'MEMBER', x.contentStatus || 'SUBMITTED',
+        x.adminApprovalStatus || 'PENDING', x.adminApprovedAt || '', x.adminApprovedBy || '',
+        x.superAdminApprovalStatus || 'PENDING', x.superAdminApprovedAt || '', x.superAdminApprovedBy || '',
+        x.rejectionReason || '', x.bannerUrl || '', x.description || '', now,
+        x.provinceId || '', x.regencyId || '', x.districtId || '', x.districtName || ''
+      ];
+
       if (action === 'CREATE' || action === 'UPDATE') {
         const idx = db.activities.findIndex(a => a.id === act.id);
-        if (idx !== -1) {
-          db.activities[idx] = { ...db.activities[idx], ...act };
-        } else {
-          db.activities.unshift(act);
+        const existing = idx >= 0 ? db.activities[idx] : null;
+        if (isMember) {
+          const memberRecord = db.members.find(m => String(m.id) === String(session.memberId || ''));
+          if (!memberRecord) return res.status(403).json({ success: false, message: 'Data anggota aktif tidak ditemukan.' });
+          act = {
+            ...(existing || {}), ...act,
+            id: act.id || `activity-${Date.now()}`,
+            slug: act.slug || `${act.title || 'agenda'}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            uploadedByRole: 'MEMBER',
+            uploadedByName: session.name || act.uploadedByName || 'Anggota Saka Pariwisata',
+            uploadedByMemberId: String(session.memberId || ''),
+            provinceId: memberRecord.provinceId,
+            provinceName: memberRecord.provinceName,
+            regencyId: memberRecord.regencyId,
+            regencyName: memberRecord.regencyName,
+            districtId: memberRecord.districtId,
+            districtName: memberRecord.districtName,
+            contentStatus: 'SUBMITTED',
+            adminApprovalStatus: 'PENDING',
+            superAdminApprovalStatus: 'PENDING',
+            isPublic: false,
+            rejectionReason: undefined
+          };
+        } else if (action === 'CREATE') {
+          if (!isSuperAdmin && !contentBelongsToAdminJurisdiction(act, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda yang dibuat harus berada di dalam wilayah kewenangan Admin Anda.' });
+          }
+          if (isSuperAdmin) {
+            act.contentStatus = 'APPROVED_PUBLISHED';
+            act.adminApprovalStatus = 'APPROVED';
+            act.superAdminApprovalStatus = 'APPROVED';
+            act.isPublic = true;
+          } else {
+            // Agenda yang dibuat Admin wilayah tetap menunggu penerbitan Super Admin.
+            act.contentStatus = 'SUBMITTED';
+            act.adminApprovalStatus = 'APPROVED';
+            act.adminApprovedAt = now;
+            act.adminApprovedBy = session.name || session.username || 'Admin';
+            act.superAdminApprovalStatus = 'PENDING';
+            act.isPublic = false;
+          }
+        } else if (action === 'UPDATE') {
+          if (!existing) return res.status(404).json({ success: false, message: 'Agenda kegiatan tidak ditemukan.' });
+          if (!isSuperAdmin && !contentBelongsToAdminJurisdiction(existing, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda berada di luar wilayah kewenangan Admin Anda.' });
+          }
+          // Operator tidak boleh memindahkan agenda ke luar yurisdiksinya.
+          if (!isSuperAdmin && !contentBelongsToAdminJurisdiction({ ...existing, ...act }, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda tidak dapat dipindahkan ke luar wilayah kewenangan Admin Anda.' });
+          }
+          if (!isSuperAdmin) {
+            // Perubahan oleh Admin harus melewati penerbitan Super Admin lagi.
+            act.contentStatus = 'SUBMITTED';
+            act.adminApprovalStatus = 'APPROVED';
+            act.adminApprovedAt = now;
+            act.adminApprovedBy = session.name || session.username || 'Admin';
+            act.superAdminApprovalStatus = 'PENDING';
+            act.superAdminApprovedAt = undefined;
+            act.superAdminApprovedBy = undefined;
+            act.isPublic = false;
+          }
         }
-        forwardMutation({
+        if (idx >= 0) db.activities[idx] = { ...db.activities[idx], ...act };
+        else db.activities.unshift(act);
+
+        await forwardMutation({
           action: 'UPSERT_ROW',
           sheet: 'Agenda_Kegiatan',
           id: act.id,
-          rowData: [
-            act.id,
-            act.title,
-            act.category,
-            act.organizerLevel,
-            act.organizerName,
-            act.locationName,
-            act.provinceName,
-            act.startDate,
-            act.endDate,
-            act.feeType,
-            act.feeAmount,
-            act.contactPhone,
-            act.uploadedByName || 'Pimpinan Saka Pariwisata',
-            new Date().toISOString()
-          ]
+          rowData: rowForActivity(act)
         });
+      } else if (['APPROVE_ADMIN', 'APPROVE_SUPER_ADMIN', 'REJECT'].includes(action)) {
+        const idx = db.activities.findIndex(a => a.id === act.id);
+        if (idx < 0) return res.status(404).json({ success: false, message: 'Agenda kegiatan tidak ditemukan.' });
+        const current = db.activities[idx];
+
+        if (action === 'APPROVE_ADMIN') {
+          if (!isContentAdmin(session) || !contentBelongsToAdminJurisdiction(current, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda berada di luar wilayah kewenangan Admin Anda.' });
+          }
+          if (current.contentStatus === 'APPROVED_PUBLISHED') {
+            return res.status(409).json({ success: false, message: 'Agenda sudah diterbitkan.' });
+          }
+          current.adminApprovalStatus = 'APPROVED';
+          current.adminApprovedAt = now;
+          current.adminApprovedBy = session.name || session.username || 'Admin';
+          current.superAdminApprovalStatus = current.superAdminApprovalStatus === 'APPROVED' ? 'PENDING' : (current.superAdminApprovalStatus || 'PENDING');
+          current.contentStatus = 'SUBMITTED';
+          current.isPublic = false;
+        } else if (action === 'APPROVE_SUPER_ADMIN') {
+          if (current.adminApprovalStatus !== 'APPROVED') {
+            return res.status(409).json({ success: false, message: 'Agenda belum disetujui Admin wilayah.' });
+          }
+          current.superAdminApprovalStatus = 'APPROVED';
+          current.superAdminApprovedAt = now;
+          current.superAdminApprovedBy = session.name || session.username || 'Super Admin';
+          current.contentStatus = 'APPROVED_PUBLISHED';
+          current.isPublic = true;
+          current.rejectionReason = undefined;
+        } else {
+          if (!isSuperAdmin && !contentBelongsToAdminJurisdiction(current, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda berada di luar wilayah kewenangan Admin Anda.' });
+          }
+          current.contentStatus = 'REJECTED';
+          current.isPublic = false;
+          current.rejectionReason = String(payload.rejectionReason || 'Agenda ditolak oleh reviewer.');
+          if (isSuperAdmin) current.superAdminApprovalStatus = 'REJECTED';
+          else current.adminApprovalStatus = 'REJECTED';
+        }
+
+        await forwardMutation({
+          action: 'UPSERT_ROW',
+          sheet: 'Agenda_Kegiatan',
+          id: current.id,
+          rowData: rowForActivity(current)
+        });
+        act = current;
       } else if (action === 'DELETE') {
+        const idx = db.activities.findIndex(a => a.id === payload.id);
+        if (idx < 0) return res.status(404).json({ success: false, message: 'Agenda kegiatan tidak ditemukan.' });
+        const current = db.activities[idx];
+        if (session?.role === 'MEMBER') {
+          if (String(current.uploadedByMemberId || '') !== String(session.memberId || '')) {
+            return res.status(403).json({ success: false, message: 'Anda hanya dapat menghapus agenda milik Anda sendiri.' });
+          }
+        } else if (!isSuperAdmin && !contentBelongsToAdminJurisdiction(current, session)) {
+          return res.status(403).json({ success: false, message: 'Agenda berada di luar wilayah kewenangan Admin Anda.' });
+        }
         db.activities = db.activities.filter(a => a.id !== payload.id);
-        forwardMutation({
+        await forwardMutation({
           action: 'DELETE_ROW',
           sheet: 'Agenda_Kegiatan',
           id: payload.id
