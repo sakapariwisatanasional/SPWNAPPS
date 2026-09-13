@@ -2469,6 +2469,7 @@ app.post('/api/admin/assign', async (req, res) => {
   }
 
   const body = req.body || {};
+  const requestScriptUrl = normalizeManualAppsScriptUrl(body.scriptUrl);
   const memberId = String(body.memberId || '').trim();
   const userId = String(body.userId || '').trim();
   const role = String(body.role || '').trim().toUpperCase();
@@ -2521,6 +2522,7 @@ app.post('/api/admin/revoke', async (req, res) => {
   const session = getSessionUser(req);
   if (session?.role !== 'SUPER_ADMIN') return res.status(403).json({ success:false, message:'Hanya Super Admin yang dapat mencabut Admin wilayah.' });
   const body = req.body || {};
+  const requestScriptUrl = normalizeManualAppsScriptUrl(body.scriptUrl);
   const memberId = String(body.memberId || '').trim();
   const userId = String(body.userId || '').trim();
   const targetUser = db.users.find(u => (userId && String(u.id || '') === userId) || (memberId && String(u.memberId || '') === memberId));
