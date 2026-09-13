@@ -1866,15 +1866,15 @@ class StorageService {
 
   public async syncWithServer(): Promise<boolean> {
     const token = this.getAuthToken();
-    if (!token) return false;
 
     try {
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
       const response = await fetch('/api/data', {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include'
+        headers,
+        credentials: 'include',
+        cache: 'no-store'
       });
 
       if (!response.ok) return false;
