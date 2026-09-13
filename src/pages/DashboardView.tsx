@@ -520,7 +520,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <TourPackageCarouselSection packages={safeTourPackages} />
           </div>
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
-            <CulinarySouvenirGallerySection items={safeCulinaryItems} />
+            <CulinarySouvenirGallerySection
+              items={safeCulinaryItems}
+              currentUser={currentUser}
+              onOpenFormModal={onOpenCulinaryFormModal}
+            />
           </div>
         </div>
       </div>
