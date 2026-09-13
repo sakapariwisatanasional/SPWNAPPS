@@ -82,19 +82,6 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
   };
 
   // Popular province quick filter buttons (wrap naturally, no horizontal scroll)
-  const popularProvinces = [
-    { id: 'ALL', name: 'Semua Wilayah' },
-    { id: '32', name: 'Jawa Barat' },
-    { id: '31', name: 'DKI Jakarta' },
-    { id: '34', name: 'DI Yogyakarta' },
-    { id: '35', name: 'Jawa Timur' },
-    { id: '33', name: 'Jawa Tengah' },
-    { id: '51', name: 'Bali' },
-    { id: '13', name: 'Sumatera Barat' },
-    { id: '73', name: 'Sulawesi Selatan' },
-    { id: '52', name: 'NTB' },
-    { id: '53', name: 'NTT' }
-  ];
 
   const kridaFilterList: { id: string; label: string; badge: string; color: string }[] = [
     { id: 'ALL', label: 'Semua Spesialisasi', badge: 'Semua Krida', color: 'slate' },
@@ -405,55 +392,8 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Popular Province Pills (WRAPPED NATURALLY - NO SCROLLING) */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              <span>Pilihan Wilayah Cepat:</span>
-              {currentProvinceId !== 'ALL' && (
-                <button
-                  type="button"
-                  onClick={() => handleProvinceSelect('ALL')}
-                  className="text-purple-400 hover:text-purple-300 cursor-pointer capitalize font-bold text-xs"
-                >
-                  Tampilkan Semua Wilayah
-                </button>
-              )}
-            </div>
-            
-            {/* Flex Wrap Container - Zero Horizontal Scroll */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {popularProvinces.map((prov) => {
-                const isSelected = currentProvinceId === prov.id;
-                const count = prov.id === 'ALL' 
-                  ? members.filter(m => m.status === 'ACTIVE').length 
-                  : members.filter(m => m.provinceId === prov.id && m.status === 'ACTIVE').length;
-
-                return (
-                  <button
-                    key={prov.id}
-                    type="button"
-                    onClick={() => handleProvinceSelect(prov.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      isSelected
-                        ? isDark
-                          ? 'bg-purple-600 text-white shadow-md shadow-purple-950/50'
-                          : 'bg-emerald-700 text-white shadow-md shadow-emerald-950/20'
-                        : isDark
-                          ? 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                    }`}
-                  >
-                    <span>{prov.name}</span>
-                    <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
-                      isSelected ? 'bg-white/20 text-white' : isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Wilayah cepat dihapus agar form tetap ringkas.
+              Filter wilayah utama di atas tetap menjadi satu-satunya kontrol wilayah. */}
 
           {/* Row 3: Krida Filter Pills & View Switcher (WRAPPED NATURALLY) */}
           <div className="pt-2 border-t border-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
