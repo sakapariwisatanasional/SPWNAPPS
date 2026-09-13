@@ -195,6 +195,14 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({ isOpen, onClose, onSuc
               <label className="text-[9px] font-bold">Margin QR{numberInput((settings as any).signerQrPadding??2,v=>setSettings(s=>({...s,signerQrPadding:v})))}</label>
             </div>
             <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-2">
+              <div className="text-[10px] font-black text-purple-950">Posisi Nama Penandatangan</div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-[9px] font-bold">X Nama{numberInput((settings as any).signerNameXOffset??0,v=>setSettings(s=>({...s,signerNameXOffset:v})))}</label>
+                <label className="text-[9px] font-bold">Y Nama{numberInput((settings as any).signerNameYOffset??0,v=>setSettings(s=>({...s,signerNameYOffset:v})))}</label>
+              </div>
+              <p className="text-[9px] text-slate-500">X/Y ini menggeser nama tanpa memindahkan jabatan.</p>
+            </div>
+            <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-2">
               <div className="text-[10px] font-black text-purple-950">Tanggal Penerbitan</div>
               <input value={settings.issueLocationDate || ''} onChange={e=>setSettings(s=>({...s,issueLocationDate:e.target.value}))} className={input} placeholder="Contoh: Jakarta, 14 Agustus 2026"/>
               <div className="grid grid-cols-2 gap-2">
