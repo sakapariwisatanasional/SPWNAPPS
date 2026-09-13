@@ -1885,7 +1885,47 @@ class StorageService {
       }
 
       if (Array.isArray(data.users) && data.users.length > 0) {
-        this.setUsers(data.users as CurrentUser[]);
+        const serverUsers = data.users as CurrentUser[];
+        this.setUsers(serverUsers);
+
+        // Sinkronkan hak Admin wilayah dari sheet Users ke objek Member.
+        // Tanpa ini, polling /api/data dapat mengembalikan data Anggota lalu
+        // menghapus kembali isOperator yang sebelumnya sudah dicentang lokal.
+        const roleByMemberId = new Map<string, CurrentUser>();
+        serverUsers.forEach((user: any) => {
+          const mid = String(user?.memberId || '').trim();
+          if (mid) roleByMemberId.set(mid, user);
+        });
+
+        const currentMembers = this.getMembers();
+        if (Array.isArray(currentMembers) && currentMembers.length > 0) {
+          const mergedMembers = currentMembers.map((member: any) => {
+            const user = roleByMemberId.get(String(member?.id || '').trim());
+            if (!user) return member;
+
+            const role = String(user.role || 'MEMBER').toUpperCase();
+            const isOperator = role === 'ADMIN_PROVINCE' || role === 'ADMIN_REGENCY' || role === 'ADMIN_BRANCH';
+
+            if (!isOperator) {
+              return {
+                ...member,
+                isOperator: false,
+                operatorRole: undefined,
+                operatorJurisdictionId: undefined,
+                operatorJurisdictionName: undefined
+              };
+            }
+
+            return {
+              ...member,
+              isOperator: true,
+              operatorRole: role,
+              operatorJurisdictionId: user.jurisdictionId || undefined,
+              operatorJurisdictionName: user.jurisdictionName || undefined
+            };
+          });
+          this.setMembers(mergedMembers);
+        }
       }
 
       if (Array.isArray(data.auditLogs)) {
