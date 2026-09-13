@@ -179,56 +179,43 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
             borderColor:(settings as any).photoBorderColor ?? '#fcd34d'
           }}><img src={photo} alt={member.fullName} className="w-full h-full" style={{objectFit:(settings as any).photoObjectFit || 'cover'}}/></div>}
           {settings.showQrCode && (() => {
+            // QR standar: tidak memakai efek visual tambahan.
+            // Posisi dan ukuran tetap mengikuti setting yang sudah tersimpan.
             const qrPercent = Math.max(5, Math.min(60, Number(settings.qrSize ?? 22)));
             const qrX = Math.max(0, Math.min(100 - qrPercent, Number(settings.qrX ?? 78)));
             const qrY = Math.max(0, Math.min(100 - qrPercent, Number(settings.qrY ?? 30)));
-            const qrPadding = Math.max(0, Number(settings.qrPadding ?? 2));
-            const qrBorderWidth = Math.max(0, Number(settings.qrBorderWidth ?? 1));
-            const qrBorderRadius = Math.max(0, Number(settings.qrBorderRadius ?? 6));
-            const qrOuterPx = Math.max(40, Math.round(Math.min(widthPx, heightPx) * (qrPercent / 100)));
-            const qrInnerPx = Math.max(24, qrOuterPx - (qrPadding * 2) - (qrBorderWidth * 2));
+            const qrPx = Math.max(40, Math.round(Math.min(widthPx, heightPx) * (qrPercent / 100)));
 
             return (
               <div
-                className={`absolute flex items-center justify-center ${onPreviewSettingsChange ? 'cursor-move select-none ring-1 ring-transparent hover:ring-emerald-400/80' : ''}`}
+                className={`absolute flex items-center justify-center ${onPreviewSettingsChange ? 'cursor-move select-none' : ''}`}
                 onPointerDown={handleQrPointerDown}
                 title={onPreviewSettingsChange ? 'Seret untuk memindahkan QR Code' : undefined}
                 style={{
                   left: `${qrX}%`,
                   top: `${qrY}%`,
                   width: `${qrPercent}%`,
-                  aspectRatio: '1 / 1',
-                  padding: `${qrPadding}px`,
-                  boxSizing: 'border-box',
-                  background: settings.qrBackgroundColor || '#ffffff',
-                  border: `${qrBorderWidth}px solid ${settings.qrBorderColor || '#ffffff'}`,
-                  borderRadius: `${qrBorderRadius}px`,
-                  overflow: 'hidden',
+                  height: `${qrPercent}%`,
+                  padding: 0,
+                  margin: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 0,
+                  boxShadow: 'none',
+                  overflow: 'visible',
                   touchAction: 'none'
                 }}
               >
-                <div
-                  className="flex items-center justify-center overflow-hidden"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    minWidth: 0,
-                    minHeight: 0
-                  }}
-                >
-                  <KtaQrCode
-                    member={member}
-                    size={qrInnerPx}
-                    showLabel={false}
-                    interactive={false}
-                    className="!bg-transparent !p-0 !rounded-none !shadow-none !border-0"
-                    margin={0}
-                    lightColor="rgba(255,255,255,0)"
-                    borderWidth={0}
-                    borderRadius={0}
-                    borderColor="transparent"
-                  />
-                </div>
+                <KtaQrCode
+                  member={member}
+                  size={qrPx}
+                  showLabel={false}
+                  interactive={false}
+                  className="!bg-transparent !p-0 !m-0 !rounded-none !shadow-none !border-0"
+                  margin={2}
+                  lightColor="#ffffff"
+                  darkColor={(settings as any).qrDarkColor || '#1e0842'}
+                />
               </div>
             );
           })()}
@@ -255,14 +242,11 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
             const signer = signerId ? members.find(m => m.id === signerId) : undefined;
             if (!signer) return null;
 
+            // QR penandatangan standar tanpa efek visual tambahan.
             const qrPercent = Math.max(8, Math.min(35, Number((settings as any).signerQrSize ?? 18)));
             const qrX = Math.max(0, Math.min(100 - qrPercent, Number((settings as any).signerQrX ?? 68)));
             const qrY = Math.max(0, Math.min(100 - qrPercent, Number((settings as any).signerQrY ?? 62)));
-            const qrPadding = Math.max(0, Number((settings as any).signerQrPadding ?? 2));
-            const qrBorderWidth = Math.max(0, Number((settings as any).signerQrBorderWidth ?? 0));
-            const qrBorderRadius = Math.max(0, Number((settings as any).signerQrBorderRadius ?? 4));
-            const qrOuterPx = Math.max(40, Math.round(Math.min(widthPx, heightPx) * (qrPercent / 100)));
-            const qrInnerPx = Math.max(24, qrOuterPx - (qrPadding * 2) - (qrBorderWidth * 2));
+            const qrPx = Math.max(40, Math.round(Math.min(widthPx, heightPx) * (qrPercent / 100)));
 
             return (
               <div
@@ -271,34 +255,26 @@ export const DigitalMemberCard: React.FC<Props> = ({ member, onEditCard, onPrint
                   left: `${qrX}%`,
                   top: `${qrY}%`,
                   width: `${qrPercent}%`,
-                  aspectRatio: '1 / 1'
+                  height: `${qrPercent}%`,
+                  padding: 0,
+                  margin: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 0,
+                  boxShadow: 'none',
+                  overflow: 'visible'
                 }}
               >
-                <div
-                  className="flex items-center justify-center overflow-hidden"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    padding: `${qrPadding}px`,
-                    boxSizing: 'border-box',
-                    background: (settings as any).signerQrBackgroundColor || '#ffffff',
-                    border: `${qrBorderWidth}px solid ${(settings as any).signerQrBorderColor || '#ffffff'}`,
-                    borderRadius: `${qrBorderRadius}px`
-                  }}
-                >
-                  <KtaQrCode
-                    member={signer}
-                    size={qrInnerPx}
-                    showLabel={false}
-                    interactive={false}
-                    className="!bg-transparent !p-0 !rounded-none !shadow-none !border-0"
-                    margin={0}
-                    lightColor="rgba(255,255,255,0)"
-                    borderWidth={0}
-                    borderRadius={0}
-                    borderColor="transparent"
-                  />
-                </div>
+                <KtaQrCode
+                  member={signer}
+                  size={qrPx}
+                  showLabel={false}
+                  interactive={false}
+                  className="!bg-transparent !p-0 !m-0 !rounded-none !shadow-none !border-0"
+                  margin={2}
+                  lightColor="#ffffff"
+                  darkColor={(settings as any).signerQrDarkColor || '#1e0842'}
+                />
                 <div className="text-[6px] flex items-center gap-1">
                   <ShieldCheck className="w-2.5 h-2.5" />
                   PENANDATANGAN TERVERIFIKASI
