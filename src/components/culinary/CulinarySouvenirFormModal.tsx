@@ -193,7 +193,14 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       setRegencyId(initReg);
       setDistrictId(initDist);
     }
-  }, [isOpen, editItem, currentMember, currentUser, initialKind]);
+  }, [
+    isOpen,
+    editItem?.id,
+    currentUser.memberId,
+    currentUser.id,
+    currentUser.jurisdictionId,
+    initialKind
+  ]);
 
   // Update regencies when province changes
   useEffect(() => {
