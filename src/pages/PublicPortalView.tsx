@@ -656,7 +656,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                     value={verifyInput}
                     onChange={(e) => setVerifyInput(e.target.value)}
                     placeholder="Ketik Nomor Anggota / NTA / Token..."
-                    className="bg-transparent outline-none w-full text-xs sm:text-sm placeholder:text-purple-200/50 font-mono text-white"
+                    className="kta-verification-input bg-transparent outline-none w-full text-xs sm:text-sm placeholder:text-purple-200/50 font-mono text-white"
                   />
                   {verifyInput && (
                     <button
