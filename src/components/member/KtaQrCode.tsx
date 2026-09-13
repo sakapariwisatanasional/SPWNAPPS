@@ -21,9 +21,7 @@ export interface KtaQrCodeProps {
   lightColor?: string;
   showLabel?: boolean;
   interactive?: boolean;
-  borderWidth?: number;
-  borderColor?: string;
-  borderRadius?: number;
+  margin?: number;
   onVerifyClick?: (member: Member) => void;
 }
 
@@ -32,19 +30,9 @@ export interface KtaQrCodeProps {
  * Saat discan oleh kamera smartphone manapun, langsung membuka halaman profil KTA anggota ini.
  */
 export function getMemberVerificationUrl(member: Member): string {
-  const origin = typeof window !== 'undefined'
-    ? window.location.origin
-    : 'https://sakapariwisata-nasional.vercel.app';
-
-  // QR membawa dua identitas. Nomor KTA menjadi identitas utama, sedangkan
-  // memberId menjadi fallback permanen bila Nomor KTA diedit oleh SuperAdmin.
-  const verifyId = String(member.nationalMemberNumber || '').trim();
-  const memberId = String(member.id || member.userId || '').trim();
-  const params = new URLSearchParams();
-  if (verifyId) params.set('verifyId', verifyId);
-  if (memberId) params.set('memberId', memberId);
-  if (!verifyId && memberId) params.set('id', memberId);
-  return `${origin}/verify?${params.toString()}`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sakapariwisata-nasional.vercel.app';
+  const nta = member.nationalMemberNumber || member.id;
+  return `${origin}/verify?verifyId=${encodeURIComponent(member.verificationToken || member.id || nta)}`;
 }
 
 export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
@@ -55,9 +43,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
   lightColor = '#ffffff',
   showLabel = true,
   interactive = true,
-  borderWidth = 1,
-  borderColor = '#c4b5fd',
-  borderRadius = 12,
+  margin = 4,
   onVerifyClick
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
@@ -76,7 +62,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
     // QR Kecil Kartu
     QRCode.toDataURL(profileUrl, {
       width: Math.max(256, Math.round(size * 5)),
-      margin: 4,
+      margin,
       color: {
         dark: darkColor,
         light: lightColor
@@ -91,7 +77,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
     // QR Resolusi Tinggi
     QRCode.toDataURL(profileUrl, {
       width: 1024,
-      margin: 4,
+      margin,
       color: {
         dark: darkColor,
         light: lightColor
@@ -164,10 +150,9 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
     <>
       {/* Container QR Code Kartu */}
       <div 
-        className={`flex flex-col items-center flex-shrink-0 bg-white p-1 shadow-md transition-all ${
+        className={`flex flex-col items-center flex-shrink-0 bg-white p-1 rounded-xl shadow-md border border-purple-200/50 transition-all ${
           interactive ? 'hover:scale-105 hover:shadow-lg cursor-pointer group/qr relative' : ''
         } ${className}`}
-        style={{ border: `${Math.max(0, borderWidth)}px solid ${borderColor}`, borderRadius: `${Math.max(0, borderRadius)}px`, boxSizing: 'border-box' }}
         onClick={(e) => {
           if (!interactive) return;
           e.stopPropagation();
@@ -181,7 +166,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
               src={qrDataUrl} 
               alt="QR Code KTA" 
               style={{ width: `${size}px`, height: `${size}px` }}
-              className="object-contain"
+              className="object-contain rounded-lg"
             />
           ) : (
             <div 
@@ -193,8 +178,15 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
           )}
 
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="bg-white rounded-full shadow-xs border border-purple-100 flex items-center justify-center" style={{ width: Math.max(12, Math.min(16, Math.round(size * 0.16))), height: Math.max(12, Math.min(16, Math.round(size * 0.16))), padding: 2 }}>
-              <SakaLogo size={Math.max(8, Math.min(12, Math.round(size * 0.12)))} />
+            <div
+              className="bg-white rounded-full shadow-xs border border-purple-100 flex items-center justify-center"
+              style={{
+                width: Math.max(14, Math.round(size * 0.18)),
+                height: Math.max(14, Math.round(size * 0.18)),
+                padding: Math.max(2, Math.round(size * 0.025))
+              }}
+            >
+              <SakaLogo size={Math.max(9, Math.round(size * 0.13))} />
             </div>
           </div>
         </div>
