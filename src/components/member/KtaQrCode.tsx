@@ -11,7 +11,6 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Member } from '../../types';
-import { SakaLogo } from '../common/SakaLogo';
 
 export interface KtaQrCodeProps {
   member: Member;
@@ -92,7 +91,7 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [profileUrl, size, darkColor, lightColor]);
+  }, [profileUrl, size, darkColor, lightColor, margin]);
 
   const handleCopyLink = async () => {
     try {
@@ -148,48 +147,33 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
 
   return (
     <>
-      {/* Container QR Code Kartu */}
-      <div 
-        className={`flex flex-col items-center flex-shrink-0 bg-white p-1 rounded-xl shadow-md border border-purple-200/50 transition-all ${
-          interactive ? 'hover:scale-105 hover:shadow-lg cursor-pointer group/qr relative' : ''
-        } ${className}`}
+      {/* QR Code standar: tanpa logo tengah, shadow, border, radius, padding, atau efek hover. */}
+      <div
+        className={`flex flex-col items-center flex-shrink-0 ${interactive ? 'cursor-pointer' : ''} ${className}`}
         onClick={(e) => {
           if (!interactive) return;
           e.stopPropagation();
           setIsModalOpen(true);
         }}
-        title="Klik untuk membuka QR Profil Anggota"
+        title={interactive ? "Klik untuk membuka QR Profil Anggota" : undefined}
       >
-        <div className="relative flex items-center justify-center">
-          {qrDataUrl ? (
-            <img 
-              src={qrDataUrl} 
-              alt="QR Code KTA" 
-              style={{ width: `${size}px`, height: `${size}px` }}
-              className="object-contain rounded-lg"
-            />
-          ) : (
-            <div 
-              style={{ width: `${size}px`, height: `${size}px` }} 
-              className="bg-slate-100 rounded-lg flex items-center justify-center animate-pulse"
-            >
-              <QrCode className="w-4 h-4 text-slate-400" />
-            </div>
-          )}
-
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="bg-white rounded-full shadow-xs border border-purple-100 flex items-center justify-center"
-              style={{
-                width: Math.max(14, Math.round(size * 0.18)),
-                height: Math.max(14, Math.round(size * 0.18)),
-                padding: Math.max(2, Math.round(size * 0.025))
-              }}
-            >
-              <SakaLogo size={Math.max(9, Math.round(size * 0.13))} />
-            </div>
+        {qrDataUrl ? (
+          <img
+            src={qrDataUrl}
+            alt="QR Code KTA"
+            width={size}
+            height={size}
+            style={{ width: `${size}px`, height: `${size}px`, display: 'block' }}
+            className="object-contain !rounded-none !shadow-none !border-0"
+          />
+        ) : (
+          <div
+            style={{ width: `${size}px`, height: `${size}px` }}
+            className="flex items-center justify-center bg-white"
+          >
+            <QrCode className="w-4 h-4 text-slate-400" />
           </div>
-        </div>
+        )}
 
         {showLabel && (
           <span className="text-[7px] font-bold text-purple-900 tracking-wider font-mono mt-0.5 uppercase">
@@ -242,18 +226,13 @@ export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
                   <img 
                     src={highResQrUrl} 
                     alt="QR Code Profil KTA" 
-                    className="w-52 h-52 object-contain rounded-xl"
+                    className="w-52 h-52 object-contain !rounded-none !shadow-none !border-0"
                   />
                 ) : (
                   <div className="w-52 h-52 bg-slate-100 rounded-xl animate-pulse flex items-center justify-center text-xs text-slate-400">
                     Memuat QR Code...
                   </div>
                 )}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="bg-white rounded-full p-1 shadow-md border border-purple-200 flex items-center justify-center" style={{ width: 40, height: 40 }}>
-                    <SakaLogo size={28} />
-                  </div>
-                </div>
               </div>
 
               <div className="text-center space-y-0.5">
