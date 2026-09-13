@@ -40,13 +40,15 @@ import {
 
 const SPREADSHEET_CONFIG_KEY = 'saka_spreadsheet_config_v1';
 
-// URL Google Apps Script produksi ditanam langsung dalam aplikasi.
-const DEFAULT_GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
-
 function getManualAppsScriptUrl(): string {
-  // Dipertahankan dengan nama lama agar seluruh pemanggil existing tetap kompatibel.
-  // Tidak lagi membaca localStorage: semua perangkat memakai endpoint bawaan aplikasi.
-  return DEFAULT_GAS_WEB_APP_URL;
+  try {
+    const raw = localStorage.getItem(SPREADSHEET_CONFIG_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    const url = String(parsed?.scriptUrl || '').trim().replace(/\s+/g, '');
+    return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(url) ? url : '';
+  } catch {
+    return '';
+  }
 }
 
 const STORAGE_KEYS = {
@@ -134,6 +136,7 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   barcodeWidth: 27,
   barcodeHeight: 9,
   barcodeShowText: false,
+  signerMemberId: '',
   signerName: 'Reza Pahlevi',
   signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
   signerSubtitle: '',
@@ -578,7 +581,7 @@ class StorageService {
     try {
       const manualScriptUrl = getManualAppsScriptUrl();
       if (!manualScriptUrl) {
-        throw new Error('Endpoint Google Apps Script bawaan aplikasi tidak tersedia.');
+        throw new Error('URL Google Apps Script belum diisi melalui Dashboard > Pengaturan API.');
       }
 
       const response = await fetch('/api/mutate', {
