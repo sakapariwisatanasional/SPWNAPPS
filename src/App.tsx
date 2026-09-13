@@ -305,20 +305,26 @@ export default function App() {
     };
 
     const hydrateFromCloud = async () => {
-      refreshAll();
       try {
         await spreadsheetService.fetchServerConfig();
         if (cancelled) return;
-        if ((currentUser?.role || 'PUBLIC') === 'PUBLIC') {
-          // Public users receive only the sanitized /api/data payload. They never
-          // need direct access to raw Spreadsheet rows.
+
+        // IMPORTANT: do not call refreshAll() before the first successful cloud
+        // snapshot. The storage service deliberately hides the old local data
+        // cache until hydration succeeds, preventing stale mobile data from
+        // flashing on screen after a deployment or server-side deletion.
+        const role = storage.getCurrentUser()?.role || currentUser?.role || 'PUBLIC';
+        if (role === 'PUBLIC' || role === 'MEMBER') {
+          // Public/member clients receive the sanitized /api/data snapshot.
           await storage.syncWithServer();
         } else {
           await spreadsheetService.syncFromSpreadsheet(true);
         }
         if (!cancelled) refreshAll();
       } catch (error) {
-        console.warn('[App] Sinkronisasi awal Spreadsheet gagal:', error);
+        // Keep cloudHydrated=false: old local domain data must not be rendered
+        // as if it were current server data when the initial sync fails.
+        console.warn('[App] Sinkronisasi awal cloud gagal:', error);
       }
     };
 
