@@ -6,7 +6,10 @@ import { ProductKind } from '../../types';
 export interface CulinarySouvenirGallerySectionProps {
   items?: any[];
   culinaryItems?: any[];
+  currentUser?: any;
+  members?: any[];
   onSelectItem?: (item: any) => void;
+  onSelectItemDetail?: (item: any) => void;
   onOpenFormModal?: (item?: any, kind?: ProductKind) => void;
   [key: string]: any;
 }
@@ -14,23 +17,57 @@ export interface CulinarySouvenirGallerySectionProps {
 export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySectionProps> = ({
   items = [],
   culinaryItems = [],
-  onSelectItem,
-  onOpenFormModal,
   currentUser,
+  members = [],
+  onSelectItem,
+  onSelectItemDetail,
+  onOpenFormModal,
 }) => {
+  // Hak pengajuan MEMBER harus ditentukan dari akun aktif, bukan dari isi galeri.
+  // Beberapa sumber login lama menyimpan role dengan spasi/variasi label.
+  const normalizedRole = String(currentUser?.role || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '_');
+  const isAdminRole = [
+    'SUPER_ADMIN',
+    'SUPERADMIN',
+    'ADMIN_PROVINCE',
+    'ADMIN_REGENCY',
+    'ADMIN_BRANCH',
+  ].includes(normalizedRole);
+  const hasLinkedMemberRecord = Array.isArray(members) && members.some((member: any) => {
+    const userId = String(currentUser?.id || '').trim();
+    const memberId = String(currentUser?.memberId || '').trim();
+    const email = String(currentUser?.email || '').trim().toLowerCase();
+    return Boolean(
+      (memberId && String(member?.id || '').trim() === memberId) ||
+      (userId && String(member?.userId || '').trim() === userId) ||
+      (email && String(member?.email || '').trim().toLowerCase() === email)
+    );
+  });
+  const isMember = !isAdminRole && (
+    normalizedRole === 'MEMBER' ||
+    normalizedRole === 'ANGGOTA' ||
+    normalizedRole.includes('MEMBER') ||
+    Boolean(currentUser?.memberId) ||
+    hasLinkedMemberRecord
+  );
+  const canSubmitProduct = Boolean(currentUser && isMember && onOpenFormModal);
+
   // Normalisasi data aman
   const safeItems = useMemo(() => {
     const rawList = Array.isArray(items) && items.length > 0 ? items : culinaryItems;
     return (Array.isArray(rawList) ? rawList : []).filter((item) => {
       if (!item) return false;
-      const role = String(currentUser?.role || '').toUpperCase();
-      if (role === 'SUPER_ADMIN' || ['ADMIN_PROVINCE','ADMIN_REGENCY','ADMIN_BRANCH'].includes(role)) return true;
-      if (role === 'MEMBER') {
+      const role = normalizedRole;
+      if (isAdminRole) return true;
+      if (isMember) {
         return item.status === 'APPROVED' || item.authorMemberId === (currentUser.memberId || currentUser.id);
       }
       return item.status === 'APPROVED';
     });
-  }, [items, culinaryItems, currentUser]);
+  }, [items, culinaryItems, currentUser, normalizedRole, isAdminRole, isMember]);
 
   return (
     <div className="space-y-4">
@@ -48,20 +85,20 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
             </p>
           </div>
         </div>
-        {String(currentUser?.role || '').toUpperCase() === 'MEMBER' && onOpenFormModal && (
+        {canSubmitProduct && (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
-              onClick={() => onOpenFormModal(undefined, 'KULINER')}
-              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+              onClick={() => onOpenFormModal?.(undefined, 'KULINER')}
+              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
             >
               <UtensilsCrossed className="w-3.5 h-3.5" />
               Ajukan Kuliner
             </button>
             <button
               type="button"
-              onClick={() => onOpenFormModal(undefined, 'CINDERAMATA')}
-              className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+              onClick={() => onOpenFormModal?.(undefined, 'CINDERAMATA')}
+              className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
             >
               <ShoppingBag className="w-3.5 h-3.5" />
               Ajukan Kriya
@@ -75,7 +112,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
           safeItems.slice(0, 4).map((item, idx) => (
             <div
               key={item?.id || idx}
-              onClick={() => onSelectItem && onSelectItem(item)}
+              onClick={() => (onSelectItem || onSelectItemDetail)?.(item)}
               className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-amber-50/30 hover:border-amber-200 transition cursor-pointer flex flex-col justify-between space-y-2 group"
             >
               <div className="space-y-1">
