@@ -1049,14 +1049,10 @@ class SpreadsheetService {
           this.lastKnownMemberCount = importedMembers.length;
 
           storage.setMembers(merged);
-          // Jangan mengubah registry USERS pada silent/live polling.
-          // Registry user berkaitan langsung dengan sesi login; menulis ulang
-          // daftar user setiap beberapa detik dapat memicu re-render/auth guard
-          // pada aplikasi utama. Sinkronisasi user hanya dilakukan saat sync
-          // manual (silent=false).
-          if (!silent) {
-            storage.setUsers(mergedUsers);
-          }
+          // USERS berasal dari snapshot Spreadsheet. Session pengguna tetap
+          // dikelola terpisah oleh storage session; registry akun tidak lagi
+          // dibaca dari localStorage.
+          storage.setUsers(mergedUsers);
           memberCount = importedMembers.length;
         } else {
           // Sheet berhasil dibaca dan memang kosong: kosongkan cache anggota.
