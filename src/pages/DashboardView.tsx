@@ -35,6 +35,7 @@ export interface DashboardViewProps {
   auditLogs?: any[];
   onNavigate?: (view: string) => void;
   onVerifyMember?: (id: string) => void;
+  onOpenCulinaryFormModal?: (item?: any, kind?: any) => void;
   [key: string]: any;
 }
 
@@ -114,6 +115,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   auditLogs = [],
   onNavigate,
   onVerifyMember,
+  onOpenCulinaryFormModal,
 }) => {
   const [searchPending, setSearchPending] = useState('');
   const [selectedKwardaFilter, setSelectedKwardaFilter] = useState('ALL');
