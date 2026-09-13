@@ -1,10 +1,13 @@
 import React, { useMemo } from 'react';
-import { UtensilsCrossed, MapPin, Tag, ChevronRight, ShoppingBag } from 'lucide-react';
+import { UtensilsCrossed, MapPin, Tag, ChevronRight, ShoppingBag, Plus, CheckCircle2, XCircle } from 'lucide-react';
+import { storage } from '../../services/storage';
+import { ProductKind } from '../../types';
 
 export interface CulinarySouvenirGallerySectionProps {
   items?: any[];
   culinaryItems?: any[];
   onSelectItem?: (item: any) => void;
+  onOpenFormModal?: (item?: any, kind?: ProductKind) => void;
   [key: string]: any;
 }
 
@@ -12,12 +15,22 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
   items = [],
   culinaryItems = [],
   onSelectItem,
+  onOpenFormModal,
+  currentUser,
 }) => {
   // Normalisasi data aman
   const safeItems = useMemo(() => {
     const rawList = Array.isArray(items) && items.length > 0 ? items : culinaryItems;
-    return (Array.isArray(rawList) ? rawList : []).filter((item) => Boolean(item));
-  }, [items, culinaryItems]);
+    return (Array.isArray(rawList) ? rawList : []).filter((item) => {
+      if (!item) return false;
+      const role = currentUser?.role;
+      if (role === 'SUPER_ADMIN' || ['ADMIN_PROVINCE','ADMIN_REGENCY','ADMIN_BRANCH'].includes(role)) return true;
+      if (role === 'MEMBER') {
+        return item.status === 'APPROVED' || item.authorMemberId === (currentUser.memberId || currentUser.id);
+      }
+      return item.status === 'APPROVED';
+    });
+  }, [items, culinaryItems, currentUser]);
 
   return (
     <div className="space-y-4">
@@ -35,6 +48,26 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
             </p>
           </div>
         </div>
+        {String(currentUser?.role || '').toUpperCase() === 'MEMBER' && onOpenFormModal && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenFormModal(undefined, 'KULINER')}
+              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+            >
+              <UtensilsCrossed className="w-3.5 h-3.5" />
+              Ajukan Kuliner
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenFormModal(undefined, 'CINDERAMATA')}
+              className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              Ajukan Cinderamata
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -72,6 +105,36 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
                   Detail <ChevronRight className="w-3 h-3" />
                 </span>
               </div>
+              {currentUser && ['SUPER_ADMIN','ADMIN_PROVINCE','ADMIN_REGENCY','ADMIN_BRANCH'].includes(currentUser.role) && item?.status === 'PENDING_APPROVAL' && (
+                <div className="flex gap-1.5 pt-1" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const action = currentUser.role === 'SUPER_ADMIN' && item?.adminApprovalStatus === 'APPROVED'
+                        ? 'APPROVE_SUPER_ADMIN'
+                        : 'APPROVE_ADMIN';
+                      const ok = await storage.moderateCulinary(item.id, action, currentUser);
+                      if (!ok) alert('Gagal memproses persetujuan produk.');
+                    }}
+                    className="flex-1 px-2 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold flex items-center justify-center gap-1"
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                    {currentUser.role === 'SUPER_ADMIN' && item?.adminApprovalStatus === 'APPROVED' ? 'Terbitkan' : 'Setujui Admin'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const reason = prompt('Alasan penolakan (opsional):') || 'Posting ditolak oleh reviewer.';
+                      const ok = await storage.moderateCulinary(item.id, 'REJECT', currentUser, reason);
+                      if (!ok) alert('Gagal menolak produk.');
+                    }}
+                    className="px-2 py-1.5 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-[10px] font-bold"
+                    title="Tolak"
+                  >
+                    <XCircle className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
           ))
         ) : (
