@@ -38,19 +38,6 @@ import {
   getDistrictsForRegency
 } from '../data/indonesiaTerritories';
 
-const SPREADSHEET_CONFIG_KEY = 'saka_spreadsheet_config_v1';
-
-function getManualAppsScriptUrl(): string {
-  try {
-    const raw = localStorage.getItem(SPREADSHEET_CONFIG_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    const url = String(parsed?.scriptUrl || '').trim().replace(/\s+/g, '');
-    return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(url) ? url : '';
-  } catch {
-    return '';
-  }
-}
-
 const STORAGE_KEYS = {
   MEMBERS: 'saka_members',
   TOURS: 'saka_tours',
@@ -115,7 +102,6 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   showKridaBadge: true,
   showPhoto: true,
   showQrCode: true,
-  // QR default: compact, balanced, and aligned to the right information column.
   qrX: 78,
   qrY: 29,
   qrSize: 18,
@@ -205,29 +191,68 @@ class StorageService {
 
     const storageHandler = (e: StorageEvent) => {
       if (e.key !== 'saka_mutation_event_v2' || !e.newValue) return;
-      try { listener(JSON.parse(e.newValue)); } catch {}
+
+      try {
+        listener(JSON.parse(e.newValue));
+      } catch {}
     };
+
     window.addEventListener('storage', storageHandler);
+
     return () => {
-      this.mutationListeners = this.mutationListeners.filter(l => l !== listener);
+      this.mutationListeners = this.mutationListeners.filter(
+        l => l !== listener
+      );
       window.removeEventListener('storage', storageHandler);
     };
   }
 
-  public emitMutation(type: string, action: string, payload: any, meta: Record<string, any> = {}) {
+  public emitMutation(
+    type: string,
+    action: string,
+    payload: any,
+    meta: Record<string, any> = {}
+  ) {
     if (typeof window === 'undefined') return;
+
     const event = {
-      type, action, payload,
+      type,
+      action,
+      payload,
       timestamp: Date.now(),
       source: 'storage-service',
       ...meta
     };
-    this.mutationListeners.forEach(listener => { try { listener(event); } catch (e) { console.warn('[Storage] mutation listener error', e); } });
+
+    this.mutationListeners.forEach(listener => {
+      try {
+        listener(event);
+      } catch (e) {
+        console.warn(
+          '[Storage] mutation listener error',
+          e
+        );
+      }
+    });
+
     try {
-      localStorage.setItem('saka_mutation_event_v2', JSON.stringify(event));
+      localStorage.setItem(
+        'saka_mutation_event_v2',
+        JSON.stringify(event)
+      );
       localStorage.removeItem('saka_mutation_event_v2');
     } catch {}
-    try { window.dispatchEvent(new CustomEvent('saka:local-mutation', { detail: event })); } catch {}
+
+    try {
+      window.dispatchEvent(
+        new CustomEvent(
+          'saka:local-mutation',
+          {
+            detail: event
+          }
+        )
+      );
+    } catch {}
   }
 
   public notify() {
@@ -254,14 +279,24 @@ class StorageService {
     }
 
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      const data = localStorage.getItem(
+        STORAGE_KEYS.NOTIFICATIONS
+      );
+
       if (!data) return [];
 
       const notifications = JSON.parse(data) as NotificationItem[];
-      if (!Array.isArray(notifications)) return [];
 
-      const targetUserId = userId ?? this.getCurrentUser()?.id;
-      if (!targetUserId) return notifications;
+      if (!Array.isArray(notifications)) {
+        return [];
+      }
+
+      const targetUserId =
+        userId ?? this.getCurrentUser()?.id;
+
+      if (!targetUserId) {
+        return notifications;
+      }
 
       return notifications.filter(
         notification =>
@@ -269,13 +304,19 @@ class StorageService {
           notification.userId === '*'
       );
     } catch (error) {
-      console.error('Gagal membaca notifikasi:', error);
+      console.error(
+        'Gagal membaca notifikasi:',
+        error
+      );
+
       return [];
     }
   }
 
   /** Menyimpan seluruh notifikasi. */
-  public setNotifications(notifications: NotificationItem[]): void {
+  public setNotifications(
+    notifications: NotificationItem[]
+  ): void {
     if (typeof window === 'undefined') return;
 
     try {
@@ -283,28 +324,53 @@ class StorageService {
         STORAGE_KEYS.NOTIFICATIONS,
         JSON.stringify(notifications)
       );
+
       this.notify();
     } catch (error) {
-      console.error('Gagal menyimpan notifikasi:', error);
+      console.error(
+        'Gagal menyimpan notifikasi:',
+        error
+      );
     }
   }
 
   /** Menambahkan satu notifikasi baru. */
-  public addNotification(notification: NotificationItem): void {
-    const notifications = this.getAllNotifications();
-    this.setNotifications([notification, ...notifications]);
+  public addNotification(
+    notification: NotificationItem
+  ): void {
+    const notifications =
+      this.getAllNotifications();
+
+    this.setNotifications([
+      notification,
+      ...notifications
+    ]);
   }
 
   /** Menandai notifikasi tertentu sebagai sudah dibaca. */
-  public markNotificationAsRead(id: string): boolean {
-    const notifications = this.getAllNotifications();
-    const index = notifications.findIndex(notification => notification.id === id);
+  public markNotificationAsRead(
+    id: string
+  ): boolean {
+    const notifications =
+      this.getAllNotifications();
+
+    const index = notifications.findIndex(
+      notification => notification.id === id
+    );
 
     if (index === -1) return false;
-    if (notifications[index].isRead) return true;
 
-    notifications[index] = { ...notifications[index], isRead: true };
+    if (notifications[index].isRead) {
+      return true;
+    }
+
+    notifications[index] = {
+      ...notifications[index],
+      isRead: true
+    };
+
     this.setNotifications(notifications);
+
     return true;
   }
 
@@ -312,12 +378,23 @@ class StorageService {
     if (typeof window === 'undefined') return [];
 
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      const data = localStorage.getItem(
+        STORAGE_KEYS.NOTIFICATIONS
+      );
+
       if (!data) return [];
+
       const notifications = JSON.parse(data);
-      return Array.isArray(notifications) ? notifications : [];
+
+      return Array.isArray(notifications)
+        ? notifications
+        : [];
     } catch (error) {
-      console.error('Gagal membaca seluruh notifikasi:', error);
+      console.error(
+        'Gagal membaca seluruh notifikasi:',
+        error
+      );
+
       return [];
     }
   }
@@ -336,23 +413,40 @@ class StorageService {
         STORAGE_KEYS.MEMBERS
       );
 
-      const parsed = data ? JSON.parse(data) : INITIAL_MEMBERS;
-      if (!Array.isArray(parsed)) return INITIAL_MEMBERS;
+      const parsed = data
+        ? JSON.parse(data)
+        : INITIAL_MEMBERS;
 
-      // Bersihkan field legacy Gudep agar data lama tidak pernah kembali ke UI/API.
+      if (!Array.isArray(parsed)) {
+        return INITIAL_MEMBERS;
+      }
+
       const cleaned = parsed.map((member: any) => {
-        if (!member || typeof member !== 'object') return member;
+        if (!member || typeof member !== 'object') {
+          return member;
+        }
+
         const cleanMember = { ...member };
+
         delete cleanMember.gugusDepan;
+
         return cleanMember as Member;
       });
 
-      const hadLegacyFields = parsed.some((member: any) =>
-        member && typeof member === 'object' && 'gugusDepan' in member
+      const hadLegacyFields = parsed.some(
+        (member: any) =>
+          member &&
+          typeof member === 'object' &&
+          'gugusDepan' in member
       );
+
       if (hadLegacyFields) {
-        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(cleaned));
+        localStorage.setItem(
+          STORAGE_KEYS.MEMBERS,
+          JSON.stringify(cleaned)
+        );
       }
+
       return cleaned as Member[];
     } catch (error) {
       console.error(
@@ -366,66 +460,124 @@ class StorageService {
 
   /**
    * Members deduplication used by live spreadsheet synchronization.
-   * Primary identity is SPW/member ID, then KTA, then email. The first
-   * complete record is preserved and later duplicates are merged into it.
+   * Primary identity is SPW/member ID, then KTA, then email.
    */
   public deduplicateDatabase(): void {
     const members = this.getMembers();
-    if (!Array.isArray(members) || members.length < 2) return;
+
+    if (
+      !Array.isArray(members) ||
+      members.length < 2
+    ) {
+      return;
+    }
 
     const result: Member[] = [];
     const byKey = new Map<string, number>();
 
-    const norm = (value: any) => String(value ?? '').trim().toLowerCase();
+    const norm = (value: any) =>
+      String(value ?? '')
+        .trim()
+        .toLowerCase();
+
     const keysFor = (member: Member) => {
       const keys: string[] = [];
+
       const id = norm(member.id);
-      const kta = norm((member as any).nationalMemberNumber);
+      const kta = norm(
+        (member as any).nationalMemberNumber
+      );
       const email = norm(member.email);
+
       if (id) keys.push(`id:${id}`);
       if (kta) keys.push(`kta:${kta}`);
       if (email) keys.push(`email:${email}`);
+
       return keys;
     };
 
     for (const member of members) {
-      if (!member || typeof member !== 'object') continue;
-      const keys = keysFor(member);
-      const existingIndex = keys.map(k => byKey.get(k)).find(v => v !== undefined);
-
-      if (existingIndex === undefined) {
-        const index = result.length;
-        result.push(member);
-        keys.forEach(k => byKey.set(k, index));
+      if (!member || typeof member !== 'object') {
         continue;
       }
 
-      const merged = { ...result[existingIndex], ...member };
-      // Never allow a legacy ID to overwrite a permanent SPW ID.
-      const existingId = norm(result[existingIndex].id);
-      const incomingId = norm(member.id);
-      if (/^spw-\d+$/i.test(existingId) && !/^spw-\d+$/i.test(incomingId)) {
-        merged.id = result[existingIndex].id;
+      const keys = keysFor(member);
+
+      const existingIndex = keys
+        .map(k => byKey.get(k))
+        .find(v => v !== undefined);
+
+      if (existingIndex === undefined) {
+        const index = result.length;
+
+        result.push(member);
+
+        keys.forEach(k =>
+          byKey.set(k, index)
+        );
+
+        continue;
       }
+
+      const merged = {
+        ...result[existingIndex],
+        ...member
+      };
+
+      const existingId =
+        norm(result[existingIndex].id);
+
+      const incomingId =
+        norm(member.id);
+
+      if (
+        /^spw-\d+$/i.test(existingId) &&
+        !/^spw-\d+$/i.test(incomingId)
+      ) {
+        merged.id =
+          result[existingIndex].id;
+      }
+
       result[existingIndex] = merged;
-      keysFor(merged).forEach(k => byKey.set(k, existingIndex));
+
+      keysFor(merged).forEach(k =>
+        byKey.set(k, existingIndex)
+      );
     }
 
-    if (result.length !== members.length) this.setMembers(result);
+    if (
+      result.length !== members.length
+    ) {
+      this.setMembers(result);
+    }
   }
 
-  public setMembers(members: Member[]) {
+  public setMembers(
+    members: Member[]
+  ) {
     if (typeof window === 'undefined') {
       return;
     }
 
     try {
-      const cleanedMembers = members.map((member: any) => {
-        if (!member || typeof member !== 'object') return member;
-        const cleanMember = { ...member };
-        delete cleanMember.gugusDepan;
-        return cleanMember;
-      });
+      const cleanedMembers =
+        members.map((member: any) => {
+          if (
+            !member ||
+            typeof member !== 'object'
+          ) {
+            return member;
+          }
+
+          const cleanMember = {
+            ...member
+          };
+
+          delete cleanMember.gugusDepan;
+
+          return cleanMember;
+        });
+
       localStorage.setItem(
         STORAGE_KEYS.MEMBERS,
         JSON.stringify(cleanedMembers)
@@ -440,45 +592,81 @@ class StorageService {
     }
   }
 
-  public saveMembers(members: Member[]) {
+  public saveMembers(
+    members: Member[]
+  ) {
     this.setMembers(members);
   }
 
   /**
-   * Snapshot perubahan profil yang belum dikonfirmasi oleh live-sync Spreadsheet.
-   * Dipakai agar polling tidak menimpa perubahan lokal dengan snapshot lama.
+   * Snapshot perubahan profil yang belum dikonfirmasi
+   * oleh live-sync Spreadsheet.
    */
-  public getPendingMemberWrites(): Record<string, { status: string; timestamp: number; member: Member }> {
-    if (typeof window === 'undefined') return {};
+  public getPendingMemberWrites(): Record<
+    string,
+    {
+      status: string;
+      timestamp: number;
+      member: Member;
+    }
+  > {
+    if (typeof window === 'undefined') {
+      return {};
+    }
+
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.PENDING_MEMBER_WRITES);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return parsed && typeof parsed === 'object' ? parsed : {};
+      const raw =
+        localStorage.getItem(
+          STORAGE_KEYS.PENDING_MEMBER_WRITES
+        );
+
+      const parsed = raw
+        ? JSON.parse(raw)
+        : {};
+
+      return parsed &&
+        typeof parsed === 'object'
+        ? parsed
+        : {};
     } catch {
       return {};
     }
   }
 
-  public clearPendingMemberWrite(memberId: string) {
-    if (typeof window === 'undefined' || !memberId) return;
+  public clearPendingMemberWrite(
+    memberId: string
+  ) {
+    if (
+      typeof window === 'undefined' ||
+      !memberId
+    ) {
+      return;
+    }
+
     try {
-      const map = this.getPendingMemberWrites();
+      const map =
+        this.getPendingMemberWrites();
+
       if (map[memberId]) {
         delete map[memberId];
-        localStorage.setItem(STORAGE_KEYS.PENDING_MEMBER_WRITES, JSON.stringify(map));
+
+        localStorage.setItem(
+          STORAGE_KEYS.PENDING_MEMBER_WRITES,
+          JSON.stringify(map)
+        );
       }
     } catch {}
   }
 
   /**
-   * Memperbarui foto anggota dan menyinkronkannya ke profil user.
-   * Foto dapat berupa data URL hasil upload lokal atau URL/Google Drive.
-   */
-  /**
-   * Memperbarui seluruh data profil anggota dari panel administrator.
-   * Perubahan disimpan ke LocalStorage terlebih dahulu agar UI langsung
-   * terbarui, kemudian dikirim ke API /api/mutate agar tersimpan di server
-   * dan diteruskan ke Google Apps Script.
+   * Memperbarui seluruh data profil anggota
+   * dari panel administrator.
+   *
+   * Browser hanya mengirim permintaan ke server.
+   * Browser TIDAK menentukan URL Google Apps Script.
+   *
+   * Server bertanggung jawab memilih satu-satunya
+   * endpoint Google Apps Script produksi.
    */
   public async adminUpdateMember(
     memberId: string,
@@ -488,153 +676,292 @@ class StorageService {
   ): Promise<Member | null> {
     if (!memberId) return null;
 
-    const members = this.getMembers();
-    const index = members.findIndex(member => member.id === memberId);
-    if (index === -1) return null;
+    const members =
+      this.getMembers();
 
-    const current = members[index];
+    const index =
+      members.findIndex(
+        member =>
+          member.id === memberId
+      );
+
+    if (index === -1) {
+      return null;
+    }
+
+    const current =
+      members[index];
+
     const updatedMember: Member = {
       ...current,
       ...payload,
       id: memberId,
-      // Field wajib jangan sampai hilang akibat payload parsial.
-      userId: payload.userId ?? current.userId,
-      registeredAt: current.registeredAt || new Date().toISOString(),
-      verificationToken: current.verificationToken || `VERIFY-${memberId}`,
-      locationHistory: current.locationHistory || [],
-      certifications: payload.certifications ?? current.certifications ?? [],
-      skills: payload.skills ?? current.skills ?? []
+      userId:
+        payload.userId ??
+        current.userId,
+      registeredAt:
+        current.registeredAt ||
+        new Date().toISOString(),
+      verificationToken:
+        current.verificationToken ||
+        `VERIFY-${memberId}`,
+      locationHistory:
+        current.locationHistory ||
+        [],
+      certifications:
+        payload.certifications ??
+        current.certifications ??
+        [],
+      skills:
+        payload.skills ??
+        current.skills ??
+        []
     };
 
-    // Validasi isolasi wilayah di sisi client sebagai lapisan pertama.
-    const role = actor?.role;
-    const jurisdictionId = actor?.jurisdictionId;
-    if (role === 'ADMIN_PROVINCE' && jurisdictionId && updatedMember.provinceId !== jurisdictionId) {
-      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke provinsi lain.');
-    }
-    if (role === 'ADMIN_REGENCY' && jurisdictionId && updatedMember.regencyId !== jurisdictionId) {
-      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke Kwartir Cabang lain.');
-    }
-    if (role === 'ADMIN_BRANCH' && jurisdictionId && updatedMember.districtId !== jurisdictionId) {
-      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke kecamatan lain.');
+    // Validasi isolasi wilayah di sisi client.
+    const role =
+      actor?.role;
+
+    const jurisdictionId =
+      actor?.jurisdictionId;
+
+    if (
+      role === 'ADMIN_PROVINCE' &&
+      jurisdictionId &&
+      updatedMember.provinceId !==
+        jurisdictionId
+    ) {
+      throw new Error(
+        'Anda tidak memiliki wewenang untuk memindahkan anggota ke provinsi lain.'
+      );
     }
 
-    // Simpan lokal terlebih dahulu agar UI responsif. Tandai record sebagai
-    // sedang dipersist ke server/Google Spreadsheet agar live-sync tidak
-    // menimpa perubahan ini dengan data Spreadsheet yang masih lama.
-    const previousMember = { ...current };
-    members[index] = updatedMember;
-    this.setMembers(members);
-    this.emitMutation('MEMBER', 'UPDATE', updatedMember, { pending: true });
+    if (
+      role === 'ADMIN_REGENCY' &&
+      jurisdictionId &&
+      updatedMember.regencyId !==
+        jurisdictionId
+    ) {
+      throw new Error(
+        'Anda tidak memiliki wewenang untuk memindahkan anggota ke Kwartir Cabang lain.'
+      );
+    }
 
-    const markPendingWrite = (pending: boolean) => {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEYS.PENDING_MEMBER_WRITES);
-        const map = raw ? JSON.parse(raw) : {};
-        if (pending) {
-          // Simpan snapshot lengkap. Live-sync memakainya untuk melindungi
-          // perubahan profil sampai Spreadsheet benar-benar memantulkan nilai baru.
-          map[memberId] = {
-            status: 'PENDING',
-            timestamp: Date.now(),
-            member: { ...updatedMember }
-          };
-        } else {
-          delete map[memberId];
-        }
-        localStorage.setItem(STORAGE_KEYS.PENDING_MEMBER_WRITES, JSON.stringify(map));
-      } catch {}
-    };
+    if (
+      role === 'ADMIN_BRANCH' &&
+      jurisdictionId &&
+      updatedMember.districtId !==
+        jurisdictionId
+    ) {
+      throw new Error(
+        'Anda tidak memiliki wewenang untuk memindahkan anggota ke kecamatan lain.'
+      );
+    }
+
+    const previousMember =
+      { ...current };
+
+    members[index] =
+      updatedMember;
+
+    this.setMembers(
+      members
+    );
+
+    this.emitMutation(
+      'MEMBER',
+      'UPDATE',
+      updatedMember,
+      {
+        pending: true
+      }
+    );
+
+    const markPendingWrite =
+      (pending: boolean) => {
+        try {
+          const raw =
+            localStorage.getItem(
+              STORAGE_KEYS.PENDING_MEMBER_WRITES
+            );
+
+          const map =
+            raw ? JSON.parse(raw) : {};
+
+          if (pending) {
+            map[memberId] = {
+              status: 'PENDING',
+              timestamp: Date.now(),
+              member: {
+                ...updatedMember
+              }
+            };
+          } else {
+            delete map[memberId];
+          }
+
+          localStorage.setItem(
+            STORAGE_KEYS.PENDING_MEMBER_WRITES,
+            JSON.stringify(map)
+          );
+        } catch {}
+      };
 
     markPendingWrite(true);
 
-    // Sinkronkan avatar dengan akun user yang terkait.
+    // Sinkronkan avatar dengan akun user.
     if (updatedMember.userId) {
-      const users = this.getUsers();
-      const userIndex = users.findIndex(user => user.id === updatedMember.userId);
+      const users =
+        this.getUsers();
+
+      const userIndex =
+        users.findIndex(
+          user =>
+            user.id ===
+            updatedMember.userId
+        );
+
       if (userIndex !== -1) {
         users[userIndex] = {
           ...users[userIndex],
-          name: updatedMember.fullName,
-          email: updatedMember.email,
-          avatarUrl: updatedMember.avatarUrl
+          name:
+            updatedMember.fullName,
+          email:
+            updatedMember.email,
+          avatarUrl:
+            updatedMember.avatarUrl
         };
+
         this.setUsers(users);
       }
     }
 
     // Audit lokal.
     const audit: AuditLog = {
-      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      userId: actor?.id || 'unknown',
-      userName: actor?.name || 'Operator',
-      userRole: actor?.role || 'SUPER_ADMIN',
-      action: 'UPDATE_MEMBER_PROFILE',
-      entityType: 'MEMBER',
-      entityId: memberId,
-      description: reason || 'Pembaruan profil anggota',
-      timestamp: new Date().toISOString(),
-      ipAddress: 'client'
+      id: `log-${Date.now()}-${Math.floor(
+        Math.random() * 1000
+      )}`,
+      userId:
+        actor?.id ||
+        'unknown',
+      userName:
+        actor?.name ||
+        'Operator',
+      userRole:
+        actor?.role ||
+        'SUPER_ADMIN',
+      action:
+        'UPDATE_MEMBER_PROFILE',
+      entityType:
+        'MEMBER',
+      entityId:
+        memberId,
+      description:
+        reason ||
+        'Pembaruan profil anggota',
+      timestamp:
+        new Date().toISOString(),
+      ipAddress:
+        'client'
     };
-    const logs = this.getAuditLogs();
-    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([audit, ...logs].slice(0, 500)));
+
+    const logs =
+      this.getAuditLogs();
+
+    localStorage.setItem(
+      STORAGE_KEYS.AUDIT_LOGS,
+      JSON.stringify(
+        [audit, ...logs].slice(
+          0,
+          500
+        )
+      )
+    );
+
     this.notify();
 
-    // Jika aplikasi berjalan dengan sesi API, kirim perubahan ke server.
-    const token = this.getAuthToken();
+    // =====================================================
+    // SERVER MUTATION
+    // =====================================================
+    // PENTING:
+    // Tidak ada scriptUrl di sini.
+    //
+    // Browser -> /api/mutate
+    //
+    // Server -> endpoint GAS yang dikunci.
+    // =====================================================
+
+    const token =
+      this.getAuthToken();
+
     if (!token) {
-      members[index] = previousMember;
-      this.setMembers(members);
+      members[index] =
+        previousMember;
+
+      this.setMembers(
+        members
+      );
+
       markPendingWrite(false);
-      throw new Error('Sesi administrator tidak ditemukan. Silakan login ulang sebelum mengubah status anggota.');
+
+      throw new Error(
+        'Sesi administrator tidak ditemukan. Silakan login ulang sebelum mengubah status anggota.'
+      );
     }
 
     try {
-      const manualScriptUrl = getManualAppsScriptUrl();
-      if (!manualScriptUrl) {
-        throw new Error('URL Google Apps Script belum diisi melalui Dashboard > Pengaturan API.');
-      }
+      const response =
+        await fetch(
+          '/api/mutate',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              'Authorization':
+                `Bearer ${token}`
+            },
+            credentials:
+              'include',
+            body: JSON.stringify({
+              type:
+                'MEMBER',
+              action:
+                'UPDATE',
+              payload:
+                updatedMember,
+              reason:
+                reason ||
+                'Pembaruan profil anggota'
+            })
+          }
+        );
 
-      const response = await fetch('/api/mutate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          type: 'MEMBER',
-          action: 'UPDATE',
-          payload: updatedMember,
-          reason: reason || 'Pembaruan profil anggota',
-          scriptUrl: getManualAppsScriptUrl()
-        })
-      });
+      let result: any =
+        null;
 
-      let result: any = null;
       try {
-        result = await response.json();
+        result =
+          await response.json();
       } catch {
         result = null;
       }
 
-      if (!response.ok || !result?.success) {
-        // Jangan rollback perubahan lokal di sini. Penyimpanan utama profil
-        // dilakukan oleh modal melalui POST UPSERT_MEMBER -> CHECK_RECORD.
-        // Rollback pada titik ini membuat modal tidak pernah sempat mengirim
-        // snapshot terbaru ke Spreadsheet.
+      if (
+        !response.ok ||
+        !result?.success
+      ) {
         console.warn(
           '[Storage] /api/mutate gagal; perubahan tetap dipertahankan sementara agar dapat diverifikasi ke Spreadsheet.',
-          result?.message || `HTTP ${response.status}`
+          result?.message ||
+            `HTTP ${response.status}`
         );
       }
-      // Pending write sengaja TIDAK dihapus di sini. Ia akan dihapus oleh
-      // spreadsheetService setelah nilai Spreadsheet benar-benar terkonfirmasi.
     } catch (error) {
-      // /api/mutate adalah jalur sinkronisasi sekunder. Jangan membatalkan
-      // perubahan profil yang sudah disimpan lokal; modal akan mengirim snapshot
-      // yang sama langsung ke Google Apps Script dan melakukan CHECK_RECORD.
-      console.warn('[Storage] Jalur /api/mutate gagal; lanjutkan verifikasi direct Apps Script:', error);
+      console.warn(
+        '[Storage] Jalur /api/mutate gagal; perubahan lokal tetap dipertahankan untuk proses verifikasi Spreadsheet:',
+        error
+      );
     }
 
     return updatedMember;
@@ -647,9 +974,8 @@ class StorageService {
   /**
    * Menetapkan member sebagai Admin wilayah.
    *
-   * Perubahan lokal dibuat optimistis agar UI langsung merespons, tetapi
-   * sumber data permanen tetap endpoint server -> Google Apps Script -> Sheet.
-   * Method sengaja tetap sinkron karena komponen lama memanggilnya tanpa await.
+   * Browser hanya mengirim data operasi.
+   * URL Apps Script tidak pernah dikirim dari client.
    */
   public assignMemberAsOperator(
     memberId: string,
@@ -665,305 +991,734 @@ class StorageService {
       'ADMIN_BRANCH'
     ];
 
-    if (!memberId || !allowedRoles.includes(role)) {
-      console.error('[Admin] Tingkat Admin tidak valid.');
+    if (
+      !memberId ||
+      !allowedRoles.includes(role)
+    ) {
+      console.error(
+        '[Admin] Tingkat Admin tidak valid.'
+      );
       return null;
     }
 
-    if (!jurisdictionId && !jurisdictionName) {
-      console.error('[Admin] Wilayah kewenangan wajib dipilih.');
+    if (
+      !jurisdictionId &&
+      !jurisdictionName
+    ) {
+      console.error(
+        '[Admin] Wilayah kewenangan wajib dipilih.'
+      );
       return null;
     }
 
-    if (adminUser?.role !== 'SUPER_ADMIN') {
-      console.error('[Admin] Hanya Super Admin yang dapat menetapkan Admin wilayah.');
+    if (
+      adminUser?.role !==
+      'SUPER_ADMIN'
+    ) {
+      console.error(
+        '[Admin] Hanya Super Admin yang dapat menetapkan Admin wilayah.'
+      );
       return null;
     }
 
-    const members = this.getMembers();
-    const idx = members.findIndex(member => String(member.id) === String(memberId));
-    if (idx === -1) return null;
+    const members =
+      this.getMembers();
 
-    const previousMember = { ...members[idx] };
+    const idx =
+      members.findIndex(
+        member =>
+          String(member.id) ===
+          String(memberId)
+      );
+
+    if (idx === -1) {
+      return null;
+    }
+
+    const previousMember =
+      { ...members[idx] };
+
     const member = {
       ...members[idx],
       isOperator: true,
       operatorRole: role,
-      operatorJurisdictionId: jurisdictionId,
-      operatorJurisdictionName: jurisdictionName,
-      operatorAssignedAt: new Date().toISOString(),
-      operatorAssignedBy: `${adminUser.name || 'Super Admin'} (${adminUser.role})`,
-      operatorNotes: notes || 'Penetapan Admin wilayah oleh Super Admin'
+      operatorJurisdictionId:
+        jurisdictionId,
+      operatorJurisdictionName:
+        jurisdictionName,
+      operatorAssignedAt:
+        new Date().toISOString(),
+      operatorAssignedBy:
+        `${adminUser.name || 'Super Admin'} (${adminUser.role})`,
+      operatorNotes:
+        notes ||
+        'Penetapan Admin wilayah oleh Super Admin'
     } as Member;
 
-    members[idx] = member;
-    this.setMembers(members);
+    members[idx] =
+      member;
 
-    const users = this.getUsers();
-    const userIndex = users.findIndex(user =>
-      String(user.memberId || '') === String(member.id) ||
-      String(user.id || '') === String(member.userId || '') ||
-      String(user.email || '').toLowerCase() === String(member.email || '').toLowerCase()
+    this.setMembers(
+      members
     );
+
+    const users =
+      this.getUsers();
+
+    const userIndex =
+      users.findIndex(
+        user =>
+          String(
+            user.memberId || ''
+          ) ===
+            String(member.id) ||
+          String(
+            user.id || ''
+          ) ===
+            String(
+              member.userId || ''
+            ) ||
+          String(
+            user.email || ''
+          ).toLowerCase() ===
+            String(
+              member.email || ''
+            ).toLowerCase()
+      );
 
     if (userIndex !== -1) {
       users[userIndex] = {
         ...users[userIndex],
-        name: member.fullName,
-        email: member.email,
-        avatarUrl: member.avatarUrl,
-        memberId: member.id,
+        name:
+          member.fullName,
+        email:
+          member.email,
+        avatarUrl:
+          member.avatarUrl,
+        memberId:
+          member.id,
         role,
         jurisdictionId,
         jurisdictionName
       } as CurrentUser;
-      this.setUsers(users);
 
-      const currentUser = this.getCurrentUser();
+      this.setUsers(
+        users
+      );
+
+      const currentUser =
+        this.getCurrentUser();
+
       if (
-        String(currentUser?.id || '') === String(users[userIndex].id || '') ||
-        String(currentUser?.memberId || '') === String(member.id)
+        String(
+          currentUser?.id || ''
+        ) ===
+          String(
+            users[userIndex].id || ''
+          ) ||
+        String(
+          currentUser?.memberId || ''
+        ) ===
+          String(member.id)
       ) {
-        this.setCurrentUser(users[userIndex]);
+        this.setCurrentUser(
+          users[userIndex]
+        );
       }
     }
 
-    this.emitMutation('ADMIN', 'ASSIGN', {
-      memberId: member.id,
-      userId: member.userId || '',
-      role,
-      jurisdictionId,
-      jurisdictionName,
-      assignedBy: adminUser.id,
-      assignedByName: adminUser.name,
-      notes: notes || ''
-    }, { pending: true });
-
-    const token = this.getAuthToken();
-    const scriptUrl = getManualAppsScriptUrl();
-
-    if (!token) {
-      this.setMembers(members.map((item, i) => i === idx ? previousMember : item));
-      console.error('[Admin] Sesi Super Admin tidak ditemukan.');
-      return null;
-    }
-
-    void fetch('/api/admin/assign', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        memberId: member.id,
-        userId: member.userId || '',
+    this.emitMutation(
+      'ADMIN',
+      'ASSIGN',
+      {
+        memberId:
+          member.id,
+        userId:
+          member.userId || '',
         role,
         jurisdictionId,
         jurisdictionName,
-        notes: notes || '',
-        scriptUrl
-      })
-    }).then(async response => {
-      let result: any = null;
-      try { result = await response.json(); } catch {}
+        assignedBy:
+          adminUser.id,
+        assignedByName:
+          adminUser.name,
+        notes:
+          notes || ''
+      },
+      {
+        pending: true
+      }
+    );
 
-      if (!response.ok || !result?.success) {
-        const latest = this.getMembers();
-        const latestIndex = latest.findIndex(item => String(item.id) === String(member.id));
-        if (latestIndex !== -1) {
-          latest[latestIndex] = previousMember;
-          this.setMembers(latest);
+    const token =
+      this.getAuthToken();
+
+    if (!token) {
+      this.setMembers(
+        members.map(
+          (item, i) =>
+            i === idx
+              ? previousMember
+              : item
+        )
+      );
+
+      console.error(
+        '[Admin] Sesi Super Admin tidak ditemukan.'
+      );
+
+      return null;
+    }
+
+    void fetch(
+      '/api/admin/assign',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json',
+          'Authorization':
+            `Bearer ${token}`
+        },
+        credentials:
+          'include',
+        body: JSON.stringify({
+          memberId:
+            member.id,
+          userId:
+            member.userId || '',
+          role,
+          jurisdictionId,
+          jurisdictionName,
+          notes:
+            notes || ''
+        })
+      }
+    )
+      .then(
+        async response => {
+          let result: any =
+            null;
+
+          try {
+            result =
+              await response.json();
+          } catch {}
+
+          if (
+            !response.ok ||
+            !result?.success
+          ) {
+            const latest =
+              this.getMembers();
+
+            const latestIndex =
+              latest.findIndex(
+                item =>
+                  String(item.id) ===
+                  String(member.id)
+              );
+
+            if (
+              latestIndex !== -1
+            ) {
+              latest[
+                latestIndex
+              ] =
+                previousMember;
+
+              this.setMembers(
+                latest
+              );
+            }
+
+            console.error(
+              '[Admin] Penetapan Admin gagal:',
+              result?.message ||
+                `HTTP ${response.status}`
+            );
+
+            return;
+          }
+
+          this.emitMutation(
+            'ADMIN',
+            'ASSIGN_CONFIRMED',
+            result.user || {
+              memberId:
+                member.id,
+              role,
+              jurisdictionId,
+              jurisdictionName
+            },
+            {
+              pending:
+                false
+            }
+          );
+
+          this.notify();
         }
-        console.error('[Admin] Penetapan Admin gagal:', result?.message || `HTTP ${response.status}`);
-        return;
-      }
+      )
+      .catch(
+        error => {
+          const latest =
+            this.getMembers();
 
-      this.emitMutation('ADMIN', 'ASSIGN_CONFIRMED', result.user || {
-        memberId: member.id,
-        role,
-        jurisdictionId,
-        jurisdictionName
-      }, { pending: false });
-      this.notify();
-    }).catch(error => {
-      const latest = this.getMembers();
-      const latestIndex = latest.findIndex(item => String(item.id) === String(member.id));
-      if (latestIndex !== -1) {
-        latest[latestIndex] = previousMember;
-        this.setMembers(latest);
-      }
-      console.error('[Admin] Gagal menyimpan penetapan Admin ke server/Spreadsheet:', error);
-    });
+          const latestIndex =
+            latest.findIndex(
+              item =>
+                String(item.id) ===
+                String(member.id)
+            );
+
+          if (
+            latestIndex !== -1
+          ) {
+            latest[
+              latestIndex
+            ] =
+              previousMember;
+
+            this.setMembers(
+              latest
+            );
+          }
+
+          console.error(
+            '[Admin] Gagal menyimpan penetapan Admin ke server/Spreadsheet:',
+            error
+          );
+        }
+      );
 
     this.notify();
+
     return member;
   }
 
   /**
-   * Mencabut hak Admin wilayah dan mengembalikan akun menjadi MEMBER.
-   * Method tetap sinkron agar kompatibel dengan UI lama.
+   * Mencabut hak Admin wilayah dan
+   * mengembalikan akun menjadi MEMBER.
    */
   public revokeMemberOperator(
     memberId: string,
     adminUser: CurrentUser,
-    reason: string = 'Pencabutan wewenang Admin oleh Super Admin'
+    reason: string =
+      'Pencabutan wewenang Admin oleh Super Admin'
   ): Member | null {
-    if (!memberId || adminUser?.role !== 'SUPER_ADMIN') {
-      console.error('[Admin] Hanya Super Admin yang dapat mencabut Admin wilayah.');
+    if (
+      !memberId ||
+      adminUser?.role !==
+        'SUPER_ADMIN'
+    ) {
+      console.error(
+        '[Admin] Hanya Super Admin yang dapat mencabut Admin wilayah.'
+      );
+
       return null;
     }
 
-    const members = this.getMembers();
-    const idx = members.findIndex(member => String(member.id) === String(memberId));
-    if (idx === -1) return null;
+    const members =
+      this.getMembers();
 
-    const previousMember = { ...members[idx] };
+    const idx =
+      members.findIndex(
+        member =>
+          String(member.id) ===
+          String(memberId)
+      );
+
+    if (idx === -1) {
+      return null;
+    }
+
+    const previousMember =
+      { ...members[idx] };
+
     const member = {
       ...members[idx],
       isOperator: false,
-      operatorRole: undefined,
-      operatorJurisdictionId: undefined,
-      operatorJurisdictionName: undefined,
-      operatorAssignedAt: undefined,
-      operatorAssignedBy: undefined,
-      operatorNotes: undefined
+      operatorRole:
+        undefined,
+      operatorJurisdictionId:
+        undefined,
+      operatorJurisdictionName:
+        undefined,
+      operatorAssignedAt:
+        undefined,
+      operatorAssignedBy:
+        undefined,
+      operatorNotes:
+        undefined
     } as Member;
 
-    members[idx] = member;
-    this.setMembers(members);
+    members[idx] =
+      member;
 
-    const users = this.getUsers();
-    const userIndex = users.findIndex(user =>
-      String(user.memberId || '') === String(member.id) ||
-      String(user.id || '') === String(member.userId || '') ||
-      String(user.email || '').toLowerCase() === String(member.email || '').toLowerCase()
+    this.setMembers(
+      members
     );
 
-    let previousUser: CurrentUser | null = null;
+    const users =
+      this.getUsers();
+
+    const userIndex =
+      users.findIndex(
+        user =>
+          String(
+            user.memberId || ''
+          ) ===
+            String(member.id) ||
+          String(
+            user.id || ''
+          ) ===
+            String(
+              member.userId || ''
+            ) ||
+          String(
+            user.email || ''
+          ).toLowerCase() ===
+            String(
+              member.email || ''
+            ).toLowerCase()
+      );
+
+    let previousUser:
+      CurrentUser | null =
+      null;
+
     if (userIndex !== -1) {
-      previousUser = { ...users[userIndex] };
+      previousUser =
+        {
+          ...users[userIndex]
+        };
+
       users[userIndex] = {
         ...users[userIndex],
-        name: member.fullName,
-        email: member.email,
-        avatarUrl: member.avatarUrl,
-        memberId: member.id,
-        role: 'MEMBER',
-        jurisdictionId: undefined,
-        jurisdictionName: undefined
+        name:
+          member.fullName,
+        email:
+          member.email,
+        avatarUrl:
+          member.avatarUrl,
+        memberId:
+          member.id,
+        role:
+          'MEMBER',
+        jurisdictionId:
+          undefined,
+        jurisdictionName:
+          undefined
       } as CurrentUser;
-      this.setUsers(users);
 
-      const currentUser = this.getCurrentUser();
+      this.setUsers(
+        users
+      );
+
+      const currentUser =
+        this.getCurrentUser();
+
       if (
-        String(currentUser?.id || '') === String(users[userIndex].id || '') ||
-        String(currentUser?.memberId || '') === String(member.id)
+        String(
+          currentUser?.id || ''
+        ) ===
+          String(
+            users[userIndex].id || ''
+          ) ||
+        String(
+          currentUser?.memberId || ''
+        ) ===
+          String(member.id)
       ) {
-        this.setCurrentUser(users[userIndex]);
+        this.setCurrentUser(
+          users[userIndex]
+        );
       }
     }
 
-    this.emitMutation('ADMIN', 'REVOKE', {
-      memberId: member.id,
-      userId: member.userId || '',
-      reason,
-      revokedBy: adminUser.id,
-      revokedByName: adminUser.name
-    }, { pending: true });
+    this.emitMutation(
+      'ADMIN',
+      'REVOKE',
+      {
+        memberId:
+          member.id,
+        userId:
+          member.userId || '',
+        reason,
+        revokedBy:
+          adminUser.id,
+        revokedByName:
+          adminUser.name
+      },
+      {
+        pending: true
+      }
+    );
 
-    const token = this.getAuthToken();
-    const scriptUrl = getManualAppsScriptUrl();
+    const token =
+      this.getAuthToken();
+
     if (!token) {
-      this.setMembers(members.map((item, i) => i === idx ? previousMember : item));
-      if (userIndex !== -1 && previousUser) {
-        const rollbackUsers = this.getUsers();
-        const rollbackIndex = rollbackUsers.findIndex(user => String(user.id) === String(previousUser!.id));
-        if (rollbackIndex !== -1) {
-          rollbackUsers[rollbackIndex] = previousUser;
-          this.setUsers(rollbackUsers);
+      this.setMembers(
+        members.map(
+          (item, i) =>
+            i === idx
+              ? previousMember
+              : item
+        )
+      );
+
+      if (
+        userIndex !== -1 &&
+        previousUser
+      ) {
+        const rollbackUsers =
+          this.getUsers();
+
+        const rollbackIndex =
+          rollbackUsers.findIndex(
+            user =>
+              String(user.id) ===
+              String(
+                previousUser!.id
+              )
+          );
+
+        if (
+          rollbackIndex !== -1
+        ) {
+          rollbackUsers[
+            rollbackIndex
+          ] =
+            previousUser;
+
+          this.setUsers(
+            rollbackUsers
+          );
         }
       }
-      console.error('[Admin] Sesi Super Admin tidak ditemukan.');
+
+      console.error(
+        '[Admin] Sesi Super Admin tidak ditemukan.'
+      );
+
       return null;
     }
 
-    void fetch('/api/admin/revoke', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        memberId: member.id,
-        userId: member.userId || '',
-        reason,
-        scriptUrl
-      })
-    }).then(async response => {
-      let result: any = null;
-      try { result = await response.json(); } catch {}
+    void fetch(
+      '/api/admin/revoke',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json',
+          'Authorization':
+            `Bearer ${token}`
+        },
+        credentials:
+          'include',
+        body: JSON.stringify({
+          memberId:
+            member.id,
+          userId:
+            member.userId || '',
+          reason
+        })
+      }
+    )
+      .then(
+        async response => {
+          let result: any =
+            null;
 
-      if (!response.ok || !result?.success) {
-        const latest = this.getMembers();
-        const latestIndex = latest.findIndex(item => String(item.id) === String(member.id));
-        if (latestIndex !== -1) {
-          latest[latestIndex] = previousMember;
-          this.setMembers(latest);
-        }
-        if (userIndex !== -1 && previousUser) {
-          const latestUsers = this.getUsers();
-          const latestUserIndex = latestUsers.findIndex(user => String(user.id) === String(previousUser!.id));
-          if (latestUserIndex !== -1) {
-            latestUsers[latestUserIndex] = previousUser;
-            this.setUsers(latestUsers);
+          try {
+            result =
+              await response.json();
+          } catch {}
+
+          if (
+            !response.ok ||
+            !result?.success
+          ) {
+            const latest =
+              this.getMembers();
+
+            const latestIndex =
+              latest.findIndex(
+                item =>
+                  String(item.id) ===
+                  String(member.id)
+              );
+
+            if (
+              latestIndex !== -1
+            ) {
+              latest[
+                latestIndex
+              ] =
+                previousMember;
+
+              this.setMembers(
+                latest
+              );
+            }
+
+            if (
+              userIndex !== -1 &&
+              previousUser
+            ) {
+              const latestUsers =
+                this.getUsers();
+
+              const latestUserIndex =
+                latestUsers.findIndex(
+                  user =>
+                    String(
+                      user.id
+                    ) ===
+                    String(
+                      previousUser!.id
+                    )
+                );
+
+              if (
+                latestUserIndex !==
+                -1
+              ) {
+                latestUsers[
+                  latestUserIndex
+                ] =
+                  previousUser;
+
+                this.setUsers(
+                  latestUsers
+                );
+              }
+            }
+
+            console.error(
+              '[Admin] Pencabutan Admin gagal:',
+              result?.message ||
+                `HTTP ${response.status}`
+            );
+
+            return;
           }
-        }
-        console.error('[Admin] Pencabutan Admin gagal:', result?.message || `HTTP ${response.status}`);
-        return;
-      }
 
-      this.emitMutation('ADMIN', 'REVOKE_CONFIRMED', result.user || {
-        memberId: member.id,
-        role: 'MEMBER'
-      }, { pending: false });
-      this.notify();
-    }).catch(error => {
-      const latest = this.getMembers();
-      const latestIndex = latest.findIndex(item => String(item.id) === String(member.id));
-      if (latestIndex !== -1) {
-        latest[latestIndex] = previousMember;
-        this.setMembers(latest);
-      }
-      if (userIndex !== -1 && previousUser) {
-        const latestUsers = this.getUsers();
-        const latestUserIndex = latestUsers.findIndex(user => String(user.id) === String(previousUser!.id));
-        if (latestUserIndex !== -1) {
-          latestUsers[latestUserIndex] = previousUser;
-          this.setUsers(latestUsers);
+          this.emitMutation(
+            'ADMIN',
+            'REVOKE_CONFIRMED',
+            result.user || {
+              memberId:
+                member.id,
+              role:
+                'MEMBER'
+            },
+            {
+              pending:
+                false
+            }
+          );
+
+          this.notify();
         }
-      }
-      console.error('[Admin] Gagal mencabut Admin dari server/Spreadsheet:', error);
-    });
+      )
+      .catch(
+        error => {
+          const latest =
+            this.getMembers();
+
+          const latestIndex =
+            latest.findIndex(
+              item =>
+                String(item.id) ===
+                String(member.id)
+            );
+
+          if (
+            latestIndex !== -1
+          ) {
+            latest[
+              latestIndex
+            ] =
+              previousMember;
+
+            this.setMembers(
+              latest
+            );
+          }
+
+          if (
+            userIndex !== -1 &&
+            previousUser
+          ) {
+            const latestUsers =
+              this.getUsers();
+
+            const latestUserIndex =
+              latestUsers.findIndex(
+                user =>
+                  String(
+                    user.id
+                  ) ===
+                  String(
+                    previousUser!.id
+                  )
+              );
+
+            if (
+              latestUserIndex !==
+              -1
+            ) {
+              latestUsers[
+                latestUserIndex
+              ] =
+                previousUser;
+
+              this.setUsers(
+                latestUsers
+              );
+            }
+          }
+
+          console.error(
+            '[Admin] Gagal mencabut Admin dari server/Spreadsheet:',
+            error
+          );
+        }
+      );
 
     this.notify();
+
     return member;
   }
 
-
+  // =========================================================
+  // MEMBER PHOTO
+  // =========================================================
 
   public updateMemberPhoto(
     memberId: string,
     avatarUrl: string,
     actor?: CurrentUser
   ): Member | null {
-    if (!avatarUrl || !avatarUrl.trim()) {
+    if (
+      !avatarUrl ||
+      !avatarUrl.trim()
+    ) {
       return null;
     }
 
-    const members = this.getMembers();
-    const index = members.findIndex(member => member.id === memberId);
+    const members =
+      this.getMembers();
+
+    const index =
+      members.findIndex(
+        member =>
+          member.id ===
+          memberId
+      );
 
     if (index === -1) {
       return null;
@@ -971,99 +1726,193 @@ class StorageService {
 
     const updatedMember: Member = {
       ...members[index],
-      avatarUrl: avatarUrl.trim()
+      avatarUrl:
+        avatarUrl.trim()
     };
 
-    members[index] = updatedMember;
-    this.setMembers(members);
+    members[index] =
+      updatedMember;
 
-    // Sinkronkan foto ke akun user yang terhubung dengan anggota.
-    const users = this.getUsers();
-    const userIndex = users.findIndex(
-      user => user.id === updatedMember.userId
+    this.setMembers(
+      members
     );
+
+    const users =
+      this.getUsers();
+
+    const userIndex =
+      users.findIndex(
+        user =>
+          user.id ===
+          updatedMember.userId
+      );
 
     if (userIndex !== -1) {
       users[userIndex] = {
         ...users[userIndex],
-        avatarUrl: updatedMember.avatarUrl
+        avatarUrl:
+          updatedMember.avatarUrl
       };
-      this.setUsers(users);
+
+      this.setUsers(
+        users
+      );
     }
 
-    // Jika current user adalah pemilik akun anggota, perbarui juga sesi aktif.
-    const currentUser = this.getCurrentUser();
+    const currentUser =
+      this.getCurrentUser();
+
     if (
-      currentUser?.id === updatedMember.userId ||
-      currentUser?.id === actor?.id
+      currentUser?.id ===
+        updatedMember.userId ||
+      currentUser?.id ===
+        actor?.id
     ) {
       this.setCurrentUser({
         ...currentUser,
-        avatarUrl: updatedMember.avatarUrl
+        avatarUrl:
+          updatedMember.avatarUrl
       });
     }
 
     return updatedMember;
   }
 
+  // =========================================================
+  // NTA
+  // =========================================================
 
-  /**
-   * Generate Nomor Tanda Anggota (NTA) berdasarkan kode wilayah.
-   * Format: PP.KK.KC.NNNNNN
-   * PP = kode provinsi, KK = kode kabupaten/kota, KC = kode kecamatan,
-   * NNNNNN = nomor urut 6 digit yang unik di dalam wilayah tersebut.
-   */
   public generateNationalMemberNumber(
     provinceCode: string,
     regencyCode: string,
     districtCode: string
   ): string {
-    const pp = String(provinceCode || '00').replace(/\D/g, '').slice(-2).padStart(2, '0');
-    const kk = String(regencyCode || '00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
-    const kc = String(districtCode || '00.00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
-    const prefix = `${pp}.${kk}.${kc}.`;
+    const pp =
+      String(
+        provinceCode || '00'
+      )
+        .replace(/\D/g, '')
+        .slice(-2)
+        .padStart(2, '0');
 
-    const members = this.getMembers();
+    const kk =
+      String(
+        regencyCode || '00.00'
+      )
+        .split('.')
+        .filter(Boolean)
+        .pop()
+        ?.replace(/\D/g, '')
+        .slice(-2)
+        .padStart(2, '0') ||
+      '00';
+
+    const kc =
+      String(
+        districtCode || '00.00.00'
+      )
+        .split('.')
+        .filter(Boolean)
+        .pop()
+        ?.replace(/\D/g, '')
+        .slice(-2)
+        .padStart(2, '0') ||
+      '00';
+
+    const prefix =
+      `${pp}.${kk}.${kc}.`;
+
+    const members =
+      this.getMembers();
+
     let maxSequence = 0;
 
-    members.forEach(member => {
-      const nta = String(member?.nationalMemberNumber || '').trim();
-      if (!nta.startsWith(prefix)) return;
+    members.forEach(
+      member => {
+        const nta =
+          String(
+            member?.nationalMemberNumber ||
+              ''
+          ).trim();
 
-      const sequence = parseInt(nta.slice(prefix.length).replace(/\D/g, ''), 10);
-      if (Number.isFinite(sequence) && sequence > maxSequence) {
-        maxSequence = sequence;
+        if (
+          !nta.startsWith(
+            prefix
+          )
+        ) {
+          return;
+        }
+
+        const sequence =
+          parseInt(
+            nta
+              .slice(prefix.length)
+              .replace(/\D/g, ''),
+            10
+          );
+
+        if (
+          Number.isFinite(
+            sequence
+          ) &&
+          sequence >
+            maxSequence
+        ) {
+          maxSequence =
+            sequence;
+        }
       }
-    });
-
-    return `${prefix}${String(maxSequence + 1).padStart(6, '0')}`;
-  }
-
-  /**
-   * Menerbitkan NTA untuk anggota yang belum memiliki nomor.
-   * Nomor selalu mengikuti wilayah anggota saat ini.
-   */
-  public assignNationalMemberNumber(memberId: string): Member | null {
-    const members = this.getMembers();
-    const index = members.findIndex(member => member.id === memberId);
-    if (index === -1) return null;
-
-    const member = members[index];
-    const nta = member.nationalMemberNumber || this.generateNationalMemberNumber(
-      member.provinceId || '00',
-      member.regencyId || '00.00',
-      member.districtId || '00.00.00'
     );
 
-    members[index] = { ...member, nationalMemberNumber: nta };
-    this.setMembers(members);
+    return `${prefix}${String(
+      maxSequence + 1
+    ).padStart(6, '0')}`;
+  }
+
+  public assignNationalMemberNumber(
+    memberId: string
+  ): Member | null {
+    const members =
+      this.getMembers();
+
+    const index =
+      members.findIndex(
+        member =>
+          member.id ===
+          memberId
+      );
+
+    if (index === -1) {
+      return null;
+    }
+
+    const member =
+      members[index];
+
+    const nta =
+      member.nationalMemberNumber ||
+      this.generateNationalMemberNumber(
+        member.provinceId ||
+          '00',
+        member.regencyId ||
+          '00.00',
+        member.districtId ||
+          '00.00.00'
+      );
+
+    members[index] = {
+      ...member,
+      nationalMemberNumber:
+        nta
+    };
+
+    this.setMembers(
+      members
+    );
+
     return members[index];
   }
 
-  /**
-   * Generate NTA massal berdasarkan wilayah yang dipilih.
-   * Hanya anggota tanpa NTA yang diberi nomor agar nomor lama tidak berubah.
-   */
   public transferMemberLocation(
     memberId: string,
     district: District,
@@ -1072,38 +1921,78 @@ class StorageService {
     reason: string,
     authorizedByName: string
   ): Member | null {
-    const members = this.getMembers();
-    const index = members.findIndex(member => member.id === memberId);
-    if (index === -1) return null;
+    const members =
+      this.getMembers();
 
-    const current = members[index];
-    const history: MemberLocationHistory = {
+    const index =
+      members.findIndex(
+        member =>
+          member.id ===
+          memberId
+      );
+
+    if (index === -1) {
+      return null;
+    }
+
+    const current =
+      members[index];
+
+    const history:
+      MemberLocationHistory = {
       id: `history-${Date.now()}-${memberId}`,
       memberId,
-      prevDistrictName: current.districtName,
-      newDistrictName: district.name,
-      prevMemberNumber: current.nationalMemberNumber || '',
-      newMemberNumber: this.generateNationalMemberNumber(province.id, regency.id, district.id),
-      transferDate: new Date().toISOString(),
+      prevDistrictName:
+        current.districtName,
+      newDistrictName:
+        district.name,
+      prevMemberNumber:
+        current.nationalMemberNumber ||
+        '',
+      newMemberNumber:
+        this.generateNationalMemberNumber(
+          province.id,
+          regency.id,
+          district.id
+        ),
+      transferDate:
+        new Date().toISOString(),
       reason,
       authorizedByName
     };
 
     const updated = {
       ...current,
-      provinceId: province.id,
-      provinceName: province.name,
-      regencyId: regency.id,
-      regencyName: regency.name,
-      districtId: district.id,
-      districtName: district.name,
-      nationalMemberNumber: history.newMemberNumber,
-      locationHistory: [...(current.locationHistory || []), history]
+      provinceId:
+        province.id,
+      provinceName:
+        province.name,
+      regencyId:
+        regency.id,
+      regencyName:
+        regency.name,
+      districtId:
+        district.id,
+      districtName:
+        district.name,
+      nationalMemberNumber:
+        history.newMemberNumber,
+      locationHistory: [
+        ...(current.locationHistory ||
+          []),
+        history
+      ]
     };
 
-    members[index] = updated;
-    this.setMembers(members);
+    members[index] =
+      updated;
+
+    this.setMembers(
+      members
+    );
+
     this.notify();
+
     return updated;
   }
 
@@ -1111,59 +2000,164 @@ class StorageService {
     provinceId?: string,
     regencyId?: string,
     districtId?: string
-  ): { updated: number; skipped: number; total: number } {
-    const members = this.getMembers();
-    let sequenceByPrefix: Record<string, number> = {};
+  ): {
+    updated: number;
+    skipped: number;
+    total: number;
+  } {
+    const members =
+      this.getMembers();
+
+    let sequenceByPrefix:
+      Record<string, number> =
+      {};
+
     let updated = 0;
     let skipped = 0;
 
-    const selected = members.filter(member => {
-      if (provinceId && member.provinceId !== provinceId) return false;
-      if (regencyId && member.regencyId !== regencyId) return false;
-      if (districtId && member.districtId !== districtId) return false;
-      return true;
-    });
+    const selected =
+      members.filter(
+        member => {
+          if (
+            provinceId &&
+            member.provinceId !==
+              provinceId
+          ) {
+            return false;
+          }
 
-    // Seed sequence dari semua nomor yang sudah ada, bukan hanya hasil filter.
-    members.forEach(member => {
-      const nta = String(member.nationalMemberNumber || '');
-      const match = nta.match(/^(\d{2}\.\d{2}\.\d{2})\.(\d{6})$/);
-      if (match) {
-        const n = Number(match[2]);
-        sequenceByPrefix[match[1]] = Math.max(sequenceByPrefix[match[1]] || 0, n);
+          if (
+            regencyId &&
+            member.regencyId !==
+              regencyId
+          ) {
+            return false;
+          }
+
+          if (
+            districtId &&
+            member.districtId !==
+              districtId
+          ) {
+            return false;
+          }
+
+          return true;
+        }
+      );
+
+    members.forEach(
+      member => {
+        const nta =
+          String(
+            member.nationalMemberNumber ||
+              ''
+          );
+
+        const match =
+          nta.match(
+            /^(\d{2}\.\d{2}\.\d{2})\.(\d{6})$/
+          );
+
+        if (match) {
+          const n =
+            Number(match[2]);
+
+          sequenceByPrefix[
+            match[1]
+          ] = Math.max(
+            sequenceByPrefix[
+              match[1]
+            ] || 0,
+            n
+          );
+        }
       }
-    });
+    );
 
-    selected.forEach(member => {
-      if (member.nationalMemberNumber) {
-        skipped++;
-        return;
+    selected.forEach(
+      member => {
+        if (
+          member.nationalMemberNumber
+        ) {
+          skipped++;
+          return;
+        }
+
+        const pp =
+          String(
+            member.provinceId ||
+              '00'
+          )
+            .replace(/\D/g, '')
+            .slice(-2)
+            .padStart(2, '0');
+
+        const kk =
+          String(
+            member.regencyId ||
+              '00.00'
+          )
+            .split('.')
+            .filter(Boolean)
+            .pop()
+            ?.replace(/\D/g, '')
+            .slice(-2)
+            .padStart(2, '0') ||
+          '00';
+
+        const kc =
+          String(
+            member.districtId ||
+              '00.00.00'
+          )
+            .split('.')
+            .filter(Boolean)
+            .pop()
+            ?.replace(/\D/g, '')
+            .slice(-2)
+            .padStart(2, '0') ||
+          '00';
+
+        const prefix =
+          `${pp}.${kk}.${kc}`;
+
+        const next =
+          (sequenceByPrefix[
+            prefix
+          ] || 0) + 1;
+
+        sequenceByPrefix[
+          prefix
+        ] = next;
+
+        member.nationalMemberNumber =
+          `${prefix}.${String(
+            next
+          ).padStart(6, '0')}`;
+
+        updated++;
       }
+    );
 
-      const pp = String(member.provinceId || '00').replace(/\D/g, '').slice(-2).padStart(2, '0');
-      const kk = String(member.regencyId || '00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
-      const kc = String(member.districtId || '00.00.00').split('.').filter(Boolean).pop()?.replace(/\D/g, '').slice(-2).padStart(2, '0') || '00';
-      const prefix = `${pp}.${kk}.${kc}`;
-      const next = (sequenceByPrefix[prefix] || 0) + 1;
-      sequenceByPrefix[prefix] = next;
+    if (updated > 0) {
+      this.setMembers(
+        members
+      );
+    }
 
-      member.nationalMemberNumber = `${prefix}.${String(next).padStart(6, '0')}`;
-      updated++;
-    });
-
-    if (updated > 0) this.setMembers(members);
-    return { updated, skipped, total: selected.length };
+    return {
+      updated,
+      skipped,
+      total:
+        selected.length
+    };
   }
 
-  /**
-   * Registrasi anggota baru.
-   *
-   * ID otomatis:
-   * member-01
-   * member-02
-   * member-03
-   * dst.
-   */
+  // =========================================================
+  // REGISTER MEMBER
+  // =========================================================
+
   public registerMember(
     payload: Omit<
       Member,
@@ -1174,131 +2168,269 @@ class StorageService {
       | 'locationHistory'
     >
   ): Member {
-    const members = this.getMembers();
+    const members =
+      this.getMembers();
 
     let maxNumber = 0;
 
-    members.forEach(existingMember => {
-      const existingId = String(existingMember?.id || '').trim();
-      const match = existingId.match(/^SPW-(\d+)$/i);
-      if (match) {
-        const numPart = parseInt(match[1], 10);
-        if (!Number.isNaN(numPart) && numPart > maxNumber) maxNumber = numPart;
-      }
-    });
+    members.forEach(
+      existingMember => {
+        const existingId =
+          String(
+            existingMember?.id ||
+              ''
+          ).trim();
 
-    const nextNumber = maxNumber + 1;
-    const formattedId = `SPW-${String(nextNumber).padStart(6, '0')}`;
+        const match =
+          existingId.match(
+            /^SPW-(\d+)$/i
+          );
+
+        if (match) {
+          const numPart =
+            parseInt(
+              match[1],
+              10
+            );
+
+          if (
+            !Number.isNaN(
+              numPart
+            ) &&
+            numPart >
+              maxNumber
+          ) {
+            maxNumber =
+              numPart;
+          }
+        }
+      }
+    );
+
+    const nextNumber =
+      maxNumber + 1;
+
+    const formattedId =
+      `SPW-${String(
+        nextNumber
+      ).padStart(6, '0')}`;
 
     const newMember: Member = {
       ...payload,
       id: formattedId,
       status: 'PENDING',
-      registeredAt: new Date().toISOString(),
-      verificationToken: `VERIFY-${formattedId}-${Date.now()
-        .toString(36)
-        .toUpperCase()}`,
+      registeredAt:
+        new Date().toISOString(),
+      verificationToken:
+        `VERIFY-${formattedId}-${Date.now()
+          .toString(36)
+          .toUpperCase()}`,
       locationHistory: [],
-      nationalMemberNumber: payload.nationalMemberNumber || this.generateNationalMemberNumber(
-        payload.provinceId,
-        payload.regencyId,
-        payload.districtId
-      ),
-      skills: payload.skills || [],
-      certifications: payload.certifications || []
+      nationalMemberNumber:
+        payload.nationalMemberNumber ||
+        this.generateNationalMemberNumber(
+          payload.provinceId,
+          payload.regencyId,
+          payload.districtId
+        ),
+      skills:
+        payload.skills || [],
+      certifications:
+        payload.certifications ||
+        []
     };
 
-    members.unshift(newMember);
+    members.unshift(
+      newMember
+    );
 
-    this.setMembers(members);
+    this.setMembers(
+      members
+    );
 
     return newMember;
   }
 
+  // =========================================================
+  // MEMBER STATUS
+  // =========================================================
+
   public async updateMemberStatus(
     memberId: string,
-    status: 'ACTIVE' | 'PENDING' | 'SUSPENDED',
+    status:
+      | 'ACTIVE'
+      | 'PENDING'
+      | 'SUSPENDED',
     actor?: CurrentUser
   ): Promise<boolean> {
-    const current = this.getMembers().find(member => member.id === memberId);
-    if (!current) return false;
+    const current =
+      this.getMembers().find(
+        member =>
+          member.id ===
+          memberId
+      );
+
+    if (!current) {
+      return false;
+    }
 
     try {
       await this.adminUpdateMember(
         memberId,
         { status },
-        actor || this.getCurrentUser() || DEFAULT_PUBLIC_USER as CurrentUser,
+        actor ||
+          this.getCurrentUser() ||
+          DEFAULT_PUBLIC_USER as CurrentUser,
         status === 'ACTIVE'
           ? 'Verifikasi anggota oleh administrator'
           : status === 'SUSPENDED'
             ? 'Penolakan/penonaktifan anggota oleh administrator'
             : 'Pengembalian status anggota menjadi pending'
       );
+
       return true;
     } catch (error) {
-      console.error('[Member Status] Gagal menyimpan status:', error);
+      console.error(
+        '[Member Status] Gagal menyimpan status:',
+        error
+      );
+
       return false;
     }
   }
+
+  // =========================================================
+  // DELETE MEMBER
+  // =========================================================
 
   public deleteMember(
     memberId: string,
     actor?: any
   ): boolean {
-    const members = this.getMembers();
+    const members =
+      this.getMembers();
 
-    const filteredMembers = members.filter(
-      member => member.id !== memberId
+    const filteredMembers =
+      members.filter(
+        member =>
+          member.id !==
+          memberId
+      );
+
+    if (
+      filteredMembers.length ===
+      members.length
+    ) {
+      return false;
+    }
+
+    this.setMembers(
+      filteredMembers
     );
 
-    if (filteredMembers.length === members.length) {
-      return false;
-    }
-
-    // Simpan perubahan lokal terlebih dahulu agar UI langsung berubah.
-    this.setMembers(filteredMembers);
-    this.emitMutation('MEMBER', 'DELETE', { id: memberId, memberId, kta: members.find(member => member.id === memberId)?.nationalMemberNumber || '' });
-
-    // DELETE harus diteruskan ke server agar benar-benar menghapus baris
-    // pada Google Spreadsheet. Jangan hanya mengandalkan LocalStorage.
-    const token = this.getAuthToken();
-    const scriptUrl = getManualAppsScriptUrl();
-    if (!token || !scriptUrl) {
-      // Rollback jika sesi/API atau URL Apps Script belum tersedia.
-      this.setMembers(members);
-      console.error('[Delete Member] Sesi administrator atau URL Apps Script tidak tersedia.');
-      return false;
-    }
-
-    void fetch('/api/mutate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        type: 'MEMBER',
-        action: 'DELETE',
-        payload: {
-          id: memberId,
-          memberId,
-          kta: members.find(member => member.id === memberId)?.nationalMemberNumber || ''
-        },
-        reason: 'Penghapusan anggota oleh administrator',
-        scriptUrl
-      })
-    }).then(async response => {
-      let result: any = null;
-      try { result = await response.json(); } catch {}
-      if (!response.ok || !result?.success) {
-        this.setMembers(members);
-        console.error('[Delete Member] Server/Spreadsheet menolak penghapusan:', result?.message || response.status);
+    this.emitMutation(
+      'MEMBER',
+      'DELETE',
+      {
+        id: memberId,
+        memberId,
+        kta:
+          members.find(
+            member =>
+              member.id ===
+              memberId
+          )?.nationalMemberNumber ||
+          ''
       }
-    }).catch(error => {
-      this.setMembers(members);
-      console.error('[Delete Member] Gagal menyinkronkan penghapusan ke Spreadsheet:', error);
-    });
+    );
+
+    const token =
+      this.getAuthToken();
+
+    if (!token) {
+      this.setMembers(
+        members
+      );
+
+      console.error(
+        '[Delete Member] Sesi administrator tidak tersedia.'
+      );
+
+      return false;
+    }
+
+    void fetch(
+      '/api/mutate',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json',
+          'Authorization':
+            `Bearer ${token}`
+        },
+        credentials:
+          'include',
+        body: JSON.stringify({
+          type:
+            'MEMBER',
+          action:
+            'DELETE',
+          payload: {
+            id:
+              memberId,
+            memberId,
+            kta:
+              members.find(
+                member =>
+                  member.id ===
+                  memberId
+              )?.nationalMemberNumber ||
+              ''
+          },
+          reason:
+            'Penghapusan anggota oleh administrator'
+        })
+      }
+    )
+      .then(
+        async response => {
+          let result: any =
+            null;
+
+          try {
+            result =
+              await response.json();
+          } catch {}
+
+          if (
+            !response.ok ||
+            !result?.success
+          ) {
+            this.setMembers(
+              members
+            );
+
+            console.error(
+              '[Delete Member] Server/Spreadsheet menolak penghapusan:',
+              result?.message ||
+                response.status
+            );
+          }
+        }
+      )
+      .catch(
+        error => {
+          this.setMembers(
+            members
+          );
+
+          console.error(
+            '[Delete Member] Gagal menyinkronkan penghapusan ke Spreadsheet:',
+            error
+          );
+        }
+      );
 
     return true;
   }
@@ -1306,18 +2438,27 @@ class StorageService {
   public deleteAllDummyMembers(
     actor?: any
   ): number {
-    const members = this.getMembers();
+    const members =
+      this.getMembers();
 
-    const filteredMembers = members.filter(
-      member =>
-        !member.id.includes('dummy') &&
-        !member.id.includes('demo')
-    );
+    const filteredMembers =
+      members.filter(
+        member =>
+          !member.id.includes(
+            'dummy'
+          ) &&
+          !member.id.includes(
+            'demo'
+          )
+      );
 
     const deletedCount =
-      members.length - filteredMembers.length;
+      members.length -
+      filteredMembers.length;
 
-    this.setMembers(filteredMembers);
+    this.setMembers(
+      filteredMembers
+    );
 
     return deletedCount;
   }
@@ -1326,29 +2467,60 @@ class StorageService {
   // KTA CARD SETTINGS
   // =========================================================
 
-  public getKtaSettings(): KtaCardSettings {
-    if (typeof window === 'undefined') {
+  public getKtaSettings():
+    KtaCardSettings {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return DEFAULT_KTA_SETTINGS;
     }
 
     try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.KTA_SETTINGS
-      );
+      const data =
+        localStorage.getItem(
+          STORAGE_KEYS.KTA_SETTINGS
+        );
 
       if (data) {
-        const parsedData = JSON.parse(data);
+        const parsedData =
+          JSON.parse(data);
 
         const merged = {
           ...DEFAULT_KTA_SETTINGS,
-          ...(parsedData && typeof parsedData === 'object' ? parsedData : {})
+          ...(parsedData &&
+          typeof parsedData ===
+            'object'
+            ? parsedData
+            : {})
         } as KtaCardSettings;
+
         return {
           ...merged,
-          logos: Array.isArray(merged.logos) ? merged.logos : [],
-          dataFields: Array.isArray(merged.dataFields) ? merged.dataFields : [],
-          textElements: Array.isArray(merged.textElements) ? merged.textElements : [],
-          terms: Array.isArray(merged.terms) ? merged.terms : []
+          logos:
+            Array.isArray(
+              merged.logos
+            )
+              ? merged.logos
+              : [],
+          dataFields:
+            Array.isArray(
+              merged.dataFields
+            )
+              ? merged.dataFields
+              : [],
+          textElements:
+            Array.isArray(
+              merged.textElements
+            )
+              ? merged.textElements
+              : [],
+          terms:
+            Array.isArray(
+              merged.terms
+            )
+              ? merged.terms
+              : []
         };
       }
     } catch (error) {
@@ -1364,26 +2536,57 @@ class StorageService {
   public saveKtaSettings(
     settings: KtaCardSettings
   ) {
-    if (typeof window === 'undefined') {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return;
     }
 
     try {
       const merged = {
         ...DEFAULT_KTA_SETTINGS,
-        ...(settings && typeof settings === 'object' ? settings : {})
+        ...(settings &&
+        typeof settings ===
+          'object'
+          ? settings
+          : {})
       } as KtaCardSettings;
-      const updatedSettings: KtaCardSettings = {
+
+      const updatedSettings:
+        KtaCardSettings = {
         ...merged,
-        logos: Array.isArray(merged.logos) ? merged.logos : [],
-        dataFields: Array.isArray(merged.dataFields) ? merged.dataFields : [],
-        textElements: Array.isArray(merged.textElements) ? merged.textElements : [],
-        terms: Array.isArray(merged.terms) ? merged.terms : []
+        logos:
+          Array.isArray(
+            merged.logos
+          )
+            ? merged.logos
+            : [],
+        dataFields:
+          Array.isArray(
+            merged.dataFields
+          )
+            ? merged.dataFields
+            : [],
+        textElements:
+          Array.isArray(
+            merged.textElements
+          )
+            ? merged.textElements
+            : [],
+        terms:
+          Array.isArray(
+            merged.terms
+          )
+            ? merged.terms
+            : []
       };
 
       localStorage.setItem(
         STORAGE_KEYS.KTA_SETTINGS,
-        JSON.stringify(updatedSettings)
+        JSON.stringify(
+          updatedSettings
+        )
       );
 
       this.notify();
@@ -1392,7 +2595,8 @@ class StorageService {
         new CustomEvent(
           'saka:kta-settings-updated',
           {
-            detail: updatedSettings
+            detail:
+              updatedSettings
           }
         )
       );
@@ -1408,15 +2612,20 @@ class StorageService {
   // TOUR PACKAGES
   // =========================================================
 
-  public getTourPackages(): TourPackage[] {
-    if (typeof window === 'undefined') {
+  public getTourPackages():
+    TourPackage[] {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return INITIAL_TOUR_PACKAGES;
     }
 
     try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.TOURS
-      );
+      const data =
+        localStorage.getItem(
+          STORAGE_KEYS.TOURS
+        );
 
       return data
         ? JSON.parse(data)
@@ -1434,7 +2643,10 @@ class StorageService {
   public setTourPackages(
     tours: TourPackage[]
   ) {
-    if (typeof window === 'undefined') {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return;
     }
 
@@ -1457,37 +2669,105 @@ class StorageService {
     id: string,
     actor?: any
   ) {
-    const tours = this.getTourPackages();
-    const filteredTours = tours.filter(tour => tour.id !== id);
-    if (filteredTours.length === tours.length) return false;
+    const tours =
+      this.getTourPackages();
 
-    this.setTourPackages(filteredTours);
-    const token = this.getAuthToken();
-    const scriptUrl = getManualAppsScriptUrl();
-    if (!token || !scriptUrl) {
-      this.setTourPackages(tours);
-      console.error('[Delete Tour] Sesi administrator atau URL Apps Script tidak tersedia.');
+    const filteredTours =
+      tours.filter(
+        tour =>
+          tour.id !== id
+      );
+
+    if (
+      filteredTours.length ===
+      tours.length
+    ) {
       return false;
     }
 
-    void fetch('/api/mutate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      credentials: 'include',
-      body: JSON.stringify({
-        type: 'TOUR', action: 'DELETE', payload: { id },
-        reason: 'Penghapusan paket wisata oleh administrator', scriptUrl
-      })
-    }).then(async response => {
-      let result: any = null; try { result = await response.json(); } catch {}
-      if (!response.ok || !result?.success) {
-        this.setTourPackages(tours);
-        console.error('[Delete Tour] Server/Spreadsheet menolak penghapusan:', result?.message || response.status);
+    this.setTourPackages(
+      filteredTours
+    );
+
+    const token =
+      this.getAuthToken();
+
+    if (!token) {
+      this.setTourPackages(
+        tours
+      );
+
+      console.error(
+        '[Delete Tour] Sesi administrator tidak tersedia.'
+      );
+
+      return false;
+    }
+
+    void fetch(
+      '/api/mutate',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json',
+          'Authorization':
+            `Bearer ${token}`
+        },
+        credentials:
+          'include',
+        body: JSON.stringify({
+          type:
+            'TOUR',
+          action:
+            'DELETE',
+          payload: {
+            id
+          },
+          reason:
+            'Penghapusan paket wisata oleh administrator'
+        })
       }
-    }).catch(error => {
-      this.setTourPackages(tours);
-      console.error('[Delete Tour] Gagal menyinkronkan penghapusan:', error);
-    });
+    )
+      .then(
+        async response => {
+          let result: any =
+            null;
+
+          try {
+            result =
+              await response.json();
+          } catch {}
+
+          if (
+            !response.ok ||
+            !result?.success
+          ) {
+            this.setTourPackages(
+              tours
+            );
+
+            console.error(
+              '[Delete Tour] Server/Spreadsheet menolak penghapusan:',
+              result?.message ||
+                response.status
+            );
+          }
+        }
+      )
+      .catch(
+        error => {
+          this.setTourPackages(
+            tours
+          );
+
+          console.error(
+            '[Delete Tour] Gagal menyinkronkan penghapusan:',
+            error
+          );
+        }
+      );
+
     return true;
   }
 
@@ -1495,15 +2775,20 @@ class StorageService {
   // ACTIVITIES
   // =========================================================
 
-  public getActivities(): Activity[] {
-    if (typeof window === 'undefined') {
+  public getActivities():
+    Activity[] {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return INITIAL_ACTIVITIES;
     }
 
     try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.ACTIVITIES
-      );
+      const data =
+        localStorage.getItem(
+          STORAGE_KEYS.ACTIVITIES
+        );
 
       return data
         ? JSON.parse(data)
@@ -1521,14 +2806,19 @@ class StorageService {
   public setActivities(
     activities: Activity[]
   ) {
-    if (typeof window === 'undefined') {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return;
     }
 
     try {
       localStorage.setItem(
         STORAGE_KEYS.ACTIVITIES,
-        JSON.stringify(activities)
+        JSON.stringify(
+          activities
+        )
       );
 
       this.notify();
@@ -1544,37 +2834,106 @@ class StorageService {
     id: string,
     actor?: any
   ) {
-    const activities = this.getActivities();
-    const filteredActivities = activities.filter(activity => activity.id !== id);
-    if (filteredActivities.length === activities.length) return false;
+    const activities =
+      this.getActivities();
 
-    this.setActivities(filteredActivities);
-    const token = this.getAuthToken();
-    const scriptUrl = getManualAppsScriptUrl();
-    if (!token || !scriptUrl) {
-      this.setActivities(activities);
-      console.error('[Delete Activity] Sesi administrator atau URL Apps Script tidak tersedia.');
+    const filteredActivities =
+      activities.filter(
+        activity =>
+          activity.id !==
+          id
+      );
+
+    if (
+      filteredActivities.length ===
+      activities.length
+    ) {
       return false;
     }
 
-    void fetch('/api/mutate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      credentials: 'include',
-      body: JSON.stringify({
-        type: 'ACTIVITY', action: 'DELETE', payload: { id },
-        reason: 'Penghapusan kegiatan oleh administrator', scriptUrl
-      })
-    }).then(async response => {
-      let result: any = null; try { result = await response.json(); } catch {}
-      if (!response.ok || !result?.success) {
-        this.setActivities(activities);
-        console.error('[Delete Activity] Server/Spreadsheet menolak penghapusan:', result?.message || response.status);
+    this.setActivities(
+      filteredActivities
+    );
+
+    const token =
+      this.getAuthToken();
+
+    if (!token) {
+      this.setActivities(
+        activities
+      );
+
+      console.error(
+        '[Delete Activity] Sesi administrator tidak tersedia.'
+      );
+
+      return false;
+    }
+
+    void fetch(
+      '/api/mutate',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json',
+          'Authorization':
+            `Bearer ${token}`
+        },
+        credentials:
+          'include',
+        body: JSON.stringify({
+          type:
+            'ACTIVITY',
+          action:
+            'DELETE',
+          payload: {
+            id
+          },
+          reason:
+            'Penghapusan kegiatan oleh administrator'
+        })
       }
-    }).catch(error => {
-      this.setActivities(activities);
-      console.error('[Delete Activity] Gagal menyinkronkan penghapusan:', error);
-    });
+    )
+      .then(
+        async response => {
+          let result: any =
+            null;
+
+          try {
+            result =
+              await response.json();
+          } catch {}
+
+          if (
+            !response.ok ||
+            !result?.success
+          ) {
+            this.setActivities(
+              activities
+            );
+
+            console.error(
+              '[Delete Activity] Server/Spreadsheet menolak penghapusan:',
+              result?.message ||
+                response.status
+            );
+          }
+        }
+      )
+      .catch(
+        error => {
+          this.setActivities(
+            activities
+          );
+
+          console.error(
+            '[Delete Activity] Gagal menyinkronkan penghapusan:',
+            error
+          );
+        }
+      );
+
     return true;
   }
 
@@ -1584,14 +2943,18 @@ class StorageService {
 
   public getCulinarySouvenirs():
     CulinarySouvenirItem[] {
-    if (typeof window === 'undefined') {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return INITIAL_CULINARY_SOUVENIRS;
     }
 
     try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.CULINARY_SOUVENIRS
-      );
+      const data =
+        localStorage.getItem(
+          STORAGE_KEYS.CULINARY_SOUVENIRS
+        );
 
       return data
         ? JSON.parse(data)
@@ -1609,7 +2972,10 @@ class StorageService {
   public setCulinarySouvenirs(
     items: CulinarySouvenirItem[]
   ) {
-    if (typeof window === 'undefined') {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return;
     }
 
@@ -1632,19 +2998,8 @@ class StorageService {
   // KRIDA MODULES
   // =========================================================
 
-  /**
-   * Mengambil seluruh modul Krida resmi.
-   *
-   * Sumber data:
-   * src/data/kridaData.ts
-   *
-   * Data modul bersifat statis dan berasal dari:
-   * INITIAL_KRIDA_MODULES
-   *
-   * Method ini dibutuhkan oleh:
-   * src/components/krida/KridaModulesView.tsx
-   */
-  public getKridaModules(): KridaModuleItem[] {
+  public getKridaModules():
+    KridaModuleItem[] {
     return INITIAL_KRIDA_MODULES;
   }
 
@@ -1652,7 +3007,8 @@ class StorageService {
   // INDONESIA TERRITORIES
   // =========================================================
 
-  public getProvinces(): Province[] {
+  public getProvinces():
+    Province[] {
     return PROVINCES_DATA;
   }
 
@@ -1665,7 +3021,8 @@ class StorageService {
 
     return REGENCIES_DATA.filter(
       regency =>
-        regency.provinceId === provinceId
+        regency.provinceId ===
+        provinceId
     );
   }
 
@@ -1676,18 +3033,23 @@ class StorageService {
       return [];
     }
 
-    return getDistrictsForRegency(regencyId);
+    return getDistrictsForRegency(
+      regencyId
+    );
   }
 
   /**
    * Kompatibilitas untuk UI lama.
    * Fitur Branch/Gudep sudah tidak digunakan.
    */
-  public getBranches(..._args: any[]): any[] {
+  public getBranches(
+    ..._args: any[]
+  ): any[] {
     return [];
   }
 
-  public getSkills(): Skill[] {
+  public getSkills():
+    Skill[] {
     return MASTER_SKILLS;
   }
 
@@ -1695,15 +3057,20 @@ class StorageService {
   // AUDIT LOGS
   // =========================================================
 
-  public getAuditLogs(): AuditLog[] {
-    if (typeof window === 'undefined') {
+  public getAuditLogs():
+    AuditLog[] {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return INITIAL_AUDIT_LOGS;
     }
 
     try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.AUDIT_LOGS
-      );
+      const data =
+        localStorage.getItem(
+          STORAGE_KEYS.AUDIT_LOGS
+        );
 
       return data
         ? JSON.parse(data)
@@ -1722,15 +3089,20 @@ class StorageService {
   // USERS & AUTH
   // =========================================================
 
-  public getUsers(): CurrentUser[] {
-    if (typeof window === 'undefined') {
+  public getUsers():
+    CurrentUser[] {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return DEMO_USERS;
     }
 
     try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.USERS
-      );
+      const data =
+        localStorage.getItem(
+          STORAGE_KEYS.USERS
+        );
 
       return data
         ? JSON.parse(data)
@@ -1748,7 +3120,10 @@ class StorageService {
   public setUsers(
     users: CurrentUser[]
   ) {
-    if (typeof window === 'undefined') {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return;
     }
 
@@ -1770,18 +3145,25 @@ class StorageService {
   public saveUsers(
     users: CurrentUser[]
   ) {
-    this.setUsers(users);
+    this.setUsers(
+      users
+    );
   }
 
-  public getCurrentUser(): CurrentUser {
-    if (typeof window === 'undefined') {
+  public getCurrentUser():
+    CurrentUser {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return DEFAULT_PUBLIC_USER;
     }
 
     try {
-      const data = localStorage.getItem(
-        STORAGE_KEYS.CURRENT_USER
-      );
+      const data =
+        localStorage.getItem(
+          STORAGE_KEYS.CURRENT_USER
+        );
 
       return data
         ? JSON.parse(data)
@@ -1799,7 +3181,10 @@ class StorageService {
   public setCurrentUser(
     user: CurrentUser
   ) {
-    if (typeof window === 'undefined') {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return;
     }
 
@@ -1818,8 +3203,12 @@ class StorageService {
     }
   }
 
-  public getAuthToken(): string | null {
-    if (typeof window === 'undefined') {
+  public getAuthToken():
+    string | null {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return null;
     }
 
@@ -1835,7 +3224,10 @@ class StorageService {
   public setAuthToken(
     token: string | null
   ) {
-    if (typeof window === 'undefined') {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
       return;
     }
 
@@ -1864,92 +3256,243 @@ class StorageService {
   // SERVER SYNCHRONIZATION
   // =========================================================
 
-  public async syncWithServer(): Promise<boolean> {
-    const token = this.getAuthToken();
+  public async syncWithServer():
+    Promise<boolean> {
+    const token =
+      this.getAuthToken();
 
     try {
-      const headers: Record<string, string> = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const response = await fetch('/api/data', {
-        method: 'GET',
-        headers,
-        credentials: 'include',
-        cache: 'no-store'
-      });
+      const headers:
+        Record<string, string> =
+        {};
 
-      if (!response.ok) return false;
-
-      const data = await response.json();
-      if (!data || !Array.isArray(data.members)) return false;
-
-      // Lindungi perubahan profil yang masih pending agar cache server lama tidak
-      // menimpa edit Admin sebelum Spreadsheet benar-benar terkonfirmasi.
-      if (data.members.length > 0) {
-        const pending = this.getPendingMemberWrites();
-        const protectedMembers = (data.members as Member[]).map((serverMember: Member) => {
-          const entry = pending[serverMember.id] || Object.values(pending).find((p: any) => p?.member && (
-            (serverMember.nationalMemberNumber && p.member.nationalMemberNumber === serverMember.nationalMemberNumber) ||
-            (serverMember.email && String(p.member.email || '').toLowerCase() === String(serverMember.email || '').toLowerCase())
-          ));
-          return entry?.member ? { ...serverMember, ...entry.member } : serverMember;
-        });
-        this.setMembers(protectedMembers);
+      if (token) {
+        headers.Authorization =
+          `Bearer ${token}`;
       }
 
-      if (Array.isArray(data.users) && data.users.length > 0) {
-        const serverUsers = data.users as CurrentUser[];
-        this.setUsers(serverUsers);
+      const response =
+        await fetch(
+          '/api/data',
+          {
+            method: 'GET',
+            headers,
+            credentials:
+              'include',
+            cache:
+              'no-store'
+          }
+        );
 
-        // Sinkronkan hak Admin wilayah dari sheet Users ke objek Member.
-        // Tanpa ini, polling /api/data dapat mengembalikan data Anggota lalu
-        // menghapus kembali isOperator yang sebelumnya sudah dicentang lokal.
-        const roleByMemberId = new Map<string, CurrentUser>();
-        serverUsers.forEach((user: any) => {
-          const mid = String(user?.memberId || '').trim();
-          if (mid) roleByMemberId.set(mid, user);
-        });
+      if (!response.ok) {
+        return false;
+      }
 
-        const currentMembers = this.getMembers();
-        if (Array.isArray(currentMembers) && currentMembers.length > 0) {
-          const mergedMembers = currentMembers.map((member: any) => {
-            const user = roleByMemberId.get(String(member?.id || '').trim());
-            if (!user) return member;
+      const data =
+        await response.json();
 
-            const role = String(user.role || 'MEMBER').toUpperCase();
-            const isOperator = role === 'ADMIN_PROVINCE' || role === 'ADMIN_REGENCY' || role === 'ADMIN_BRANCH';
+      if (
+        !data ||
+        !Array.isArray(
+          data.members
+        )
+      ) {
+        return false;
+      }
 
-            if (!isOperator) {
-              return {
-                ...member,
-                isOperator: false,
-                operatorRole: undefined,
-                operatorJurisdictionId: undefined,
-                operatorJurisdictionName: undefined
-              };
+      // Lindungi perubahan profil yang masih pending.
+      if (
+        data.members.length > 0
+      ) {
+        const pending =
+          this.getPendingMemberWrites();
+
+        const protectedMembers =
+          (
+            data.members as Member[]
+          ).map(
+            (
+              serverMember: Member
+            ) => {
+              const entry =
+                pending[
+                  serverMember.id
+                ] ||
+                Object.values(
+                  pending
+                ).find(
+                  (p: any) =>
+                    p?.member &&
+                    (
+                      (
+                        serverMember.nationalMemberNumber &&
+                        p.member
+                          .nationalMemberNumber ===
+                          serverMember.nationalMemberNumber
+                      ) ||
+                      (
+                        serverMember.email &&
+                        String(
+                          p.member.email ||
+                            ''
+                        ).toLowerCase() ===
+                        String(
+                          serverMember.email ||
+                            ''
+                        ).toLowerCase()
+                      )
+                    )
+                );
+
+              return entry?.member
+                ? {
+                    ...serverMember,
+                    ...entry.member
+                  }
+                : serverMember;
             }
+          );
 
-            return {
-              ...member,
-              isOperator: true,
-              operatorRole: role,
-              operatorJurisdictionId: user.jurisdictionId || undefined,
-              operatorJurisdictionName: user.jurisdictionName || undefined
-            };
-          });
-          this.setMembers(mergedMembers);
+        this.setMembers(
+          protectedMembers
+        );
+      }
+
+      if (
+        Array.isArray(
+          data.users
+        ) &&
+        data.users.length > 0
+      ) {
+        const serverUsers =
+          data.users as CurrentUser[];
+
+        this.setUsers(
+          serverUsers
+        );
+
+        const roleByMemberId =
+          new Map<
+            string,
+            CurrentUser
+          >();
+
+        serverUsers.forEach(
+          (user: any) => {
+            const mid =
+              String(
+                user?.memberId ||
+                  ''
+              ).trim();
+
+            if (mid) {
+              roleByMemberId.set(
+                mid,
+                user
+              );
+            }
+          }
+        );
+
+        const currentMembers =
+          this.getMembers();
+
+        if (
+          Array.isArray(
+            currentMembers
+          ) &&
+          currentMembers.length >
+            0
+        ) {
+          const mergedMembers =
+            currentMembers.map(
+              (member: any) => {
+                const user =
+                  roleByMemberId.get(
+                    String(
+                      member?.id ||
+                        ''
+                    ).trim()
+                  );
+
+                if (!user) {
+                  return member;
+                }
+
+                const role =
+                  String(
+                    user.role ||
+                      'MEMBER'
+                  ).toUpperCase();
+
+                const isOperator =
+                  role ===
+                    'ADMIN_PROVINCE' ||
+                  role ===
+                    'ADMIN_REGENCY' ||
+                  role ===
+                    'ADMIN_BRANCH';
+
+                if (!isOperator) {
+                  return {
+                    ...member,
+                    isOperator:
+                      false,
+                    operatorRole:
+                      undefined,
+                    operatorJurisdictionId:
+                      undefined,
+                    operatorJurisdictionName:
+                      undefined
+                  };
+                }
+
+                return {
+                  ...member,
+                  isOperator:
+                    true,
+                  operatorRole:
+                    role,
+                  operatorJurisdictionId:
+                    user.jurisdictionId ||
+                    undefined,
+                  operatorJurisdictionName:
+                    user.jurisdictionName ||
+                    undefined
+                };
+              }
+            );
+
+          this.setMembers(
+            mergedMembers
+          );
         }
       }
 
-      if (Array.isArray(data.auditLogs)) {
+      if (
+        Array.isArray(
+          data.auditLogs
+        )
+      ) {
         try {
-          localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(data.auditLogs));
+          localStorage.setItem(
+            STORAGE_KEYS.AUDIT_LOGS,
+            JSON.stringify(
+              data.auditLogs
+            )
+          );
         } catch {}
       }
 
       this.notify();
+
       return true;
     } catch (error) {
-      console.warn('[Storage] Sinkronisasi server gagal:', error);
+      console.warn(
+        '[Storage] Sinkronisasi server gagal:',
+        error
+      );
+
       return false;
     }
   }
