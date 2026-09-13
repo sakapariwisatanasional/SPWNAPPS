@@ -1,5 +1,6 @@
 import {
   Member,
+  MemberLocationHistory,
   TourPackage,
   Activity,
   Province,
@@ -77,17 +78,73 @@ const STORAGE_KEYS = {
  * DEFAULT_KTA_SETTINGS
  */
 export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
+  preset: 'CR80_KTA',
+  widthMm: 85.60,
+  heightMm: 53.98,
+  cornerRadiusMm: 3.18,
+  cardTheme: 'purple_saka',
+  bgImageUrl: '',
+  frontBackgroundUrl: '',
+  backBackgroundUrl: '',
+  customBackgroundColorFront: '#24105b',
+  customBackgroundColorBack: '#111827',
+  bgOpacity: 0.10,
+  frontLogoUrl: '',
+  backLogoUrl: '',
+  logos: [],
+  dataFields: [],
+  textElements: [],
+  frontOrganizationTitle: 'SAKA PARIWISATA',
+  frontOrganizationSubtitle: 'GERAKAN PRAMUKA INDONESIA',
+  frontOrganizationTitleX: 15,
+  frontOrganizationTitleY: 6,
+  frontOrganizationTitleWidth: 65,
+  frontOrganizationTitleFontSize: 11,
+  frontOrganizationTitleFontWeight: 'bold',
+  frontOrganizationTitleColor: '#ffffff',
+  frontOrganizationTitleAlign: 'left',
+  frontOrganizationSubtitleX: 15,
+  frontOrganizationSubtitleY: 12,
+  frontOrganizationSubtitleWidth: 70,
+  frontOrganizationSubtitleFontSize: 8,
+  frontOrganizationSubtitleFontWeight: 'normal',
+  frontOrganizationSubtitleColor: '#e5e7eb',
+  frontOrganizationSubtitleAlign: 'left',
+  frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota',
+  watermarkOpacity: 0.10,
+  showKridaBadge: true,
+  showPhoto: true,
+  showQrCode: true,
+  // QR default: compact, balanced, and aligned to the right information column.
+  qrX: 78,
+  qrY: 29,
+  qrSize: 18,
+  qrBorderWidth: 1,
+  qrBorderColor: '#e9d5ff',
+  qrBorderRadius: 10,
+  qrPadding: 6,
+  qrBackgroundColor: '#ffffff',
+  backHeaderTitle: 'KARTU TANDA ANGGOTA',
+  backHeaderSubtitle: 'SAKA PARIWISATA NASIONAL',
+  terms: [],
   issueLocationDate: 'Jakarta, 14 Agustus 2026',
+  barcodeType: 'CODE128',
+  barcodeCustomValue: '',
+  showBarcode: true,
+  barcodeX: 68,
+  barcodeY: 70,
+  barcodeWidth: 27,
+  barcodeHeight: 9,
+  barcodeShowText: false,
   signerName: 'Reza Pahlevi',
   signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
-  barcodeCustomValue: '',
-  frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota',
-  bgOpacity: 0.10,
-  bgImageUrl: ''
+  signerSubtitle: '',
+  showStamp: false
 };
 
 class StorageService {
   private listeners: (() => void)[] = [];
+  private mutationListeners: ((event: any) => void)[] = [];
 
   constructor() {
     this.initDefaultData();
@@ -130,37 +187,35 @@ class StorageService {
     };
   }
 
-  public subscribeMutation(
-    listener: (event: any) => void
-  ): () => void {
-    if (typeof window === 'undefined') {
-      return () => {};
-    }
+  public subscribeMutation(listener: (event: any) => void): () => void {
+    this.mutationListeners.push(listener);
+    if (typeof window === 'undefined') return () => {};
 
-    const handler = (e: StorageEvent) => {
-      if (
-        e.key &&
-        Object.values(STORAGE_KEYS).includes(e.key)
-      ) {
-        try {
-          listener({
-            type: e.key,
-            payload: JSON.parse(e.newValue || '{}')
-          });
-        } catch {
-          listener({
-            type: e.key,
-            payload: null
-          });
-        }
-      }
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key !== 'saka_mutation_event_v2' || !e.newValue) return;
+      try { listener(JSON.parse(e.newValue)); } catch {}
     };
-
-    window.addEventListener('storage', handler);
-
+    window.addEventListener('storage', storageHandler);
     return () => {
-      window.removeEventListener('storage', handler);
+      this.mutationListeners = this.mutationListeners.filter(l => l !== listener);
+      window.removeEventListener('storage', storageHandler);
     };
+  }
+
+  public emitMutation(type: string, action: string, payload: any, meta: Record<string, any> = {}) {
+    if (typeof window === 'undefined') return;
+    const event = {
+      type, action, payload,
+      timestamp: Date.now(),
+      source: 'storage-service',
+      ...meta
+    };
+    this.mutationListeners.forEach(listener => { try { listener(event); } catch (e) { console.warn('[Storage] mutation listener error', e); } });
+    try {
+      localStorage.setItem('saka_mutation_event_v2', JSON.stringify(event));
+      localStorage.removeItem('saka_mutation_event_v2');
+    } catch {}
+    try { window.dispatchEvent(new CustomEvent('saka:local-mutation', { detail: event })); } catch {}
   }
 
   public notify() {
@@ -269,9 +324,24 @@ class StorageService {
         STORAGE_KEYS.MEMBERS
       );
 
-      return data
-        ? JSON.parse(data)
-        : INITIAL_MEMBERS;
+      const parsed = data ? JSON.parse(data) : INITIAL_MEMBERS;
+      if (!Array.isArray(parsed)) return INITIAL_MEMBERS;
+
+      // Bersihkan field legacy Gudep agar data lama tidak pernah kembali ke UI/API.
+      const cleaned = parsed.map((member: any) => {
+        if (!member || typeof member !== 'object') return member;
+        const cleanMember = { ...member };
+        delete cleanMember.gugusDepan;
+        return cleanMember as Member;
+      });
+
+      const hadLegacyFields = parsed.some((member: any) =>
+        member && typeof member === 'object' && 'gugusDepan' in member
+      );
+      if (hadLegacyFields) {
+        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(cleaned));
+      }
+      return cleaned as Member[];
     } catch (error) {
       console.error(
         'Gagal membaca data anggota:',
@@ -282,15 +352,71 @@ class StorageService {
     }
   }
 
+  /**
+   * Members deduplication used by live spreadsheet synchronization.
+   * Primary identity is SPW/member ID, then KTA, then email. The first
+   * complete record is preserved and later duplicates are merged into it.
+   */
+  public deduplicateDatabase(): void {
+    const members = this.getMembers();
+    if (!Array.isArray(members) || members.length < 2) return;
+
+    const result: Member[] = [];
+    const byKey = new Map<string, number>();
+
+    const norm = (value: any) => String(value ?? '').trim().toLowerCase();
+    const keysFor = (member: Member) => {
+      const keys: string[] = [];
+      const id = norm(member.id);
+      const kta = norm((member as any).nationalMemberNumber);
+      const email = norm(member.email);
+      if (id) keys.push(`id:${id}`);
+      if (kta) keys.push(`kta:${kta}`);
+      if (email) keys.push(`email:${email}`);
+      return keys;
+    };
+
+    for (const member of members) {
+      if (!member || typeof member !== 'object') continue;
+      const keys = keysFor(member);
+      const existingIndex = keys.map(k => byKey.get(k)).find(v => v !== undefined);
+
+      if (existingIndex === undefined) {
+        const index = result.length;
+        result.push(member);
+        keys.forEach(k => byKey.set(k, index));
+        continue;
+      }
+
+      const merged = { ...result[existingIndex], ...member };
+      // Never allow a legacy ID to overwrite a permanent SPW ID.
+      const existingId = norm(result[existingIndex].id);
+      const incomingId = norm(member.id);
+      if (/^spw-\d+$/i.test(existingId) && !/^spw-\d+$/i.test(incomingId)) {
+        merged.id = result[existingIndex].id;
+      }
+      result[existingIndex] = merged;
+      keysFor(merged).forEach(k => byKey.set(k, existingIndex));
+    }
+
+    if (result.length !== members.length) this.setMembers(result);
+  }
+
   public setMembers(members: Member[]) {
     if (typeof window === 'undefined') {
       return;
     }
 
     try {
+      const cleanedMembers = members.map((member: any) => {
+        if (!member || typeof member !== 'object') return member;
+        const cleanMember = { ...member };
+        delete cleanMember.gugusDepan;
+        return cleanMember;
+      });
       localStorage.setItem(
         STORAGE_KEYS.MEMBERS,
-        JSON.stringify(members)
+        JSON.stringify(cleanedMembers)
       );
 
       this.notify();
@@ -304,6 +430,32 @@ class StorageService {
 
   public saveMembers(members: Member[]) {
     this.setMembers(members);
+  }
+
+  /**
+   * Snapshot perubahan profil yang belum dikonfirmasi oleh live-sync Spreadsheet.
+   * Dipakai agar polling tidak menimpa perubahan lokal dengan snapshot lama.
+   */
+  public getPendingMemberWrites(): Record<string, { status: string; timestamp: number; member: Member }> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.PENDING_MEMBER_WRITES);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  public clearPendingMemberWrite(memberId: string) {
+    if (typeof window === 'undefined' || !memberId) return;
+    try {
+      const map = this.getPendingMemberWrites();
+      if (map[memberId]) {
+        delete map[memberId];
+        localStorage.setItem(STORAGE_KEYS.PENDING_MEMBER_WRITES, JSON.stringify(map));
+      }
+    } catch {}
   }
 
   /**
@@ -351,8 +503,8 @@ class StorageService {
     if (role === 'ADMIN_REGENCY' && jurisdictionId && updatedMember.regencyId !== jurisdictionId) {
       throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke Kwartir Cabang lain.');
     }
-    if (role === 'ADMIN_BRANCH' && jurisdictionId && updatedMember.branchId !== jurisdictionId) {
-      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke wilayah cabang lain.');
+    if (role === 'ADMIN_BRANCH' && jurisdictionId && updatedMember.districtId !== jurisdictionId) {
+      throw new Error('Anda tidak memiliki wewenang untuk memindahkan anggota ke kecamatan lain.');
     }
 
     // Simpan lokal terlebih dahulu agar UI responsif. Tandai record sebagai
@@ -361,13 +513,20 @@ class StorageService {
     const previousMember = { ...current };
     members[index] = updatedMember;
     this.setMembers(members);
+    this.emitMutation('MEMBER', 'UPDATE', updatedMember, { pending: true });
 
     const markPendingWrite = (pending: boolean) => {
       try {
         const raw = localStorage.getItem(STORAGE_KEYS.PENDING_MEMBER_WRITES);
         const map = raw ? JSON.parse(raw) : {};
         if (pending) {
-          map[memberId] = { status: updatedMember.status, timestamp: Date.now() };
+          // Simpan snapshot lengkap. Live-sync memakainya untuk melindungi
+          // perubahan profil sampai Spreadsheet benar-benar memantulkan nilai baru.
+          map[memberId] = {
+            status: 'PENDING',
+            timestamp: Date.now(),
+            member: { ...updatedMember }
+          };
         } else {
           delete map[memberId];
         }
@@ -448,78 +607,26 @@ class StorageService {
       }
 
       if (!response.ok || !result?.success) {
-        throw new Error(result?.message || `Server menolak perubahan profil (HTTP ${response.status}).`);
+        // Jangan rollback perubahan lokal di sini. Penyimpanan utama profil
+        // dilakukan oleh modal melalui POST UPSERT_MEMBER -> CHECK_RECORD.
+        // Rollback pada titik ini membuat modal tidak pernah sempat mengirim
+        // snapshot terbaru ke Spreadsheet.
+        console.warn(
+          '[Storage] /api/mutate gagal; perubahan tetap dipertahankan sementara agar dapat diverifikasi ke Spreadsheet.',
+          result?.message || `HTTP ${response.status}`
+        );
       }
-
-      markPendingWrite(false);
+      // Pending write sengaja TIDAK dihapus di sini. Ia akan dihapus oleh
+      // spreadsheetService setelah nilai Spreadsheet benar-benar terkonfirmasi.
     } catch (error) {
-      // Jangan biarkan UI menyimpan status palsu jika server/Spreadsheet gagal.
-      const latestMembers = this.getMembers();
-      const latestIndex = latestMembers.findIndex(member => member.id === memberId);
-      if (latestIndex !== -1) {
-        latestMembers[latestIndex] = previousMember;
-        this.setMembers(latestMembers);
-      }
-      markPendingWrite(false);
-      throw error;
+      // /api/mutate adalah jalur sinkronisasi sekunder. Jangan membatalkan
+      // perubahan profil yang sudah disimpan lokal; modal akan mengirim snapshot
+      // yang sama langsung ke Google Apps Script dan melakukan CHECK_RECORD.
+      console.warn('[Storage] Jalur /api/mutate gagal; lanjutkan verifikasi direct Apps Script:', error);
     }
 
     return updatedMember;
   }
-
-  public updateMemberPhoto(
-    memberId: string,
-    avatarUrl: string,
-    actor?: CurrentUser
-  ): Member | null {
-    if (!avatarUrl || !avatarUrl.trim()) {
-      return null;
-    }
-
-    const members = this.getMembers();
-    const index = members.findIndex(member => member.id === memberId);
-
-    if (index === -1) {
-      return null;
-    }
-
-    const updatedMember: Member = {
-      ...members[index],
-      avatarUrl: avatarUrl.trim()
-    };
-
-    members[index] = updatedMember;
-    this.setMembers(members);
-
-    // Sinkronkan foto ke akun user yang terhubung dengan anggota.
-    const users = this.getUsers();
-    const userIndex = users.findIndex(
-      user => user.id === updatedMember.userId
-    );
-
-    if (userIndex !== -1) {
-      users[userIndex] = {
-        ...users[userIndex],
-        avatarUrl: updatedMember.avatarUrl
-      };
-      this.setUsers(users);
-    }
-
-    // Jika current user adalah pemilik akun anggota, perbarui juga sesi aktif.
-    const currentUser = this.getCurrentUser();
-    if (
-      currentUser?.id === updatedMember.userId ||
-      currentUser?.id === actor?.id
-    ) {
-      this.setCurrentUser({
-        ...currentUser,
-        avatarUrl: updatedMember.avatarUrl
-      });
-    }
-
-    return updatedMember;
-  }
-
 
   // =========================================================
   // ADMIN WILAYAH — PENETAPAN / PENCABUTAN
@@ -833,6 +940,61 @@ class StorageService {
   }
 
 
+
+  public updateMemberPhoto(
+    memberId: string,
+    avatarUrl: string,
+    actor?: CurrentUser
+  ): Member | null {
+    if (!avatarUrl || !avatarUrl.trim()) {
+      return null;
+    }
+
+    const members = this.getMembers();
+    const index = members.findIndex(member => member.id === memberId);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const updatedMember: Member = {
+      ...members[index],
+      avatarUrl: avatarUrl.trim()
+    };
+
+    members[index] = updatedMember;
+    this.setMembers(members);
+
+    // Sinkronkan foto ke akun user yang terhubung dengan anggota.
+    const users = this.getUsers();
+    const userIndex = users.findIndex(
+      user => user.id === updatedMember.userId
+    );
+
+    if (userIndex !== -1) {
+      users[userIndex] = {
+        ...users[userIndex],
+        avatarUrl: updatedMember.avatarUrl
+      };
+      this.setUsers(users);
+    }
+
+    // Jika current user adalah pemilik akun anggota, perbarui juga sesi aktif.
+    const currentUser = this.getCurrentUser();
+    if (
+      currentUser?.id === updatedMember.userId ||
+      currentUser?.id === actor?.id
+    ) {
+      this.setCurrentUser({
+        ...currentUser,
+        avatarUrl: updatedMember.avatarUrl
+      });
+    }
+
+    return updatedMember;
+  }
+
+
   /**
    * Generate Nomor Tanda Anggota (NTA) berdasarkan kode wilayah.
    * Format: PP.KK.KC.NNNNNN
@@ -890,6 +1052,49 @@ class StorageService {
    * Generate NTA massal berdasarkan wilayah yang dipilih.
    * Hanya anggota tanpa NTA yang diberi nomor agar nomor lama tidak berubah.
    */
+  public transferMemberLocation(
+    memberId: string,
+    district: District,
+    regency: Regency,
+    province: Province,
+    reason: string,
+    authorizedByName: string
+  ): Member | null {
+    const members = this.getMembers();
+    const index = members.findIndex(member => member.id === memberId);
+    if (index === -1) return null;
+
+    const current = members[index];
+    const history: MemberLocationHistory = {
+      id: `history-${Date.now()}-${memberId}`,
+      memberId,
+      prevDistrictName: current.districtName,
+      newDistrictName: district.name,
+      prevMemberNumber: current.nationalMemberNumber || '',
+      newMemberNumber: this.generateNationalMemberNumber(province.id, regency.id, district.id),
+      transferDate: new Date().toISOString(),
+      reason,
+      authorizedByName
+    };
+
+    const updated = {
+      ...current,
+      provinceId: province.id,
+      provinceName: province.name,
+      regencyId: regency.id,
+      regencyName: regency.name,
+      districtId: district.id,
+      districtName: district.name,
+      nationalMemberNumber: history.newMemberNumber,
+      locationHistory: [...(current.locationHistory || []), history]
+    };
+
+    members[index] = updated;
+    this.setMembers(members);
+    this.notify();
+    return updated;
+  }
+
   public generateNationalMemberNumbersByRegion(
     provinceId?: string,
     regencyId?: string,
@@ -962,30 +1167,16 @@ class StorageService {
     let maxNumber = 0;
 
     members.forEach(existingMember => {
-      if (
-        existingMember?.id &&
-        typeof existingMember.id === 'string' &&
-        existingMember.id.startsWith('member-')
-      ) {
-        const numPart = parseInt(
-          existingMember.id.replace('member-', ''),
-          10
-        );
-
-        if (
-          !isNaN(numPart) &&
-          numPart > maxNumber
-        ) {
-          maxNumber = numPart;
-        }
+      const existingId = String(existingMember?.id || '').trim();
+      const match = existingId.match(/^SPW-(\d+)$/i);
+      if (match) {
+        const numPart = parseInt(match[1], 10);
+        if (!Number.isNaN(numPart) && numPart > maxNumber) maxNumber = numPart;
       }
     });
 
     const nextNumber = maxNumber + 1;
-
-    const formattedId = `member-${String(
-      nextNumber
-    ).padStart(2, '0')}`;
+    const formattedId = `SPW-${String(nextNumber).padStart(6, '0')}`;
 
     const newMember: Member = {
       ...payload,
@@ -1054,6 +1245,7 @@ class StorageService {
 
     // Simpan perubahan lokal terlebih dahulu agar UI langsung berubah.
     this.setMembers(filteredMembers);
+    this.emitMutation('MEMBER', 'DELETE', { id: memberId, memberId, kta: members.find(member => member.id === memberId)?.nationalMemberNumber || '' });
 
     // DELETE harus diteruskan ke server agar benar-benar menghapus baris
     // pada Google Spreadsheet. Jangan hanya mengandalkan LocalStorage.
@@ -1135,9 +1327,16 @@ class StorageService {
       if (data) {
         const parsedData = JSON.parse(data);
 
-        return {
+        const merged = {
           ...DEFAULT_KTA_SETTINGS,
-          ...parsedData
+          ...(parsedData && typeof parsedData === 'object' ? parsedData : {})
+        } as KtaCardSettings;
+        return {
+          ...merged,
+          logos: Array.isArray(merged.logos) ? merged.logos : [],
+          dataFields: Array.isArray(merged.dataFields) ? merged.dataFields : [],
+          textElements: Array.isArray(merged.textElements) ? merged.textElements : [],
+          terms: Array.isArray(merged.terms) ? merged.terms : []
         };
       }
     } catch (error) {
@@ -1158,9 +1357,16 @@ class StorageService {
     }
 
     try {
-      const updatedSettings: KtaCardSettings = {
+      const merged = {
         ...DEFAULT_KTA_SETTINGS,
-        ...settings
+        ...(settings && typeof settings === 'object' ? settings : {})
+      } as KtaCardSettings;
+      const updatedSettings: KtaCardSettings = {
+        ...merged,
+        logos: Array.isArray(merged.logos) ? merged.logos : [],
+        dataFields: Array.isArray(merged.dataFields) ? merged.dataFields : [],
+        textElements: Array.isArray(merged.textElements) ? merged.textElements : [],
+        terms: Array.isArray(merged.terms) ? merged.terms : []
       };
 
       localStorage.setItem(
@@ -1458,13 +1664,12 @@ class StorageService {
       return [];
     }
 
-    return getDistrictsForRegency(regencyId);
+    return getDistrictsForRegency(regency  /** Kompatibilitas untuk UI lama: fitur Branch/Gudep tidak digunakan. */
+  public getBranches(..._args: any[]): Branch[] {
+    return [];
   }
 
-  public getBranches(
-    districtId?: string
-  ): Branch[] {
-    return [];
+Id);
   }
 
   public getSkills(): Skill[] {
@@ -1662,9 +1867,18 @@ class StorageService {
       const data = await response.json();
       if (!data || !Array.isArray(data.members)) return false;
 
-      // Jangan menghapus data lokal hanya karena server sedang kosong.
+      // Lindungi perubahan profil yang masih pending agar cache server lama tidak
+      // menimpa edit Admin sebelum Spreadsheet benar-benar terkonfirmasi.
       if (data.members.length > 0) {
-        this.setMembers(data.members as Member[]);
+        const pending = this.getPendingMemberWrites();
+        const protectedMembers = (data.members as Member[]).map((serverMember: Member) => {
+          const entry = pending[serverMember.id] || Object.values(pending).find((p: any) => p?.member && (
+            (serverMember.nationalMemberNumber && p.member.nationalMemberNumber === serverMember.nationalMemberNumber) ||
+            (serverMember.email && String(p.member.email || '').toLowerCase() === String(serverMember.email || '').toLowerCase())
+          ));
+          return entry?.member ? { ...serverMember, ...entry.member } : serverMember;
+        });
+        this.setMembers(protectedMembers);
       }
 
       if (Array.isArray(data.users) && data.users.length > 0) {
