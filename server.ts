@@ -1185,7 +1185,7 @@ app.get('/api/data', (req, res) => {
   res.json({
     members: sanitizedMembers,
     tours: db.tours.filter(t => isSuperAdmin || isOperator || t.status === 'APPROVED_PUBLISHED'),
-    culinaryItems: db.culinaryItems.filter(c => isSuperAdmin || isOperator || c.status === 'APPROVED'),
+    culinaryItems: db.culinaryItems.filter(c => isSuperAdmin || isOperator || c.status === 'APPROVED' || (session?.role === 'MEMBER' && session.memberId && String(c.authorMemberId) === String(session.memberId))),
     activities: db.activities,
     kridaModules: db.kridaModules || [],
     users: sanitizedUsers,
@@ -1226,6 +1226,27 @@ app.post('/api/mutate', async (req, res) => {
   }
 
   // Role Validation for sensitive actions
+  if (type === 'CULINARY') {
+    if (!session) {
+      return res.status(401).json({ success: false, message: 'Sesi login tidak ditemukan. Silakan login ulang.' });
+    }
+    if (!['MEMBER', 'SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role)) {
+      return res.status(403).json({ success: false, message: 'Anda tidak memiliki hak untuk mengelola produk kuliner/cinderamata.' });
+    }
+    if (['CREATE', 'UPDATE'].includes(action) && session.role === 'MEMBER') {
+      const memberId = String(session.memberId || '');
+      const authorId = String(payload?.authorMemberId || '');
+      if (!memberId || !authorId || memberId !== authorId) {
+        return res.status(403).json({ success: false, message: 'Anggota hanya dapat menyimpan produk atas nama dirinya sendiri.' });
+      }
+      // Anggota tidak boleh menerbitkan langsung. Semua kiriman masuk antrean persetujuan.
+      payload.status = 'PENDING_APPROVAL';
+      payload.authorMemberId = memberId;
+    }
+    if (action === 'DELETE' && !isSuperAdmin && !isOperator) {
+      return res.status(403).json({ success: false, message: 'Penghapusan produk hanya dapat dilakukan administrator.' });
+    }
+  }
   if (type === 'MEMBER') {
     if (action === 'DELETE') {
       if (!isSuperAdmin) {
@@ -1403,6 +1424,13 @@ app.post('/api/mutate', async (req, res) => {
       }
     } else if (type === 'CULINARY') {
       const item = payload;
+      if (!item?.id || !item?.name || !item?.description || !item?.imageUrl) {
+        return res.status(400).json({ success: false, message: 'Data produk belum lengkap: nama, deskripsi, foto, dan ID wajib tersedia.' });
+      }
+      if (session?.role === 'MEMBER') {
+        item.status = 'PENDING_APPROVAL';
+        item.authorMemberId = session.memberId;
+      }
       if (action === 'CREATE' || action === 'UPDATE') {
         const idx = db.culinaryItems.findIndex(c => c.id === item.id);
         if (idx !== -1) {
