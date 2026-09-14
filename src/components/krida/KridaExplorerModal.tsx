@@ -147,7 +147,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
           // Heading 2
           if (trimmed.startsWith('## ')) {
             return (
-              <h2 key={idx} className="text-lg sm:text-xl font-bold text-white font-heading mt-6 pt-2 border-b border-slate-800 pb-2 flex items-center gap-2">
+              <h2 key={idx} className="text-lg sm:text-xl font-bold text-white font-heading mt-6 pt-2 border-b border-white/10 pb-2 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
                 <span>{trimmed.replace('## ', '')}</span>
               </h2>
@@ -179,7 +179,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
             if (numMatch) {
               return (
                 <div key={idx} className="flex items-start gap-2.5 pl-2">
-                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-purple-300 text-xs font-mono font-bold shrink-0 mt-0.5">
+                  <span className="px-1.5 py-0.5 rounded bg-white/[0.07] text-purple-300 text-xs font-mono font-bold shrink-0 mt-0.5">
                     {numMatch[1]}
                   </span>
                   <p className="flex-1">{numMatch[2]}</p>
@@ -200,26 +200,26 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 md:p-6 overflow-y-auto">
-      <div className="relative w-full max-w-6xl max-h-[95vh] bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#120d20]/90 backdrop-blur-sm p-2 sm:p-4 md:p-6 overflow-y-auto">
+      <div className="relative w-full max-w-6xl max-h-[94vh] bg-[#171127] border border-white/10 rounded-[28px] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* MODAL HEADER */}
-        <div className="px-3 py-3 sm:px-6 sm:py-5 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between gap-3 shrink-0">
+        <div className="px-3 py-3 sm:px-6 sm:py-5 border-b border-white/10 bg-[#21183a]/95 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${activeCategoryInfo.color} flex items-center justify-center text-white shadow-lg shrink-0`}>
+            <div className={`w-10 h-10 rounded-2xl bg-purple-600 flex items-center justify-center text-white shadow-lg shrink-0`}>
               <FolderOpen className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-sm sm:text-lg font-extrabold text-white font-heading leading-tight">
-                  Folder Kurikulum & Modul SKK 4 Krida
+                  Eksplorasi Krida & SKK
                 </h2>
                 <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[11px] font-bold border border-purple-500/30">
-                  23 Mata Krida Terakreditasi
+                  4 Krida • 23 SKK
                 </span>
               </div>
               <p className="hidden sm:block text-xs text-slate-400">
-                Pusat materi pembelajaran, silabus pertemuan, dan standar uji kecakapan khusus Saka Pariwisata Nasional.
+                Pilih Krida → pilih SKK → mulai belajar. Semua materi ada di satu tempat.
               </p>
             </div>
           </div>
@@ -238,7 +238,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Tutup Jendela"
             >
               <X className="w-5 h-5" />
@@ -247,7 +247,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
         </div>
 
         {/* UNIVERSAL DROPDOWN NAVIGATION: KRIDA -> SKK -> MATERI SKK */}
-        <div className="shrink-0 border-b border-slate-800 bg-slate-950/95 px-3 py-3 sm:px-5">
+        <div className="shrink-0 border-b border-white/10 bg-[#120d20]/98 px-3 py-3 sm:px-5">
           <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-5xl mx-auto">
             {[
               { key: 'KRIDA' as const, icon: Compass, label: 'Krida', value: activeCategoryInfo.shortTitle },
@@ -262,7 +262,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                   type="button"
                   aria-expanded={open}
                   onClick={() => setMobileMenu(open ? null : item.key)}
-                  className={`min-w-0 rounded-xl sm:rounded-2xl border px-2.5 py-2 sm:px-4 sm:py-3 text-left transition-all ${open ? 'border-purple-500/60 bg-purple-600/20 text-white ring-1 ring-purple-500/20' : 'border-slate-800 bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:border-slate-700'}`}
+                  className={`min-w-0 rounded-xl sm:rounded-2xl border px-2.5 py-2 sm:px-4 sm:py-3 text-left transition-all ${open ? 'border-purple-500/60 bg-purple-600/20 text-white ring-1 ring-purple-500/20' : 'border-white/10 bg-white/[0.045] text-slate-300 hover:bg-white/[0.07] hover:border-slate-700'}`}
                 >
                   <div className="flex items-center justify-between gap-1.5">
                     <span className="flex items-center gap-1.5 sm:gap-2 min-w-0">
@@ -278,7 +278,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
           </div>
 
           {mobileMenu === 'KRIDA' && (
-            <div className="mt-2 sm:mt-3 mx-auto max-w-5xl rounded-2xl border border-slate-800 bg-slate-900 p-2 sm:p-3 shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="mt-2 sm:mt-3 mx-auto max-w-5xl rounded-2xl border border-white/10 bg-white/[0.045] p-2 sm:p-3 shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {KRIDA_CATEGORIES.map((cat, idx) => {
                   const selected = selectedKridaId === cat.id;
@@ -287,9 +287,9 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       key={cat.id}
                       type="button"
                       onClick={() => handleSelectCategory(cat.id)}
-                      className={`flex items-center gap-2 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${selected ? 'border-purple-500/60 bg-purple-600/20' : 'border-slate-800 bg-slate-950 hover:bg-slate-800'}`}
+                      className={`flex items-center gap-2 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${selected ? 'border-purple-500/60 bg-purple-600/20' : 'border-white/10 bg-[#120d20] hover:bg-white/[0.07]'}`}
                     >
-                      <span className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-[10px] font-bold shrink-0 ${selected ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{idx + 1}</span>
+                      <span className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-[10px] font-bold shrink-0 ${selected ? 'bg-purple-600 text-white' : 'bg-white/[0.07] text-slate-400'}`}>{idx + 1}</span>
                       <span className="min-w-0">
                         <span className={`block text-[10px] sm:text-xs font-bold truncate ${selected ? 'text-white' : 'text-slate-200'}`}>{cat.name}</span>
                         <span className="block text-[9px] sm:text-[10px] text-slate-500 mt-0.5">{cat.topicsCount} SKK</span>
@@ -302,15 +302,15 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
           )}
 
           {mobileMenu === 'SKK' && (
-            <div className="mt-2 sm:mt-3 mx-auto max-w-5xl rounded-2xl border border-slate-800 bg-slate-900 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-              <div className="p-2.5 sm:p-3 border-b border-slate-800 flex items-center justify-between gap-2">
+            <div className="mt-2 sm:mt-3 mx-auto max-w-5xl rounded-2xl border border-white/10 bg-white/[0.045] shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="p-2.5 sm:p-3 border-b border-white/10 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <List className="w-4 h-4 text-purple-400 shrink-0" />
                   <span className="text-[11px] sm:text-xs font-extrabold text-white truncate">{activeCategoryInfo.name}</span>
                 </div>
                 <span className="text-[9px] sm:text-[10px] text-slate-500 shrink-0">{categoryModules.length} Mata Krida</span>
               </div>
-              <div className="p-2 border-b border-slate-800/80">
+              <div className="p-2 border-b border-white/10/80">
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                   <input
@@ -318,7 +318,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Cari kode atau nama SKK..."
-                    className="w-full pl-9 pr-9 py-2 sm:py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    className="w-full pl-9 pr-9 py-2 sm:py-2.5 bg-[#120d20] border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
                   />
                   {searchQuery && (
                     <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
@@ -335,9 +335,9 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       key={mod.id}
                       type="button"
                       onClick={() => handleSelectModule(mod.id)}
-                      className={`w-full flex items-center gap-2.5 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${selected ? 'border-purple-500/60 bg-purple-600/15' : 'border-slate-800 bg-slate-950 hover:bg-slate-800'}`}
+                      className={`w-full flex items-center gap-2.5 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${selected ? 'border-purple-500/60 bg-purple-600/15' : 'border-white/10 bg-[#120d20] hover:bg-white/[0.07]'}`}
                     >
-                      <span className={`w-9 h-9 rounded-lg flex items-center justify-center text-[9px] font-bold font-mono shrink-0 ${selected ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{mod.code}</span>
+                      <span className={`w-9 h-9 rounded-lg flex items-center justify-center text-[9px] font-bold font-mono shrink-0 ${selected ? 'bg-purple-600 text-white' : 'bg-white/[0.07] text-slate-400'}`}>{mod.code}</span>
                       <span className="min-w-0 flex-1">
                         <span className={`block text-[11px] sm:text-xs font-bold ${selected ? 'text-purple-200' : 'text-slate-200'}`}>{mod.title}</span>
                         <span className="block text-[9px] sm:text-[10px] text-slate-500 truncate mt-0.5">{mod.levelSKK}</span>
@@ -352,7 +352,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
           )}
 
           {mobileMenu === 'MATERI' && (
-            <div className="mt-2 sm:mt-3 mx-auto max-w-5xl rounded-2xl border border-slate-800 bg-slate-900 p-2 sm:p-3 shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="mt-2 sm:mt-3 mx-auto max-w-5xl rounded-2xl border border-white/10 bg-white/[0.045] p-2 sm:p-3 shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { tab: 'CONTENT' as const, icon: BookOpen, label: 'Materi & Naskah' },
@@ -367,7 +367,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       key={item.tab}
                       type="button"
                       onClick={() => handleSelectMobileTab(item.tab)}
-                      className={`flex items-center gap-2 rounded-xl border p-2.5 sm:p-3 text-left text-[10px] sm:text-xs font-bold transition-all ${selected ? 'border-purple-500/60 bg-purple-600 text-white' : 'border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800'}`}
+                      className={`flex items-center gap-2 rounded-xl border p-2.5 sm:p-3 text-left text-[10px] sm:text-xs font-bold transition-all ${selected ? 'border-purple-500/60 bg-purple-600 text-white' : 'border-white/10 bg-[#120d20] text-slate-300 hover:bg-white/[0.07]'}`}
                     >
                       <Icon className="w-4 h-4 shrink-0" />
                       <span className="truncate">{item.label}</span>
@@ -382,14 +382,14 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
         {/* MAIN BODY: SINGLE CONTENT PANE */}
         <div className="flex-1 flex flex-col overflow-hidden">
                     {/* CONTENT PANE */}
-          <div className="flex-1 flex flex-col bg-slate-900/30 overflow-hidden min-w-0">
+          <div className="flex-1 flex flex-col bg-white/[0.045]/30 overflow-hidden min-w-0">
             {currentModule ? (
               <>
                 {/* DETAIL HEADER */}
-                <div className="p-3 sm:p-6 border-b border-slate-800 bg-slate-950/60 shrink-0 space-y-3">
+                <div className="p-3 sm:p-6 border-b border-white/10 bg-[#120d20]/60 shrink-0 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-xl bg-purple-950/80 text-purple-300 text-xs font-bold border border-purple-800/60 flex items-center gap-1.5">
+                      <span className="px-2.5 py-1 rounded-xl bg-purple-500/10 text-purple-300 text-xs font-bold border border-purple-400/20 flex items-center gap-1.5">
                         <Award className="w-3.5 h-3.5 text-amber-400" />
                         <span>Mata Krida {currentModule.code}</span>
                       </span>
@@ -397,7 +397,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         {currentModule.kridaName}
                       </span>
                       {currentModule.skkniReference && (
-                        <span className="px-2 py-0.5 rounded-lg bg-emerald-950/80 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-800/60">
+                        <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-800/60">
                           SKKNI: {currentModule.skkniReference}
                         </span>
                       )}
@@ -416,7 +416,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       
                       <button
                         onClick={handleShare}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer"
                         title="Salin Tautan Modul"
                       >
                         <Share2 className="w-3.5 h-3.5 text-purple-400" />
@@ -425,7 +425,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
 
                       <button
                         onClick={handlePrint}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer"
                         title="Cetak Materi Modul Ini"
                       >
                         <Printer className="w-3.5 h-3.5 text-emerald-400" />
@@ -452,7 +452,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                   {activeTab === 'CONTENT' && (
                     <div className="space-y-6 max-w-4xl">
                       {/* Formatted Text */}
-                      <div className="bg-slate-950/80 border border-slate-800/80 rounded-3xl p-5 sm:p-7 shadow-lg">
+                      <div className="bg-[#120d20]/80 border border-white/10/80 rounded-3xl p-5 sm:p-7 shadow-lg">
                         {renderFormattedContent(currentModule.content)}
                       </div>
 
@@ -465,8 +465,8 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                           </h3>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {currentModule.images.map((img) => (
-                              <div key={img.id} className="bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 group shadow-md">
-                                <div className="h-48 overflow-hidden bg-slate-900">
+                              <div key={img.id} className="bg-[#120d20] rounded-2xl overflow-hidden border border-white/10 group shadow-md">
+                                <div className="h-48 overflow-hidden bg-white/[0.045]">
                                   <img
                                     src={img.url}
                                     alt={img.caption}
@@ -491,11 +491,11 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                             <TableIcon className="w-4 h-4 text-purple-400" />
                             <span>Matriks Standar Kompetensi & Evaluasi</span>
                           </h3>
-                          <div className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden">
+                          <div className="rounded-2xl border border-white/10 bg-[#120d20] overflow-hidden">
                             {/* Desktop Table */}
                             <div className="hidden md:block overflow-x-auto">
                               <table className="w-full text-left text-xs text-slate-300">
-                                <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                                <thead className="bg-white/[0.045] text-slate-400 uppercase text-[10px] tracking-wider border-b border-white/10">
                                   <tr>
                                     <th className="p-3">Kode Unit</th>
                                     <th className="p-3">Elemen Kompetensi</th>
@@ -505,7 +505,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/80">
                                   {currentModule.competencyTable.map((row, rIdx) => (
-                                    <tr key={rIdx} className="hover:bg-slate-900/50">
+                                    <tr key={rIdx} className="hover:bg-white/[0.045]/50">
                                       <td className="p-3 font-mono text-purple-300 font-semibold">{row.code}</td>
                                       <td className="p-3 font-bold text-white">{row.element}</td>
                                       <td className="p-3 text-slate-300">{row.indicator}</td>
@@ -521,7 +521,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                               {currentModule.competencyTable.map((row, rIdx) => (
                                 <div key={rIdx} className="p-3.5 space-y-2 text-xs">
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-mono text-xs font-bold text-purple-300 bg-purple-950/70 px-2 py-0.5 rounded border border-purple-800/60">
+                                    <span className="font-mono text-xs font-bold text-purple-300 bg-purple-950/70 px-2 py-0.5 rounded border border-purple-400/20">
                                       {row.code}
                                     </span>
                                     <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/50">
@@ -529,7 +529,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                                     </span>
                                   </div>
                                   <p className="font-bold text-white text-[13px]">{row.element}</p>
-                                  <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                                  <div className="p-2.5 rounded-xl bg-white/[0.045]/80 border border-white/10 text-[11px] text-slate-300 space-y-1">
                                     <span className="text-[10px] text-slate-400 block font-semibold">Indikator Kinerja:</span>
                                     <p className="leading-relaxed">{row.indicator}</p>
                                   </div>
@@ -554,10 +554,10 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                                 href={link.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-purple-500/50 transition-all flex items-center justify-between gap-3 group"
+                                className="p-3.5 rounded-2xl bg-[#120d20] border border-white/10 hover:border-purple-500/50 transition-all flex items-center justify-between gap-3 group"
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 rounded-xl bg-purple-950/60 border border-purple-800/40 flex items-center justify-center text-purple-400 shrink-0">
+                                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-800/40 flex items-center justify-center text-purple-400 shrink-0">
                                     {link.type === 'VIDEO' ? <Video className="w-4 h-4" /> : <ExternalLink className="w-4 h-4" />}
                                   </div>
                                   <div className="min-w-0">
@@ -595,7 +595,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         {(currentModule.curriculum || []).map((session, sIdx) => (
                           <div
                             key={sIdx}
-                            className="bg-slate-950 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-purple-500/40 transition-all"
+                            className="bg-[#120d20] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-purple-500/40 transition-all"
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
@@ -612,7 +612,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                                   <span>{session.duration}</span>
                                 </span>
                                 <span>•</span>
-                                <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[11px]">
+                                <span className="px-2 py-0.5 rounded-md bg-white/[0.07] text-slate-300 text-[11px]">
                                   {session.method}
                                 </span>
                               </div>
@@ -646,7 +646,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       </div>
 
                       {/* PURWA */}
-                      <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 space-y-3">
+                      <div className="bg-[#120d20] border border-white/10 rounded-3xl p-5 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-emerald-500" />
@@ -654,7 +654,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                               Tingkat Purwa (7–15 Thn / Dasar)
                             </h4>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 text-[10px] font-bold border border-emerald-800/60 font-mono">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 text-[10px] font-bold border border-emerald-800/60 font-mono">
                             Bingkai Bulat
                           </span>
                         </div>
@@ -670,7 +670,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                               <div
                                 key={rIdx}
                                 onClick={() => setCheckedPurwa(prev => ({ ...prev, [key]: !prev[key] }))}
-                                className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 cursor-pointer transition-colors"
+                                className="flex items-start gap-3 p-2.5 rounded-xl bg-white/[0.045]/60 hover:bg-white/[0.045] border border-white/10/80 cursor-pointer transition-colors"
                               >
                                 {isChecked ? (
                                   <CheckSquare className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -686,7 +686,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         </div>
 
                         {currentModule.practiceProduct?.purwa && (
-                          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-emerald-800/40 text-xs text-emerald-300">
+                          <div className="mt-3 p-3 rounded-xl bg-white/[0.045] border border-emerald-800/40 text-xs text-emerald-300">
                             <span className="font-bold text-emerald-400 block mb-1">📦 Produk Nyata / Bukti Uji Wajib Purwa:</span>
                             <p className="text-slate-300 text-[11px] leading-relaxed">{currentModule.practiceProduct.purwa}</p>
                           </div>
@@ -694,7 +694,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       </div>
 
                       {/* MADYA */}
-                      <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 space-y-3">
+                      <div className="bg-[#120d20] border border-white/10 rounded-3xl p-5 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-amber-500" />
@@ -702,7 +702,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                               Tingkat Madya (15–20 Thn / Penerapan)
                             </h4>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 text-[10px] font-bold border border-amber-800/60 font-mono">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 text-[10px] font-bold border border-amber-800/60 font-mono">
                             Bingkai Persegi
                           </span>
                         </div>
@@ -718,7 +718,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                               <div
                                 key={rIdx}
                                 onClick={() => setCheckedMadya(prev => ({ ...prev, [key]: !prev[key] }))}
-                                className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 cursor-pointer transition-colors"
+                                className="flex items-start gap-3 p-2.5 rounded-xl bg-white/[0.045]/60 hover:bg-white/[0.045] border border-white/10/80 cursor-pointer transition-colors"
                               >
                                 {isChecked ? (
                                   <CheckSquare className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
@@ -734,7 +734,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         </div>
 
                         {currentModule.practiceProduct?.madya && (
-                          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-amber-800/40 text-xs text-amber-300">
+                          <div className="mt-3 p-3 rounded-xl bg-white/[0.045] border border-amber-800/40 text-xs text-amber-300">
                             <span className="font-bold text-amber-400 block mb-1">📦 Produk Nyata / Bukti Uji Wajib Madya:</span>
                             <p className="text-slate-300 text-[11px] leading-relaxed">{currentModule.practiceProduct.madya}</p>
                           </div>
@@ -742,7 +742,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                       </div>
 
                       {/* UTAMA */}
-                      <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 space-y-3">
+                      <div className="bg-[#120d20] border border-white/10 rounded-3xl p-5 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-purple-500" />
@@ -750,7 +750,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                               Tingkat Utama (21–25 Thn / Pengembangan)
                             </h4>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 text-[10px] font-bold border border-purple-800/60 font-mono">
+                          <span className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 text-[10px] font-bold border border-purple-400/20 font-mono">
                             Bingkai Segilima
                           </span>
                         </div>
@@ -766,7 +766,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                               <div
                                 key={rIdx}
                                 onClick={() => setCheckedUtama(prev => ({ ...prev, [key]: !prev[key] }))}
-                                className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 cursor-pointer transition-colors"
+                                className="flex items-start gap-3 p-2.5 rounded-xl bg-white/[0.045]/60 hover:bg-white/[0.045] border border-white/10/80 cursor-pointer transition-colors"
                               >
                                 {isChecked ? (
                                   <CheckSquare className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
@@ -782,7 +782,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         </div>
 
                         {currentModule.practiceProduct?.utama && (
-                          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-purple-800/40 text-xs text-purple-300">
+                          <div className="mt-3 p-3 rounded-xl bg-white/[0.045] border border-purple-800/40 text-xs text-purple-300">
                             <span className="font-bold text-purple-400 block mb-1">📦 Produk Nyata / Bukti Uji Wajib Utama:</span>
                             <p className="text-slate-300 text-[11px] leading-relaxed">{currentModule.practiceProduct.utama}</p>
                           </div>
@@ -791,7 +791,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
 
                       {/* Special Safety Notes */}
                       {currentModule.specialSafetyNotes && (
-                        <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-800/40 text-xs text-rose-200 flex items-start gap-3">
+                        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-800/40 text-xs text-rose-200 flex items-start gap-3">
                           <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                           <div>
                             <span className="font-bold text-sm text-rose-400 block">Prosedur Keselamatan Kerja & Etika Wisata (K3 Wisata):</span>
@@ -802,14 +802,14 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
 
                       {/* 8 Components Portfolio */}
                       {currentModule.portfolioItems && currentModule.portfolioItems.length > 0 && (
-                        <div className="p-5 rounded-3xl bg-slate-950 border border-slate-800 space-y-3">
+                        <div className="p-5 rounded-3xl bg-[#120d20] border border-white/10 space-y-3">
                           <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2 font-heading">
                             <CheckCircle2 className="w-4 h-4" />
                             <span>8 Komponen Bukti Portofolio Uji Resmi 2026</span>
                           </h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                             {currentModule.portfolioItems.map((item, idx) => (
-                              <div key={idx} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/70 text-slate-300 flex items-start gap-2">
+                              <div key={idx} className="p-2.5 rounded-xl bg-white/[0.045]/60 border border-white/10/70 text-slate-300 flex items-start gap-2">
                                 <span className="w-5 h-5 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-[10px] shrink-0">
                                   {idx + 1}
                                 </span>
@@ -825,7 +825,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                   {/* TAB 4: DOWNLOADS */}
                   {activeTab === 'DOWNLOADS' && (
                     <div className="space-y-4 max-w-4xl">
-                      <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-800/40 text-xs text-emerald-200 flex items-center justify-between">
+                      <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-800/40 text-xs text-emerald-200 flex items-center justify-between">
                         <div>
                           <p className="font-bold">Dokumen Modul & Lembar Kerja Uji</p>
                           <p className="text-slate-400 text-[11px] mt-0.5">Berkas resmi dapat diunduh untuk kebutuhan belajar mandiri dan kegiatan perkemahan.</p>
@@ -839,10 +839,10 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         ).map((dl) => (
                           <div
                             key={dl.id}
-                            className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 transition-all flex items-center justify-between gap-3 group"
+                            className="p-4 rounded-2xl bg-[#120d20] border border-white/10 hover:border-emerald-500/50 transition-all flex items-center justify-between gap-3 group"
                           >
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-10 h-10 rounded-2xl bg-emerald-950/60 border border-emerald-800/50 flex items-center justify-center text-emerald-400 shrink-0">
+                              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-800/50 flex items-center justify-center text-emerald-400 shrink-0">
                                 <FileText className="w-5 h-5" />
                               </div>
                               <div className="min-w-0">
@@ -868,7 +868,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
                         ))}
 
                         {(!currentModule.materials?.downloads?.length && !currentModule.downloads?.length) && (
-                          <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 text-slate-500 text-xs space-y-2">
+                          <div className="p-8 text-center bg-[#120d20] rounded-2xl border border-white/10 text-slate-500 text-xs space-y-2">
                             <Download className="w-8 h-8 mx-auto text-slate-600" />
                             <p>Dokumen PDF sedang dalam proses digitalisasi oleh Pimpinan Saka Pariwisata Nasional.</p>
                             <p className="text-[11px] text-slate-600">Gunakan tombol "Cetak" di atas untuk menyimpan naskah modul ini sebagai dokumen PDF lokal.</p>
@@ -888,7 +888,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
         </div>
 
         {/* MODAL FOOTER */}
-        <div className="hidden sm:flex px-5 py-3 border-t border-slate-800 bg-slate-950/80 flex-wrap items-center justify-between gap-3 text-xs text-slate-500 shrink-0">
+        <div className="hidden sm:flex px-5 py-3 border-t border-white/10 bg-[#120d20]/80 flex-wrap items-center justify-between gap-3 text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>Terakhir disinkronkan: {currentModule?.updatedAt ? new Date(currentModule.updatedAt).toLocaleDateString('id-ID') : 'Terbaru'}</span>
@@ -899,7 +899,7 @@ export const KridaExplorerModal: React.FC<KridaExplorerModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold cursor-pointer"
+              className="px-4 py-1.5 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] text-slate-200 text-xs font-bold cursor-pointer"
             >
               Tutup
             </button>
