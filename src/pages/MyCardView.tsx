@@ -216,7 +216,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           {onOpenQuickShareModal && (
             <button
               onClick={() => onOpenQuickShareModal(member)}
-              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-purple-700 to-indigo-900 hover:from-amber-600 hover:to-indigo-950 text-white rounded-2xl text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-purple-700 to-indigo-900 hover:from-amber-600 hover:to-indigo-950 text-white rounded-[1.35rem] text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer"
             >
               <Share2 className="w-4 h-4 text-amber-300" />
               <span>Bagikan Profil</span>
@@ -226,7 +226,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           {onOpenPrintPdfModal && (
             <button
               onClick={() => onOpenPrintPdfModal(member)}
-              className="px-4 py-2.5 bg-purple-900 hover:bg-purple-950 text-white rounded-2xl text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-purple-900 hover:bg-purple-950 text-white rounded-[1.35rem] text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer"
             >
               <FileDown className="w-4 h-4 text-purple-300" />
               <span>Cetak / Unduh PDF</span>
@@ -236,7 +236,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           {(isStrictOwner || isAdmin) && onOpenEditMemberModal && (
             <button
               onClick={() => onOpenEditMemberModal(member)}
-              className="px-4 py-2.5 bg-indigo-900 hover:bg-indigo-950 text-white rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-indigo-900 hover:bg-indigo-950 text-white rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
               <Edit3 className="w-4 h-4 text-indigo-300" />
               <span>{isStrictOwner && !isAdmin ? 'Edit Profil Saya' : 'Koreksi Data'}</span>
@@ -246,9 +246,9 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           {(isOwner || isAdmin) && onOpenEditPhotoModal && (
             <button
               onClick={() => onOpenEditPhotoModal(member)}
-              className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
-              <Camera className="w-4 h-4 text-purple-600" />
+              <Camera className="w-4 h-4 text-fuchsia-600" />
               <span>Ubah Foto</span>
             </button>
           )}
@@ -256,7 +256,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           {isAdmin && onOpenEditCardModal && (
             <button
               onClick={onOpenEditCardModal}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
               <Sliders className="w-4 h-4" />
               <span>Desain KTA</span>
@@ -268,7 +268,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
               <button
                 type="button"
                 onClick={() => onOpenCulinaryFormModal('KULINER')}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm"
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm"
               >
                 <span>🍽️</span>
                 <span>Ajukan Kuliner</span>
@@ -276,7 +276,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
               <button
                 type="button"
                 onClick={() => onOpenCulinaryFormModal('CINDERAMATA')}
-                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-white rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm"
+                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-white rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm"
               >
                 <span>🎁</span>
                 <span>Ajukan Cinderamata</span>
@@ -287,7 +287,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
       </div>
 
       {/* Kartu 3D KTA Interaktif */}
-      <div className="bg-gradient-to-b from-slate-900 to-slate-950 p-8 rounded-3xl border border-slate-800 shadow-2xl flex flex-col items-center justify-center space-y-6">
+      <div className="bg-gradient-to-b from-slate-900 to-slate-950 p-8 rounded-[1.75rem] border border-slate-800 shadow-xl flex flex-col items-center justify-center space-y-6">
         <DigitalMemberCard
           member={member}
           onVerifyClick={onOpenVerifyModal}
@@ -305,7 +305,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
       </div>
 
       {/* Detail Data Profil Anggota */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+      <div className="bg-white rounded-[1.35rem] p-6 border border-slate-200 shadow-xs space-y-4">
         <h3 className="font-bold text-sm text-slate-900 pb-2 border-b border-slate-100 flex items-center justify-between">
           <span>Informasi Keanggotaan Terdaftar</span>
           <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
@@ -316,26 +316,26 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+          <div className="p-3 bg-slate-50 rounded-2xl space-y-1">
             <span className="text-slate-400 text-[10px] font-bold uppercase">Nomor Tanda Anggota (NTA)</span>
             <p className="font-mono font-bold text-slate-800 text-sm">{nta}</p>
           </div>
-          <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+          <div className="p-3 bg-slate-50 rounded-2xl space-y-1">
             <span className="text-slate-400 text-[10px] font-bold uppercase">Pilihan Krida Utama</span>
             <p className="font-bold text-emerald-800 text-sm">{member.krida}</p>
           </div>
-          <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+          <div className="p-3 bg-slate-50 rounded-2xl space-y-1">
             <span className="text-slate-400 text-[10px] font-bold uppercase">Kecamatan</span>
             <p className="font-semibold text-slate-800">{'' || '-'}</p>
           </div>
-          <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+          <div className="p-3 bg-slate-50 rounded-2xl space-y-1">
             <span className="text-slate-400 text-[10px] font-bold uppercase">Wilayah Kwartir</span>
             <p className="font-semibold text-slate-800">Kwarcab {member.regencyName}, Kwarda {member.provinceName}</p>
           </div>
         </div>
 
         {member.bio && (
-          <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-xs">
+          <div className="p-3 bg-slate-50 rounded-2xl space-y-1 text-xs">
             <span className="text-slate-400 text-[10px] font-bold uppercase">Bio / Catatan Pengabdian</span>
             <p className="text-slate-700 italic">"{member.bio}"</p>
           </div>
@@ -343,7 +343,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
       </div>
 
       {/* Bagikan Profil & Akses Cepat */}
-      <div className="bg-gradient-to-br from-purple-950 via-slate-900 to-indigo-950 text-white p-6 rounded-3xl border border-purple-800/40 shadow-xl space-y-4">
+      <div className="bg-gradient-to-br from-purple-950 via-slate-900 to-indigo-950 text-white p-6 rounded-[1.75rem] border border-purple-800/40 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-base font-bold text-white">Bagikan Profil Anggota Ini</h3>
@@ -352,14 +352,14 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleWhatsAppShare}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Kirim WhatsApp</span>
             </button>
             <button
               onClick={handleDownloadQuickQr}
-              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/20 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold border border-white/20 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <QrCode className="w-3.5 h-3.5 text-purple-300" />
               <span>Unduh QR</span>
@@ -371,7 +371,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           <button
             type="button"
             onClick={handleCopyLink}
-            className="p-2.5 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/40 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-purple-200"
+            className="p-2.5 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/40 rounded-2xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-purple-200"
           >
             {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-300" />}
             <span className="font-medium">{copiedLink ? 'Tautan Profil Tersalin!' : 'Salin Tautan Profil KTA'}</span>
@@ -379,7 +379,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           <button
             type="button"
             onClick={handleCopyNta}
-            className="p-2.5 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/40 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-purple-200"
+            className="p-2.5 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/40 rounded-2xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-purple-200"
           >
             {copiedNta ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-300" />}
             <span className="font-medium">{copiedNta ? 'NTA Tersalin!' : 'Salin Nomor NTA'}</span>
