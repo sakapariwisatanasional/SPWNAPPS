@@ -479,17 +479,17 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
   // Visual Theme Classes
   const themeClasses = {
     dark: {
-      bg: 'bg-slate-950 text-slate-100',
-      headerBg: 'bg-slate-900/90 border-slate-800 text-slate-100',
-      cardBg: 'bg-slate-900/70 border-slate-800 text-slate-200',
-      subCardBg: 'bg-slate-950 border-slate-800/80',
-      footerBg: 'bg-slate-900/90 border-slate-800 text-slate-200',
-      accentText: 'text-purple-400',
-      badgeBg: 'bg-purple-950/80 text-purple-300 border-purple-800/80',
-      mutedText: 'text-slate-400',
-      highlightBorder: 'border-purple-500/40',
-      progressTrack: 'bg-slate-800',
-      progressFill: 'bg-gradient-to-r from-purple-500 to-indigo-500'
+      bg: 'bg-[#171225] text-white',
+      headerBg: 'bg-[#211936] border-white/10 text-white',
+      cardBg: 'bg-[#211936] border-white/10 text-white',
+      subCardBg: 'bg-[#19142a] border-white/10',
+      footerBg: 'bg-[#211936] border-white/10 text-white',
+      accentText: 'text-fuchsia-300',
+      badgeBg: 'bg-fuchsia-400/10 text-fuchsia-200 border-fuchsia-300/20',
+      mutedText: 'text-white/55',
+      highlightBorder: 'border-fuchsia-300/25',
+      progressTrack: 'bg-white/10',
+      progressFill: 'bg-fuchsia-300'
     },
     sepia: {
       bg: 'bg-[#FAF4E8] text-[#3D2C1F]',
@@ -510,12 +510,12 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
       cardBg: 'bg-white border-slate-200 text-slate-800 shadow-sm',
       subCardBg: 'bg-slate-50 border-slate-200',
       footerBg: 'bg-white border-slate-200 text-slate-800 shadow-xs',
-      accentText: 'text-purple-700',
-      badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
+      accentText: 'text-fuchsia-700',
+      badgeBg: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
       mutedText: 'text-slate-600',
-      highlightBorder: 'border-purple-300',
+      highlightBorder: 'border-fuchsia-300',
       progressTrack: 'bg-slate-200',
-      progressFill: 'bg-purple-600'
+      progressFill: 'bg-fuchsia-500'
     }
   }[theme];
 
@@ -581,7 +581,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </div>
               <div className={`p-3 rounded-2xl border ${themeClasses.subCardBg}`}>
                 <div className={`text-[10px] font-bold uppercase ${themeClasses.mutedText}`}>Format Bahan</div>
-                <div className="text-base sm:text-lg font-bold mt-1 text-purple-400">Modul & Dokumen</div>
+                <div className="text-base sm:text-lg font-bold mt-1 text-fuchsia-300">Modul & Dokumen</div>
                 <div className={`text-[10px] ${themeClasses.mutedText}`}>Silabus & Panduan Lapangan</div>
               </div>
               <div className={`p-3 rounded-2xl border ${themeClasses.subCardBg}`}>
@@ -625,7 +625,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col justify-between ${themeClasses.subCardBg}`}>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-md bg-purple-600 text-white font-mono text-[11px] font-bold">
+                    <span className="px-2.5 py-0.5 rounded-md bg-fuchsia-500 text-white font-mono text-[11px] font-bold">
                       Sesi 01: {s1 ? `${s1.sessionNumber}` : '1'}
                     </span>
                     <span className={`text-xs font-mono ${themeClasses.mutedText}`}>{s1?.duration || '120 Menit'}</span>
@@ -765,7 +765,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                   Materi <strong>{currentModule.title}</strong> dirumuskan untuk membekali Pramuka Penegak dan Pandega dengan pengetahuan terapan yang selaras dengan Standar Kompetensi Kerja Nasional Indonesia (SKKNI) sektor pariwisata.
                 </p>
                 <div className={`p-3.5 rounded-xl border space-y-2 text-xs sm:text-sm ${themeClasses.cardBg}`}>
-                  <h5 className="font-bold text-purple-400">Poin Kunci yang Wajib Dikuasai:</h5>
+                  <h5 className="font-bold text-fuchsia-300">Poin Kunci yang Wajib Dikuasai:</h5>
                   <ul className="space-y-1.5 pl-2">
                     <li className="flex items-start gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
@@ -818,7 +818,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className={`p-3 rounded-xl border ${themeClasses.cardBg}`}>
-                    <span className="text-[11px] font-bold text-purple-400 block mb-1">Tahap 1: Persiapan</span>
+                    <span className="text-[11px] font-bold text-fuchsia-300 block mb-1">Tahap 1: Persiapan</span>
                     <p className="text-xs leading-relaxed text-slate-300">
                       Riset daya tarik objek wisata, kelengkapan peralatan teknis, kesiapan fisik, serta koordinasi tim pemandu/pelaksana.
                     </p>
@@ -1046,7 +1046,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                     <p><strong>Etika (20%):</strong> Menunjukkan sikap ramah, santun, dan disiplin waktu.</p>
                   </div>
                 </div>
-                <div className="text-[11px] font-mono text-purple-400 pt-2 border-t border-slate-800">
+                <div className="text-[11px] font-mono text-fuchsia-300 pt-2 border-t border-slate-800">
                   Target: Penguasaan Dasar
                 </div>
               </div>
@@ -1141,7 +1141,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                   {/* Fallback general download */}
                   <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${themeClasses.cardBg}`}>
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/30">
+                      <div className="w-8 h-8 rounded-lg bg-fuchsia-500/20 text-fuchsia-300 flex items-center justify-center shrink-0 border border-fuchsia-300/20">
                         <FileCheck className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
@@ -1153,7 +1153,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                     </div>
                     <button
                       onClick={() => window.print()}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer border border-slate-700"
+                      className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-slate-700 text-white text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer border border-slate-700"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Cetak Lembar</span>
@@ -1256,13 +1256,13 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
   return (
     <div className={`fixed inset-0 z-50 flex flex-col h-screen w-screen overflow-hidden select-none transition-colors duration-200 ${themeClasses.bg}`}>
       {/* 1. TOP HEADER (Navigation & Display Controls) */}
-      <header className={`px-4 sm:px-6 py-3 border-b flex items-center justify-between gap-3 shrink-0 ${themeClasses.headerBg}`}>
+      <header className={`px-4 sm:px-7 py-3.5 border-b flex items-center justify-between gap-3 shrink-0 ${themeClasses.headerBg}`}>
         {/* Left: Document / Module Picker Drawer Toggle */}
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative">
             <button
               onClick={() => setIsPickerOpen(!isPickerOpen)}
-              className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-xl bg-fuchsia-500 hover:bg-fuchsia-400 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
               title="Pilih materi krida atau dokumen lain untuk dibaca"
             >
               <FolderOpen className="w-3.5 h-3.5 text-amber-300" />
@@ -1273,7 +1273,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             {/* Dropdown / Picker Drawer Modal */}
             {isPickerOpen && (
               <div 
-                className={`absolute left-0 top-full mt-2 w-72 sm:w-84 rounded-2xl border shadow-2xl p-3 z-50 space-y-3 ${
+                className={`absolute left-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-sm rounded-2xl border shadow-xl p-3 z-50 space-y-3 ${
                   theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
                 }`}
               >
@@ -1281,18 +1281,18 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                   <span className="text-xs font-bold uppercase tracking-wider">Daftar Materi Bacaan:</span>
                   <button 
                     onClick={() => setIsPickerOpen(false)}
-                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                    className="p-1 rounded-lg hover:bg-white/10 text-white/55 hover:text-white cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 {/* Switch Category tabs: 23 SKK vs Dokumen Regulasi */}
-                <div className="flex rounded-xl bg-slate-800/80 p-1 text-xs">
+                <div className="flex rounded-xl bg-white/10/80 p-1 text-xs">
                   <button
                     onClick={() => setActiveType('MODULE')}
                     className={`flex-1 py-1 px-2 rounded-lg font-bold cursor-pointer transition-all ${
-                      activeType === 'MODULE' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                      activeType === 'MODULE' ? 'bg-fuchsia-500 text-white shadow-xs' : 'text-white/55 hover:text-white'
                     }`}
                   >
                     23 Modul SKK
@@ -1300,7 +1300,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                   <button
                     onClick={() => setActiveType('OFFICIAL_DOC')}
                     className={`flex-1 py-1 px-2 rounded-lg font-bold cursor-pointer transition-all ${
-                      activeType === 'OFFICIAL_DOC' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                      activeType === 'OFFICIAL_DOC' ? 'bg-fuchsia-500 text-white shadow-xs' : 'text-white/55 hover:text-white'
                     }`}
                   >
                     Dokumen Juklak
@@ -1320,8 +1320,8 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                         }}
                         className={`w-full text-left p-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer ${
                           selectedModuleId === m.id
-                            ? 'bg-purple-600 text-white font-bold'
-                            : 'hover:bg-slate-800/60 text-slate-300'
+                            ? 'bg-fuchsia-500 text-white font-bold'
+                            : 'hover:bg-white/10/60 text-slate-300'
                         }`}
                       >
                         <span className="truncate">{m.code} {m.title}</span>
@@ -1341,8 +1341,8 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                         }}
                         className={`w-full text-left p-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer ${
                           selectedDocId === d.id
-                            ? 'bg-purple-600 text-white font-bold'
-                            : 'hover:bg-slate-800/60 text-slate-300'
+                            ? 'bg-fuchsia-500 text-white font-bold'
+                            : 'hover:bg-white/10/60 text-slate-300'
                         }`}
                       >
                         <span className="truncate">{d.title}</span>
@@ -1371,11 +1371,11 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
         {/* Right: Preferences (Theme, Font, Fullscreen, Close) */}
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Theme switcher */}
-          <div className="flex items-center bg-slate-800/60 rounded-xl p-0.5 border border-slate-700/50">
+          <div className="flex items-center bg-white/10/60 rounded-xl p-0.5 border border-slate-700/50">
             <button
               onClick={() => setTheme('dark')}
               className={`p-1.5 rounded-lg text-xs cursor-pointer transition-all ${
-                theme === 'dark' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                theme === 'dark' ? 'bg-fuchsia-500 text-white' : 'text-white/55 hover:text-white'
               }`}
               title="Mode Gelap (OLED/Malam)"
             >
@@ -1384,7 +1384,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             <button
               onClick={() => setTheme('sepia')}
               className={`p-1.5 rounded-lg text-xs cursor-pointer transition-all ${
-                theme === 'sepia' ? 'bg-[#8A4A1C] text-white' : 'text-slate-400 hover:text-white'
+                theme === 'sepia' ? 'bg-[#8A4A1C] text-white' : 'text-white/55 hover:text-white'
               }`}
               title="Mode Buku Sepia (Kertas Lembut)"
             >
@@ -1393,7 +1393,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             <button
               onClick={() => setTheme('light')}
               className={`p-1.5 rounded-lg text-xs cursor-pointer transition-all ${
-                theme === 'light' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                theme === 'light' ? 'bg-fuchsia-500 text-white' : 'text-white/55 hover:text-white'
               }`}
               title="Mode Terang (Siang Hari)"
             >
@@ -1402,24 +1402,24 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           </div>
 
           {/* Font Size Selector */}
-          <div className="hidden sm:flex items-center bg-slate-800/60 rounded-xl p-0.5 border border-slate-700/50 text-[11px] font-bold font-mono">
+          <div className="hidden sm:flex items-center bg-white/10/60 rounded-xl p-0.5 border border-slate-700/50 text-[11px] font-bold font-mono">
             <button
               onClick={() => setTextSize('sm')}
-              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'sm' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
+              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'sm' ? 'bg-fuchsia-500 text-white' : 'text-white/55'}`}
               title="Ukuran Teks Ringkas"
             >
               A-
             </button>
             <button
               onClick={() => setTextSize('base')}
-              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'base' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
+              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'base' ? 'bg-fuchsia-500 text-white' : 'text-white/55'}`}
               title="Ukuran Teks Standar"
             >
               A
             </button>
             <button
               onClick={() => setTextSize('lg')}
-              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'lg' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
+              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'lg' ? 'bg-fuchsia-500 text-white' : 'text-white/55'}`}
               title="Ukuran Teks Nyaman/Besar"
             >
               A+
@@ -1429,7 +1429,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           {/* Browser Fullscreen Toggle */}
           <button
             onClick={toggleFullscreen}
-            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-all"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-white/10/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-all"
             title="Toggle Layar Penuh Perangkat"
           >
             {isBrowserFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
@@ -1457,7 +1457,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
 
       {/* 3. MAIN READING CANVAS (Strictly 100% Viewport-Fitted, ZERO Scrolling) */}
       <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-8 py-3 sm:py-5 overflow-hidden flex flex-col justify-center">
-        <div className={`h-full rounded-3xl border p-4 sm:p-7 flex flex-col justify-between overflow-hidden shadow-2xl transition-all ${themeClasses.cardBg}`}>
+        <div className={`h-full rounded-[2rem] border p-4 sm:p-8 flex flex-col justify-between overflow-hidden shadow-xl transition-all ${themeClasses.cardBg}`}>
           {activeType === 'MODULE' 
             ? renderModuleSlideContent(moduleSlides[currentSlideIndex]?.type || 'COVER')
             : renderDocSlideContent()
@@ -1472,12 +1472,12 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           type="button"
           onClick={handlePrevSlide}
           disabled={currentSlideIndex === 0 && (activeType !== 'MODULE' || modules.findIndex(m => m.id === selectedModuleId) === 0)}
-          className={`flex items-center gap-2 px-5 sm:px-7 py-3 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wide transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none ${
+          className={`flex items-center gap-2 px-4 sm:px-7 py-3 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wide transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none ${
             theme === 'sepia'
               ? 'bg-[#E3D1BA] hover:bg-[#D5BF9F] text-[#3D2C1F] border border-[#DFCBB5]'
               : theme === 'light'
                 ? 'bg-slate-200 hover:bg-slate-300 text-slate-800'
-                : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+                : 'bg-white/10 hover:bg-slate-700 text-white border border-slate-700'
           }`}
           title="Halaman Sebelumnya (Tombol Panah Kiri)"
         >
@@ -1502,7 +1502,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           type="button"
           onClick={handleNextSlide}
           disabled={currentSlideIndex === totalSlides - 1 && (activeType !== 'MODULE' || modules.findIndex(m => m.id === selectedModuleId) === modules.length - 1)}
-          className={`flex items-center gap-2 px-6 sm:px-8 py-3 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wide transition-all shadow-lg active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none ${
+          className={`flex items-center gap-2 px-4 sm:px-8 py-3 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wide transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none ${
             theme === 'sepia'
               ? 'bg-[#8A4A1C] hover:bg-[#733B14] text-white shadow-[#8A4A1C]/20'
               : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-900/40'
