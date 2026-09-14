@@ -106,7 +106,76 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
   useEffect(() => {
     const unsub = storage.subscribe(() => setKridaModules(storage.getKridaModules()));
-    return (
+    return () => unsub();
+  }, []);
+
+  const scrollTo = (id: string) => {
+    setMobileMenuOpen(false);
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
+  const openTool = (tool: HomeTool) => {
+    setActiveTool(prev => prev === tool ? null : tool);
+    if (tool === 'verify') scrollTo('landing-verification');
+    if (tool === 'krida') scrollTo('landing-krida');
+    if (tool === 'tour') scrollTo('landing-discover');
+    if (tool === 'agenda') scrollTo('landing-agenda');
+    if (tool === 'kuliner') scrollTo('landing-discover');
+    if (tool === 'anggota') scrollTo('landing-members');
+  };
+
+  const handleQuickVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    setVerifyError('');
+    const term = quickVerifyTerm.trim().toLowerCase();
+    if (!term) return;
+    const found = members.find(m =>
+      (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === term) ||
+      (m.verificationToken && m.verificationToken.toLowerCase() === term) ||
+      m.id.toLowerCase() === term ||
+      m.fullName.toLowerCase().includes(term)
+    );
+    if (found) onOpenVerifyModal(found);
+    else setVerifyError('Data anggota tidak ditemukan. Periksa Nomor Anggota atau Nama.');
+  };
+
+  const openKrida = (kridaId: KridaId, moduleId?: string) => {
+    setActiveExplorerKrida(kridaId);
+    setActiveExplorerModuleId(moduleId);
+    setIsKridaExplorerOpen(true);
+  };
+
+  // Support deep-links created by the "Bagikan" button in the Krida Explorer.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kridaParam = params.get('krida') as KridaId | null;
+    const moduleParam = params.get('skk');
+
+    if (kridaParam && KRIDA_CATEGORIES.some(category => category.id === kridaParam)) {
+      const targetModule = moduleParam
+        ? kridaModules.find(module => module.id === moduleParam && module.kridaId === kridaParam)
+        : undefined;
+
+      openKrida(kridaParam, targetModule?.id);
+    }
+  }, []);
+
+  const openReader = (moduleId?: string) => {
+    setReaderModuleId(moduleId || kridaModules[0]?.id);
+    setIsFullScreenReaderOpen(true);
+  };
+
+  const openEditor = (item: KridaModuleItem) => {
+    setEditingKridaModule(item);
+    setIsKridaEditorOpen(true);
+  };
+
+  const handleSaveKridaModule = (updatedItem: KridaModuleItem) => {
+    storage.updateKridaModule(updatedItem, currentUser.name);
+    setKridaModules(storage.getKridaModules());
+  };
+
+  return (
     <div className="min-h-screen bg-[#090711] text-slate-100 font-sans selection:bg-fuchsia-500 selection:text-white overflow-x-hidden">
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#090711]/85 backdrop-blur-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between gap-3">
