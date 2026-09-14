@@ -8,7 +8,8 @@ import {
   AuditLog, 
   CurrentUser, 
   CulinarySouvenirItem,
-  ProductKind 
+  ProductKind,
+  KridaModuleItem
 } from './types';
 import { storage } from './services/storage';
 import { DEFAULT_PUBLIC_USER } from './data/initialData';
@@ -468,14 +469,16 @@ export default function App() {
   };
 
   // Super Admin: akses editor materi Krida dari area admin.
+  const canManageKrida = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+
   const handleOpenKridaEditor = (moduleItem: KridaModuleItem) => {
-    if (currentUser.role !== 'SUPER_ADMIN') return;
+    if (!canManageKrida) return;
     setEditingKridaModule(moduleItem);
     setIsKridaEditorOpen(true);
   };
 
   const handleSaveKridaModule = (updatedItem: KridaModuleItem) => {
-    if (currentUser.role !== 'SUPER_ADMIN') return;
+    if (!canManageKrida) return;
     storage.updateKridaModule(updatedItem, currentUser.name);
     setIsKridaEditorOpen(false);
     setEditingKridaModule(null);
@@ -719,7 +722,7 @@ export default function App() {
             {currentTab === 'krida-modules' && (
               <KridaModulesView
                 currentUser={currentUser}
-                onOpenEditor={userRole === 'SUPER_ADMIN' ? handleOpenKridaEditor : undefined}
+                onOpenEditor={canManageKrida ? handleOpenKridaEditor : undefined}
               />
             )}
 
@@ -953,7 +956,7 @@ export default function App() {
         }}
       />
 
-      {userRole === 'SUPER_ADMIN' && (
+      {canManageKrida && (
         <KridaMaterialEditorModal
           isOpen={isKridaEditorOpen}
           moduleItem={editingKridaModule}
