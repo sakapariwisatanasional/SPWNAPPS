@@ -154,6 +154,7 @@ class StorageService {
   private cloudCulinarySouvenirs: CulinarySouvenirItem[] = [];
   private cloudUsers: CurrentUser[] = [];
   private cloudAuditLogs: AuditLog[] = [];
+  private kridaModules: KridaModuleItem[] = [...INITIAL_KRIDA_MODULES];
   private pendingMemberWrites: Record<string, { status: string; timestamp: number; member: Member }> = {};
   private ktaSettings: KtaCardSettings = { ...DEFAULT_KTA_SETTINGS, logos: [], dataFields: [], textElements: [], terms: [] };
 
@@ -172,6 +173,15 @@ class StorageService {
           STORAGE_KEYS.NOTIFICATIONS,
           JSON.stringify([])
         );
+      }
+
+      // Krida editor is currently a frontend-managed content collection.
+      // Restore the last edited module set when available. This does not affect
+      // member registration, QR, KTA, or the Google Spreadsheet member data.
+      const savedKrida = localStorage.getItem('spwn_krida_modules_v1');
+      if (savedKrida) {
+        const parsedKrida = JSON.parse(savedKrida);
+        if (Array.isArray(parsedKrida)) this.kridaModules = parsedKrida;
       }
 
       // KTA settings are hydrated from the GAS-backed central endpoint.
@@ -2666,9 +2676,42 @@ class StorageService {
   // KRIDA MODULES
   // =========================================================
 
-  public getKridaModules():
-    KridaModuleItem[] {
-    return INITIAL_KRIDA_MODULES;
+  public getKridaModules(): KridaModuleItem[] {
+    return this.kridaModules.map(item => ({
+      ...item,
+      images: item.images ? item.images.map(v => ({ ...v })) : [],
+      links: item.links ? item.links.map(v => ({ ...v })) : [],
+      downloads: item.downloads ? item.downloads.map(v => ({ ...v })) : [],
+      curriculum: item.curriculum ? item.curriculum.map(v => ({ ...v })) : [],
+      competencyTable: item.competencyTable ? item.competencyTable.map(v => ({ ...v })) : [],
+      testRequirements: item.testRequirements ? {
+        purwa: [...(item.testRequirements.purwa || [])],
+        madya: [...(item.testRequirements.madya || [])],
+        utama: [...(item.testRequirements.utama || [])]
+      } : undefined
+    }));
+  }
+
+  public updateKridaModule(updatedItem: KridaModuleItem, updatedBy?: string): boolean {
+    if (!updatedItem?.id) return false;
+    const index = this.kridaModules.findIndex(item => item.id === updatedItem.id);
+    if (index < 0) return false;
+
+    const nextItem: KridaModuleItem = {
+      ...updatedItem,
+      updatedAt: new Date().toISOString(),
+      updatedBy: updatedBy || updatedItem.updatedBy || 'Admin'
+    };
+    this.kridaModules = this.kridaModules.map((item, i) => i === index ? nextItem : item);
+
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('spwn_krida_modules_v1', JSON.stringify(this.kridaModules));
+      }
+    } catch {}
+
+    this.notify();
+    return true;
   }
 
   // =========================================================
