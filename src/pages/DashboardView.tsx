@@ -141,6 +141,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     );
   }, [currentUser]);
 
+  const canManageKrida = useMemo(() => {
+    const role = currentUser?.role || '';
+    return ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(role);
+  }, [currentUser]);
+
   // Cakupan data anggota (Super admin membaca seluruh data nasional)
   const scopedMembers = useMemo(() => {
     if (isSuperAdmin) {
@@ -276,8 +281,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Akses cepat CMS Materi Krida — khusus Super Admin */}
-      {isSuperAdmin && (
+      {/* Akses cepat CMS Materi Krida — admin */}
+      {canManageKrida && (
         <section className="rounded-[1.6rem] border border-fuchsia-200 bg-white p-4 sm:p-5 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0">
@@ -287,8 +292,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-sm sm:text-base font-extrabold text-slate-900">Kelola Materi Krida & SKK</h2>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-amber-700">
-                    <Edit3 className="w-3 h-3" /> Super Admin
+                  <span className="inline-flex items-center gap-1 rounded-full bg-fuchsia-50 border border-fuchsia-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-fuchsia-700">
+                    <Edit3 className="w-3 h-3" /> Admin Pengelola
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] sm:text-xs text-slate-500">
