@@ -118,27 +118,27 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser,
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-6 overflow-hidden">
-      <header className="shrink-0 flex items-center justify-between gap-4 px-1">
+    <div className="h-full min-h-0 flex flex-col gap-3 sm:gap-4 overflow-hidden">
+      <header className="shrink-0 flex items-center justify-between gap-3 px-1">
         <div className="min-w-0">
-          <div className="inline-flex items-center gap-2 text-[10px] font-extrabold tracking-[0.18em] text-fuchsia-600 uppercase">
+          <div className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black tracking-[0.16em] text-fuchsia-600 uppercase">
             <Sparkles className="w-3.5 h-3.5" />
             Pusat Krida & SKK
           </div>
-          <h1 className="mt-1 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
-            Pilih Krida
+          <h1 className="mt-0.5 text-lg sm:text-2xl font-black tracking-tight text-slate-900">
+            Pusat Materi Krida
           </h1>
-          <p className="mt-1 text-xs text-slate-500">
-            Pilih salah satu dari 4 Krida untuk membuka mata krida, naskah/materi, dan instrumen uji SKK.
+          <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500">
+            Pilih Krida → pilih SKK → mulai belajar.
           </p>
         </div>
-        <div className="hidden sm:flex items-center gap-2 rounded-2xl bg-white border border-fuchsia-100 px-3 py-2 text-xs text-slate-500 shadow-sm rounded-2xl">
-          <BookOpen className="w-4 h-4 text-fuchsia-600" />
-          <span><b className="text-slate-900">{modules.length}</b> mata krida</span>
+        <div className="hidden sm:flex items-center gap-2 rounded-full bg-white border border-fuchsia-100 px-3 py-1.5 text-[10px] font-bold text-slate-500 shadow-sm">
+          <BookOpen className="w-3.5 h-3.5 text-fuchsia-600" />
+          <span><b className="text-slate-900">{modules.length}</b> SKK</span>
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+      <main className="min-h-0 flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-3 xl:gap-4 auto-rows-fr">
         {cards.map(({ category, modules: categoryModules, imageUrl }) => {
           const Icon = KRIDA_ICONS[category.id];
           const expanded = openKrida === category.id;
@@ -146,25 +146,25 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser,
           return (
             <section
               key={category.id}
-              className={`relative min-h-0 rounded-3xl border bg-white shadow-sm transition-all ${expanded ? 'border-purple-300 shadow-lg shadow-purple-100/60' : 'border-slate-200 hover:border-fuchsia-200 hover:shadow-md'}`}
+              className={`relative min-h-0 overflow-visible rounded-[24px] border bg-white transition-all duration-200 ${expanded ? 'border-fuchsia-300 ring-2 ring-fuchsia-100 shadow-md' : 'border-slate-200 hover:border-fuchsia-200 hover:shadow-sm'}`}
             >
               <button
                 type="button"
                 onClick={() => setOpenKrida(expanded ? null : category.id)}
-                className="w-full h-full min-h-[220px] sm:min-h-[270px] flex flex-col items-center justify-center p-4 sm:p-6 text-center cursor-pointer"
+                className="w-full h-full min-h-[180px] sm:min-h-[205px] xl:min-h-[235px] flex flex-col items-center justify-center p-3.5 sm:p-4 xl:p-5 text-center cursor-pointer"
                 aria-expanded={expanded}
               >
                 <span className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-[24px] bg-gradient-to-br ${category.color} flex items-center justify-center text-white shadow-lg ring-4 ring-white`}>
-                  <Icon className="w-8 h-8 sm:w-9 sm:h-9" />
+                  <Icon className="w-7 h-7 sm:w-8 sm:h-8" />
                   {imageUrl && (
-                    <span className="absolute -right-1 -bottom-1 w-7 h-7 rounded-full bg-white text-purple-700 border border-slate-200 flex items-center justify-center shadow-sm">
+                    <span className="absolute -right-1 -bottom-1 w-6 h-6 rounded-full bg-white text-purple-700 border border-slate-200 flex items-center justify-center shadow-sm">
                       <ImageIcon className="w-3.5 h-3.5" />
                     </span>
                   )}
                 </span>
-                <h2 className="mt-4 text-sm sm:text-base font-extrabold text-slate-900 leading-tight">{category.shortTitle}</h2>
-                <p className="mt-1 text-[10px] sm:text-xs font-semibold text-slate-500 line-clamp-2">{category.subtitle}</p>
-                <span className="mt-4 inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-3 py-1.5 text-[10px] font-extrabold text-slate-600">
+                <h2 className="mt-3 text-sm sm:text-base xl:text-lg font-black text-slate-900 leading-tight">{category.shortTitle}</h2>
+                <p className="mt-1 max-w-[190px] text-[9px] sm:text-[10px] font-semibold text-slate-500 line-clamp-2">{category.subtitle}</p>
+                <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-fuchsia-50 border border-fuchsia-100 px-2.5 py-1.5 text-[9px] font-black text-fuchsia-700">
                   <Award className="w-3 h-3 text-fuchsia-600" />
                   {category.topicsCount} Mata Krida
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -172,7 +172,7 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser,
               </button>
 
               {expanded && (
-                <div className="absolute z-20 left-2 right-2 bottom-2 sm:left-3 sm:right-3 sm:bottom-3 rounded-2xl border border-fuchsia-100 bg-white shadow-xl p-2 max-h-[min(62vh,430px)] overflow-y-auto">
+                <div className="absolute z-30 left-2 right-2 bottom-2 sm:left-2 sm:right-2 rounded-2xl border border-fuchsia-100 bg-white shadow-xl p-2 max-h-[min(46dvh,320px)] overflow-y-auto">
                   <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-100 mb-1">
                     <div className="min-w-0">
                       <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Mata Krida</p>
