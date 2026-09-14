@@ -172,7 +172,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           {onOpenEditCardModal && (
             <button
               onClick={onOpenEditCardModal}
-              className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+              className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-2xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
             >
               <Sliders className="w-3.5 h-3.5 text-amber-700" />
               <span className="sr-only">Edit Desain KTA</span>
@@ -183,7 +183,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           {currentUser.role === 'SUPER_ADMIN' && onDeleteAllDummyMembers && (
             <button
               onClick={() => setShowClearAllModal(true)}
-              className="p-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+              className="p-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-2xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
               title="Hapus / Bersihkan semua data dummy dari aplikasi"
             >
               <Trash2 className="w-3.5 h-3.5 text-red-600" />
@@ -193,7 +193,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
           <button
             onClick={handleExportCSV}
-            className="p-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+            className="p-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="sr-only">Ekspor CSV</span>
@@ -201,7 +201,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
           <button
             onClick={onOpenRegisterModal}
-            className="p-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
+            className="p-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span className="sr-only">Tambah Anggota</span>
@@ -210,10 +210,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+      <div className="bg-white p-4 rounded-[1.35rem] border border-slate-200 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           {/* Search Box */}
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2">
             <Search className="w-4 h-4 text-slate-400" />
             <input
               type="text"
@@ -229,7 +229,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none font-medium text-slate-700"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 outline-none font-medium text-slate-700"
             >
               <option value="ALL">Semua Status (Aktif, Pending, Operator)</option>
               <option value="OPERATOR_ONLY">⭐ Hanya Operator Kwartir</option>
@@ -245,7 +245,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             <select
               value={selectedProvinceId}
               onChange={(e) => setSelectedProvinceId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none font-medium text-slate-700"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 outline-none font-medium text-slate-700"
             >
               <option value="ALL">Semua Wilayah (Kwarnas / Kwarda)</option>
               {provinces.map((p) => (
@@ -259,7 +259,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             <select
               value={selectedKrida}
               onChange={(e) => setSelectedKrida(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none font-medium text-slate-700"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 outline-none font-medium text-slate-700"
             >
               <option value="ALL">Semua Krida Saka</option>
               {kridaOptions.map((k) => (
@@ -289,7 +289,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       </div>
 
       {/* Main Members Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-[1.75rem] border border-slate-200 shadow-xs overflow-hidden">
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
@@ -320,7 +320,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             src={formatDriveImageUrl(m.avatarUrl) || m.avatarUrl || getValidAvatarUrl(m.avatarUrl, m.gender)}
                             alt={m.fullName}
                             referrerPolicy="no-referrer"
-                            className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-xs bg-slate-800"
+                            className="w-10 h-10 rounded-2xl object-cover border border-slate-200 shadow-xs bg-slate-800"
                             onError={(e) => {
                               const img = e.target as HTMLImageElement;
                               const directFallback = getDriveDirectFallbackUrl(m.avatarUrl);
@@ -335,7 +335,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             <button
                               type="button"
                               onClick={() => onOpenEditPhotoModal(m)}
-                              className="absolute inset-0 bg-purple-950/80 opacity-0 group-hover/avatar:opacity-100 rounded-xl flex items-center justify-center text-white transition-opacity cursor-pointer shadow-xs"
+                              className="absolute inset-0 bg-purple-950/80 opacity-0 group-hover/avatar:opacity-100 rounded-2xl flex items-center justify-center text-white transition-opacity cursor-pointer shadow-xs"
                               title="Perbaiki Pas Foto Resmi KTA"
                             >
                               <Camera className="w-4 h-4 text-purple-200" />
@@ -346,8 +346,8 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="font-bold text-slate-900 truncate text-xs font-heading">{m.fullName}</p>
                             {m.isOperator && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300 font-extrabold text-[9px] shadow-xs">
-                                <ShieldCheck className="w-3 h-3 text-purple-700" />
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-fuchsia-300 font-extrabold text-[9px] shadow-xs">
+                                <ShieldCheck className="w-3 h-3 text-fuchsia-700" />
                                 <span>{m.operatorRole === 'ADMIN_REGENCY' ? 'Kwarcab' : m.operatorRole === 'ADMIN_PROVINCE' ? 'Kwarda' : 'Kecamatan'}</span>
                               </span>
                             )}
@@ -418,10 +418,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                         {onOpenPrintPdfModal && (
                           <button
                             onClick={() => onOpenPrintPdfModal(m)}
-                            className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-lg transition-colors border border-purple-200/60"
+                            className="p-1.5 bg-purple-50 hover:bg-fuchsia-100 text-purple-800 rounded-lg transition-colors border border-fuchsia-200/60"
                             title="Cetak / Konversi KTA ke PDF (CR80 / A4)"
                           >
-                            <FileDown className="w-4 h-4 text-purple-700" />
+                            <FileDown className="w-4 h-4 text-fuchsia-700" />
                           </button>
                         )}
 
@@ -440,7 +440,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                         {onOpenEditPhotoModal && (
                           <button
                             onClick={() => onOpenEditPhotoModal(m)}
-                            className="p-1.5 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-800 rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 bg-slate-100 hover:bg-fuchsia-100 text-slate-700 hover:text-purple-800 rounded-lg transition-colors cursor-pointer"
                             title="Perbaiki Pas Foto Resmi KTA & Profil"
                           >
                             <Camera className="w-4 h-4 text-slate-700" />
@@ -465,8 +465,8 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             onClick={() => onOpenOperatorModal(m)}
                             className={`p-1.5 rounded-lg transition-colors border cursor-pointer ${
                               m.isOperator
-                                ? 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300 shadow-xs'
-                                : 'bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-800 border-slate-200/80'
+                                ? 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-fuchsia-300 shadow-xs'
+                                : 'bg-slate-100 hover:bg-fuchsia-50 text-slate-700 hover:text-purple-800 border-slate-200/80'
                             }`}
                             title={
                               m.isOperator
@@ -475,9 +475,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             }
                           >
                             {m.isOperator ? (
-                              <ShieldCheck className="w-4 h-4 text-purple-700" />
+                              <ShieldCheck className="w-4 h-4 text-fuchsia-700" />
                             ) : (
-                              <Shield className="w-4 h-4 text-slate-600 hover:text-purple-700" />
+                              <Shield className="w-4 h-4 text-slate-600 hover:text-fuchsia-700" />
                             )}
                           </button>
                         )}
@@ -545,7 +545,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                       src={formatDriveImageUrl(m.avatarUrl) || m.avatarUrl || getValidAvatarUrl(m.avatarUrl, m.gender)}
                       alt={m.fullName}
                       referrerPolicy="no-referrer"
-                      className="w-12 h-12 rounded-2xl object-cover border border-slate-200 shadow-xs bg-slate-800 flex-shrink-0"
+                      className="w-12 h-12 rounded-[1.35rem] object-cover border border-slate-200 shadow-xs bg-slate-800 flex-shrink-0"
                     />
                     <div className="min-w-0">
                       <p className="font-bold text-slate-900 text-sm font-heading leading-tight truncate">{m.fullName}</p>
@@ -570,7 +570,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 </div>
 
                 {/* Details Grid */}
-                <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-3 rounded-[1.35rem] border border-slate-100">
                   <div>
                     <span className="text-[10px] text-slate-400 uppercase font-semibold block">No. KTA Nasional</span>
                     {m.nationalMemberNumber ? (
@@ -595,7 +595,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
                   <button
                     onClick={() => setPreviewCardMember(m)}
-                    className="flex-1 py-2 px-2.5 bg-teal-50 hover:bg-teal-100 text-teal-900 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-teal-200/80 min-h-[38px]"
+                    className="flex-1 py-2 px-2.5 bg-teal-50 hover:bg-teal-100 text-teal-900 rounded-2xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-teal-200/80 min-h-[38px]"
                   >
                     <CreditCard className="w-3.5 h-3.5 text-teal-700" />
                     <span>Lihat KTA</span>
@@ -604,17 +604,17 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                   {onOpenPrintPdfModal && (
                     <button
                       onClick={() => onOpenPrintPdfModal(m)}
-                      className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-xl text-xs font-bold transition-colors border border-purple-200/80 min-h-[38px] min-w-[38px] flex items-center justify-center"
+                      className="p-2 bg-purple-50 hover:bg-fuchsia-100 text-purple-800 rounded-2xl text-xs font-bold transition-colors border border-fuchsia-200/80 min-h-[38px] min-w-[38px] flex items-center justify-center"
                       title="Cetak PDF"
                     >
-                      <FileDown className="w-4 h-4 text-purple-700" />
+                      <FileDown className="w-4 h-4 text-fuchsia-700" />
                     </button>
                   )}
 
                   {onOpenEditMemberModal && (
                     <button
                       onClick={() => onOpenEditMemberModal(m)}
-                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
+                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
                       title="Edit Data"
                     >
                       <Edit3 className="w-4 h-4 text-slate-700" />
@@ -624,7 +624,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                   {onOpenEditPhotoModal && (
                     <button
                       onClick={() => onOpenEditPhotoModal(m)}
-                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
+                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
                       title="Ubah Foto KTA"
                     >
                       <Camera className="w-4 h-4 text-slate-700" />
@@ -633,7 +633,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                   <button
                     onClick={() => onOpenVerifyModal(m)}
-                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
+                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
                     title="QR Verifikasi"
                   >
                     <Eye className="w-4 h-4 text-slate-700" />
@@ -642,7 +642,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                   {m.status === 'PENDING' && (
                     <button
                       onClick={() => onApproveMember(m.id)}
-                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-colors min-h-[38px] flex items-center justify-center gap-1.5"
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-xs transition-colors min-h-[38px] flex items-center justify-center gap-1.5"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Setujui Anggota</span>
@@ -658,7 +658,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       {/* Digital KTA Preview Modal */}
       {previewCardMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 max-w-lg w-full space-y-4">
+          <div className="bg-white rounded-[1.75rem] p-6 shadow-xl border border-slate-200 max-w-lg w-full space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="font-bold text-base text-slate-900 font-heading">
@@ -691,7 +691,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             <div className="pt-2 flex justify-end">
               <button
                 onClick={() => setPreviewCardMember(null)}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold"
               >
                 Tutup
               </button>
@@ -703,9 +703,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       {/* Modal Konfirmasi Hapus 1 Anggota (Super Admin) */}
       {memberToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 shadow-2xl border border-red-200 max-w-md w-full space-y-4">
+          <div className="bg-white rounded-[1.75rem] p-6 shadow-xl border border-red-200 max-w-md w-full space-y-4">
             <div className="flex items-center gap-3 text-red-600">
-              <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-[1.35rem] bg-red-100 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
               <div>
@@ -716,13 +716,13 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               </div>
             </div>
 
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+            <div className="p-4 bg-slate-50 rounded-[1.35rem] border border-slate-200 space-y-2 text-xs">
               <div className="flex items-center gap-3">
                 <img
                   src={formatDriveImageUrl(memberToDelete.avatarUrl) || memberToDelete.avatarUrl || getValidAvatarUrl(memberToDelete.avatarUrl, memberToDelete.gender)}
                   alt={memberToDelete.fullName}
                   referrerPolicy="no-referrer"
-                  className="w-12 h-12 rounded-xl object-cover border border-slate-300 bg-slate-800"
+                  className="w-12 h-12 rounded-2xl object-cover border border-slate-300 bg-slate-800"
                   onError={(e) => {
                     const img = e.target as HTMLImageElement;
                     const directFallback = getDriveDirectFallbackUrl(memberToDelete.avatarUrl);
@@ -735,7 +735,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 />
                 <div>
                   <p className="font-bold text-slate-900 text-sm">{memberToDelete.fullName}</p>
-                  <p className="text-[11px] text-purple-700 font-mono font-semibold">
+                  <p className="text-[11px] text-fuchsia-700 font-mono font-semibold">
                     {memberToDelete.nationalMemberNumber || 'Belum ada NTA'}
                   </p>
                   <p className="text-slate-500">{memberToDelete.districtName}, {memberToDelete.regencyName}</p>
@@ -750,7 +750,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               <button
                 type="button"
                 onClick={() => setMemberToDelete(null)}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold cursor-pointer"
               >
                 Batal
               </button>
@@ -762,7 +762,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                   }
                   setMemberToDelete(null);
                 }}
-                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Hapus Anggota Ini</span>
@@ -775,9 +775,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       {/* Modal Konfirmasi Bersihkan Semua Data Dummy */}
       {showClearAllModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 shadow-2xl border border-red-200 max-w-md w-full space-y-4">
+          <div className="bg-white rounded-[1.75rem] p-6 shadow-xl border border-red-200 max-w-md w-full space-y-4">
             <div className="flex items-center gap-3 text-red-600">
-              <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-[1.35rem] bg-red-100 flex items-center justify-center">
                 <Trash2 className="w-5 h-5 text-red-600" />
               </div>
               <div>
@@ -796,7 +796,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowClearAllModal(false)}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold cursor-pointer"
               >
                 Batal
               </button>
@@ -808,7 +808,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                   }
                   setShowClearAllModal(false);
                 }}
-                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Ya, Hapus Seluruh Dummy</span>
