@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Search, 
@@ -62,7 +62,6 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   const [notFoundMessage, setNotFoundMessage] = useState<string>('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const verificationResultRef = useRef<HTMLDivElement | null>(null);
 
   // --- Tour Packages State ---
   const [tourCategoryFilter, setTourCategoryFilter] = useState<string>('ALL');
@@ -72,61 +71,6 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   const [talentSearchQuery, setTalentSearchQuery] = useState<string>('');
   const [talentCategoryFilter, setTalentCategoryFilter] = useState<string>('ALL');
   const [talentSkillFilter, setTalentSkillFilter] = useState<string>('ALL');
-
-  // --- Public member showcase ---
-  // Only a small rotating sample is exposed publicly. Full member data remains
-  // available through the existing verification/profile flow.
-  const familyMemberSignature = useMemo(() => {
-    return (Array.isArray(members) ? members : [])
-      .filter(m =>
-        m.status === 'ACTIVE' &&
-        !!(m.nationalMemberNumber || m.ktaNumber || m.ktaId) &&
-        !!m.avatarUrl
-      )
-      .map(m => m.id)
-      .sort()
-      .join('|');
-  }, [members]);
-
-  const familyShowcaseMembers = useMemo(() => {
-    const active = (Array.isArray(members) ? members : []).filter(m =>
-      m.status === 'ACTIVE' &&
-      !!(m.nationalMemberNumber || m.ktaNumber || m.ktaId) &&
-      !!m.avatarUrl
-    );
-
-    // Randomize only when the eligible member set changes.
-    // This prevents the order from being reshuffled on every render.
-    const shuffled = [...active];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  }, [familyMemberSignature]);
-
-  const [familyShowcaseIndex, setFamilyShowcaseIndex] = useState(0);
-
-  useEffect(() => {
-    setFamilyShowcaseIndex(0);
-  }, [familyShowcaseMembers.length]);
-
-  useEffect(() => {
-    if (familyShowcaseMembers.length <= 1) return;
-
-    const timer = window.setInterval(() => {
-      setFamilyShowcaseIndex(current =>
-        current + 1 >= familyShowcaseMembers.length ? 0 : current + 1
-      );
-    }, 4500);
-
-    return () => window.clearInterval(timer);
-  }, [familyShowcaseMembers.length]);
-
-  const familyShowcaseMember =
-    familyShowcaseMembers.length > 0
-      ? familyShowcaseMembers[familyShowcaseIndex % familyShowcaseMembers.length]
-      : null;
 
   // Perform universal verification
   const executeVerification = async (termToVerify: string) => {
@@ -147,17 +91,6 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
       if (result.found && result.member) {
         setSearchedMember(result.member);
         setNotFound(false);
-
-        // Setelah QR/URL berhasil diverifikasi, arahkan pengguna langsung
-        // ke kartu hasil verifikasi agar tidak perlu mencari/scroll manual.
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => {
-            verificationResultRef.current?.scrollIntoView({
-              behavior: 'smooth',
-              block: 'center'
-            });
-          });
-        });
       } else {
         setSearchedMember(null);
         setNotFound(true);
@@ -172,24 +105,20 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
     }
   };
 
-  // Auto-check URL parameters on mount. QR verification is intentionally
-  // executed once per page load so a later local member sync cannot overwrite
-  // the authoritative remote result or force the page to jump again.
+  // Auto-check URL parameters on mount
   useEffect(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlVerifyId = urlParams.get('verifyId') || urlParams.get('memberId') || urlParams.get('nta') || urlParams.get('id') || urlParams.get('kta');
+      const urlVerifyId = urlParams.get('verifyId') || urlParams.get('nta') || urlParams.get('id') || urlParams.get('kta');
       if (urlVerifyId) {
         const term = urlVerifyId.trim();
         setVerifyInput(term);
-        // Kirim URL lengkap ke service agar verifyId DAN memberId dapat dicoba.
-        executeVerification(window.location.href);
+        executeVerification(term);
       }
     } catch (e) {
       console.warn('URL verify param error', e);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [members]);
 
   // Verify Handler
   const handleVerify = (e: React.FormEvent) => {
@@ -259,22 +188,11 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   const activeTalentCount = (Array.isArray(members) ? members : []).filter(m => m.status === 'ACTIVE' && m.skills && m.skills.length > 0).length;
 
   return (
-    <>
-      <style>{`
-        @keyframes familySlideUp {
-          from { opacity: 0; transform: translateY(100%); }
-          65% { opacity: 1; transform: translateY(-2%); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .animate-\\[familySlideUp_0\\.65s_ease-out\\] { animation: none !important; }
-        }
-      `}</style>
-      <div className="space-y-12 pb-20">
+    <div className="space-y-10 pb-16">
       {/* 1. HERO BANNER: Portal Publik Saka Pariwisata */}
-      <div className="bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 rounded-3xl p-8 sm:p-12 text-white shadow-2xl border border-purple-900/50 relative overflow-hidden">
+      <div className="bg-[#24133f] rounded-[2rem] p-6 sm:p-10 text-white shadow-xl border border-white/10 relative overflow-hidden">
         {/* Ambient Glow Background & Watermark */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
           <SakaLogo size={320} />
         </div>
@@ -284,8 +202,8 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             <SakaLogo size={74} id="portal-hero-logo" />
           </div>
 
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-purple-500/20 border border-purple-400/40 rounded-full text-purple-200 text-xs font-bold shadow-xs">
-            <Sparkles className="w-4 h-4 text-purple-300" />
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-fuchsia-500/15 border border-fuchsia-300/30 rounded-full text-fuchsia-100 text-xs font-bold shadow-xs">
+            <Sparkles className="w-4 h-4 text-fuchsia-200" />
             <span>Portal Publik Resmi Saka Pariwisata Kwartir Nasional Gerakan Pramuka</span>
           </div>
 
@@ -301,7 +219,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
           <div className="pt-3 flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={onOpenRegisterModal}
-              className="px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/50 transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+              className="px-6 py-3.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950 font-extrabold rounded-full text-xs sm:text-sm shadow-lg/50 transition-all active:scale-95 cursor-pointer flex items-center gap-2"
             >
               <UserPlus className="w-4 h-4" />
               <span>Daftar Anggota Baru</span>
@@ -309,25 +227,25 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
 
             <a
               href="#paket-wisata"
-              className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl text-xs sm:text-sm backdrop-blur-md border border-white/20 transition-all cursor-pointer flex items-center gap-2"
+              className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-full text-xs sm:text-sm border border-white/20 transition-all cursor-pointer flex items-center gap-2"
             >
-              <Compass className="w-4 h-4 text-purple-300" />
+              <Compass className="w-4 h-4 text-fuchsia-200" />
               <span>Paket Wisata</span>
             </a>
 
             <a
               href="#talent-pool"
-              className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl text-xs sm:text-sm backdrop-blur-md border border-white/20 transition-all cursor-pointer flex items-center gap-2"
+              className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-full text-xs sm:text-sm border border-white/20 transition-all cursor-pointer flex items-center gap-2"
             >
-              <Award className="w-4 h-4 text-purple-300" />
+              <Award className="w-4 h-4 text-fuchsia-200" />
               <span>Direktori Keahlian</span>
             </a>
 
             <a
               href="#verifikasi-kta"
-              className="px-5 py-3.5 bg-purple-900/60 hover:bg-purple-800 text-purple-200 font-bold rounded-2xl text-xs sm:text-sm border border-purple-500/40 transition-all cursor-pointer flex items-center gap-2"
+              className="px-5 py-3.5 bg-white/10 hover:bg-white/15 text-fuchsia-100 font-bold rounded-full text-xs sm:text-sm border border-fuchsia-400/30 transition-all cursor-pointer flex items-center gap-2"
             >
-              <ShieldCheck className="w-4 h-4 text-purple-300" />
+              <ShieldCheck className="w-4 h-4 text-fuchsia-200" />
               <span>Verifikasi KTA</span>
             </a>
           </div>
@@ -338,37 +256,37 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
               <p className="text-xl sm:text-2xl font-extrabold text-white font-heading">
                 {tours.filter(t => t.status === 'APPROVED_PUBLISHED').length}
               </p>
-              <p className="text-[11px] text-purple-200/70 font-medium">Paket Wisata Aktif</p>
+              <p className="text-[11px] text-fuchsia-100/70 font-medium">Paket Wisata Aktif</p>
             </div>
             <div className="p-2">
               <p className="text-xl sm:text-2xl font-extrabold text-white font-heading">
                 {activeTalentCount}
               </p>
-              <p className="text-[11px] text-purple-200/70 font-medium">Talenta Tersertifikasi</p>
+              <p className="text-[11px] text-fuchsia-100/70 font-medium">Talenta Tersertifikasi</p>
             </div>
             <div className="p-2">
               <p className="text-xl sm:text-2xl font-extrabold text-white font-heading">
                 38+
               </p>
-              <p className="text-[11px] text-purple-200/70 font-medium">Kwartir Daerah</p>
+              <p className="text-[11px] text-fuchsia-100/70 font-medium">Kwartir Daerah</p>
             </div>
             <div className="p-2">
               <p className="text-xl sm:text-2xl font-extrabold text-white font-heading">
                 100%
               </p>
-              <p className="text-[11px] text-purple-200/70 font-medium">KTA Digital Resmi</p>
+              <p className="text-[11px] text-fuchsia-100/70 font-medium">KTA Digital Resmi</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* 2. REGISTRATION CALL-TO-ACTION BANNER: Pilihan Mendaftar Anggota Baru */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white border border-purple-700/60 shadow-xl relative overflow-hidden">
-        <div className="absolute -right-6 -bottom-6 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+      <div className="bg-[#3b2366] rounded-[2rem] p-5 sm:p-8 text-white border border-white/10 shadow-xl relative overflow-hidden">
+        <div className="absolute -right-6 -bottom-6 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
           <div className="space-y-3 text-center lg:text-left max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-400/40 rounded-full text-emerald-300 text-xs font-bold">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-fuchsia-500/15 border border-fuchsia-300/30 rounded-full text-emerald-300 text-xs font-bold">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Penerimaan Anggota Baru Terbuka</span>
             </div>
@@ -381,15 +299,15 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             
             {/* 3 Keuntungan Utama */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-left">
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-xs px-3 py-2 rounded-xl text-xs border border-white/10">
+              <div className="flex items-center gap-2 bg-white/10 px-3 py-2 rounded-xl text-xs border border-white/10">
                 <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 <span className="text-slate-100 font-medium">KTA Digital Standar ISO</span>
               </div>
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-xs px-3 py-2 rounded-xl text-xs border border-white/10">
+              <div className="flex items-center gap-2 bg-white/10 px-3 py-2 rounded-xl text-xs border border-white/10">
                 <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 <span className="text-slate-100 font-medium">Pelatihan 4 Krida Khusus</span>
               </div>
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-xs px-3 py-2 rounded-xl text-xs border border-white/10">
+              <div className="flex items-center gap-2 bg-white/10 px-3 py-2 rounded-xl text-xs border border-white/10">
                 <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 <span className="text-slate-100 font-medium">Jejaring Pemandu 38 Kwarda</span>
               </div>
@@ -399,13 +317,13 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
           <div className="flex-shrink-0 w-full sm:w-auto text-center">
             <button
               onClick={onOpenRegisterModal}
-              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-extrabold rounded-2xl text-sm shadow-xl shadow-emerald-950 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 group"
+              className="w-full sm:w-auto px-8 py-4 bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950 font-extrabold rounded-full text-sm shadow-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 group"
             >
               <UserPlus className="w-5 h-5 text-slate-950" />
               <span>Daftar Anggota Baru Sekarang</span>
               <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
-            <p className="text-[11px] text-purple-200/70 mt-2">
+            <p className="text-[11px] text-fuchsia-100/70 mt-2">
               Proses pendaftaran cepat & gratis secara online
             </p>
           </div>
@@ -507,7 +425,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             <p className="text-xs text-slate-400 mt-1">Coba gunakan kata kunci lain atau pilih kategori Semua Paket.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredTours.map((tour) => (
               <TourPackageCard
                 key={tour.id}
@@ -519,144 +437,196 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
         )}
       </section>
 
-      {/* 4. SECTION 2: KELUARGA SAKA PARIWISATA */}
-      <section id="talent-pool" className="space-y-5 pt-4 scroll-mt-6">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-5 sm:p-7">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-              <div className="max-w-xl">
-                <div className="inline-flex items-center gap-2 text-purple-700 font-extrabold text-[11px] uppercase tracking-wider">
-                  <Users className="w-4 h-4" />
-                  <span>Keluarga Saka Pariwisata</span>
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-extrabold font-heading text-slate-900 mt-1">
-                  Keluarga Saka Pariwisata
-                </h2>
-                <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
-                  Terhubung dari berbagai wilayah Indonesia.
-                </p>
+      {/* 4. SECTION 2: DIREKTORI KEAHLIAN & TALENT POOL PARIWISATA */}
+      <section id="talent-pool" className="space-y-6 pt-4 scroll-mt-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-200">
+          <div>
+            <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs uppercase tracking-wider">
+              <Award className="w-4 h-4" />
+              <span>Pangkalan Data Kompetensi Resmi</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-extrabold font-heading text-slate-900 mt-1">
+              Direktori Keahlian & Talent Pool Pariwisata
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Daftar pemandu wisata, fotografer, penyuluh, dan praktisi kepariwisataan anggota Saka Pariwisata bersertifikasi
+            </p>
+          </div>
+        </div>
 
-                <div className="flex flex-wrap items-center gap-2 mt-4">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-800 text-xs font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {activeTalentCount} anggota aktif
-                  </span>
-                  <span className="text-[11px] text-slate-400">
-                    Menampilkan beberapa anggota secara bergantian
-                  </span>
-                </div>
-              </div>
+        {/* Talent Filters */}
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            {/* Search Input */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
+              <Search className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <input
+                type="text"
+                value={talentSearchQuery}
+                onChange={(e) => setTalentSearchQuery(e.target.value)}
+                placeholder="Cari nama talenta, keahlian, kota..."
+                className="bg-transparent outline-none w-full text-slate-800 placeholder:text-slate-400"
+              />
+            </div>
 
-              <div className="w-full lg:w-[390px]">
-                {familyShowcaseMember ? (
-                  <div
-                    key={familyShowcaseMember.id}
-                    className="relative overflow-hidden rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 via-white to-slate-50 p-4 shadow-sm animate-[familySlideUp_0.65s_ease-out]"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <img
-                        src={familyShowcaseMember.avatarUrl}
-                        alt=""
-                        className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md flex-shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-extrabold text-sm text-slate-900 truncate">
-                            {familyShowcaseMember.fullName}
-                          </h3>
-                          <BadgeCheck
-                            className="w-4 h-4 text-emerald-600 flex-shrink-0"
-                            title="Anggota aktif terverifikasi"
-                          />
-                        </div>
-                        <p className="text-[11px] font-semibold text-slate-600 truncate mt-0.5">
-                          {familyShowcaseMember.currentPosition || 'Anggota Saka Pariwisata'}
-                        </p>
-                        <p className="text-[10px] text-slate-500 truncate mt-0.5">
-                          {familyShowcaseMember.provinceId === '00' ||
-                          familyShowcaseMember.provinceName?.toLowerCase().includes('nasional')
-                            ? 'Kwartir Nasional'
-                            : [familyShowcaseMember.regencyName, familyShowcaseMember.provinceName]
-                                .filter(Boolean)
-                                .join(' · ') || 'Indonesia'}
-                        </p>
-                      </div>
-                    </div>
+            {/* Category Dropdown */}
+            <div>
+              <select
+                value={talentCategoryFilter}
+                onChange={(e) => {
+                  setTalentCategoryFilter(e.target.value);
+                  setTalentSkillFilter('ALL');
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none font-medium text-slate-700 focus:border-emerald-500"
+              >
+                <option value="ALL">Semua Kategori Bidang</option>
+                {skillCategories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
 
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-purple-700">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        KTA Digital Terverifikasi
-                      </div>
-                      <button
-                        onClick={() => onOpenVerifyModal(familyShowcaseMember)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-extrabold transition-colors cursor-pointer"
-                      >
-                        Lihat profil
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-                    <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                    <p className="text-xs font-bold text-slate-600">
-                      Anggota aktif belum tersedia untuk ditampilkan.
-                    </p>
-                  </div>
-                )}
-              </div>
+            {/* Specific Skill Dropdown */}
+            <div>
+              <select
+                value={talentSkillFilter}
+                onChange={(e) => setTalentSkillFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none font-medium text-slate-700 focus:border-emerald-500"
+              >
+                <option value="ALL">Semua Jenis Keahlian Khusus</option>
+                {skills
+                  .filter(s => talentCategoryFilter === 'ALL' || s.category === talentCategoryFilter)
+                  .map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+              </select>
             </div>
           </div>
-
-          {familyShowcaseMembers.length > 1 && (
-            <div className="px-5 sm:px-7 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
-              <span className="text-[10px] font-semibold text-slate-400">
-                Profil anggota berganti otomatis
-              </span>
-              <div className="flex items-center gap-1">
-                {familyShowcaseMembers.slice(0, Math.min(familyShowcaseMembers.length, 8)).map((member, index) => (
-                  <span
-                    key={member.id}
-                    className={`w-1.5 h-1.5 rounded-full transition-all ${
-                      index === familyShowcaseIndex % Math.min(familyShowcaseMembers.length, 8)
-                        ? 'bg-purple-600 w-4'
-                        : 'bg-slate-300'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Talents Grid */}
+        {filteredTalents.length === 0 ? (
+          <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 text-slate-400">
+            <Award className="w-12 h-12 mx-auto text-slate-300 stroke-1 mb-2" />
+            <p className="font-bold text-slate-700 text-sm">Tidak ada talenta keahlian yang cocok.</p>
+            <p className="text-xs text-slate-400 mt-1">Coba gunakan filter kategori lain atau reset kata pencarian.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredTalents.map((member) => (
+              <div
+                key={member.id}
+                className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+              >
+                <div className="space-y-3">
+                  {/* Header Profile */}
+                  <div className="flex items-start gap-3.5">
+                    <img
+                      src={member.avatarUrl}
+                      alt={member.fullName}
+                      className="w-14 h-14 rounded-2xl object-cover border-2 border-emerald-500 shadow-xs flex-shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-bold text-sm text-slate-900 truncate font-heading">
+                          {member.fullName}
+                        </h4>
+                        <BadgeCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" title="Anggota Terverifikasi" />
+                      </div>
+                      <p className="text-[11px] font-mono font-bold text-purple-700 truncate">
+                        {member.nationalMemberNumber || 'Anggota Resmi'}
+                      </p>
+                      <p className="text-[11px] font-semibold text-slate-700 truncate mt-0.5">
+                        {member.currentPosition || 'Anggota Saka Pariwisata'}
+                      </p>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {member.provinceId === '00' || member.provinceName?.toLowerCase().includes('nasional')
+                          ? 'Kwartir Nasional'
+                          : (member.regencyName ? `Kwarcab ${member.regencyName}` : `Kwarda ${member.provinceName}`)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Skills List */}
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Kompetensi & Keahlian:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {member.skills?.map((s) => (
+                        <span
+                          key={s.id}
+                          className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-semibold"
+                        >
+                          {s.skillName}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Certifications if any */}
+                  {member.certifications && member.certifications.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Sertifikasi Resmi:
+                      </p>
+                      <div className="space-y-1">
+                        {member.certifications.slice(0, 2).map((cert) => (
+                          <div key={cert.id} className="text-[10px] text-slate-600 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                            <Award className="w-3 h-3 text-purple-600 flex-shrink-0" />
+                            <span className="truncate font-medium">{cert.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Action */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">
+                    Krida: <strong className="text-slate-600">{member.krida || 'Krida Pemandu'}</strong>
+                  </span>
+                  <button
+                    onClick={() => onOpenVerifyModal(member)}
+                    className="px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold rounded-xl text-xs border border-purple-200 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Verifikasi KTA</span>
+                    <ExternalLink className="w-3 h-3 text-purple-600" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 5. SECTION 3: VERIFIKASI KEANGGOTAAN SAKA PARIWISATA */}
       <section id="verifikasi-kta" className="space-y-6 pt-4 scroll-mt-6">
         <div className="bg-gradient-to-br from-slate-900 to-purple-950 rounded-3xl p-6 sm:p-10 text-white border border-purple-800/60 shadow-xl space-y-6">
           <div className="max-w-2xl mx-auto text-center space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-500/20 border border-purple-400/40 rounded-full text-purple-200 text-xs font-bold">
-              <ShieldCheck className="w-4 h-4 text-purple-300" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-fuchsia-500/15 border border-fuchsia-300/30 rounded-full text-fuchsia-100 text-xs font-bold">
+              <ShieldCheck className="w-4 h-4 text-fuchsia-200" />
               <span>Verifikasi Keabsahan KTA Digital & Fisik</span>
             </div>
             <h2 className="text-xl sm:text-3xl font-extrabold font-heading text-white">
               Cek Keaslian Kartu Tanda Anggota (NTA)
             </h2>
-            <p className="text-xs sm:text-sm text-purple-200/80 leading-relaxed">
-              Ketik Nomor Anggota Nasional (misal: <code className="bg-purple-950 px-2 py-0.5 rounded text-purple-200 font-mono">00.00.00.000001</code> atau <code className="bg-purple-950 px-2 py-0.5 rounded text-purple-200 font-mono">32.06.12.000123</code>) untuk memastikan keaslian anggota.
+            <p className="text-xs sm:text-sm text-fuchsia-100/80 leading-relaxed">
+              Ketik Nomor Anggota Nasional (misal: <code className="bg-purple-950 px-2 py-0.5 rounded text-fuchsia-100 font-mono">00.00.00.000001</code> atau <code className="bg-purple-950 px-2 py-0.5 rounded text-fuchsia-100 font-mono">32.06.12.000123</code>) untuk memastikan keaslian anggota.
             </p>
 
             {/* Search Input Form */}
             <div className="pt-2 max-w-lg mx-auto space-y-2">
               <form onSubmit={handleVerify} className="flex flex-col sm:flex-row gap-2">
-                <div className="flex-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 px-4 py-3 flex items-center gap-3 text-white focus-within:bg-white/20 focus-within:border-purple-400 transition-all">
-                  <QrCode className="w-5 h-5 text-purple-300 flex-shrink-0" />
+                <div className="flex-1 bg-white/10 rounded-2xl border border-white/20 px-4 py-3 flex items-center gap-3 text-white focus-within:bg-white/20 focus-within:border-purple-400 transition-all">
+                  <QrCode className="w-5 h-5 text-fuchsia-200 flex-shrink-0" />
                   <input
                     type="text"
                     value={verifyInput}
                     onChange={(e) => setVerifyInput(e.target.value)}
                     placeholder="Ketik Nomor Anggota / NTA / Token..."
-                    className="kta-verification-input bg-transparent outline-none w-full text-xs sm:text-sm placeholder:text-purple-200/50 font-mono text-white"
+                    className="bg-transparent outline-none w-full text-xs sm:text-sm placeholder:text-fuchsia-100/50 font-mono text-white"
                   />
                   {verifyInput && (
                     <button
@@ -666,7 +636,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                         setSearchedMember(null);
                         setNotFound(false);
                       }}
-                      className="text-purple-300 hover:text-white text-xs font-bold px-1"
+                      className="text-fuchsia-200 hover:text-white text-xs font-bold px-1"
                     >
                       ✕
                     </button>
@@ -675,7 +645,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                 <button
                   type="submit"
                   disabled={isVerifying}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 disabled:opacity-50 text-white font-extrabold rounded-2xl text-xs sm:text-sm shadow-lg shadow-purple-950 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 disabled:opacity-50 text-white font-extrabold rounded-full text-xs sm:text-sm shadow-lg shadow-purple-950 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   {isVerifying ? (
                     <>
@@ -696,7 +666,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsScannerOpen(true)}
-                  className="w-full sm:w-auto px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/40 rounded-xl text-purple-200 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                  className="w-full sm:w-auto px-4 py-2 bg-fuchsia-500/15 hover:bg-purple-500/30 border border-fuchsia-300/30 rounded-xl text-fuchsia-100 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
                 >
                   <Camera className="w-4 h-4 text-emerald-400" />
                   <span>📷 Pindai Kamera Barcode / QR Code KTA</span>
@@ -705,7 +675,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             </div>
 
             {/* Quick Demo Autofill Suggestions */}
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] text-purple-200/60">
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] text-fuchsia-100/60">
               <span>Coba cepat:</span>
               {members.slice(0, 4).map((m) => (
                 <button
@@ -716,7 +686,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                     setVerifyInput(term);
                     executeVerification(term);
                   }}
-                  className="font-mono text-purple-200 hover:underline bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800 text-[10px] cursor-pointer"
+                  className="font-mono text-fuchsia-100 hover:underline bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800 text-[10px] cursor-pointer"
                 >
                   {m.nationalMemberNumber} ({m.fullName.split(' ')[0]})
                 </button>
@@ -726,12 +696,12 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
 
           {/* Loading Indicator */}
           {isVerifying && (
-            <div className="p-6 bg-purple-900/40 border border-purple-500/40 rounded-3xl max-w-md mx-auto text-center space-y-2 text-white">
-              <RefreshCw className="w-8 h-8 text-purple-300 animate-spin mx-auto" />
-              <p className="font-bold text-sm text-purple-200">
+            <div className="p-6 bg-purple-900/40 border border-fuchsia-400/30 rounded-3xl max-w-md mx-auto text-center space-y-2 text-white">
+              <RefreshCw className="w-8 h-8 text-fuchsia-200 animate-spin mx-auto" />
+              <p className="font-bold text-sm text-fuchsia-100">
                 Memverifikasi Data KTA...
               </p>
-              <p className="text-xs text-purple-300/80">
+              <p className="text-xs text-fuchsia-200/80">
                 Mengecek kecocokan di database lokal dan Google Spreadsheet
               </p>
             </div>
@@ -739,10 +709,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
 
           {/* Verification Result Card */}
           {searchedMember && !isVerifying && (
-            <div
-              ref={verificationResultRef}
-              className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-emerald-500 text-slate-900 shadow-2xl max-w-2xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-200"
-            >
+            <div className="bg-white rounded-[2rem] p-5 sm:p-8 border-2 border-emerald-500 text-slate-900 shadow-xl max-w-2xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
                 <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs sm:text-sm">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
@@ -767,56 +734,31 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                   alt={searchedMember.fullName}
                   className="w-24 h-28 object-cover rounded-2xl border-2 border-purple-500 shadow-md"
                 />
-                <div className="flex-1 text-center sm:text-left space-y-2">
-                  <div>
-                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">Nama Anggota</p>
-                    <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 font-heading leading-tight">
-                      {searchedMember.fullName}
-                    </h3>
+                <div className="flex-1 text-center sm:text-left space-y-1.5">
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 font-heading">
+                    {searchedMember.fullName}
+                  </h3>
+                  <div className="bg-purple-50 inline-block px-3 py-1 rounded-lg border border-purple-200 text-purple-950 font-mono font-bold text-xs">
+                    NTA: {searchedMember.nationalMemberNumber || 'Dalam Proses'}
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                    <div className="bg-purple-50 rounded-xl border border-purple-200 px-3 py-2.5">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600">Nomor KTA</p>
-                      <p className="mt-0.5 text-xs sm:text-sm font-mono font-extrabold text-purple-950 break-all">
-                        {searchedMember.nationalMemberNumber || 'Dalam Proses'}
-                      </p>
-                    </div>
-                    <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Jabatan</p>
-                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-800">
-                        {searchedMember.currentPosition || 'Anggota Saka Pariwisata'}
-                      </p>
-                    </div>
-                    <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Kwartir</p>
-                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-800">
-                        {searchedMember.provinceId === '00' || searchedMember.provinceName?.toLowerCase().includes('nasional')
-                          ? 'Kwartir Nasional'
-                          : `Kwartir Daerah ${searchedMember.provinceName || ''}`}
-                      </p>
-                    </div>
-                    <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Krida</p>
-                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-800">
-                        {searchedMember.krida || 'Krida Pemandu'}
-                      </p>
-                    </div>
-                    <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5 sm:col-span-2">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Tanggal Aktif</p>
-                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-800">
-                        {searchedMember.registeredAt ? new Date(searchedMember.registeredAt).toLocaleDateString('id-ID', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric'
-                        }) : '—'}
-                      </p>
-                    </div>
-                  </div>
+                  <p className="text-xs font-semibold text-slate-700">
+                    Jabatan: {searchedMember.currentPosition || 'Anggota Saka Pariwisata'}
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    Kecamatan: <strong className="text-slate-800">{searchedMember.districtName}</strong>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {searchedMember.provinceId === '00' || searchedMember.provinceName?.toLowerCase().includes('nasional')
+                      ? 'Kwartir Nasional Gerakan Pramuka'
+                      : `Kwartir Cabang ${searchedMember.regencyName}, Kwarda ${searchedMember.provinceName}`}
+                  </p>
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-end border-t border-slate-100">
+              <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                <span className="text-[11px] text-slate-400">
+                  Terdaftar sejak {new Date(searchedMember.registeredAt).getFullYear()}
+                </span>
                 <button
                   onClick={() => onOpenVerifyModal(searchedMember)}
                   className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
@@ -860,7 +802,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-2.5">
             <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-base">
               1
@@ -899,19 +841,17 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
         onClose={() => setIsScannerOpen(false)}
         localMembers={members}
         onScanSuccess={(scannedMember, result) => {
-          // Scanner sudah memverifikasi ke Spreadsheet. Tampilkan record remote yang
-          // dikembalikan, bukan record lokal lama.
           setSearchedMember(scannedMember);
           setVerificationMeta(result);
-          setVerifyInput(scannedMember.nationalMemberNumber || scannedMember.id || scannedMember.userId || '');
+          setVerifyInput(scannedMember.nationalMemberNumber || scannedMember.verificationToken || scannedMember.id);
           setNotFound(false);
-          setIsScannerOpen(false);
-          window.requestAnimationFrame(() => {
-            verificationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          });
+          // Scroll to verification card
+          const el = document.getElementById('verifikasi-kta');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          }
         }}
       />
     </div>
-    </>
   );
 };
