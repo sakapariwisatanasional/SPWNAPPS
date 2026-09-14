@@ -16,7 +16,9 @@ import {
   Check,
   ArrowUpRight,
   UtensilsCrossed,
-  ShoppingBag
+  ShoppingBag,
+  BookOpen,
+  Edit3
 } from 'lucide-react';
 
 import { NationalMapVisual } from '../components/dashboard/NationalMapVisual';
@@ -35,6 +37,7 @@ export interface DashboardViewProps {
   auditLogs?: any[];
   onNavigate?: (view: string) => void;
   onVerifyMember?: (id: string) => void;
+  onOpenKridaEditor?: () => void;
   onOpenCulinaryFormModal?: (item?: any, kind?: any) => void;
   [key: string]: any;
 }
@@ -93,7 +96,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
         </span>
       )}
       <div className="flex items-start justify-between gap-3">
-        <div className={`w-11 h-11 rounded-[1.35rem] ${colorMap.iconBg} flex items-center justify-center shrink-0`}>
+        <div className={`w-11 h-11 rounded-2xl ${colorMap.iconBg} flex items-center justify-center shrink-0`}>
           {icon}
         </div>
       </div>
@@ -244,7 +247,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Saka Pariwisata
               </span>
             </div>
-            <h1 className="text-2xl sm:text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-white">
               Pusat Kendali & Informasi Nasional
             </h1>
             <p className="text-emerald-100/80 text-sm max-w-2xl">
@@ -256,7 +259,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('audit-logs')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[1.35rem] bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition backdrop-blur-sm border border-white/10"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition backdrop-blur-sm border border-white/10"
             >
               <FileText className="w-4 h-4" />
               Log Audit
@@ -264,7 +267,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('members')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[1.35rem] bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
             >
               <Users className="w-4 h-4" />
               Kelola Anggota
@@ -272,6 +275,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Akses cepat CMS Materi Krida — khusus Super Admin */}
+      {isSuperAdmin && (
+        <section className="rounded-[1.6rem] border border-fuchsia-200 bg-white p-4 sm:p-5 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-11 h-11 shrink-0 rounded-2xl bg-fuchsia-50 border border-fuchsia-100 text-fuchsia-600 flex items-center justify-center">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm sm:text-base font-extrabold text-slate-900">Kelola Materi Krida & SKK</h2>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-amber-700">
+                    <Edit3 className="w-3 h-3" /> Super Admin
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] sm:text-xs text-slate-500">
+                  Buka pusat Krida untuk memilih SKK dan mengedit naskah, kompetensi, silabus, referensi, serta berkas materi.
+                </p>
+              </div>
+            </div>
+            <button type="button" onClick={() => onOpenKridaEditor ? onOpenKridaEditor() : handleNavigate('krida-modules')} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-extrabold shadow-sm transition-colors cursor-pointer shrink-0" title="Buka pengelolaan materi Krida">
+              <Edit3 className="w-4 h-4" />
+              Kelola Materi Krida
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Kartu Metrik Utama */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -336,7 +367,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 placeholder="Cari nama, NTA, atau Kwarcab..."
                 value={searchPending}
                 onChange={(e) => setSearchPending(e.target.value)}
-                className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-[1.35rem] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-52 sm:w-64"
+                className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-52 sm:w-64"
               />
             </div>
             <button
