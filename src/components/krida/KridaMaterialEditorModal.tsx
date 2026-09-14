@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   X, 
   Save, 
@@ -32,11 +32,21 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
   currentUser,
   onSave
 }) => {
-  if (!isOpen || !moduleItem) return null;
-
   const [activeSubTab, setActiveSubTab] = useState<'TEXT' | 'IMAGES' | 'TABLE' | 'LINKS' | 'DOWNLOADS' | 'CURRICULUM' | 'TESTS'>('TEXT');
-  const [formData, setFormData] = useState<KridaModuleItem>({ ...moduleItem });
+  const [formData, setFormData] = useState<KridaModuleItem>(() => ({ ...(moduleItem as KridaModuleItem) }));
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Keep the editor synchronized with the selected module. This is important when
+  // the modal stays mounted while Super Admin switches from one SKK to another.
+  useEffect(() => {
+    if (moduleItem) {
+      setFormData({ ...moduleItem });
+      setActiveSubTab('TEXT');
+      setSaveSuccess(false);
+    }
+  }, [moduleItem]);
+
+  if (!isOpen || !moduleItem) return null;
 
   // Text formatting helpers
   const handleInsertText = (prefix: string, suffix: string = '') => {
