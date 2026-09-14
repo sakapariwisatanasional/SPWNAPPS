@@ -338,7 +338,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                               className="absolute inset-0 bg-purple-950/80 opacity-0 group-hover/avatar:opacity-100 rounded-2xl flex items-center justify-center text-white transition-opacity cursor-pointer shadow-xs"
                               title="Perbaiki Pas Foto Resmi KTA"
                             >
-                              <Camera className="w-4 h-4 text-purple-200" />
+                              <Camera className="w-4 h-4 text-fuchsia-200" />
                             </button>
                           )}
                         </div>
@@ -346,7 +346,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="font-bold text-slate-900 truncate text-xs font-heading">{m.fullName}</p>
                             {m.isOperator && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-fuchsia-300 font-extrabold text-[9px] shadow-xs">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300 font-extrabold text-[9px] shadow-xs">
                                 <ShieldCheck className="w-3 h-3 text-fuchsia-700" />
                                 <span>{m.operatorRole === 'ADMIN_REGENCY' ? 'Kwarcab' : m.operatorRole === 'ADMIN_PROVINCE' ? 'Kwarda' : 'Kecamatan'}</span>
                               </span>
@@ -405,124 +405,115 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
-                        {/* Preview Digital KTA */}
+                        {/* Primary action: preview KTA */}
                         <button
                           onClick={() => setPreviewCardMember(m)}
-                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                          className="p-2 bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 rounded-xl transition-colors border border-fuchsia-200 cursor-pointer"
                           title="Lihat KTA Digital"
+                          aria-label={`Lihat KTA Digital ${m.fullName}`}
                         >
-                          <CreditCard className="w-4 h-4 text-emerald-700" />
+                          <CreditCard className="w-4 h-4" />
                         </button>
 
-                        {/* Cetak / Unduh PDF KTA */}
-                        {onOpenPrintPdfModal && (
-                          <button
-                            onClick={() => onOpenPrintPdfModal(m)}
-                            className="p-1.5 bg-purple-50 hover:bg-fuchsia-100 text-purple-800 rounded-lg transition-colors border border-fuchsia-200/60"
-                            title="Cetak / Konversi KTA ke PDF (CR80 / A4)"
-                          >
-                            <FileDown className="w-4 h-4 text-fuchsia-700" />
-                          </button>
-                        )}
-
-                        {/* Quick Share / Badge Networking Event */}
-                        {onOpenQuickShareModal && (
-                          <button
-                            onClick={() => onOpenQuickShareModal(m)}
-                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg transition-colors border border-amber-300/80 cursor-pointer"
-                            title="Quick Share: Badge Event & QR Portofolio Instan"
-                          >
-                            <Share2 className="w-4 h-4 text-amber-700" />
-                          </button>
-                        )}
-
-                        {/* Perbaiki Pas Foto KTA */}
-                        {onOpenEditPhotoModal && (
-                          <button
-                            onClick={() => onOpenEditPhotoModal(m)}
-                            className="p-1.5 bg-slate-100 hover:bg-fuchsia-100 text-slate-700 hover:text-purple-800 rounded-lg transition-colors cursor-pointer"
-                            title="Perbaiki Pas Foto Resmi KTA & Profil"
-                          >
-                            <Camera className="w-4 h-4 text-slate-700" />
-                          </button>
-                        )}
-
-                        {/* Koreksi Profil, Nama, Gelar, & Domisili (Hak Admin) */}
+                        {/* Primary action: edit profile */}
                         {onOpenEditMemberModal && (
                           <button
                             onClick={() => onOpenEditMemberModal(m)}
-                            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 rounded-lg transition-colors border border-indigo-200/60 cursor-pointer"
-                            title="Koreksi Nama, Gelar, Profil & Domisili (Hak Admin)"
+                            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors border border-slate-200 cursor-pointer"
+                            title="Koreksi Profil"
+                            aria-label={`Koreksi profil ${m.fullName}`}
                           >
-                            <Edit3 className="w-4 h-4 text-indigo-700" />
+                            <Edit3 className="w-4 h-4" />
                           </button>
                         )}
 
-                        {/* Kelola / Tetapkan / Batalkan Operator (Hak Khusus Super Admin) */}
-                        {currentUser.role === 'SUPER_ADMIN' && onOpenOperatorModal && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenOperatorModal(m)}
-                            className={`p-1.5 rounded-lg transition-colors border cursor-pointer ${
-                              m.isOperator
-                                ? 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-fuchsia-300 shadow-xs'
-                                : 'bg-slate-100 hover:bg-fuchsia-50 text-slate-700 hover:text-purple-800 border-slate-200/80'
-                            }`}
-                            title={
-                              m.isOperator
-                                ? `Kelola / Batalkan Wewenang Operator (${m.operatorJurisdictionName || m.regencyName})`
-                                : `Tetapkan ${m.fullName} sebagai Operator Kwartir`
-                            }
+                        {/* Secondary actions grouped into one menu */}
+                        <details className="relative">
+                          <summary
+                            className="list-none p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors border border-slate-200 cursor-pointer flex items-center justify-center"
+                            title="Aksi lainnya"
+                            aria-label={`Aksi lainnya untuk ${m.fullName}`}
                           >
-                            {m.isOperator ? (
-                              <ShieldCheck className="w-4 h-4 text-fuchsia-700" />
-                            ) : (
-                              <Shield className="w-4 h-4 text-slate-600 hover:text-fuchsia-700" />
+                            <MoreHorizontal className="w-4 h-4" />
+                          </summary>
+                          <div className="absolute right-0 top-full mt-2 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl text-left">
+                            {onOpenPrintPdfModal && (
+                              <button
+                                onClick={() => onOpenPrintPdfModal(m)}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
+                              >
+                                <FileDown className="w-4 h-4" />
+                                Cetak / Unduh KTA
+                              </button>
                             )}
-                          </button>
-                        )}
+                            {onOpenQuickShareModal && (
+                              <button
+                                onClick={() => onOpenQuickShareModal(m)}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800"
+                              >
+                                <Share2 className="w-4 h-4" />
+                                Quick Share / Badge
+                              </button>
+                            )}
+                            {onOpenEditPhotoModal && (
+                              <button
+                                onClick={() => onOpenEditPhotoModal(m)}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
+                              >
+                                <Camera className="w-4 h-4" />
+                                Perbaiki Foto
+                              </button>
+                            )}
+                            {currentUser.role === 'SUPER_ADMIN' && onOpenOperatorModal && (
+                              <button
+                                type="button"
+                                onClick={() => onOpenOperatorModal(m)}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
+                              >
+                                {m.isOperator ? <ShieldCheck className="w-4 h-4 text-fuchsia-700" /> : <Shield className="w-4 h-4" />}
+                                {m.isOperator ? 'Kelola Operator' : 'Tetapkan Operator'}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onOpenVerifyModal(m)}
+                              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            >
+                              <Eye className="w-4 h-4" />
+                              Verifikasi Anggota
+                            </button>
+                            <button
+                              onClick={() => onOpenTransferModal(m)}
+                              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800"
+                            >
+                              <ArrowRightLeft className="w-4 h-4" />
+                              Mutasi / Transfer
+                            </button>
+                            {currentUser.role === 'SUPER_ADMIN' && onDeleteMember && (
+                              <button
+                                onClick={() => setMemberToDelete(m)}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Hapus Anggota
+                              </button>
+                            )}
+                          </div>
+                        </details>
 
-                        {/* Public Verifier Modal */}
-                        <button
-                          onClick={() => onOpenVerifyModal(m)}
-                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
-                          title="Verifikasi QR Publik"
-                        >
-                          <Eye className="w-4 h-4 text-slate-700" />
-                        </button>
-
-                        {/* Mutasi / Transfer Lokasi */}
-                        <button
-                          onClick={() => onOpenTransferModal(m)}
-                          className="p-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 rounded-lg transition-colors"
-                          title="Mutasi / Pindah Wilayah Kwartir"
-                        >
-                          <ArrowRightLeft className="w-4 h-4" />
-                        </button>
-
-                        {/* Hapus Anggota (Hak Super Admin) */}
-                        {currentUser.role === 'SUPER_ADMIN' && onDeleteMember && (
-                          <button
-                            onClick={() => setMemberToDelete(m)}
-                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 rounded-lg transition-colors border border-red-200 cursor-pointer"
-                            title="Hapus Data Anggota Ini (Super Admin)"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </button>
-                        )}
-
-                        {/* Approve Button for Pending */}
+                        {/* Pending approval remains visible as the highest-priority action */}
                         {m.status === 'PENDING' && (
                           <button
                             onClick={() => onApproveMember(m.id)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                            className="px-3 py-2 bg-emerald-600 hover:bg-fuchsia-500 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                             title="Setujui dan terbitkan Nomor Anggota"
                           >
-                            <span className="sr-only">Setujui</span>
+                            <CheckCircle2 className="w-4 h-4" />
+                            Setujui
                           </button>
                         )}
                       </div>
                     </td>
+
                   </tr>
                 ))
               )}
@@ -592,57 +583,98 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 </div>
 
                 {/* Action Buttons Toolbar */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
                     onClick={() => setPreviewCardMember(m)}
-                    className="flex-1 py-2 px-2.5 bg-teal-50 hover:bg-teal-100 text-teal-900 rounded-2xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-teal-200/80 min-h-[38px]"
+                    className="py-2.5 px-3 bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-800 rounded-2xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-fuchsia-200 min-h-[42px]"
                   >
-                    <CreditCard className="w-3.5 h-3.5 text-teal-700" />
+                    <CreditCard className="w-4 h-4" />
                     <span>Lihat KTA</span>
                   </button>
-
-                  {onOpenPrintPdfModal && (
-                    <button
-                      onClick={() => onOpenPrintPdfModal(m)}
-                      className="p-2 bg-purple-50 hover:bg-fuchsia-100 text-purple-800 rounded-2xl text-xs font-bold transition-colors border border-fuchsia-200/80 min-h-[38px] min-w-[38px] flex items-center justify-center"
-                      title="Cetak PDF"
-                    >
-                      <FileDown className="w-4 h-4 text-fuchsia-700" />
-                    </button>
-                  )}
 
                   {onOpenEditMemberModal && (
                     <button
                       onClick={() => onOpenEditMemberModal(m)}
-                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
-                      title="Edit Data"
+                      className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-colors border border-slate-200 min-h-[42px] flex items-center justify-center gap-1.5"
                     >
-                      <Edit3 className="w-4 h-4 text-slate-700" />
+                      <Edit3 className="w-4 h-4" />
+                      <span>Edit Profil</span>
                     </button>
                   )}
 
-                  {onOpenEditPhotoModal && (
-                    <button
-                      onClick={() => onOpenEditPhotoModal(m)}
-                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
-                      title="Ubah Foto KTA"
-                    >
-                      <Camera className="w-4 h-4 text-slate-700" />
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => onOpenVerifyModal(m)}
-                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
-                    title="QR Verifikasi"
-                  >
-                    <Eye className="w-4 h-4 text-slate-700" />
-                  </button>
+                  <details className="relative col-span-2">
+                    <summary className="list-none w-full py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 rounded-2xl text-xs font-bold transition-colors border border-slate-200 min-h-[42px] flex items-center justify-center gap-1.5 cursor-pointer">
+                      <MoreHorizontal className="w-4 h-4" />
+                      <span>Aksi lainnya</span>
+                    </summary>
+                    <div className="mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                      {onOpenPrintPdfModal && (
+                        <button
+                          onClick={() => onOpenPrintPdfModal(m)}
+                          className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
+                        >
+                          <FileDown className="w-4 h-4 text-fuchsia-700" />
+                          PDF KTA
+                        </button>
+                      )}
+                      {onOpenQuickShareModal && (
+                        <button
+                          onClick={() => onOpenQuickShareModal(m)}
+                          className="py-2.5 px-2 bg-white hover:bg-amber-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
+                        >
+                          <Share2 className="w-4 h-4 text-amber-700" />
+                          Quick Share
+                        </button>
+                      )}
+                      {onOpenEditPhotoModal && (
+                        <button
+                          onClick={() => onOpenEditPhotoModal(m)}
+                          className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
+                        >
+                          <Camera className="w-4 h-4" />
+                          Foto
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onOpenVerifyModal(m)}
+                        className="py-2.5 px-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Verifikasi
+                      </button>
+                      <button
+                        onClick={() => onOpenTransferModal(m)}
+                        className="py-2.5 px-2 bg-white hover:bg-amber-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
+                      >
+                        <ArrowRightLeft className="w-4 h-4" />
+                        Mutasi
+                      </button>
+                      {currentUser.role === 'SUPER_ADMIN' && onOpenOperatorModal && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenOperatorModal(m)}
+                          className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
+                        >
+                          {m.isOperator ? <ShieldCheck className="w-4 h-4 text-fuchsia-700" /> : <Shield className="w-4 h-4" />}
+                          Operator
+                        </button>
+                      )}
+                      {currentUser.role === 'SUPER_ADMIN' && onDeleteMember && (
+                        <button
+                          onClick={() => setMemberToDelete(m)}
+                          className="py-2.5 px-2 bg-white hover:bg-red-50 text-red-700 rounded-xl text-[11px] font-semibold border border-red-200 flex items-center justify-center gap-1.5"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                  </details>
 
                   {m.status === 'PENDING' && (
                     <button
                       onClick={() => onApproveMember(m.id)}
-                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-xs transition-colors min-h-[38px] flex items-center justify-center gap-1.5"
+                      className="col-span-2 py-2.5 bg-emerald-600 hover:bg-fuchsia-500 text-white font-bold rounded-2xl text-xs transition-colors min-h-[42px] flex items-center justify-center gap-1.5"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Setujui Anggota</span>
