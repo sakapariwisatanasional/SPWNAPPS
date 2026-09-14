@@ -35,7 +35,7 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-lg rounded-[1.75rem] shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header Banner with SakaLogo Key Visual */}
         <div className={`p-6 text-white text-center relative overflow-hidden ${
           isVerified 
@@ -58,7 +58,7 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
             <SakaLogo size={56} id="modal-saka-logo" />
           </div>
 
-          <span className="inline-block px-3 py-1 bg-white/15 rounded-full text-xs font-extrabold uppercase tracking-widest mb-1 text-purple-200 border border-purple-300/20">
+          <span className="inline-block px-3 py-1 bg-white/15 rounded-full text-xs font-extrabold uppercase tracking-widest mb-1 text-purple-200 border border-fuchsia-300/20">
             {isVerified ? 'Anggota Resmi Terverifikasi' : 'Status: Menunggu Verifikasi'}
           </span>
           <h3 className="text-xl font-extrabold tracking-tight font-heading">
@@ -93,7 +93,7 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <CreditCard className="w-3.5 h-3.5 text-purple-700" />
+            <CreditCard className="w-3.5 h-3.5 text-fuchsia-700" />
             <span>Kartu KTA Digital</span>
           </button>
         </div>
@@ -112,13 +112,13 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
           ) : (
             <>
               {/* Member Main Badge */}
-              <div className="flex items-center gap-4 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
+              <div className="flex items-center gap-4 p-4 bg-purple-50/50 rounded-[1.35rem] border border-purple-100">
                 <div className="relative flex-shrink-0">
                   <img
                     src={avatar}
                     alt={member.fullName}
                     referrerPolicy="no-referrer"
-                    className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-500 shadow-sm bg-slate-900"
+                    className="w-16 h-16 rounded-[1.35rem] object-cover border-2 border-purple-500 shadow-sm bg-slate-900"
                     onError={(e) => {
                       const img = e.target as HTMLImageElement;
                       const directFallback = getDriveDirectFallbackUrl(member.avatarUrl);
@@ -139,28 +139,28 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
                     {member.fullName}
                   </h4>
                   <div className="flex items-center gap-1.5 text-xs text-purple-900 font-bold font-mono mt-0.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-purple-600" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-fuchsia-600" />
                     <span>{member.nationalMemberNumber || 'Nomor Anggota Dalam Proses'}</span>
                   </div>
                   <p className="text-xs text-slate-500 truncate mt-0.5">
-                    {member.currentPosition || 'Anggota Saka'} • <strong className="text-purple-700">{member.krida}</strong>
+                    {member.currentPosition || 'Anggota Saka'} • <strong className="text-fuchsia-700">{member.krida}</strong>
                   </p>
                 </div>
               </div>
 
               {/* Safe Public Data Grid */}
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Provinsi</p>
                   <p className="font-bold text-slate-800 mt-0.5">{member.provinceName}</p>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kabupaten/Kota</p>
                   <p className="font-bold text-slate-800 mt-0.5">{member.regencyName}</p>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kwartir Ranting</p>
                   <p className="font-bold text-slate-800 mt-0.5 truncate">{member.districtName}</p>
                 </div>
@@ -172,16 +172,16 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
               {member.skills && member.skills.length > 0 && (
                 <div>
                   <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5 text-purple-600" />
+                    <Award className="w-3.5 h-3.5 text-fuchsia-600" />
                     <span>Keahlian Kepariwisataan Terdaftar</span>
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {member.skills.map((s) => (
                       <span
                         key={s.id}
-                        className="px-2.5 py-1 bg-purple-50 text-purple-900 border border-purple-200/80 rounded-lg text-xs font-semibold"
+                        className="px-2.5 py-1 bg-purple-50 text-purple-900 border border-fuchsia-200/80 rounded-lg text-xs font-semibold"
                       >
-                        {s.skillName} • <span className="text-purple-600 font-bold">{s.proficiency}</span>
+                        {s.skillName} • <span className="text-fuchsia-600 font-bold">{s.proficiency}</span>
                       </span>
                     ))}
                   </div>
@@ -189,7 +189,7 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
               )}
 
               {/* Privacy Notice (UU PDP Compliance) */}
-              <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200/60 text-[11px] text-purple-950 leading-relaxed">
+              <div className="p-3 bg-purple-50/60 rounded-2xl border border-fuchsia-200/60 text-[11px] text-purple-950 leading-relaxed">
                 <span className="font-bold">🔒 Informasi Privasi & Keamanan:</span> Halaman ini hanya menampilkan data publik terverifikasi sesuai kebijakan perlindungan data pribadi nasional. Data privat (NIK, alamat lengkap, kontak pribadi) dilindungi secara terenkripsi.
               </div>
             </>
@@ -204,13 +204,13 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveView(activeView === 'INFO' ? 'CARD' : 'INFO')}
-              className="px-3.5 py-2 bg-purple-100 hover:bg-purple-200 text-purple-950 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              className="px-3.5 py-2 bg-purple-100 hover:bg-purple-200 text-purple-950 rounded-2xl text-xs font-bold transition-colors cursor-pointer"
             >
               {activeView === 'INFO' ? 'Lihat KTA Digital' : 'Lihat Data Lengkap'}
             </button>
             <button
               onClick={onClose}
-              className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold transition-colors cursor-pointer"
             >
               Tutup
             </button>
