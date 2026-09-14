@@ -128,21 +128,21 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* Header & Quick Action */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 p-6 rounded-3xl text-white shadow-xl border border-purple-800/40 relative overflow-hidden">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-br from-[#24113f] via-[#4b2377] to-[#6b3fa0] p-6 rounded-3xl text-white shadow-xl border border-fuchsia-300/20 relative overflow-hidden">
         <div className="relative z-10 space-y-1.5 max-w-2xl">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2.5 py-0.5 bg-amber-400/20 text-amber-300 border border-amber-300/30 rounded-full text-[10px] font-extrabold uppercase tracking-wider">
-              Talent Pool & Kompetensi
+            <span className="px-2.5 py-0.5 bg-fuchsia-400/15 text-fuchsia-100 border border-fuchsia-300/25 rounded-full text-[10px] font-extrabold uppercase tracking-wider">
+              TALENTA & SKILL
             </span>
-            <span className="text-purple-300 text-xs font-mono">
+            <span className="text-fuchsia-100/75 text-xs font-medium">
               Standar SKK Saka Pariwisata & SKKNI BNSP
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black font-heading text-white">
-            Direktori Keahlian & Talent Pool Pariwisata
+            Temukan Skill & Talenta Pariwisata
           </h2>
-          <p className="text-xs text-purple-200/80 leading-relaxed">
-            Pangkalan data resmi talenta pemanduan, fotografi wisata, kuliner kriya, ekowisata, promosi digital, dan penyelenggara event pariwisata se-Indonesia yang disetujui & diverifikasi oleh Kwartir.
+          <p className="text-xs text-fuchsia-100/75 leading-relaxed">
+            Jelajahi keahlian anggota Saka Pariwisata — dari pemanduan, kuliner, ekowisata, digital, sampai event. Cari orang dengan skill yang kamu butuhkan.
           </p>
         </div>
 
@@ -152,19 +152,19 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
             <button
               type="button"
               onClick={() => handleOpenManageSkills()}
-              className="px-4 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer font-heading"
+              className="px-4 py-3 bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950 font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer font-heading"
             >
               <Award className="w-4 h-4 text-slate-950" />
-              <span>Kelola & Setujui Keahlian</span>
+              <span>Kelola Keahlian</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={() => handleOpenManageSkills(loggedInMember || undefined)}
-              className="px-4 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="px-4 py-3 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-bold rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Ajukan Keahlian / Sertifikat Saya</span>
+              <span>Tambah Skill Saya</span>
             </button>
           )}
         </div>
@@ -172,33 +172,33 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Talenta Terdaftar</span>
+        <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Talenta Ditemukan</span>
           <p className="text-xl font-black text-slate-900 mt-1 font-heading">{filteredMembers.length} Orang</p>
-          <span className="text-[11px] text-slate-500">Anggota berkeahlian</span>
+          <span className="text-[11px] text-slate-500">Anggota dengan skill</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm">
           <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Keahlian Disetujui</span>
           <p className="text-xl font-black text-emerald-700 mt-1 font-heading">{stats.verifiedSkillsCount}</p>
           <span className="text-[11px] text-emerald-600 font-medium">Terverifikasi Kwartir</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm">
           <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Menunggu Persetujuan</span>
           <p className="text-xl font-black text-amber-700 mt-1 font-heading">{stats.pendingSkillsCount}</p>
           <span className="text-[11px] text-amber-600 font-medium">Perlu review admin</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-          <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Total Portofolio Keahlian</span>
-          <p className="text-xl font-black text-purple-900 mt-1 font-heading">{stats.totalSkillsCount}</p>
-          <span className="text-[11px] text-purple-600 font-medium">Keahlian terdata</span>
+        <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm">
+          <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Total Skill</span>
+          <p className="text-xl font-black text-fuchsia-900 mt-1 font-heading">{stats.totalSkillsCount}</p>
+          <span className="text-[11px] text-purple-600 font-medium">Skill terdata</span>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+      <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           {/* Search */}
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
@@ -262,21 +262,21 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
 
       {/* Member Talent Cards Grid */}
       {filteredMembers.length === 0 ? (
-        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 text-slate-400 space-y-3">
+        <div className="bg-white rounded-3xl p-10 sm:p-12 text-center border border-slate-200/80 shadow-sm text-slate-400 space-y-3">
           <Award className="w-12 h-12 mx-auto text-slate-300 stroke-1" />
-          <p className="font-bold text-slate-700">Tidak ada talenta keahlian yang cocok dengan filter yang dipilih.</p>
+          <p className="font-bold text-slate-700">Belum menemukan talenta yang cocok.</p>
           {isAdminOrOperator && (
             <button
               type="button"
               onClick={() => handleOpenManageSkills()}
-              className="px-4 py-2 bg-purple-900 text-white rounded-xl text-xs font-bold hover:bg-purple-800 transition-colors"
+              className="px-4 py-2 bg-fuchsia-700 text-white rounded-xl text-xs font-bold hover:bg-fuchsia-800 transition-colors"
             >
-              Input Keahlian Anggota Baru
+              Tambah Keahlian Anggota
             </button>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
           {filteredMembers.map((member) => {
             const verifiedSkills = (member.skills || []).filter(s => s.isVerified);
             const pendingSkills = (member.skills || []).filter(s => !s.isVerified);
@@ -284,7 +284,7 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
             return (
               <div
                 key={member.id}
-                className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200 flex flex-col justify-between space-y-4"
               >
                 <div className="space-y-3">
                   {/* Header Profile */}
@@ -293,7 +293,7 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
                       src={formatDriveImageUrl(member.avatarUrl) || member.avatarUrl || getValidAvatarUrl('', member.gender)}
                       alt={member.fullName}
                       referrerPolicy="no-referrer"
-                      className="w-13 h-13 rounded-2xl object-cover border-2 border-purple-600 shadow-xs flex-shrink-0 bg-slate-900"
+                      className="w-13 h-13 rounded-2xl object-cover border-2 border-fuchsia-500/70 shadow-xs flex-shrink-0 bg-slate-900"
                       onError={(e) => {
                         const img = e.target as HTMLImageElement;
                         const direct = getDriveDirectFallbackUrl(member.avatarUrl);
@@ -305,8 +305,8 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
                       <h4 className="font-bold text-sm text-slate-900 truncate font-heading">
                         {member.fullName}
                       </h4>
-                      <div className="flex items-center gap-1 text-[11px] text-purple-900 font-mono font-bold">
-                        <CheckCircle2 className="w-3 h-3 text-purple-600" />
+                      <div className="flex items-center gap-1 text-[11px] text-fuchsia-900 font-mono font-bold">
+                        <CheckCircle2 className="w-3 h-3 text-fuchsia-600" />
                         <span>{member.nationalMemberNumber || 'Dalam Proses Verifikasi'}</span>
                       </div>
                       <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
@@ -318,7 +318,7 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
 
                   {/* Bio or Position */}
                   <div className="text-xs text-slate-600 line-clamp-2 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <span className="font-semibold text-purple-900">{member.krida || 'Krida Pemandu'}</span> • {member.bio || 'Kader aktif Saka Pariwisata berdaya saing tinggi.'}
+                    <span className="font-semibold text-fuchsia-900">{member.krida || 'Krida Pemandu'}</span> • {member.bio || 'Kader aktif Saka Pariwisata berdaya saing tinggi.'}
                   </div>
 
                   {/* Skills Badges (Verified) */}
@@ -376,10 +376,10 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
                   <button
                     type="button"
                     onClick={() => handleOpenManageSkills(member)}
-                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-fuchsia-900 border border-purple-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
                     title="Input, edit, atau setujui keahlian anggota ini"
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-purple-700" />
+                    <Edit3 className="w-3.5 h-3.5 text-fuchsia-700" />
                     <span>{isAdminOrOperator ? 'Kelola Keahlian' : 'Keahlian'}</span>
                   </button>
 
