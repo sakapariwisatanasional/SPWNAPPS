@@ -101,6 +101,7 @@ import { TerritoryManagementView } from './pages/TerritoryManagementView';
 import { AuditLogsView } from './pages/AuditLogsView';
 import { MyCardView } from './pages/MyCardView';
 import { KridaModulesView } from './pages/KridaModulesView';
+import { KridaMaterialEditorModal } from './components/krida/KridaMaterialEditorModal';
 import { PublicPortalView } from './pages/PublicPortalView';
 
 // Modals
@@ -229,6 +230,8 @@ export default function App() {
   const [managingOperatorMember, setManagingOperatorMember] = useState<Member | null>(null);
   const [verifyingMember, setVerifyingMember] = useState<Member | null>(null);
   const [transferringMember, setTransferringMember] = useState<Member | null>(null);
+  const [editingKridaModule, setEditingKridaModule] = useState<KridaModuleItem | null>(null);
+  const [isKridaEditorOpen, setIsKridaEditorOpen] = useState(false);
   const [selectedTourDetail, setSelectedTourDetail] = useState<TourPackage | null>(null);
   const [selectedActivityDetail, setSelectedActivityDetail] = useState<Activity | null>(null);
   const [isActivityFormOpen, setIsActivityFormOpen] = useState(false);
@@ -464,6 +467,20 @@ export default function App() {
     alert(`Berhasil menghapus ${count} data anggota dummy. Database anggota kini bersih.`);
   };
 
+  // Super Admin: akses editor materi Krida dari area admin.
+  const handleOpenKridaEditor = (moduleItem: KridaModuleItem) => {
+    if (currentUser.role !== 'SUPER_ADMIN') return;
+    setEditingKridaModule(moduleItem);
+    setIsKridaEditorOpen(true);
+  };
+
+  const handleSaveKridaModule = (updatedItem: KridaModuleItem) => {
+    if (currentUser.role !== 'SUPER_ADMIN') return;
+    storage.updateKridaModule(updatedItem, currentUser.name);
+    setIsKridaEditorOpen(false);
+    setEditingKridaModule(null);
+  };
+
   // Open Auth Modal helper
   const handleOpenAuth = (type: 'login' | 'register' | 'forgot') => {
     setAuthModalTab(type);
@@ -626,6 +643,7 @@ export default function App() {
                   onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
                   onOpenSpreadsheetModal={userRole === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
                   onOpenDriveModal={userRole === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
+                  onOpenKridaEditor={() => handleNavigateTab('krida-modules')}
                 />
               </AppErrorBoundary>
             )}
@@ -701,6 +719,7 @@ export default function App() {
             {currentTab === 'krida-modules' && (
               <KridaModulesView
                 currentUser={currentUser}
+                onOpenEditor={userRole === 'SUPER_ADMIN' ? handleOpenKridaEditor : undefined}
               />
             )}
 
@@ -933,6 +952,19 @@ export default function App() {
           setMembers(storage.getMembers());
         }}
       />
+
+      {userRole === 'SUPER_ADMIN' && (
+        <KridaMaterialEditorModal
+          isOpen={isKridaEditorOpen}
+          moduleItem={editingKridaModule}
+          currentUser={currentUser}
+          onClose={() => {
+            setIsKridaEditorOpen(false);
+            setEditingKridaModule(null);
+          }}
+          onSave={handleSaveKridaModule}
+        />
+      )}
 
       {userRole === 'SUPER_ADMIN' && (
         <DriveMediaRepositoryModal
