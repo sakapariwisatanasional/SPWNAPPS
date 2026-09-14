@@ -50,7 +50,7 @@ export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = (
       {/* 3-Column Hierarchy Explorer */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Column 1: Provinces List (4 Cols) */}
-        <div className="lg:col-span-4 bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
+        <div className="lg:col-span-4 bg-white rounded-[1.75rem] p-5 border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <h3 className="font-bold text-sm text-slate-900 font-heading flex items-center gap-1.5">
               <Globe2 className="w-4 h-4 text-emerald-600" />
@@ -61,7 +61,7 @@ export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = (
             </span>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-2.5 py-1.5 text-xs">
             <Search className="w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
@@ -83,7 +83,7 @@ export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = (
                     const regs = storage.getRegencies(prov.id);
                     if (regs.length > 0) setSelectedRegencyId(regs[0].id);
                   }}
-                  className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-colors ${
+                  className={`w-full text-left p-2.5 rounded-2xl text-xs flex items-center justify-between transition-colors ${
                     isSelected 
                       ? 'bg-emerald-50 text-emerald-950 font-bold border border-emerald-300 shadow-xs' 
                       : 'hover:bg-slate-50 text-slate-700 border border-transparent'
@@ -105,7 +105,7 @@ export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = (
         </div>
 
         {/* Column 2: Regencies List (4 Cols) */}
-        <div className="lg:col-span-4 bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
+        <div className="lg:col-span-4 bg-white rounded-[1.75rem] p-5 border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <h3 className="font-bold text-sm text-slate-900 font-heading flex items-center gap-1.5">
               <Building className="w-4 h-4 text-emerald-600" />
@@ -130,7 +130,7 @@ export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = (
                   <button
                     key={reg.id}
                     onClick={() => setSelectedRegencyId(reg.id)}
-                    className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-colors ${
+                    className={`w-full text-left p-2.5 rounded-2xl text-xs flex items-center justify-between transition-colors ${
                       isSelected 
                         ? 'bg-emerald-50 text-emerald-950 font-bold border border-emerald-300 shadow-xs' 
                         : 'hover:bg-slate-50 text-slate-700 border border-transparent'
@@ -151,7 +151,7 @@ export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = (
         </div>
 
         {/* Column 3: Districts (4 Cols) */}
-        <div className="lg:col-span-4 bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
+        <div className="lg:col-span-4 bg-white rounded-[1.75rem] p-5 border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <h3 className="font-bold text-sm text-slate-900 font-heading flex items-center gap-1.5">
               <MapPin className="w-4 h-4 text-emerald-600" />
@@ -168,12 +168,12 @@ export const TerritoryManagementView: React.FC<TerritoryManagementViewProps> = (
 
           <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
             {districts.length === 0 ? (
-              <div className="p-4 bg-slate-50 rounded-xl text-center text-xs text-slate-400">
+              <div className="p-4 bg-slate-50 rounded-2xl text-center text-xs text-slate-400">
                 Pilih kabupaten untuk melihat daftar Kwartir Ranting (Kecamatan).
               </div>
             ) : (
               districts.map((dist) => (
-                <div key={dist.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+                <div key={dist.id} className="p-3 bg-slate-50 rounded-[1.35rem] border border-slate-200/80">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-900">
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-[10px] text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded font-bold">
