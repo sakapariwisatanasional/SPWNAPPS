@@ -258,12 +258,12 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 overflow-y-auto">
-      <div className="relative w-full max-w-5xl max-h-[94vh] bg-slate-950 border border-purple-500/50 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-5xl max-h-[94vh] bg-slate-950 border border-purple-500/50 rounded-[1.75rem] shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* HEADER */}
         <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-purple-600 flex items-center justify-center text-white shadow-lg shrink-0">
+            <div className="w-10 h-10 rounded-[1.35rem] bg-fuchsia-600 flex items-center justify-center text-white shadow-lg shrink-0">
               <FileText className="w-5 h-5" />
             </div>
             <div>
@@ -284,7 +284,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
           <div className="flex items-center gap-2">
             <button
               onClick={handleSave}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-lg cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-lg cursor-pointer"
             >
               <Save className="w-4 h-4" />
               <span>{saveSuccess ? 'Tersimpan!' : 'Simpan Perubahan'}</span>
@@ -292,7 +292,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -303,9 +303,9 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
         <div className="px-6 py-2.5 border-b border-slate-800/80 bg-slate-900/50 flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={() => setActiveSubTab('TEXT')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               activeSubTab === 'TEXT'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-fuchsia-600 text-white shadow-sm'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
@@ -315,9 +315,9 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
           <button
             onClick={() => setActiveSubTab('IMAGES')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               activeSubTab === 'IMAGES'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-fuchsia-600 text-white shadow-sm'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
@@ -327,9 +327,9 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
           <button
             onClick={() => setActiveSubTab('TABLE')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               activeSubTab === 'TABLE'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-fuchsia-600 text-white shadow-sm'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
@@ -339,9 +339,9 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
           <button
             onClick={() => setActiveSubTab('LINKS')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               activeSubTab === 'LINKS'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-fuchsia-600 text-white shadow-sm'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
@@ -351,9 +351,9 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
           <button
             onClick={() => setActiveSubTab('DOWNLOADS')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               activeSubTab === 'DOWNLOADS'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-fuchsia-600 text-white shadow-sm'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
@@ -363,9 +363,9 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
           <button
             onClick={() => setActiveSubTab('CURRICULUM')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               activeSubTab === 'CURRICULUM'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-fuchsia-600 text-white shadow-sm'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
@@ -375,9 +375,9 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
           <button
             onClick={() => setActiveSubTab('TESTS')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               activeSubTab === 'TESTS'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-fuchsia-600 text-white shadow-sm'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
@@ -401,7 +401,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none focus:border-purple-500"
                   />
                 </div>
 
@@ -413,7 +413,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                     type="text"
                     value={formData.code}
                     onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none focus:border-purple-500"
                   />
                 </div>
               </div>
@@ -426,46 +426,46 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                   rows={2}
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none focus:border-purple-500"
                 />
               </div>
 
               {/* Text formatting bar */}
-              <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/40">
+              <div className="border border-slate-800 rounded-[1.35rem] overflow-hidden bg-slate-900/40">
                 <div className="p-2 border-b border-slate-800 bg-slate-900/80 flex flex-wrap items-center gap-1.5 text-xs text-slate-300">
                   <span className="text-[11px] font-bold text-slate-400 mr-2">Sisipkan Format:</span>
                   <button
                     type="button"
                     onClick={() => handleInsertText('## ')}
-                    className="px-2 py-1 rounded bg-slate-800 hover:bg-purple-600 hover:text-white font-bold text-xs cursor-pointer"
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-fuchsia-600 hover:text-white font-bold text-xs cursor-pointer"
                   >
                     Judul H2 (##)
                   </button>
                   <button
                     type="button"
                     onClick={() => handleInsertText('### ')}
-                    className="px-2 py-1 rounded bg-slate-800 hover:bg-purple-600 hover:text-white font-bold text-xs cursor-pointer"
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-fuchsia-600 hover:text-white font-bold text-xs cursor-pointer"
                   >
                     Subjudul H3 (###)
                   </button>
                   <button
                     type="button"
                     onClick={() => handleInsertText('**', '**')}
-                    className="px-2 py-1 rounded bg-slate-800 hover:bg-purple-600 hover:text-white font-bold text-xs cursor-pointer"
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-fuchsia-600 hover:text-white font-bold text-xs cursor-pointer"
                   >
                     Tebal (**)
                   </button>
                   <button
                     type="button"
                     onClick={() => handleInsertText('- ')}
-                    className="px-2 py-1 rounded bg-slate-800 hover:bg-purple-600 hover:text-white text-xs cursor-pointer"
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-fuchsia-600 hover:text-white text-xs cursor-pointer"
                   >
                     Poin Bullet (- )
                   </button>
                   <button
                     type="button"
                     onClick={() => handleInsertText('1. ')}
-                    className="px-2 py-1 rounded bg-slate-800 hover:bg-purple-600 hover:text-white text-xs cursor-pointer"
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-fuchsia-600 hover:text-white text-xs cursor-pointer"
                   >
                     Nomor (1. )
                   </button>
@@ -494,7 +494,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                 <button
                   type="button"
                   onClick={handleAddImage}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Tambah Gambar</span>
@@ -503,8 +503,8 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
               <div className="space-y-3">
                 {(formData.images || []).map((img, idx) => (
-                  <div key={img.id || idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row gap-4 items-start">
-                    <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shrink-0">
+                  <div key={img.id || idx} className="p-4 rounded-[1.35rem] bg-slate-900 border border-slate-800 flex flex-col sm:flex-row gap-4 items-start">
+                    <div className="w-24 h-24 rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shrink-0">
                       <img
                         src={img.url}
                         alt={img.caption}
@@ -546,7 +546,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                     <button
                       type="button"
                       onClick={() => handleRemoveImage(idx)}
-                      className="p-2 rounded-xl bg-red-950/40 hover:bg-red-900 text-red-400 hover:text-white transition-colors cursor-pointer self-end sm:self-center"
+                      className="p-2 rounded-2xl bg-red-950/40 hover:bg-red-900 text-red-400 hover:text-white transition-colors cursor-pointer self-end sm:self-center"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -554,7 +554,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                 ))}
 
                 {(!formData.images || formData.images.length === 0) && (
-                  <div className="p-8 text-center bg-slate-900/50 rounded-2xl border border-slate-800 text-slate-500 text-xs">
+                  <div className="p-8 text-center bg-slate-900/50 rounded-[1.35rem] border border-slate-800 text-slate-500 text-xs">
                     Belum ada gambar yang disisipkan. Klik "Tambah Gambar" untuk menambahkan ilustrasi.
                   </div>
                 )}
@@ -573,7 +573,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                 <button
                   type="button"
                   onClick={handleAddTableRow}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Tambah Baris Kompetensi</span>
@@ -582,7 +582,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
               <div className="space-y-3">
                 {(formData.competencyTable || []).map((row, idx) => (
-                  <div key={idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                  <div key={idx} className="p-4 rounded-[1.35rem] bg-slate-900 border border-slate-800 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-purple-300 font-mono">
                         Baris #{idx + 1}
@@ -649,7 +649,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                 ))}
 
                 {(!formData.competencyTable || formData.competencyTable.length === 0) && (
-                  <div className="p-8 text-center bg-slate-900/50 rounded-2xl border border-slate-800 text-slate-500 text-xs">
+                  <div className="p-8 text-center bg-slate-900/50 rounded-[1.35rem] border border-slate-800 text-slate-500 text-xs">
                     Belum ada baris tabel kompetensi. Klik "Tambah Baris Kompetensi" untuk memasukkan data.
                   </div>
                 )}
@@ -668,7 +668,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                 <button
                   type="button"
                   onClick={handleAddLink}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Tambah Tautan</span>
@@ -677,7 +677,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
               <div className="space-y-3">
                 {(formData.links || []).map((link, idx) => (
-                  <div key={link.id || idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4">
+                  <div key={link.id || idx} className="p-4 rounded-[1.35rem] bg-slate-900 border border-slate-800 flex items-center justify-between gap-4">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1">Judul Tautan</label>
@@ -716,7 +716,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                     <button
                       type="button"
                       onClick={() => handleRemoveLink(idx)}
-                      className="p-2 rounded-xl bg-red-950/40 text-red-400 hover:bg-red-900 hover:text-white transition-colors cursor-pointer"
+                      className="p-2 rounded-2xl bg-red-950/40 text-red-400 hover:bg-red-900 hover:text-white transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -737,7 +737,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                 <button
                   type="button"
                   onClick={handleAddDownload}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Tambah Berkas</span>
@@ -746,7 +746,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
               <div className="space-y-3">
                 {(formData.downloads || []).map((dl, idx) => (
-                  <div key={dl.id || idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4">
+                  <div key={dl.id || idx} className="p-4 rounded-[1.35rem] bg-slate-900 border border-slate-800 flex items-center justify-between gap-4">
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 flex-1">
                       <div className="sm:col-span-2">
                         <label className="block text-[10px] font-bold text-slate-400 mb-1">Nama Dokumen</label>
@@ -786,7 +786,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                     <button
                       type="button"
                       onClick={() => handleRemoveDownload(idx)}
-                      className="p-2 rounded-xl bg-red-950/40 text-red-400 hover:bg-red-900 hover:text-white transition-colors cursor-pointer"
+                      className="p-2 rounded-2xl bg-red-950/40 text-red-400 hover:bg-red-900 hover:text-white transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -807,7 +807,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
                 <button
                   type="button"
                   onClick={handleAddSession}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Tambah Sesi</span>
@@ -816,7 +816,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
 
               <div className="space-y-3">
                 {(formData.curriculum || []).map((sess, idx) => (
-                  <div key={idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                  <div key={idx} className="p-4 rounded-[1.35rem] bg-slate-900 border border-slate-800 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-purple-300">
                         Sesi Pertemuan #{sess.sessionNumber || idx + 1}
@@ -881,7 +881,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
           {activeSubTab === 'TESTS' && (
             <div className="space-y-6 max-w-4xl">
               {/* PURWA */}
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+              <div className="p-4 rounded-[1.35rem] bg-slate-900 border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
                     Syarat Uji Tingkat Purwa
@@ -917,7 +917,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
               </div>
 
               {/* MADYA */}
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+              <div className="p-4 rounded-[1.35rem] bg-slate-900 border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">
                     Syarat Uji Tingkat Madya
@@ -953,7 +953,7 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
               </div>
 
               {/* UTAMA */}
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+              <div className="p-4 rounded-[1.35rem] bg-slate-900 border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider">
                     Syarat Uji Tingkat Utama
@@ -999,13 +999,13 @@ export const KridaMaterialEditorModal: React.FC<KridaMaterialEditorModalProps> =
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer"
+              className="px-4 py-2 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer"
             >
               Batal
             </button>
             <button
               onClick={handleSave}
-              className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+              className="px-5 py-2 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
             >
               {saveSuccess ? 'Tersimpan!' : 'Simpan Perubahan'}
             </button>
