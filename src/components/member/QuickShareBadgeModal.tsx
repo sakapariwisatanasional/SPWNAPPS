@@ -235,12 +235,12 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[94vh]">
+      <div className="bg-white w-full max-w-5xl rounded-[1.75rem] shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[94vh]">
         
         {/* Modal Header */}
         <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white flex items-center justify-between border-b border-purple-900/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500/30 to-amber-500/20 border border-purple-400/40 flex items-center justify-center text-amber-300 shadow-inner">
+            <div className="w-10 h-10 rounded-[1.35rem] bg-gradient-to-br from-purple-500/30 to-amber-500/20 border border-purple-400/40 flex items-center justify-center text-amber-300 shadow-inner">
               <Share2 className="w-5 h-5" />
             </div>
             <div>
@@ -270,8 +270,8 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
           
           {/* Quick Notice Banner */}
-          <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl flex items-start gap-2.5 text-xs text-purple-950">
-            <Sparkles className="w-4 h-4 text-purple-700 flex-shrink-0 mt-0.5" />
+          <div className="p-3 bg-purple-50 border border-fuchsia-200 rounded-[1.35rem] flex items-start gap-2.5 text-xs text-purple-950">
+            <Sparkles className="w-4 h-4 text-fuchsia-700 flex-shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               <span className="font-bold">Solusi Praktis saat Kegiatan Kepramukaan & Pariwisata:</span>
               <p className="text-purple-900/80">
@@ -286,7 +286,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
             <div className="lg:col-span-5 space-y-3 flex flex-col items-center">
               <div className="w-full flex items-center justify-between">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-purple-700" />
+                  <Layers className="w-3.5 h-3.5 text-fuchsia-700" />
                   <span>Pratinjau Badge Siap Unduh</span>
                 </span>
                 <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
@@ -295,7 +295,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
               </div>
 
               {/* Badge Preview Canvas Wrapper */}
-              <div className="w-full bg-slate-950 p-4 rounded-3xl border border-slate-800 shadow-2xl flex flex-col items-center justify-center relative min-h-[380px] max-h-[460px] overflow-hidden">
+              <div className="w-full bg-slate-950 p-4 rounded-[1.75rem] border border-slate-800 shadow-xl flex flex-col items-center justify-center relative min-h-[380px] max-h-[460px] overflow-hidden">
                 {isRendering ? (
                   <div className="flex flex-col items-center justify-center space-y-2 text-purple-300 animate-pulse">
                     <RotateCw className="w-8 h-8 animate-spin" />
@@ -306,7 +306,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                     <img
                       src={previewUrl}
                       alt="Networking Badge Preview"
-                      className="max-h-[420px] w-auto object-contain rounded-2xl shadow-xl transition-transform duration-300 group-hover/preview:scale-[1.02]"
+                      className="max-h-[420px] w-auto object-contain rounded-[1.35rem] shadow-xl transition-transform duration-300 group-hover/preview:scale-[1.02]"
                     />
                   </div>
                 ) : (
@@ -320,7 +320,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                   type="button"
                   onClick={handleDownloadPng}
                   disabled={isDownloading || isRendering}
-                  className="py-2.5 px-3 bg-gradient-to-r from-purple-900 to-indigo-900 hover:from-purple-950 hover:to-indigo-950 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-950/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="py-2.5 px-3 bg-gradient-to-r from-purple-900 to-indigo-900 hover:from-purple-950 hover:to-indigo-950 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-950/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Download className="w-3.5 h-3.5 text-purple-300" />
                   <span>Unduh PNG HD</span>
@@ -329,7 +329,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                 <button
                   type="button"
                   onClick={handleWhatsAppShare}
-                  className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5 text-emerald-100" />
                   <span>Kirim WhatsApp</span>
@@ -341,9 +341,9 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
             <div className="lg:col-span-7 space-y-5">
               
               {/* 1. Theme Selector */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
+              <div className="bg-slate-50 p-4 rounded-[1.35rem] border border-slate-200 space-y-2.5">
                 <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-purple-700" />
+                  <Palette className="w-3.5 h-3.5 text-fuchsia-700" />
                   <span>Pilihan Tema Warna Badge:</span>
                 </label>
 
@@ -352,10 +352,10 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setOptions({ ...options, theme: 'purple_gold' })}
-                    className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                       options.theme === 'purple_gold'
                         ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-600/30'
-                        : 'border-slate-200 bg-white hover:border-purple-300'
+                        : 'border-slate-200 bg-white hover:border-fuchsia-300'
                     }`}
                   >
                     <div className="flex items-center gap-1.5 mb-1.5">
@@ -370,7 +370,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setOptions({ ...options, theme: 'emerald_pesona' })}
-                    className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                       options.theme === 'emerald_pesona'
                         ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-600/30'
                         : 'border-slate-200 bg-white hover:border-emerald-300'
@@ -388,7 +388,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setOptions({ ...options, theme: 'midnight_slate' })}
-                    className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                       options.theme === 'midnight_slate'
                         ? 'border-slate-700 bg-slate-100 ring-2 ring-slate-700/30'
                         : 'border-slate-200 bg-white hover:border-slate-400'
@@ -406,15 +406,15 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setOptions({ ...options, theme: 'clean_white' })}
-                    className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                       options.theme === 'clean_white'
                         ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-600/30'
-                        : 'border-slate-200 bg-white hover:border-purple-300'
+                        : 'border-slate-200 bg-white hover:border-fuchsia-300'
                     }`}
                   >
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <div className="w-3.5 h-3.5 rounded-full bg-white border border-slate-400" />
-                      <div className="w-3.5 h-3.5 rounded-full bg-purple-600 border border-purple-700" />
+                      <div className="w-3.5 h-3.5 rounded-full bg-fuchsia-600 border border-purple-700" />
                     </div>
                     <span className="text-[11px] font-bold text-slate-900 leading-tight">Clean White</span>
                     <span className="text-[9px] text-slate-500">Hemat Tinta</span>
@@ -423,9 +423,9 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
               </div>
 
               {/* 2. Format & Layout Selector */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
+              <div className="bg-slate-50 p-4 rounded-[1.35rem] border border-slate-200 space-y-2.5">
                 <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-purple-700" />
+                  <Sliders className="w-3.5 h-3.5 text-fuchsia-700" />
                   <span>Format & Orientasi Badge:</span>
                 </label>
 
@@ -433,10 +433,10 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setOptions({ ...options, format: 'VERTICAL_LANYARD' })}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
                       options.format === 'VERTICAL_LANYARD'
                         ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-600/20'
-                        : 'border-slate-200 bg-white hover:border-purple-300'
+                        : 'border-slate-200 bg-white hover:border-fuchsia-300'
                     }`}
                   >
                     <div className="w-7 h-10 rounded-md bg-purple-900 text-white flex items-center justify-center text-[10px] font-bold shadow-xs">
@@ -451,10 +451,10 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setOptions({ ...options, format: 'HORIZONTAL_CARD' })}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
                       options.format === 'HORIZONTAL_CARD'
                         ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-600/20'
-                        : 'border-slate-200 bg-white hover:border-purple-300'
+                        : 'border-slate-200 bg-white hover:border-fuchsia-300'
                     }`}
                   >
                     <div className="w-10 h-7 rounded-md bg-purple-900 text-white flex items-center justify-center text-[10px] font-bold shadow-xs">
@@ -469,7 +469,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
               </div>
 
               {/* 3. Custom Event Title & Field Toggles */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+              <div className="bg-slate-50 p-4 rounded-[1.35rem] border border-slate-200 space-y-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                     Nama Acara / Subjudul Badge (Opsional):
@@ -479,7 +479,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                     value={options.eventName || ''}
                     onChange={(e) => setOptions({ ...options, eventName: e.target.value })}
                     placeholder="Contoh: Kemah Wisata Nusantara 2026 / Munas Pramuka"
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-xs text-slate-900 outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
                   />
                 </div>
 
@@ -490,7 +490,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                       type="checkbox"
                       checked={options.showContactPhone}
                       onChange={(e) => setOptions({ ...options, showContactPhone: e.target.checked })}
-                      className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                      className="rounded border-slate-300 text-fuchsia-600 focus:ring-fuchsia-500"
                     />
                     <span>Nomor WhatsApp</span>
                   </label>
@@ -500,7 +500,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                       type="checkbox"
                       checked={options.showEmail}
                       onChange={(e) => setOptions({ ...options, showEmail: e.target.checked })}
-                      className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                      className="rounded border-slate-300 text-fuchsia-600 focus:ring-fuchsia-500"
                     />
                     <span>Alamat Email</span>
                   </label>
@@ -510,7 +510,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                       type="checkbox"
                       checked={options.showSkills}
                       onChange={(e) => setOptions({ ...options, showSkills: e.target.checked })}
-                      className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                      className="rounded border-slate-300 text-fuchsia-600 focus:ring-fuchsia-500"
                     />
                     <span>Keahlian Anggota</span>
                   </label>
@@ -518,16 +518,16 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
               </div>
 
               {/* 4. Public URL & Direct NTA Share Box */}
-              <div className="bg-white p-4 rounded-2xl border border-purple-200/80 shadow-xs space-y-3">
+              <div className="bg-white p-4 rounded-[1.35rem] border border-fuchsia-200/80 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
-                    <QrCode className="w-3.5 h-3.5 text-purple-700" />
+                    <QrCode className="w-3.5 h-3.5 text-fuchsia-700" />
                     <span>NTA & Tautan Profil Resmi:</span>
                   </span>
                   <button
                     type="button"
                     onClick={handleCopyNta}
-                    className="text-[11px] font-mono font-bold text-purple-800 hover:text-purple-950 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-200 transition-colors flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-mono font-bold text-purple-800 hover:text-purple-950 bg-purple-50 hover:bg-fuchsia-100 px-2 py-0.5 rounded-lg border border-fuchsia-200 transition-colors flex items-center gap-1 cursor-pointer"
                     title="Klik untuk menyalin NTA"
                   >
                     {copiedNta ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
@@ -540,12 +540,12 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
                     type="text"
                     readOnly
                     value={verificationUrl}
-                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-700 outline-none select-all"
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono text-slate-700 outline-none select-all"
                   />
                   <button
                     type="button"
                     onClick={handleCopyLink}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                    className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
                       copiedLink
                         ? 'bg-emerald-600 text-white'
                         : 'bg-purple-900 hover:bg-purple-950 text-white'
@@ -568,14 +568,14 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
 
               {/* Progress and Success Notices */}
               {isDownloading && (
-                <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl flex items-center gap-2.5 text-purple-900 text-xs font-semibold animate-pulse">
-                  <RotateCw className="w-4 h-4 animate-spin text-purple-700 flex-shrink-0" />
+                <div className="p-3 bg-purple-50 border border-fuchsia-200 rounded-[1.35rem] flex items-center gap-2.5 text-purple-900 text-xs font-semibold animate-pulse">
+                  <RotateCw className="w-4 h-4 animate-spin text-fuchsia-700 flex-shrink-0" />
                   <span>{downloadProgressText || 'Memproses badge dan berkas...'}</span>
                 </div>
               )}
 
               {downloadSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2 text-emerald-900 text-xs font-bold animate-in fade-in">
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-[1.35rem] flex items-center gap-2 text-emerald-900 text-xs font-bold animate-in fade-in">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span>Badge berhasil diunduh ke perangkat Anda! Siap dicetak atau dibagikan.</span>
                 </div>
@@ -597,10 +597,10 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
             <button
               type="button"
               onClick={handleDownloadStandaloneQr}
-              className="px-3 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-2xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
               title="Unduh file gambar QR Code saja"
             >
-              <QrCode className="w-3.5 h-3.5 text-purple-700" />
+              <QrCode className="w-3.5 h-3.5 text-fuchsia-700" />
               <span>QR Saja</span>
             </button>
 
@@ -608,7 +608,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
             <button
               type="button"
               onClick={handleNativeShare}
-              className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-2xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5 text-indigo-700" />
               <span>Bagikan Link</span>
@@ -619,7 +619,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
               type="button"
               onClick={handleDownloadPdf}
               disabled={isDownloading || isRendering}
-              className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-2xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <FileDown className="w-3.5 h-3.5 text-slate-600" />
               <span>Dokumen PDF ({options.format === 'VERTICAL_LANYARD' ? 'A6' : 'A5'})</span>
@@ -630,7 +630,7 @@ export const QuickShareBadgeModal: React.FC<QuickShareBadgeModalProps> = ({
               type="button"
               onClick={handleDownloadPng}
               disabled={isDownloading || isRendering}
-              className="px-5 py-2 bg-gradient-to-r from-purple-900 to-indigo-900 hover:from-purple-950 hover:to-indigo-950 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-950/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-5 py-2 bg-gradient-to-r from-purple-900 to-indigo-900 hover:from-purple-950 hover:to-indigo-950 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-950/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Download className="w-4 h-4 text-purple-300" />
               <span>Unduh Badge (PNG HD)</span>
