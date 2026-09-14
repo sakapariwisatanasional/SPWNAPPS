@@ -127,7 +127,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
           if (trimmed.startsWith('## ')) {
             return (
               <h4 key={idx} className={`font-bold font-heading text-sm sm:text-base pt-2 pb-1 border-b flex items-center gap-2 ${
-                isDark ? 'text-purple-300 border-slate-800' : 'text-purple-800 border-slate-200'
+                isDark ? 'text-fuchsia-200 border-white/10' : 'text-purple-700 border-slate-200'
               }`}>
                 <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span>{trimmed.replace('## ', '')}</span>
@@ -144,7 +144,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
           if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
             return (
               <div key={idx} className="flex items-start gap-2 pl-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5 shrink-0" />
+                <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-500 mt-1.5 shrink-0" />
                 <p className="flex-1">{trimmed.substring(2)}</p>
               </div>
             );
@@ -155,7 +155,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
               return (
                 <div key={idx} className="flex items-start gap-2 pl-2">
                   <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold mt-0.5 shrink-0 ${
-                    isDark ? 'bg-purple-950 text-purple-300 border border-purple-800' : 'bg-purple-100 text-purple-700'
+                    isDark ? 'bg-fuchsia-950 text-fuchsia-200 border border-fuchsia-400/30' : 'bg-fuchsia-50 text-purple-700'
                   }`}>
                     {numMatch[1]}
                   </span>
@@ -171,24 +171,24 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
   };
 
   return (
-    <div className={`rounded-3xl border transition-all ${
+    <div className={`rounded-[1.75rem] border transition-all ${
       isDark 
-        ? 'bg-slate-950/95 border-slate-800 text-slate-100 shadow-2xl' 
-        : 'bg-white border-slate-200/90 text-slate-900 shadow-md'
+        ? 'bg-[#160f2d]/95 border-white/10 text-slate-100 shadow-xl' 
+        : 'bg-white border-slate-200 text-slate-900 shadow-sm'
     }`}>
       {/* 1. TINGKAT 1: FOLDER 4 KRIDA UTAMA (Simpel, Horizontal/Tab Bar Ringkas) */}
-      <div className={`p-4 sm:p-6 border-b ${isDark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/70'} rounded-t-3xl`}>
+      <div className={`p-4 sm:p-6 border-b ${isDark ? 'border-white/10 bg-[#241640]/70' : 'border-purple-100 bg-[#faf8ff]'} rounded-t-3xl`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <span className={`p-1.5 rounded-xl ${isDark ? 'bg-purple-950/80 text-amber-400 border border-purple-800/60' : 'bg-purple-100 text-purple-700'}`}>
+            <span className={`p-1.5 rounded-xl ${isDark ? 'bg-fuchsia-950/40 text-amber-400 border border-fuchsia-400/30' : 'bg-fuchsia-50 text-purple-700'}`}>
               <FolderOpen className="w-4 h-4" />
             </span>
             <div>
               <h3 className="text-sm sm:text-base font-extrabold font-heading tracking-tight">
-                Pilih Folder Krida & Mata Kurikulum
+                Pilih Krida & Mulai Belajar
               </h3>
               <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Klik folder untuk melihat daftar mata krida, lalu klik mata krida untuk membuka materinya.
+                Pilih Krida, pilih SKK, lalu mulai belajar.
               </p>
             </div>
           </div>
@@ -216,7 +216,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 }`}
                 title="Buka Penjelajah Lengkap (Mode Modal)"
               >
-                <Maximize2 className="w-3.5 h-3.5 text-purple-400" />
+                <Maximize2 className="w-3.5 h-3.5 text-fuchsia-300" />
                 <span className="hidden sm:inline">Penjelajah</span>
               </button>
             )}
@@ -247,10 +247,10 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 className={`relative p-3 rounded-2xl text-left transition-all border cursor-pointer flex flex-col justify-between ${
                   isSelected
                     ? isDark
-                      ? 'bg-purple-950/60 border-purple-500/70 shadow-lg shadow-purple-950/50 ring-1 ring-purple-500/40'
+                      ? 'bg-fuchsia-950/60 border-purple-500/70 shadow-lg shadow-purple-950/50 ring-1 ring-purple-500/40'
                       : 'bg-purple-50 border-purple-400 shadow-sm ring-1 ring-purple-300'
                     : isDark
-                      ? 'bg-slate-900/60 hover:bg-slate-900 border-slate-800/80 hover:border-slate-700 text-slate-400'
+                      ? 'bg-slate-900/60 hover:bg-white/5 border-white/10/80 hover:border-slate-700 text-slate-400'
                       : 'bg-white hover:bg-slate-100 border-slate-200/80 text-slate-600'
                 }`}
               >
@@ -264,7 +264,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                   </div>
                   <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
                     isSelected
-                      ? isDark ? 'bg-purple-900/80 text-purple-200' : 'bg-purple-200 text-purple-800'
+                      ? isDark ? 'bg-purple-900/80 text-purple-200' : 'bg-purple-200 text-purple-700'
                       : isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
                   }`}>
                     {cat.topicsCount} SKK
@@ -281,7 +281,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                   </div>
                   <div className={`text-[10px] truncate ${
                     isSelected 
-                      ? isDark ? 'text-purple-300 font-medium' : 'text-purple-700 font-medium' 
+                      ? isDark ? 'text-fuchsia-200 font-medium' : 'text-purple-700 font-medium' 
                       : isDark ? 'text-slate-500' : 'text-slate-400'
                   }`}>
                     {cat.badge}
@@ -298,10 +298,10 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
       </div>
 
       {/* 2. TINGKAT 2: DAFTAR MATA KRIDA / SKK (Ringkas, Berbentuk Barisan Pilihan) */}
-      <div className={`p-4 sm:p-5 border-b ${isDark ? 'border-slate-800/80 bg-slate-900/30' : 'border-slate-100 bg-slate-50/40'}`}>
+      <div className={`p-4 sm:p-5 border-b ${isDark ? 'border-white/10/80 bg-slate-900/30' : 'border-purple-100 bg-slate-50/40'}`}>
         <div className="flex items-center justify-between gap-2 mb-2.5">
           <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Mata Krida dalam <span className={isDark ? 'text-purple-300 font-bold' : 'text-purple-700 font-bold'}>{activeCategory.name}</span>:
+            Mata Krida dalam <span className={isDark ? 'text-fuchsia-200 font-bold' : 'text-purple-700 font-bold'}>{activeCategory.name}</span>:
           </span>
           <span className={`text-[11px] font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Klik salah satu mata krida di bawah:
@@ -323,14 +323,14 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                       ? 'bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-950/50 ring-2 ring-purple-400/40'
                       : 'bg-purple-600 text-white border-purple-600 shadow-sm ring-2 ring-purple-300'
                     : isDark
-                      ? 'bg-slate-900/80 hover:bg-slate-800/90 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700'
+                      ? 'bg-slate-900/80 hover:bg-white/10/90 text-slate-300 hover:text-white border-white/10 hover:border-slate-700'
                       : 'bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border-slate-200/90 hover:border-slate-300 shadow-2xs'
                 }`}
               >
                 <span className={`w-5 h-5 rounded-md text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${
                   isModSelected
                     ? 'bg-white/20 text-white'
-                    : isDark ? 'bg-slate-800 text-purple-400 group-hover/btn:bg-slate-700' : 'bg-slate-100 text-purple-700'
+                    : isDark ? 'bg-slate-800 text-fuchsia-300 group-hover/btn:bg-slate-700' : 'bg-slate-100 text-purple-700'
                 }`}>
                   {mod.code.replace(/[()]/g, '')}
                 </span>
@@ -346,16 +346,16 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
 
       {/* 3. TINGKAT 3: PANEL MATERI TERPILIH (Apa yang diklik itu yang dilihat) */}
       {currentModule && (
-        <div className="p-4 sm:p-6 space-y-5">
+        <div className="p-4 sm:p-6 md:p-7 space-y-5">
           {/* Header Info Mata Krida Terpilih */}
           <div className={`p-4 rounded-2xl border transition-all ${
-            isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-purple-50/50 border-purple-100'
+            isDark ? 'bg-slate-900/80 border-white/10' : 'bg-purple-50/50 border-purple-100'
           }`}>
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
               <div className="space-y-1.5 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${
-                    isDark ? 'bg-purple-950 text-purple-300 border border-purple-800' : 'bg-purple-100 text-purple-800 border border-purple-200'
+                    isDark ? 'bg-fuchsia-950 text-fuchsia-200 border border-fuchsia-400/30' : 'bg-fuchsia-50 text-purple-700 border border-purple-200'
                   }`}>
                     MATA KRIDA {currentModule.code}
                   </span>
@@ -379,16 +379,18 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 <h3 className={`text-base sm:text-lg font-bold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {currentModule.title}
                 </h3>
-                <p className={`text-xs font-medium ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>
-                  {currentModule.badge}
-                </p>
+                {currentModule.subtitle && (
+                  <p className={`text-xs font-medium ${isDark ? 'text-fuchsia-300' : 'text-purple-700'}`}>
+                    {currentModule.subtitle}
+                  </p>
+                )}
                 <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   {currentModule.description}
                 </p>
               </div>
 
               {/* Status Pill & Fullscreen Reader Button */}
-              <div className={`shrink-0 text-right sm:border-l sm:pl-4 flex flex-col justify-between items-end gap-2 ${isDark ? 'border-slate-800' : 'border-purple-200'}`}>
+              <div className={`shrink-0 text-right sm:border-l sm:pl-4 flex flex-col justify-between items-end gap-2 ${isDark ? 'border-white/10' : 'border-purple-200'}`}>
                 <div>
                   <div className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     Kelengkapan
@@ -415,7 +417,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
           {/* 4. TOMBOL-TOMBOL BUKA MATERI BERKAITAN (Hanya dibuka jika diklik/dipilih pengguna) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-purple-300' : 'text-purple-800'}`}>
+              <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-fuchsia-200' : 'text-purple-700'}`}>
                 <BookOpen className="w-3.5 h-3.5 text-amber-400" />
                 <span>Pilih Bagian Materi yang Ingin Dibuka:</span>
               </span>
@@ -443,13 +445,13 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                   activeSection === 'CONTENT'
                     ? 'bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-900/30 ring-2 ring-purple-400/40'
                     : isDark
-                      ? 'bg-slate-900/90 hover:bg-slate-900 text-slate-300 hover:text-white border-slate-800'
+                      ? 'bg-[#1d1435]/90 hover:bg-white/5 text-slate-300 hover:text-white border-white/10'
                       : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                    activeSection === 'CONTENT' ? 'bg-white/20 text-white' : isDark ? 'bg-slate-800 text-purple-400' : 'bg-purple-100 text-purple-700'
+                    activeSection === 'CONTENT' ? 'bg-white/20 text-white' : isDark ? 'bg-slate-800 text-fuchsia-300' : 'bg-fuchsia-50 text-purple-700'
                   }`}>
                     <FileText className="w-3.5 h-3.5" />
                   </div>
@@ -471,7 +473,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                   activeSection === 'CURRICULUM'
                     ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-900/30 ring-2 ring-indigo-400/40'
                     : isDark
-                      ? 'bg-slate-900/90 hover:bg-slate-900 text-slate-300 hover:text-white border-slate-800'
+                      ? 'bg-[#1d1435]/90 hover:bg-white/5 text-slate-300 hover:text-white border-white/10'
                       : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs'
                 }`}
               >
@@ -499,7 +501,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                   activeSection === 'SKK'
                     ? 'bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-900/30 ring-2 ring-amber-400/40'
                     : isDark
-                      ? 'bg-slate-900/90 hover:bg-slate-900 text-slate-300 hover:text-white border-slate-800'
+                      ? 'bg-[#1d1435]/90 hover:bg-white/5 text-slate-300 hover:text-white border-white/10'
                       : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs'
                 }`}
               >
@@ -525,25 +527,25 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 onClick={() => handleToggleSection('RELATED_MATERIALS')}
                 className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                   activeSection === 'RELATED_MATERIALS'
-                    ? 'bg-teal-600 text-white border-teal-500 shadow-md shadow-teal-900/30 ring-2 ring-teal-400/40'
+                    ? 'bg-fuchsia-600 text-white border-teal-500 shadow-md shadow-teal-900/30 ring-2 ring-teal-400/40'
                     : isDark
-                      ? 'bg-slate-900/90 hover:bg-slate-900 text-slate-300 hover:text-white border-slate-800'
+                      ? 'bg-[#1d1435]/90 hover:bg-white/5 text-slate-300 hover:text-white border-white/10'
                       : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                    activeSection === 'RELATED_MATERIALS' ? 'bg-white/20 text-white' : isDark ? 'bg-slate-800 text-teal-400' : 'bg-teal-100 text-teal-700'
+                    activeSection === 'RELATED_MATERIALS' ? 'bg-white/20 text-white' : isDark ? 'bg-slate-800 text-cyan-300' : 'bg-teal-100 text-teal-700'
                   }`}>
                     <Download className="w-3.5 h-3.5" />
                   </div>
                   <div className="flex items-center gap-1">
                     <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
-                      activeSection === 'RELATED_MATERIALS' ? 'bg-white/20 text-white' : 'bg-teal-500/20 text-teal-400'
+                      activeSection === 'RELATED_MATERIALS' ? 'bg-white/20 text-white' : 'bg-cyan-400/15 text-cyan-300'
                     }`}>
-                      {((currentModule.downloads?.length || 0) +
-                       (currentModule.competencyTable?.length || 0) +
-                       (currentModule.images?.length || 0))} File
+                      {((currentModule.downloads?.length || 0) + ((currentModule as any).materials?.downloads?.length || 0)) +
+                       ((currentModule.competencyTable?.length || 0) + ((currentModule as any).materials?.tables?.length || 0)) +
+                       ((currentModule.images?.length || 0) + ((currentModule as any).materials?.images?.length || 0))} File
                     </span>
                     <ChevronDown className={`w-4 h-4 transition-transform ${activeSection === 'RELATED_MATERIALS' ? 'rotate-180 text-white' : 'text-slate-500'}`} />
                   </div>
@@ -560,20 +562,20 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
             {/* DETAIL VIEWER CONTAINER: Hanya muncul jika diklik pengguna */}
             {activeSection !== 'NONE' && (
               <div className={`mt-4 p-4 sm:p-6 rounded-2xl border transition-all animate-fadeIn ${
-                isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                isDark ? 'bg-[#1d1435]/90 border-white/10' : 'bg-white border-slate-200 shadow-sm'
               }`}>
                 {/* SECTION 1: NASKAH MATERI */}
                 {activeSection === 'CONTENT' && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center justify-between pb-3 border-b border-white/10">
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-purple-400" />
+                        <FileText className="w-4 h-4 text-fuchsia-300" />
                         <h4 className={`text-sm sm:text-base font-bold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           Naskah Lengkap: {currentModule.title}
                         </h4>
                       </div>
                       <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Diperbarui oleh: <strong className="text-purple-400">{currentModule.updatedBy || 'Super Admin Saka'}</strong>
+                        Diperbarui oleh: <strong className="text-fuchsia-300">{currentModule.updatedBy || 'Super Admin Saka'}</strong>
                       </span>
                     </div>
 
@@ -586,7 +588,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 {/* SECTION 2: SILABUS KURIKULUM */}
                 {activeSection === 'CURRICULUM' && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center justify-between pb-3 border-b border-white/10">
                       <div className="flex items-center gap-2">
                         <Layers className="w-4 h-4 text-indigo-400" />
                         <h4 className={`text-sm sm:text-base font-bold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
@@ -603,7 +605,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                         <div
                           key={sess.session}
                           className={`p-3.5 rounded-xl border ${
-                            isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
+                            isDark ? 'bg-[#120d25]/70 border-white/10' : 'bg-slate-50 border-slate-200'
                           } space-y-2`}
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -634,7 +636,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 {/* SECTION 3: UJI SKK */}
                 {activeSection === 'SKK' && (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-white/10 gap-2">
                       <div className="flex items-center gap-2">
                         <Award className="w-4 h-4 text-amber-400" />
                         <h4 className={`text-sm sm:text-base font-bold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
@@ -661,9 +663,9 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-2">
                       {/* Purwa */}
-                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-2 flex flex-col justify-between`}>
+                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-[#120d25]/70 border-white/10' : 'bg-slate-50 border-slate-200'} space-y-2 flex flex-col justify-between`}>
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold">
@@ -672,7 +674,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                             <span className="text-[10px] text-slate-500 font-mono">Bingkai Bulat</span>
                           </div>
                           <div className="space-y-1.5 pt-1">
-                            {currentModule.testRequirements?.purwa?.map((item, i) => {
+                            {currentModule.competencies?.purwa?.map((item, i) => {
                               const key = `purwa-${i}`;
                               const isChecked = !!checkedPurwa[key];
                               return (
@@ -682,7 +684,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                                   className={`p-2 rounded-lg text-[11px] flex items-start gap-2 cursor-pointer transition-colors ${
                                     isChecked 
                                       ? isDark ? 'bg-amber-950/40 text-amber-200' : 'bg-amber-100 text-amber-900'
-                                      : isDark ? 'hover:bg-slate-900 text-slate-300' : 'hover:bg-white text-slate-700'
+                                      : isDark ? 'hover:bg-white/5 text-slate-300' : 'hover:bg-white text-slate-700'
                                   }`}
                                 >
                                   {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
@@ -704,16 +706,16 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                       </div>
 
                       {/* Madya */}
-                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-2 flex flex-col justify-between`}>
+                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-[#120d25]/70 border-white/10' : 'bg-slate-50 border-slate-200'} space-y-2 flex flex-col justify-between`}>
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-md bg-fuchsia-500/20 text-fuchsia-300 border border-purple-500/30 text-[10px] font-bold">
                               Tingkat Madya (15–20 Thn)
                             </span>
                             <span className="text-[10px] text-slate-500 font-mono">Bingkai Persegi</span>
                           </div>
                           <div className="space-y-1.5 pt-1">
-                            {currentModule.testRequirements?.madya?.map((item, i) => {
+                            {currentModule.competencies?.madya?.map((item, i) => {
                               const key = `madya-${i}`;
                               const isChecked = !!checkedMadya[key];
                               return (
@@ -722,11 +724,11 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                                   onClick={() => setCheckedMadya(prev => ({ ...prev, [key]: !prev[key] }))}
                                   className={`p-2 rounded-lg text-[11px] flex items-start gap-2 cursor-pointer transition-colors ${
                                     isChecked 
-                                      ? isDark ? 'bg-purple-950/40 text-purple-200' : 'bg-purple-100 text-purple-900'
-                                      : isDark ? 'hover:bg-slate-900 text-slate-300' : 'hover:bg-white text-slate-700'
+                                      ? isDark ? 'bg-fuchsia-950/40 text-purple-200' : 'bg-fuchsia-50 text-purple-900'
+                                      : isDark ? 'hover:bg-white/5 text-slate-300' : 'hover:bg-white text-slate-700'
                                   }`}
                                 >
-                                  {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
+                                  {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-fuchsia-300 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
                                   <span className="flex-1 leading-relaxed">{item}</span>
                                 </div>
                               );
@@ -736,16 +738,16 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
 
                         {currentModule.practiceProduct?.madya && (
                           <div className={`mt-3 p-2 rounded-lg border text-[10px] ${
-                            isDark ? 'bg-slate-900/80 border-purple-800/30 text-purple-300/90' : 'bg-purple-50 border-purple-200 text-purple-900'
+                            isDark ? 'bg-slate-900/80 border-fuchsia-400/30/30 text-fuchsia-200/90' : 'bg-purple-50 border-purple-200 text-purple-900'
                           }`}>
-                            <span className="font-bold block text-purple-400 mb-0.5">📦 Produk Uji Wajib Madya:</span>
+                            <span className="font-bold block text-fuchsia-300 mb-0.5">📦 Produk Uji Wajib Madya:</span>
                             {currentModule.practiceProduct.madya}
                           </div>
                         )}
                       </div>
 
                       {/* Utama */}
-                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'} space-y-2 flex flex-col justify-between`}>
+                      <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-[#120d25]/70 border-white/10' : 'bg-slate-50 border-slate-200'} space-y-2 flex flex-col justify-between`}>
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
@@ -754,7 +756,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                             <span className="text-[10px] text-slate-500 font-mono">Bingkai Segilima</span>
                           </div>
                           <div className="space-y-1.5 pt-1">
-                            {currentModule.testRequirements?.utama?.map((item, i) => {
+                            {currentModule.competencies?.utama?.map((item, i) => {
                               const key = `utama-${i}`;
                               const isChecked = !!checkedUtama[key];
                               return (
@@ -764,7 +766,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                                   className={`p-2 rounded-lg text-[11px] flex items-start gap-2 cursor-pointer transition-colors ${
                                     isChecked 
                                       ? isDark ? 'bg-emerald-950/40 text-emerald-200' : 'bg-emerald-100 text-emerald-900'
-                                      : isDark ? 'hover:bg-slate-900 text-slate-300' : 'hover:bg-white text-slate-700'
+                                      : isDark ? 'hover:bg-white/5 text-slate-300' : 'hover:bg-white text-slate-700'
                                   }`}
                                 >
                                   {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" /> : <Square className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />}
@@ -802,7 +804,7 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                     {/* 8 Components Portfolio Requirements */}
                     {currentModule.portfolioItems && currentModule.portfolioItems.length > 0 && (
                       <div className={`p-3.5 rounded-xl border text-xs ${
-                        isDark ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                        isDark ? 'bg-slate-900/60 border-white/10 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
                       }`}>
                         <span className="font-bold text-[11px] text-amber-400 flex items-center gap-1.5 mb-2">
                           <CheckCircle2 className="w-3.5 h-3.5" />
@@ -824,14 +826,14 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                 {/* SECTION 4: MATERI TERKAIT & BERKAS UNDUHAN (FITUR UTAMA) */}
                 {activeSection === 'RELATED_MATERIALS' && (
                   <div className="space-y-5">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center justify-between pb-3 border-b border-white/10">
                       <div className="flex items-center gap-2">
-                        <Download className="w-4 h-4 text-teal-400" />
+                        <Download className="w-4 h-4 text-cyan-300" />
                         <h4 className={`text-sm sm:text-base font-bold font-heading ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           Materi Terkait, Bahan Ajar & Lampiran Resmi
                         </h4>
                       </div>
-                      <span className="text-[11px] text-teal-400 font-semibold">
+                      <span className="text-[11px] text-cyan-300 font-semibold">
                         Akses Terbuka untuk Anggota & Pembina
                       </span>
                     </div>
@@ -842,15 +844,15 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                         📄 Berkas Panduan & Lembar Kerja PDF:
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {currentModule.downloads?.map((file) => (
+                        {currentModule.materials?.downloads?.map((file) => (
                           <div
                             key={file.id}
                             className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
-                              isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+                              isDark ? 'bg-[#120d25]/80 border-white/10' : 'bg-slate-50 border-slate-200'
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center shrink-0 font-bold text-xs">
+                              <span className="w-8 h-8 rounded-lg bg-cyan-400/15 text-cyan-300 flex items-center justify-center shrink-0 font-bold text-xs">
                                 PDF
                               </span>
                               <div className="min-w-0">
@@ -864,10 +866,10 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                             </div>
 
                             <a
-                              href={file.fileUrl}
+                              href={file.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition-all flex items-center gap-1 shrink-0"
+                              className="px-3 py-1.5 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold transition-all flex items-center gap-1 shrink-0"
                             >
                               <Download className="w-3 h-3" />
                               <span>Unduh</span>
@@ -878,31 +880,31 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                     </div>
 
                     {/* Sub-B: Matriks Tabel Kompetensi Khusus */}
-                    {currentModule.competencyTable && currentModule.competencyTable.length > 0 && (
-                      <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                        <div className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-purple-300' : 'text-purple-800'}`}>
+                    {currentModule.materials?.tables && currentModule.materials.tables.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-white/10/80">
+                        <div className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-fuchsia-200' : 'text-purple-700'}`}>
                           <TableIcon className="w-3.5 h-3.5" />
                           <span>Matriks Indikator Kecakapan Krida:</span>
                         </div>
-                        <div className={`rounded-xl border ${isDark ? 'border-slate-800' : 'border-slate-200'} overflow-hidden`}>
+                        <div className={`rounded-xl border ${isDark ? 'border-white/10' : 'border-slate-200'} overflow-hidden`}>
                           {/* Desktop Table */}
                           <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-xs">
-                              <thead className={isDark ? 'bg-slate-950 text-slate-300 font-bold' : 'bg-slate-100 text-slate-700 font-bold'}>
+                              <thead className={isDark ? 'bg-[#120d25] text-slate-300 font-bold' : 'bg-slate-100 text-slate-700 font-bold'}>
                                 <tr>
-                                  <th className="p-2.5 border-b border-slate-800">Kode</th>
-                                  <th className="p-2.5 border-b border-slate-800">Elemen Kompetensi</th>
-                                  <th className="p-2.5 border-b border-slate-800">Indikator</th>
-                                  <th className="p-2.5 border-b border-slate-800">Metode Uji</th>
+                                  <th className="p-2.5 border-b border-white/10">Aspek / Unsur</th>
+                                  <th className="p-2.5 border-b border-white/10">Tingkat Purwa</th>
+                                  <th className="p-2.5 border-b border-white/10">Tingkat Madya</th>
+                                  <th className="p-2.5 border-b border-white/10">Tingkat Utama</th>
                                 </tr>
                               </thead>
                               <tbody className={`divide-y ${isDark ? 'divide-slate-800/60' : 'divide-slate-100'}`}>
-                                {currentModule.competencyTable.map((row, rIdx) => (
-                                  <tr key={rIdx} className={isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}>
-                                    <td className="p-2.5 font-mono text-purple-400">{row.code}</td>
-                                    <td className="p-2.5 font-semibold">{row.element}</td>
-                                    <td className="p-2.5">{row.indicator}</td>
-                                    <td className="p-2.5 text-emerald-400">{row.assessment}</td>
+                                {currentModule.materials.tables.map((row, rIdx) => (
+                                  <tr key={rIdx} className={isDark ? 'hover:bg-white/10/40' : 'hover:bg-slate-50'}>
+                                    <td className="p-2.5 font-semibold text-fuchsia-300">{row.aspect}</td>
+                                    <td className="p-2.5">{row.purwa}</td>
+                                    <td className="p-2.5">{row.madya}</td>
+                                    <td className="p-2.5">{row.utama}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -910,16 +912,23 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                           </div>
 
                           {/* Mobile Cards View (Zero Horizontal Scrolling) */}
-                          <div className={`md:hidden divide-y ${isDark ? 'divide-slate-800/60 bg-slate-950/70' : 'divide-slate-100 bg-white'}`}>
-                            {currentModule.competencyTable.map((row, rIdx) => (
+                          <div className={`md:hidden divide-y ${isDark ? 'divide-slate-800/60 bg-[#120d25]/70' : 'divide-slate-100 bg-white'}`}>
+                            {currentModule.materials.tables.map((row, rIdx) => (
                               <div key={rIdx} className="p-3 space-y-2 text-xs">
+                                <p className="font-bold text-fuchsia-300 text-[13px]">{row.aspect}</p>
                                 <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="font-mono text-purple-400 font-bold">{row.code}</span>
-                                    <span className="text-emerald-400 font-semibold">{row.assessment}</span>
+                                  <div className={`p-2 rounded-lg text-[11px] ${isDark ? 'bg-[#1d1435]/90' : 'bg-slate-50'}`}>
+                                    <span className="font-bold text-amber-500 block text-[10px]">Tingkat Purwa:</span>
+                                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.purwa}</span>
                                   </div>
-                                  <p className="font-bold text-white text-[12px]">{row.element}</p>
-                                  <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.indicator}</p>
+                                  <div className={`p-2 rounded-lg text-[11px] ${isDark ? 'bg-[#1d1435]/90' : 'bg-slate-50'}`}>
+                                    <span className="font-bold text-cyan-300 block text-[10px]">Tingkat Madya:</span>
+                                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.madya}</span>
+                                  </div>
+                                  <div className={`p-2 rounded-lg text-[11px] ${isDark ? 'bg-[#1d1435]/90' : 'bg-slate-50'}`}>
+                                    <span className="font-bold text-indigo-400 block text-[10px]">Tingkat Utama:</span>
+                                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{row.utama}</span>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -929,13 +938,13 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                     )}
 
                     {/* Sub-C: Referensi Tautan Eksternal & Video Terkait */}
-                    {currentModule.links && currentModule.links.length > 0 && (
-                      <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                    {currentModule.materials?.links && currentModule.materials.links.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-white/10/80">
                         <div className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           🌐 Tautan Referensi & Video Pendukung:
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {currentModule.links.map((link, lIdx) => (
+                          {currentModule.materials.links.map((link, lIdx) => (
                             <a
                               key={lIdx}
                               href={link.url}
@@ -943,11 +952,11 @@ export const CompactKridaPortal: React.FC<CompactKridaPortalProps> = ({
                               rel="noopener noreferrer"
                               className={`px-3 py-1.5 rounded-xl border text-xs font-medium inline-flex items-center gap-1.5 transition-all ${
                                 isDark
-                                  ? 'bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-800'
+                                  ? 'bg-[#120d25]/80 hover:bg-white/10 text-slate-300 hover:text-white border-white/10'
                                   : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                               }`}
                             >
-                              <ExternalLink className="w-3 h-3 text-purple-400" />
+                              <ExternalLink className="w-3 h-3 text-fuchsia-300" />
                               <span>{link.title}</span>
                             </a>
                           ))}
