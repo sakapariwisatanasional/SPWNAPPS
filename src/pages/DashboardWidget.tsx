@@ -500,7 +500,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
     if (active && payload && payload.length) {
       const data: MonthDataPoint = payload[0].payload;
       return (
-        <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-xl border border-slate-800 shadow-2xl text-xs space-y-2 min-w-[190px]">
+        <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl border border-slate-800 shadow-xl text-xs space-y-2 min-w-[190px]">
           <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <span className="font-bold text-emerald-400 font-heading">{data.period}</span>
             <span className="text-[10px] text-slate-400 font-mono">Periode</span>
@@ -560,7 +560,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
     if (active && payload && payload.length) {
       const data: ProvinceDataPoint = payload[0].payload;
       return (
-        <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-xl border border-slate-800 shadow-2xl text-xs space-y-2 min-w-[230px]">
+        <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl border border-slate-800 shadow-xl text-xs space-y-2 min-w-[230px]">
           <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <div className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-emerald-400" />
@@ -634,7 +634,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
     if (active && payload && payload.length) {
       const data: IslandDataPoint = payload[0].payload;
       return (
-        <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-xl border border-slate-800 shadow-2xl text-xs space-y-2 min-w-[210px]">
+        <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl border border-slate-800 shadow-xl text-xs space-y-2 min-w-[210px]">
           <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <span className="font-bold text-teal-300 font-heading">Wilayah {data.island}</span>
             <span className="text-[10px] text-slate-400 font-mono">{data.sharePct}% Nasional</span>
@@ -675,7 +675,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
   ];
 
   return (
-    <div id="dashboard-widget-container" className={`bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-5 ${className}`}>
+    <div id="dashboard-widget-container" className={`bg-white rounded-[1.35rem] sm:rounded-[1.75rem] p-4 sm:p-6 border border-slate-200 shadow-xs space-y-5 ${className}`}>
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
         <div className="space-y-1">
@@ -703,13 +703,13 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
         </div>
 
         {/* Primary View Mode Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl text-xs font-semibold text-slate-600">
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-[1.35rem] text-xs font-semibold text-slate-600">
           <button
             id="tab-view-cumulative"
             type="button"
             onClick={() => setViewMode('cumulative')}
             title="Grafik Tren Akumulasi Total"
-            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 min-h-[36px] ${
+            className={`px-3 py-1.5 rounded-2xl transition-all cursor-pointer text-xs flex items-center gap-1.5 min-h-[36px] ${
               viewMode === 'cumulative'
                 ? 'bg-emerald-700 text-white shadow-xs font-bold'
                 : 'hover:text-slate-900 hover:bg-slate-200/60'
@@ -724,7 +724,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
             type="button"
             onClick={() => setViewMode('monthly')}
             title="Grafik Pendaftaran Baru per Periode"
-            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 min-h-[36px] ${
+            className={`px-3 py-1.5 rounded-2xl transition-all cursor-pointer text-xs flex items-center gap-1.5 min-h-[36px] ${
               viewMode === 'monthly'
                 ? 'bg-emerald-700 text-white shadow-xs font-bold'
                 : 'hover:text-slate-900 hover:bg-slate-200/60'
@@ -739,7 +739,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
             type="button"
             onClick={() => setViewMode('status_breakdown')}
             title="Komposisi Status Aktif vs Pending"
-            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 min-h-[36px] ${
+            className={`px-3 py-1.5 rounded-2xl transition-all cursor-pointer text-xs flex items-center gap-1.5 min-h-[36px] ${
               viewMode === 'status_breakdown'
                 ? 'bg-emerald-700 text-white shadow-xs font-bold'
                 : 'hover:text-slate-900 hover:bg-slate-200/60'
@@ -755,7 +755,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
             type="button"
             onClick={() => setViewMode('province_distribution')}
             title="Sebaran Anggota per Provinsi / Kwarda Se-Indonesia"
-            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5 min-h-[36px] relative ${
+            className={`px-3 py-1.5 rounded-2xl transition-all cursor-pointer text-xs flex items-center gap-1.5 min-h-[36px] relative ${
               viewMode === 'province_distribution'
                 ? 'bg-gradient-to-r from-teal-700 to-emerald-700 text-white shadow-sm font-bold ring-2 ring-emerald-400/40'
                 : 'text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-300/60'
@@ -774,7 +774,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
       {showSummaryCards && viewMode !== 'province_distribution' && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Total Kader */}
-          <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+          <div className="bg-slate-50/80 p-3.5 rounded-[1.35rem] border border-slate-100">
             <div className="flex items-center justify-between text-slate-500">
               <span className="text-[11px] font-bold">Total Terdata</span>
               <div className="w-7 h-7 rounded-lg bg-emerald-100/70 text-emerald-700 flex items-center justify-center">
@@ -790,7 +790,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
           </div>
 
           {/* Kader Aktif */}
-          <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+          <div className="bg-slate-50/80 p-3.5 rounded-[1.35rem] border border-slate-100">
             <div className="flex items-center justify-between text-slate-500">
               <span className="text-[11px] font-bold">Status Aktif</span>
               <div className="w-7 h-7 rounded-lg bg-indigo-100/70 text-indigo-700 flex items-center justify-center">
@@ -808,7 +808,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
           </div>
 
           {/* Menunggu Verifikasi */}
-          <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+          <div className="bg-slate-50/80 p-3.5 rounded-[1.35rem] border border-slate-100">
             <div className="flex items-center justify-between text-slate-500">
               <span className="text-[11px] font-bold">Menunggu Review</span>
               <div className="w-7 h-7 rounded-lg bg-amber-100/70 text-amber-700 flex items-center justify-center">
@@ -824,7 +824,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
           </div>
 
           {/* Tren Terkini */}
-          <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+          <div className="bg-slate-50/80 p-3.5 rounded-[1.35rem] border border-slate-100">
             <div className="flex items-center justify-between text-slate-500">
               <span className="text-[11px] font-bold">Pertumbuhan Periode</span>
               <div className="w-7 h-7 rounded-lg bg-teal-100/70 text-teal-700 flex items-center justify-center">
@@ -848,7 +848,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
       {showSummaryCards && viewMode === 'province_distribution' && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Total Kwarda Terdata */}
-          <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200/70">
+          <div className="bg-emerald-50/70 p-3.5 rounded-[1.35rem] border border-emerald-200/70">
             <div className="flex items-center justify-between text-emerald-800">
               <span className="text-[11px] font-bold">Kwarda Terdata</span>
               <div className="w-7 h-7 rounded-lg bg-emerald-200 text-emerald-800 flex items-center justify-center">
@@ -865,7 +865,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
           </div>
 
           {/* Top Province */}
-          <div className="bg-indigo-50/70 p-3.5 rounded-2xl border border-indigo-200/70">
+          <div className="bg-indigo-50/70 p-3.5 rounded-[1.35rem] border border-indigo-200/70">
             <div className="flex items-center justify-between text-indigo-800">
               <span className="text-[11px] font-bold">Kwarda Terbesar</span>
               <div className="w-7 h-7 rounded-lg bg-indigo-200 text-indigo-800 flex items-center justify-center">
@@ -883,7 +883,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
           </div>
 
           {/* Gugus Kepulauan Aktif */}
-          <div className="bg-teal-50/70 p-3.5 rounded-2xl border border-teal-200/70">
+          <div className="bg-teal-50/70 p-3.5 rounded-[1.35rem] border border-teal-200/70">
             <div className="flex items-center justify-between text-teal-800">
               <span className="text-[11px] font-bold">Wilayah Kepulauan</span>
               <div className="w-7 h-7 rounded-lg bg-teal-200 text-teal-800 flex items-center justify-center">
@@ -900,7 +900,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
           </div>
 
           {/* Rata-rata Anggota / Prov */}
-          <div className="bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200/70">
+          <div className="bg-purple-50/70 p-3.5 rounded-[1.35rem] border border-fuchsia-200/70">
             <div className="flex items-center justify-between text-purple-800">
               <span className="text-[11px] font-bold">Rata-rata per Kwarda</span>
               <div className="w-7 h-7 rounded-lg bg-purple-200 text-purple-800 flex items-center justify-center">
@@ -911,9 +911,9 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
               <span className="text-xl font-extrabold font-heading text-purple-950">
                 {provincesCountWithData > 0 ? (totalRegistered / provincesCountWithData).toFixed(1) : 0}
               </span>
-              <span className="text-[11px] text-purple-700 font-medium">Kader / Kwarda</span>
+              <span className="text-[11px] text-fuchsia-700 font-medium">Kader / Kwarda</span>
             </div>
-            <p className="text-[10px] text-purple-600 mt-0.5">Kepadatan kader aktif terdata</p>
+            <p className="text-[10px] text-fuchsia-600 mt-0.5">Kepadatan kader aktif terdata</p>
           </div>
         </div>
       )}
@@ -924,10 +924,10 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
       {viewMode !== 'province_distribution' && (
         <div className="space-y-4">
           {/* Time Range & Krida Filter bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-[1.35rem] border border-slate-100">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500">Rentang Waktu:</span>
-              <div className="flex items-center bg-white p-0.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
+              <div className="flex items-center bg-white p-0.5 rounded-2xl border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setTimeRange('6M')}
@@ -973,7 +973,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
               <select
                 value={selectedKrida}
                 onChange={(e) => setSelectedKrida(e.target.value)}
-                className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-2xs"
+                className="text-xs font-semibold bg-white border border-slate-200 rounded-2xl px-2.5 py-1 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-2xs"
               >
                 <option value="ALL">Semua Krida (4 Krida)</option>
                 <option value="Krida Pemandu">Krida Pemandu</option>
@@ -1118,10 +1118,10 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
       {viewMode === 'province_distribution' && (
         <div className="space-y-4">
           {/* Sub-Controls Toolbar: Chart Type, Scope, Island, and Search */}
-          <div className="bg-slate-50/90 rounded-2xl p-3 sm:p-4 border border-slate-200/80 space-y-3">
+          <div className="bg-slate-50/90 rounded-[1.35rem] p-3 sm:p-4 border border-slate-200/80 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2.5">
               {/* Display Format Buttons */}
-              <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs">
                 <button
                   id="btn-prov-chart-total"
                   type="button"
@@ -1183,7 +1183,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
               {provinceChartType !== 'ISLAND_SUMMARY' && (
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="font-bold text-slate-500 hidden sm:inline">Tampilkan:</span>
-                  <div className="flex items-center bg-white p-0.5 rounded-xl border border-slate-200 shadow-2xs">
+                  <div className="flex items-center bg-white p-0.5 rounded-2xl border border-slate-200 shadow-2xs">
                     {(['TOP_5', 'TOP_10', 'ALL_ACTIVE', 'ALL_38'] as ProvinceScopeFilter[]).map((scope) => (
                       <button
                         key={scope}
@@ -1215,7 +1215,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                   <select
                     value={selectedIsland}
                     onChange={(e) => setSelectedIsland(e.target.value)}
-                    className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-2xs"
+                    className="text-xs font-semibold bg-white border border-slate-200 rounded-2xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-2xs"
                   >
                     {islandOptions.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1230,7 +1230,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as any)}
-                      className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-2xs"
+                      className="text-xs font-semibold bg-white border border-slate-200 rounded-2xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-2xs"
                     >
                       <option value="total">Total Terbanyak</option>
                       <option value="active">Aktif Terbanyak</option>
@@ -1249,7 +1249,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                   placeholder="Cari provinsi / pulau..."
                   value={provinceSearchQuery}
                   onChange={(e) => setProvinceSearchQuery(e.target.value)}
-                  className="w-full text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-800 shadow-2xs placeholder:text-slate-400"
+                  className="w-full text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-800 shadow-2xs placeholder:text-slate-400"
                 />
               </div>
             </div>
@@ -1422,7 +1422,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
 
             {/* SUB-VIEW D: RANKED TABLE LEADERBOARD */}
             {provinceChartType === 'RANKED_TABLE' && (
-              <div className="rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="rounded-[1.35rem] border border-slate-200 overflow-hidden">
                 {/* Desktop Table */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -1526,7 +1526,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2 rounded-xl text-[11px]">
+                        <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2 rounded-2xl text-[11px]">
                           <div>
                             <span className="text-[10px] text-slate-400 block">Aktif</span>
                             <span className="font-mono font-bold text-emerald-700">{item.active}</span>
