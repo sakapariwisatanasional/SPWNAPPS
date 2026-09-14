@@ -42,8 +42,8 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
       </div>
 
       {/* Filter */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 w-full sm:w-80">
+      <div className="bg-white p-4 rounded-[1.35rem] border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 w-full sm:w-80">
           <Search className="w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -57,7 +57,7 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
         <select
           value={selectedAction}
           onChange={(e) => setSelectedAction(e.target.value)}
-          className="w-full sm:w-auto bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none font-medium text-slate-700"
+          className="w-full sm:w-auto bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 outline-none font-medium text-slate-700"
         >
           <option value="ALL">Semua Jenis Aktivitas</option>
           <option value="REGISTER_MEMBER">Registrasi Anggota</option>
@@ -68,7 +68,7 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
       </div>
 
       {/* Table & Mobile Card View */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-[1.75rem] border border-slate-200 shadow-xs overflow-hidden">
         {/* Desktop Table View */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -144,7 +144,7 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
                   </span>
                 </div>
 
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1 text-[11px]">
+                <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100 space-y-1 text-[11px]">
                   <div className="flex items-center justify-between text-slate-500">
                     <span>Target:</span>
                     <span className="font-semibold text-slate-800">{log.entityId || (log as any).targetName || (log as any).targetId || '-'} ({log.entityType || '-'})</span>
