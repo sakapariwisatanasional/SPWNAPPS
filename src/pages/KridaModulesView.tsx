@@ -12,6 +12,7 @@ import {
   Utensils,
   X,
   CalendarDays,
+  Edit3,
 } from 'lucide-react';
 import { CurrentUser, KridaId, KridaModuleItem } from '../types';
 import { KRIDA_CATEGORIES } from '../data/kridaData';
@@ -20,6 +21,7 @@ import { KridaExplorerModal } from '../components/krida/KridaExplorerModal';
 
 interface KridaModulesViewProps {
   currentUser: CurrentUser;
+  onOpenEditor?: (moduleItem: KridaModuleItem) => void;
 }
 
 type KridaVisualConfig = {
@@ -54,7 +56,7 @@ const KRIDA_ICONS: Record<KridaId, React.ComponentType<{ className?: string }>> 
   kuliner: Utensils,
 };
 
-export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser }) => {
+export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser, onOpenEditor }) => {
   const [modules, setModules] = useState<KridaModuleItem[]>(() => storage.getKridaModules());
   const [config, setConfig] = useState<Record<string, KridaVisualConfig>>(readConfig);
   const [openKrida, setOpenKrida] = useState<KridaId | null>(null);
@@ -193,19 +195,34 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser 
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {categoryModules.map((mod, index) => (
-                        <button
-                          type="button"
+                        <div
                           key={mod.id}
-                          onClick={() => openExplorer(category.id, mod.id)}
                           className="min-w-0 rounded-xl border border-slate-100 hover:border-fuchsia-200 hover:bg-fuchsia-50 px-3 py-2.5 text-left group transition-all"
-                          title={`${mod.code} — ${mod.title}`}
                         >
-                          <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${category.color} text-white flex items-center justify-center shadow-sm`}>
-                            <BookOpen className="w-3.5 h-3.5" />
-                          </span>
-                          <span className="mt-1.5 block text-[9px] font-black text-fuchsia-600">{mod.code}</span>
-                          <span className="mt-0.5 block text-[10px] leading-4 font-extrabold text-slate-800 line-clamp-2">{mod.title}</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => openExplorer(category.id, mod.id)}
+                            className="w-full min-w-0 text-left cursor-pointer"
+                            title={`${mod.code} — ${mod.title}`}
+                          >
+                            <span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${category.color} text-white flex items-center justify-center shadow-sm`}>
+                              <BookOpen className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="mt-1.5 block text-[9px] font-black text-fuchsia-600">{mod.code}</span>
+                            <span className="mt-0.5 block text-[10px] leading-4 font-extrabold text-slate-800 line-clamp-2">{mod.title}</span>
+                          </button>
+                          {isSuperAdmin && onOpenEditor && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); onOpenEditor(mod); }}
+                              className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 text-[9px] font-extrabold cursor-pointer"
+                              title="Edit materi SKK"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              Edit materi
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -250,7 +267,7 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser 
         modules={modules}
         initialKridaId={explorerKrida}
         initialModuleId={explorerModule}
-        onOpenEditor={() => undefined}
+        onOpenEditor={onOpenEditor || (() => undefined)}
       />
     </div>
   );
