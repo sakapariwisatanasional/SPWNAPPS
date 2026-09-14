@@ -479,17 +479,17 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
   // Visual Theme Classes
   const themeClasses = {
     dark: {
-      bg: 'bg-[#171225] text-white',
-      headerBg: 'bg-[#211936] border-white/10 text-white',
-      cardBg: 'bg-[#211936] border-white/10 text-white',
-      subCardBg: 'bg-[#19142a] border-white/10',
-      footerBg: 'bg-[#211936] border-white/10 text-white',
-      accentText: 'text-fuchsia-300',
-      badgeBg: 'bg-fuchsia-400/10 text-fuchsia-200 border-fuchsia-300/20',
-      mutedText: 'text-white/55',
-      highlightBorder: 'border-fuchsia-300/25',
-      progressTrack: 'bg-white/10',
-      progressFill: 'bg-fuchsia-300'
+      bg: 'bg-slate-950 text-slate-100',
+      headerBg: 'bg-slate-900/90 border-slate-800 text-slate-100',
+      cardBg: 'bg-slate-900/70 border-slate-800 text-slate-200',
+      subCardBg: 'bg-slate-950 border-slate-800/80',
+      footerBg: 'bg-slate-900/90 border-slate-800 text-slate-200',
+      accentText: 'text-purple-400',
+      badgeBg: 'bg-purple-950/80 text-purple-300 border-purple-800/80',
+      mutedText: 'text-slate-400',
+      highlightBorder: 'border-purple-500/40',
+      progressTrack: 'bg-slate-800',
+      progressFill: 'bg-gradient-to-r from-purple-500 to-indigo-500'
     },
     sepia: {
       bg: 'bg-[#FAF4E8] text-[#3D2C1F]',
@@ -511,11 +511,11 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
       subCardBg: 'bg-slate-50 border-slate-200',
       footerBg: 'bg-white border-slate-200 text-slate-800 shadow-xs',
       accentText: 'text-fuchsia-700',
-      badgeBg: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
+      badgeBg: 'bg-purple-100 text-purple-800 border-fuchsia-200',
       mutedText: 'text-slate-600',
       highlightBorder: 'border-fuchsia-300',
       progressTrack: 'bg-slate-200',
-      progressFill: 'bg-fuchsia-500'
+      progressFill: 'bg-fuchsia-600'
     }
   }[theme];
 
@@ -569,22 +569,22 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
 
             {/* Quick Overview Bento Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-2">
-              <div className={`p-3 rounded-2xl border ${themeClasses.subCardBg}`}>
+              <div className={`p-3 rounded-[1.35rem] border ${themeClasses.subCardBg}`}>
                 <div className={`text-[10px] font-bold uppercase ${themeClasses.mutedText}`}>Alokasi Pelatihan</div>
                 <div className="text-base sm:text-lg font-bold mt-1">4 Pertemuan</div>
                 <div className={`text-[10px] ${themeClasses.mutedText}`}>± {(currentModule.curriculum?.length || 4) * 3} Jam Pelajaran</div>
               </div>
-              <div className={`p-3 rounded-2xl border ${themeClasses.subCardBg}`}>
+              <div className={`p-3 rounded-[1.35rem] border ${themeClasses.subCardBg}`}>
                 <div className={`text-[10px] font-bold uppercase ${themeClasses.mutedText}`}>Jenjang SKK</div>
                 <div className="text-base sm:text-lg font-bold mt-1 text-emerald-500">Purwa • Madya • Utama</div>
                 <div className={`text-[10px] ${themeClasses.mutedText}`}>Tanda Kecakapan Khusus</div>
               </div>
-              <div className={`p-3 rounded-2xl border ${themeClasses.subCardBg}`}>
+              <div className={`p-3 rounded-[1.35rem] border ${themeClasses.subCardBg}`}>
                 <div className={`text-[10px] font-bold uppercase ${themeClasses.mutedText}`}>Format Bahan</div>
-                <div className="text-base sm:text-lg font-bold mt-1 text-fuchsia-300">Modul & Dokumen</div>
+                <div className="text-base sm:text-lg font-bold mt-1 text-purple-400">Modul & Dokumen</div>
                 <div className={`text-[10px] ${themeClasses.mutedText}`}>Silabus & Panduan Lapangan</div>
               </div>
-              <div className={`p-3 rounded-2xl border ${themeClasses.subCardBg}`}>
+              <div className={`p-3 rounded-[1.35rem] border ${themeClasses.subCardBg}`}>
                 <div className={`text-[10px] font-bold uppercase ${themeClasses.mutedText}`}>Kelulusan Uji</div>
                 <div className="text-base sm:text-lg font-bold mt-1 text-amber-400">TKK Resmi</div>
                 <div className={`text-[10px] ${themeClasses.mutedText}`}>Pamong & Tim Penguji</div>
@@ -592,7 +592,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             </div>
 
             {/* Hint for navigation */}
-            <div className={`p-3 rounded-xl border flex items-center justify-between gap-2 text-xs ${themeClasses.subCardBg}`}>
+            <div className={`p-3 rounded-2xl border flex items-center justify-between gap-2 text-xs ${themeClasses.subCardBg}`}>
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                 <span className="font-medium">
@@ -622,10 +622,10 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-2 flex-1 items-stretch">
               {/* Sesi 1 */}
-              <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col justify-between ${themeClasses.subCardBg}`}>
+              <div className={`p-3.5 sm:p-4 rounded-[1.35rem] border flex flex-col justify-between ${themeClasses.subCardBg}`}>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-md bg-fuchsia-500 text-white font-mono text-[11px] font-bold">
+                    <span className="px-2.5 py-0.5 rounded-md bg-fuchsia-600 text-white font-mono text-[11px] font-bold">
                       Sesi 01: {s1 ? `${s1.sessionNumber}` : '1'}
                     </span>
                     <span className={`text-xs font-mono ${themeClasses.mutedText}`}>{s1?.duration || '120 Menit'}</span>
@@ -644,7 +644,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </div>
 
               {/* Sesi 2 */}
-              <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col justify-between ${themeClasses.subCardBg}`}>
+              <div className={`p-3.5 sm:p-4 rounded-[1.35rem] border flex flex-col justify-between ${themeClasses.subCardBg}`}>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="px-2.5 py-0.5 rounded-md bg-indigo-600 text-white font-mono text-[11px] font-bold">
@@ -666,7 +666,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
               <span>Lanjut ke sesi simulasi praktik lapangan &amp; pengujian kelulusan:</span>
               <span className={`font-bold ${themeClasses.accentText}`}>Klik &quot;Next &gt;&gt;&quot;</span>
             </div>
@@ -690,7 +690,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-2 flex-1 items-stretch">
               {/* Sesi 3 */}
-              <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col justify-between ${themeClasses.subCardBg}`}>
+              <div className={`p-3.5 sm:p-4 rounded-[1.35rem] border flex flex-col justify-between ${themeClasses.subCardBg}`}>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="px-2.5 py-0.5 rounded-md bg-amber-600 text-white font-mono text-[11px] font-bold">
@@ -712,7 +712,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </div>
 
               {/* Sesi 4 */}
-              <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col justify-between ${themeClasses.subCardBg}`}>
+              <div className={`p-3.5 sm:p-4 rounded-[1.35rem] border flex flex-col justify-between ${themeClasses.subCardBg}`}>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="px-2.5 py-0.5 rounded-md bg-emerald-600 text-white font-mono text-[11px] font-bold">
@@ -734,7 +734,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
               <span>Berikutnya naskah materi modul yang disajikan secara ringkas per bab:</span>
               <span className={`font-bold ${themeClasses.accentText}`}>Klik &quot;Next &gt;&gt;&quot;</span>
             </div>
@@ -755,7 +755,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </h3>
             </div>
 
-            <div className={`p-4 sm:p-6 rounded-2xl border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-4 sm:p-6 rounded-[1.35rem] border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
                   <Bookmark className="w-4 h-4" />
@@ -764,8 +764,8 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                 <p className={`leading-relaxed ${fontClasses}`}>
                   Materi <strong>{currentModule.title}</strong> dirumuskan untuk membekali Pramuka Penegak dan Pandega dengan pengetahuan terapan yang selaras dengan Standar Kompetensi Kerja Nasional Indonesia (SKKNI) sektor pariwisata.
                 </p>
-                <div className={`p-3.5 rounded-xl border space-y-2 text-xs sm:text-sm ${themeClasses.cardBg}`}>
-                  <h5 className="font-bold text-fuchsia-300">Poin Kunci yang Wajib Dikuasai:</h5>
+                <div className={`p-3.5 rounded-2xl border space-y-2 text-xs sm:text-sm ${themeClasses.cardBg}`}>
+                  <h5 className="font-bold text-purple-400">Poin Kunci yang Wajib Dikuasai:</h5>
                   <ul className="space-y-1.5 pl-2">
                     <li className="flex items-start gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
@@ -789,7 +789,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
               <span>Lanjut ke prosedur teknis dan penerapan lapangan:</span>
               <span className={`font-bold ${themeClasses.accentText}`}>Klik &quot;Next &gt;&gt;&quot;</span>
             </div>
@@ -810,26 +810,26 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </h3>
             </div>
 
-            <div className={`p-4 sm:p-6 rounded-2xl border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-4 sm:p-6 rounded-[1.35rem] border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
                   <CheckSquare className="w-4 h-4" />
                   <span>Langkah Operasional &amp; Manajemen Risiko</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className={`p-3 rounded-xl border ${themeClasses.cardBg}`}>
-                    <span className="text-[11px] font-bold text-fuchsia-300 block mb-1">Tahap 1: Persiapan</span>
+                  <div className={`p-3 rounded-2xl border ${themeClasses.cardBg}`}>
+                    <span className="text-[11px] font-bold text-purple-400 block mb-1">Tahap 1: Persiapan</span>
                     <p className="text-xs leading-relaxed text-slate-300">
                       Riset daya tarik objek wisata, kelengkapan peralatan teknis, kesiapan fisik, serta koordinasi tim pemandu/pelaksana.
                     </p>
                   </div>
-                  <div className={`p-3 rounded-xl border ${themeClasses.cardBg}`}>
+                  <div className={`p-3 rounded-2xl border ${themeClasses.cardBg}`}>
                     <span className="text-[11px] font-bold text-indigo-400 block mb-1">Tahap 2: Pelaksanaan</span>
                     <p className="text-xs leading-relaxed text-slate-300">
                       Eksekusi kegiatan ramah tamu, kepatuhan jadwal waktu, manajemen dinamika rombongan, dan mitigasi kondisi darurat.
                     </p>
                   </div>
-                  <div className={`p-3 rounded-xl border ${themeClasses.cardBg}`}>
+                  <div className={`p-3 rounded-2xl border ${themeClasses.cardBg}`}>
                     <span className="text-[11px] font-bold text-emerald-400 block mb-1">Tahap 3: Pasca Kegiatan</span>
                     <p className="text-xs leading-relaxed text-slate-300">
                       Evaluasi umpan balik kepuasan peserta, pembersihan area (Leave No Trace), dan pelaporan administrasi ke Pamong.
@@ -837,7 +837,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                   </div>
                 </div>
 
-                <div className={`p-3 rounded-xl border text-xs leading-relaxed ${themeClasses.cardBg}`}>
+                <div className={`p-3 rounded-2xl border text-xs leading-relaxed ${themeClasses.cardBg}`}>
                   <strong className="text-amber-400">Pesan Pamong Saka:</strong> Seluruh anggota Saka Pariwisata wajib menjaga martabat Gerakan Pramuka dan citra pariwisata Indonesia dengan tidak memungut biaya tidak resmi dan senantiasa bersikap jujur.
                 </div>
               </div>
@@ -848,7 +848,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
               <span>Lanjut ke lembar instrumen uji SKK Purwa, Madya, dan Utama:</span>
               <span className={`font-bold ${themeClasses.accentText}`}>Klik &quot;Next &gt;&gt;&quot;</span>
             </div>
@@ -871,7 +871,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </h3>
             </div>
 
-            <div className={`p-4 sm:p-5 rounded-2xl border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-4 sm:p-5 rounded-[1.35rem] border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
               <div className="space-y-3">
                 <p className={`text-xs sm:text-sm ${themeClasses.mutedText}`}>
                   Kriteria pengujian tingkat dasar yang wajib dipenuhi oleh Pramuka Penegak/Pandega untuk memperoleh TKK Purwa:
@@ -879,7 +879,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
 
                 <div className="space-y-2.5">
                   {purwaList.slice(0, 4).map((req, idx) => (
-                    <div key={idx} className={`p-3 rounded-xl border flex items-start gap-3 ${themeClasses.cardBg}`}>
+                    <div key={idx} className={`p-3 rounded-2xl border flex items-start gap-3 ${themeClasses.cardBg}`}>
                       <span className="w-5 h-5 rounded-md bg-red-600/20 text-red-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 border border-red-500/40 font-mono">
                         {idx + 1}
                       </span>
@@ -897,13 +897,13 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-red-950/40 border border-red-900/50 text-xs text-red-200 flex items-center justify-between">
+              <div className="p-3 rounded-2xl bg-red-950/40 border border-red-900/50 text-xs text-red-200 flex items-center justify-between">
                 <span>Penguji: Pamong Saka atau Instruktur Kejuruan yang ditunjuk</span>
                 <span className="font-bold">Standar Purwa: Minimal 80% Penguasaan</span>
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
               <span>Berikutnya instrumen uji SKK Tingkat Madya:</span>
               <span className={`font-bold ${themeClasses.accentText}`}>Klik &quot;Next &gt;&gt;&quot;</span>
             </div>
@@ -926,7 +926,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </h3>
             </div>
 
-            <div className={`p-4 sm:p-5 rounded-2xl border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-4 sm:p-5 rounded-[1.35rem] border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
               <div className="space-y-3">
                 <p className={`text-xs sm:text-sm ${themeClasses.mutedText}`}>
                   Kriteria pengujian tingkat menengah berorientasi pada simulasi mandiri dan pemecahan kasus lapangan:
@@ -934,7 +934,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
 
                 <div className="space-y-2.5">
                   {madyaList.slice(0, 4).map((req, idx) => (
-                    <div key={idx} className={`p-3 rounded-xl border flex items-start gap-3 ${themeClasses.cardBg}`}>
+                    <div key={idx} className={`p-3 rounded-2xl border flex items-start gap-3 ${themeClasses.cardBg}`}>
                       <span className="w-5 h-5 rounded-md bg-amber-600/20 text-amber-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 border border-amber-500/40 font-mono">
                         {idx + 1}
                       </span>
@@ -952,13 +952,13 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-900/50 text-xs text-amber-200 flex items-center justify-between">
+              <div className="p-3 rounded-2xl bg-amber-950/40 border border-amber-900/50 text-xs text-amber-200 flex items-center justify-between">
                 <span>Prasyarat: Telah lulus SKK Purwa minimal 3 bulan sebelumnya</span>
                 <span className="font-bold">Standar Madya: Praktik Lapangan Mandiri</span>
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
               <span>Berikutnya instrumen uji SKK Tingkat Utama:</span>
               <span className={`font-bold ${themeClasses.accentText}`}>Klik &quot;Next &gt;&gt;&quot;</span>
             </div>
@@ -981,7 +981,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </h3>
             </div>
 
-            <div className={`p-4 sm:p-5 rounded-2xl border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-4 sm:p-5 rounded-[1.35rem] border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
               <div className="space-y-3">
                 <p className={`text-xs sm:text-sm ${themeClasses.mutedText}`}>
                   Kriteria pengujian jenjang tertinggi dengan kapabilitas melatih, memimpin, dan membina anggota lainnya:
@@ -989,7 +989,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
 
                 <div className="space-y-2.5">
                   {utamaList.slice(0, 4).map((req, idx) => (
-                    <div key={idx} className={`p-3 rounded-xl border flex items-start gap-3 ${themeClasses.cardBg}`}>
+                    <div key={idx} className={`p-3 rounded-2xl border flex items-start gap-3 ${themeClasses.cardBg}`}>
                       <span className="w-5 h-5 rounded-md bg-emerald-600/20 text-emerald-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/40 font-mono">
                         {idx + 1}
                       </span>
@@ -1007,13 +1007,13 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-900/50 text-xs text-emerald-200 flex items-center justify-between">
+              <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-900/50 text-xs text-emerald-200 flex items-center justify-between">
                 <span>Prasyarat: Telah aktif melatih anggota Purwa &amp; Madya di pangkalan Saka</span>
                 <span className="font-bold">Standar Utama: Instruktur Muda Bersertifikat</span>
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
               <span>Berikutnya matriks komparasi 3 aspek kompetensi:</span>
               <span className={`font-bold ${themeClasses.accentText}`}>Klik &quot;Next &gt;&gt;&quot;</span>
             </div>
@@ -1034,7 +1034,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 my-2 flex-1 items-stretch">
-              <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${themeClasses.subCardBg}`}>
+              <div className={`p-3.5 rounded-[1.35rem] border flex flex-col justify-between ${themeClasses.subCardBg}`}>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-sm bg-red-600 rotate-45" />
@@ -1046,12 +1046,12 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                     <p><strong>Etika (20%):</strong> Menunjukkan sikap ramah, santun, dan disiplin waktu.</p>
                   </div>
                 </div>
-                <div className="text-[11px] font-mono text-fuchsia-300 pt-2 border-t border-slate-800">
+                <div className="text-[11px] font-mono text-purple-400 pt-2 border-t border-slate-800">
                   Target: Penguasaan Dasar
                 </div>
               </div>
 
-              <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${themeClasses.subCardBg}`}>
+              <div className={`p-3.5 rounded-[1.35rem] border flex flex-col justify-between ${themeClasses.subCardBg}`}>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-xs bg-amber-500" />
@@ -1068,7 +1068,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                 </div>
               </div>
 
-              <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${themeClasses.subCardBg}`}>
+              <div className={`p-3.5 rounded-[1.35rem] border flex flex-col justify-between ${themeClasses.subCardBg}`}>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="w-3.5 h-3.5 rounded-full bg-emerald-500" />
@@ -1086,7 +1086,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
               <span>Berikutnya dokumen digital dan lampiran berkas resmi:</span>
               <span className={`font-bold ${themeClasses.accentText}`}>Klik &quot;Next &gt;&gt;&quot;</span>
             </div>
@@ -1106,7 +1106,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
               </h3>
             </div>
 
-            <div className={`p-4 sm:p-5 rounded-2xl border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-4 sm:p-5 rounded-[1.35rem] border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
               <div className="space-y-3">
                 <p className={`text-xs sm:text-sm ${themeClasses.mutedText}`}>
                   Dokumen resmi dan petunjuk teknis yang dapat diunduh untuk bahan pembinaan di Gugus Depan dan Pangkalan Saka:
@@ -1114,7 +1114,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
 
                 <div className="space-y-2.5">
                   {downloadsList.map((dl, idx) => (
-                    <div key={idx} className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${themeClasses.cardBg}`}>
+                    <div key={idx} className={`p-3 rounded-2xl border flex items-center justify-between gap-3 ${themeClasses.cardBg}`}>
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
                           <FileText className="w-4 h-4" />
@@ -1139,9 +1139,9 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                   ))}
 
                   {/* Fallback general download */}
-                  <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${themeClasses.cardBg}`}>
+                  <div className={`p-3 rounded-2xl border flex items-center justify-between gap-3 ${themeClasses.cardBg}`}>
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-fuchsia-500/20 text-fuchsia-300 flex items-center justify-center shrink-0 border border-fuchsia-300/20">
+                      <div className="w-8 h-8 rounded-lg bg-fuchsia-600/20 text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/30">
                         <FileCheck className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
@@ -1153,7 +1153,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                     </div>
                     <button
                       onClick={() => window.print()}
-                      className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-slate-700 text-white text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer border border-slate-700"
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer border border-slate-700"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Cetak Lembar</span>
@@ -1162,13 +1162,13 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-900/50 text-xs text-purple-200 flex items-center justify-between">
+              <div className="p-3 rounded-2xl bg-purple-950/40 border border-purple-900/50 text-xs text-purple-200 flex items-center justify-between">
                 <span>Anda telah membaca seluruh halaman untuk modul ini!</span>
                 <span className="font-bold">Klik &quot;Next &gt;&gt;&quot; untuk modul berikutnya</span>
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+            <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
               <span>Selesai membaca modul ini. Ingin pindah ke mata krida lain?</span>
               <span className={`font-bold ${themeClasses.accentText}`}>Gunakan Menu Pilih Dokumen di atas atau tombol Next</span>
             </div>
@@ -1205,7 +1205,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           </p>
         </div>
 
-        <div className={`p-4 sm:p-5 rounded-2xl border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
+        <div className={`p-4 sm:p-5 rounded-[1.35rem] border my-2 flex-1 flex flex-col justify-between ${themeClasses.subCardBg}`}>
           <div className="space-y-3 sm:space-y-4">
             <div className="space-y-2">
               {currentSlide.contentParagraphs.map((para, idx) => (
@@ -1216,7 +1216,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             </div>
 
             {currentSlide.bulletPoints && currentSlide.bulletPoints.length > 0 && (
-              <div className={`p-3 rounded-xl border space-y-1.5 text-xs sm:text-sm ${themeClasses.cardBg}`}>
+              <div className={`p-3 rounded-2xl border space-y-1.5 text-xs sm:text-sm ${themeClasses.cardBg}`}>
                 <h6 className="font-bold text-amber-400">Poin Penting:</h6>
                 {currentSlide.bulletPoints.map((bp, idx) => (
                   <div key={idx} className="flex items-start gap-2">
@@ -1230,7 +1230,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             {currentSlide.keyHighlights && currentSlide.keyHighlights.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                 {currentSlide.keyHighlights.map((kh, idx) => (
-                  <div key={idx} className={`p-2.5 rounded-xl border ${themeClasses.cardBg}`}>
+                  <div key={idx} className={`p-2.5 rounded-2xl border ${themeClasses.cardBg}`}>
                     <div className={`text-[10px] font-bold uppercase ${themeClasses.mutedText}`}>{kh.label}</div>
                     <div className="text-xs sm:text-sm font-bold mt-0.5">{kh.value}</div>
                   </div>
@@ -1245,7 +1245,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           </div>
         </div>
 
-        <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
+        <div className={`p-2.5 rounded-2xl border text-xs flex items-center justify-between ${themeClasses.subCardBg}`}>
           <span>Lanjut ke lembar berikutnya tanpa scroll:</span>
           <span className={`font-bold ${themeClasses.accentText}`}>Gunakan tombol &quot;Next &gt;&gt;&quot; di bawah</span>
         </div>
@@ -1256,13 +1256,13 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
   return (
     <div className={`fixed inset-0 z-50 flex flex-col h-screen w-screen overflow-hidden select-none transition-colors duration-200 ${themeClasses.bg}`}>
       {/* 1. TOP HEADER (Navigation & Display Controls) */}
-      <header className={`px-4 sm:px-7 py-3.5 border-b flex items-center justify-between gap-3 shrink-0 ${themeClasses.headerBg}`}>
+      <header className={`px-4 sm:px-6 py-3 border-b flex items-center justify-between gap-3 shrink-0 ${themeClasses.headerBg}`}>
         {/* Left: Document / Module Picker Drawer Toggle */}
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative">
             <button
               onClick={() => setIsPickerOpen(!isPickerOpen)}
-              className="px-3.5 py-2 rounded-xl bg-fuchsia-500 hover:bg-fuchsia-400 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+              className="px-3 py-1.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
               title="Pilih materi krida atau dokumen lain untuk dibaca"
             >
               <FolderOpen className="w-3.5 h-3.5 text-amber-300" />
@@ -1273,7 +1273,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             {/* Dropdown / Picker Drawer Modal */}
             {isPickerOpen && (
               <div 
-                className={`absolute left-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-sm rounded-2xl border shadow-xl p-3 z-50 space-y-3 ${
+                className={`absolute left-0 top-full mt-2 w-72 sm:w-84 rounded-[1.35rem] border shadow-xl p-3 z-50 space-y-3 ${
                   theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
                 }`}
               >
@@ -1281,18 +1281,18 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                   <span className="text-xs font-bold uppercase tracking-wider">Daftar Materi Bacaan:</span>
                   <button 
                     onClick={() => setIsPickerOpen(false)}
-                    className="p-1 rounded-lg hover:bg-white/10 text-white/55 hover:text-white cursor-pointer"
+                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 {/* Switch Category tabs: 23 SKK vs Dokumen Regulasi */}
-                <div className="flex rounded-xl bg-white/10/80 p-1 text-xs">
+                <div className="flex rounded-2xl bg-slate-800/80 p-1 text-xs">
                   <button
                     onClick={() => setActiveType('MODULE')}
                     className={`flex-1 py-1 px-2 rounded-lg font-bold cursor-pointer transition-all ${
-                      activeType === 'MODULE' ? 'bg-fuchsia-500 text-white shadow-xs' : 'text-white/55 hover:text-white'
+                      activeType === 'MODULE' ? 'bg-fuchsia-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     23 Modul SKK
@@ -1300,7 +1300,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                   <button
                     onClick={() => setActiveType('OFFICIAL_DOC')}
                     className={`flex-1 py-1 px-2 rounded-lg font-bold cursor-pointer transition-all ${
-                      activeType === 'OFFICIAL_DOC' ? 'bg-fuchsia-500 text-white shadow-xs' : 'text-white/55 hover:text-white'
+                      activeType === 'OFFICIAL_DOC' ? 'bg-fuchsia-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     Dokumen Juklak
@@ -1318,10 +1318,10 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                           setCurrentSlideIndex(0);
                           setIsPickerOpen(false);
                         }}
-                        className={`w-full text-left p-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                        className={`w-full text-left p-2 rounded-2xl text-xs transition-colors flex items-center justify-between cursor-pointer ${
                           selectedModuleId === m.id
-                            ? 'bg-fuchsia-500 text-white font-bold'
-                            : 'hover:bg-white/10/60 text-slate-300'
+                            ? 'bg-fuchsia-600 text-white font-bold'
+                            : 'hover:bg-slate-800/60 text-slate-300'
                         }`}
                       >
                         <span className="truncate">{m.code} {m.title}</span>
@@ -1339,10 +1339,10 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
                           setCurrentSlideIndex(0);
                           setIsPickerOpen(false);
                         }}
-                        className={`w-full text-left p-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                        className={`w-full text-left p-2 rounded-2xl text-xs transition-colors flex items-center justify-between cursor-pointer ${
                           selectedDocId === d.id
-                            ? 'bg-fuchsia-500 text-white font-bold'
-                            : 'hover:bg-white/10/60 text-slate-300'
+                            ? 'bg-fuchsia-600 text-white font-bold'
+                            : 'hover:bg-slate-800/60 text-slate-300'
                         }`}
                       >
                         <span className="truncate">{d.title}</span>
@@ -1371,11 +1371,11 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
         {/* Right: Preferences (Theme, Font, Fullscreen, Close) */}
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Theme switcher */}
-          <div className="flex items-center bg-white/10/60 rounded-xl p-0.5 border border-slate-700/50">
+          <div className="flex items-center bg-slate-800/60 rounded-2xl p-0.5 border border-slate-700/50">
             <button
               onClick={() => setTheme('dark')}
               className={`p-1.5 rounded-lg text-xs cursor-pointer transition-all ${
-                theme === 'dark' ? 'bg-fuchsia-500 text-white' : 'text-white/55 hover:text-white'
+                theme === 'dark' ? 'bg-fuchsia-600 text-white' : 'text-slate-400 hover:text-white'
               }`}
               title="Mode Gelap (OLED/Malam)"
             >
@@ -1384,7 +1384,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             <button
               onClick={() => setTheme('sepia')}
               className={`p-1.5 rounded-lg text-xs cursor-pointer transition-all ${
-                theme === 'sepia' ? 'bg-[#8A4A1C] text-white' : 'text-white/55 hover:text-white'
+                theme === 'sepia' ? 'bg-[#8A4A1C] text-white' : 'text-slate-400 hover:text-white'
               }`}
               title="Mode Buku Sepia (Kertas Lembut)"
             >
@@ -1393,7 +1393,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
             <button
               onClick={() => setTheme('light')}
               className={`p-1.5 rounded-lg text-xs cursor-pointer transition-all ${
-                theme === 'light' ? 'bg-fuchsia-500 text-white' : 'text-white/55 hover:text-white'
+                theme === 'light' ? 'bg-fuchsia-600 text-white' : 'text-slate-400 hover:text-white'
               }`}
               title="Mode Terang (Siang Hari)"
             >
@@ -1402,24 +1402,24 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           </div>
 
           {/* Font Size Selector */}
-          <div className="hidden sm:flex items-center bg-white/10/60 rounded-xl p-0.5 border border-slate-700/50 text-[11px] font-bold font-mono">
+          <div className="hidden sm:flex items-center bg-slate-800/60 rounded-2xl p-0.5 border border-slate-700/50 text-[11px] font-bold font-mono">
             <button
               onClick={() => setTextSize('sm')}
-              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'sm' ? 'bg-fuchsia-500 text-white' : 'text-white/55'}`}
+              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'sm' ? 'bg-fuchsia-600 text-white' : 'text-slate-400'}`}
               title="Ukuran Teks Ringkas"
             >
               A-
             </button>
             <button
               onClick={() => setTextSize('base')}
-              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'base' ? 'bg-fuchsia-500 text-white' : 'text-white/55'}`}
+              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'base' ? 'bg-fuchsia-600 text-white' : 'text-slate-400'}`}
               title="Ukuran Teks Standar"
             >
               A
             </button>
             <button
               onClick={() => setTextSize('lg')}
-              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'lg' ? 'bg-fuchsia-500 text-white' : 'text-white/55'}`}
+              className={`px-2 py-1 rounded-lg cursor-pointer ${textSize === 'lg' ? 'bg-fuchsia-600 text-white' : 'text-slate-400'}`}
               title="Ukuran Teks Nyaman/Besar"
             >
               A+
@@ -1429,7 +1429,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           {/* Browser Fullscreen Toggle */}
           <button
             onClick={toggleFullscreen}
-            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-white/10/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-all"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-all"
             title="Toggle Layar Penuh Perangkat"
           >
             {isBrowserFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
@@ -1439,7 +1439,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           {/* Close button */}
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition-all cursor-pointer"
+            className="p-2 rounded-2xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition-all cursor-pointer"
             title="Tutup Mode Layar Penuh (Esc)"
           >
             <X className="w-4 h-4" />
@@ -1457,7 +1457,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
 
       {/* 3. MAIN READING CANVAS (Strictly 100% Viewport-Fitted, ZERO Scrolling) */}
       <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-8 py-3 sm:py-5 overflow-hidden flex flex-col justify-center">
-        <div className={`h-full rounded-[2rem] border p-4 sm:p-8 flex flex-col justify-between overflow-hidden shadow-xl transition-all ${themeClasses.cardBg}`}>
+        <div className={`h-full rounded-[1.75rem] border p-4 sm:p-7 flex flex-col justify-between overflow-hidden shadow-xl transition-all ${themeClasses.cardBg}`}>
           {activeType === 'MODULE' 
             ? renderModuleSlideContent(moduleSlides[currentSlideIndex]?.type || 'COVER')
             : renderDocSlideContent()
@@ -1472,12 +1472,12 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           type="button"
           onClick={handlePrevSlide}
           disabled={currentSlideIndex === 0 && (activeType !== 'MODULE' || modules.findIndex(m => m.id === selectedModuleId) === 0)}
-          className={`flex items-center gap-2 px-4 sm:px-7 py-3 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wide transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none ${
+          className={`flex items-center gap-2 px-5 sm:px-7 py-3 rounded-[1.35rem] font-extrabold text-xs sm:text-sm tracking-wide transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none ${
             theme === 'sepia'
               ? 'bg-[#E3D1BA] hover:bg-[#D5BF9F] text-[#3D2C1F] border border-[#DFCBB5]'
               : theme === 'light'
                 ? 'bg-slate-200 hover:bg-slate-300 text-slate-800'
-                : 'bg-white/10 hover:bg-slate-700 text-white border border-slate-700'
+                : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
           }`}
           title="Halaman Sebelumnya (Tombol Panah Kiri)"
         >
@@ -1502,7 +1502,7 @@ export const KridaFullScreenReaderModal: React.FC<KridaFullScreenReaderModalProp
           type="button"
           onClick={handleNextSlide}
           disabled={currentSlideIndex === totalSlides - 1 && (activeType !== 'MODULE' || modules.findIndex(m => m.id === selectedModuleId) === modules.length - 1)}
-          className={`flex items-center gap-2 px-4 sm:px-8 py-3 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wide transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none ${
+          className={`flex items-center gap-2 px-6 sm:px-8 py-3 rounded-[1.35rem] font-extrabold text-xs sm:text-sm tracking-wide transition-all shadow-lg active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none ${
             theme === 'sepia'
               ? 'bg-[#8A4A1C] hover:bg-[#733B14] text-white shadow-[#8A4A1C]/20'
               : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-900/40'
