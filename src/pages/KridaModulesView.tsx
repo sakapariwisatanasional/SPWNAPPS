@@ -65,7 +65,7 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser,
   const [explorerModule, setExplorerModule] = useState<string | undefined>(undefined);
   const [draft, setDraft] = useState<KridaVisualConfig>({ imageUrl: '', downloadUrl: '' });
 
-  const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
+  const canManageKrida = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
 
   useEffect(() => {
     const unsubscribe = storage.subscribe(() => setModules(storage.getKridaModules()));
@@ -179,7 +179,7 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser,
                       <p className="text-xs font-bold text-slate-800 truncate">{category.name}</p>
                     </div>
                     <div className="flex items-center gap-1">
-                      {isSuperAdmin && (
+                      {canManageKrida && (
                         <button type="button" onClick={() => openSettings(category.id)} className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-700" title="Pengaturan gambar & link">
                           <Settings2 className="w-4 h-4" />
                         </button>
@@ -211,7 +211,7 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser,
                             <span className="mt-1.5 block text-[9px] font-black text-fuchsia-600">{mod.code}</span>
                             <span className="mt-0.5 block text-[10px] leading-4 font-extrabold text-slate-800 line-clamp-2">{mod.title}</span>
                           </button>
-                          {isSuperAdmin && onOpenEditor && (
+                          {canManageKrida && onOpenEditor && (
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); onOpenEditor(mod); }}
@@ -238,7 +238,7 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser,
           <div className="w-full max-w-lg rounded-3xl bg-white border border-slate-200 shadow-xl p-5" onMouseDown={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600">Super Admin</p>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600">Admin Pengelola</p>
                 <h3 className="text-base font-extrabold text-slate-900">Pengaturan Krida</h3>
               </div>
               <button type="button" onClick={() => setSettingsKrida(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500"><X className="w-4 h-4" /></button>
