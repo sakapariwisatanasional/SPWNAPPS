@@ -83,7 +83,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 rounded-2xl sm:rounded-3xl p-5 sm:p-7 text-white border border-purple-800/40 shadow-xl space-y-4">
+      <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 rounded-[1.35rem] sm:rounded-[1.75rem] p-5 sm:p-7 text-white border border-purple-800/40 shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-teal-500/20 border border-teal-400/40 rounded-full text-teal-200 text-xs font-bold">
@@ -104,7 +104,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                 setEditingActivity(null);
                 setIsFormOpen(true);
               }}
-              className="px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer flex-shrink-0"
+              className="px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer flex-shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Unggah Agenda Baru</span>
@@ -113,7 +113,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
         </div>
 
         {/* Non-transactional Notice */}
-        <div className="p-3 bg-teal-950/60 border border-teal-500/30 rounded-xl flex items-start gap-2.5 text-xs text-teal-100">
+        <div className="p-3 bg-teal-950/60 border border-teal-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-teal-100">
           <Info className="w-4 h-4 text-teal-300 flex-shrink-0 mt-0.5" />
           <div>
             <strong className="text-white font-semibold">Etalase Informasi & Narahubung Langsung:</strong>
@@ -125,13 +125,13 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">
+      <div className="bg-white rounded-[1.35rem] p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Category Filter Pills */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <button
               onClick={() => setCategoryFilter('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                 categoryFilter === 'ALL'
                   ? 'bg-purple-900 text-white shadow-xs'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -143,7 +143,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   categoryFilter === cat
                     ? 'bg-purple-900 text-white shadow-xs'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -160,7 +160,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
               aria-label="Filter Tingkat Penyelenggara"
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 font-medium outline-none focus:border-purple-600 cursor-pointer"
+              className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-1.5 text-xs text-slate-700 font-medium outline-none focus:border-purple-600 cursor-pointer"
             >
               <option value="ALL">Semua Tingkat</option>
               <option value="Nasional">Nasional (Kwarnas)</option>
@@ -173,7 +173,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
               aria-label="Filter Status Pendaftaran"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 font-medium outline-none focus:border-purple-600 cursor-pointer"
+              className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-1.5 text-xs text-slate-700 font-medium outline-none focus:border-purple-600 cursor-pointer"
             >
               <option value="ALL">Semua Status</option>
               <option value="OPEN_REGISTRATION">Pendaftaran Dibuka</option>
@@ -191,7 +191,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
             placeholder="Cari agenda kegiatan berdasarkan nama kegiatan, kota/lokasi, atau narahubung..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-purple-600 focus:bg-white transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-purple-600 focus:bg-white transition-all"
           />
           {searchQuery && (
             <button
@@ -206,7 +206,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
 
       {/* Activities Grid */}
       {filteredActivities.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 text-slate-400 space-y-2">
+        <div className="bg-white rounded-[1.35rem] p-12 text-center border border-slate-200 text-slate-400 space-y-2">
           <CalendarDays className="w-12 h-12 mx-auto text-slate-300 stroke-1" />
           <p className="font-bold text-slate-700 text-sm">Tidak ada agenda kegiatan yang sesuai filter.</p>
           <p className="text-xs text-slate-400">Silakan ubah kata kunci atau setel ulang filter pencarian.</p>
@@ -220,7 +220,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
             return (
               <div
                 key={act.id}
-                className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group hover:border-purple-300"
+                className="bg-white rounded-[1.35rem] sm:rounded-[1.75rem] border border-slate-200 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group hover:border-fuchsia-300"
               >
                 <div className="space-y-3">
                   {/* Cover Banner Image */}
@@ -250,7 +250,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
 
                     {/* Tingkat Penyelenggara & Lokasi Floating */}
                     <div className="absolute bottom-3 left-3 right-3 text-white z-10 space-y-0.5">
-                      <span className="px-2 py-0.5 bg-purple-600/90 text-white text-[10px] font-bold rounded-md inline-block">
+                      <span className="px-2 py-0.5 bg-fuchsia-600/90 text-white text-[10px] font-bold rounded-md inline-block">
                         Tingkat {act.organizerLevel}
                       </span>
                       <p className="text-xs font-semibold text-slate-200 flex items-center gap-1 truncate">
@@ -263,8 +263,8 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                   {/* Content Details */}
                   <div className="p-4 sm:p-5 pt-1 space-y-3">
                     {/* Dates & Duration */}
-                    <div className="flex items-center gap-1.5 text-xs text-purple-800 font-semibold bg-purple-50 p-2 rounded-xl border border-purple-100">
-                      <CalendarDays className="w-3.5 h-3.5 text-purple-700 flex-shrink-0" />
+                    <div className="flex items-center gap-1.5 text-xs text-purple-800 font-semibold bg-purple-50 p-2 rounded-2xl border border-purple-100">
+                      <CalendarDays className="w-3.5 h-3.5 text-fuchsia-700 flex-shrink-0" />
                       <span className="truncate">
                         {new Date(act.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                         {' - '}
@@ -286,11 +286,11 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                     </p>
 
                     {/* Uploader / Organizer Box */}
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                    <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
                       <div className="min-w-0">
                         <p className="text-[10px] text-slate-400 font-medium uppercase">Penyelenggara / Pengunggah</p>
                         <p className="font-bold text-slate-800 truncate">{act.organizerName}</p>
-                        <p className="text-[10px] text-purple-700 font-medium">{act.uploadedByName} ({act.uploadedByRole})</p>
+                        <p className="text-[10px] text-fuchsia-700 font-medium">{act.uploadedByName} ({act.uploadedByRole})</p>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <span className="text-[10px] text-slate-400 block">Biaya Registrasi</span>
@@ -330,7 +330,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                     )}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl sm:rounded-2xl text-xs transition-colors flex items-center justify-center gap-2 min-h-[40px] shadow-xs active:scale-98"
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl sm:rounded-[1.35rem] text-xs transition-colors flex items-center justify-center gap-2 min-h-[40px] shadow-xs active:scale-98"
                   >
                     <Phone className="w-3.5 h-3.5 text-white" />
                     <span>Hubungi Narahubung via WhatsApp</span>
@@ -340,9 +340,9 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setSelectedActivity(act)}
-                      className="flex-1 py-2 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="flex-1 py-2 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-2xl text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Ticket className="w-3.5 h-3.5 text-purple-700" />
+                      <Ticket className="w-3.5 h-3.5 text-fuchsia-700" />
                       <span>Detail & Pendaftaran</span>
                     </button>
 
@@ -353,7 +353,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                           setEditingActivity(act);
                           setIsFormOpen(true);
                         }}
-                        className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-xs font-bold border border-amber-200 transition-colors cursor-pointer flex items-center justify-center"
+                        className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-2xl text-xs font-bold border border-amber-200 transition-colors cursor-pointer flex items-center justify-center"
                         title="Edit Agenda Kegiatan"
                       >
                         <Edit3 className="w-3.5 h-3.5 text-amber-700" />
@@ -369,7 +369,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                             refreshActivities();
                           }
                         }}
-                        className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold border border-rose-200 transition-colors cursor-pointer flex items-center justify-center"
+                        className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-2xl text-xs font-bold border border-rose-200 transition-colors cursor-pointer flex items-center justify-center"
                         title="Hapus Agenda Kegiatan"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-rose-600" />
