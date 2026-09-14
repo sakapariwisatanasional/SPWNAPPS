@@ -111,7 +111,7 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
 
         <button
           onClick={onOpenTourFormModal}
-          className="px-4 py-2.5 bg-gradient-to-r from-purple-700 to-violet-600 hover:from-purple-600 hover:to-violet-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-md shadow-purple-950/20 transition-all cursor-pointer w-fit"
+          className="px-4 py-2.5 bg-gradient-to-r from-purple-700 to-violet-600 hover:from-purple-600 hover:to-violet-500 text-white rounded-[1.35rem] text-xs font-bold flex items-center gap-2 shadow-md shadow-purple-950/20 transition-all cursor-pointer w-fit"
         >
           <Plus className="w-4 h-4" />
           <span>Ajukan Paket Wisata Baru</span>
@@ -124,7 +124,7 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <button
             onClick={() => setSelectedCategory('ALL')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+            className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all ${
               selectedCategory === 'ALL'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
@@ -136,7 +136,7 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all ${
                 selectedCategory === cat
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
@@ -148,9 +148,9 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
         </div>
 
         {/* Secondary Filter Bar */}
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+        <div className="bg-white p-3.5 rounded-[1.35rem] border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
           {/* Search */}
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 w-full md:w-80">
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 w-full md:w-80">
             <Search className="w-4 h-4 text-slate-400" />
             <input
               type="text"
@@ -166,7 +166,7 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
             <select
               value={selectedProvinceId}
               onChange={(e) => setSelectedProvinceId(e.target.value)}
-              className="flex-1 md:flex-none bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none font-medium text-slate-700"
+              className="flex-1 md:flex-none bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 outline-none font-medium text-slate-700"
             >
               <option value="ALL">Semua Provinsi</option>
               {provinces.map(p => (
@@ -178,7 +178,7 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
             <select
               value={sortBy}
               onChange={(e: any) => setSortBy(e.target.value)}
-              className="flex-1 md:flex-none bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none font-medium text-slate-700"
+              className="flex-1 md:flex-none bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 outline-none font-medium text-slate-700"
             >
               <option value="POPULAR">Rekomendasi</option>
               <option value="PRICE_LOW">Harga Termurah</option>
@@ -190,7 +190,7 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
 
       {/* Tour Cards Grid */}
       {filteredTours.length === 0 ? (
-        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 text-slate-400 space-y-3">
+        <div className="bg-white rounded-[1.75rem] p-12 text-center border border-slate-200 text-slate-400 space-y-3">
           <Compass className="w-12 h-12 mx-auto text-slate-300 stroke-1" />
           <p className="text-sm font-bold text-slate-700">Belum ada paket wisata yang cocok</p>
           <p className="text-xs">Coba ganti kata kunci pencarian atau reset filter kategori.</p>
