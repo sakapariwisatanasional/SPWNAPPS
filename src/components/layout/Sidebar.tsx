@@ -58,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const content = (
-    <div className="app-sidebar w-72 sm:w-80 lg:w-64 h-full bg-slate-950 text-white flex flex-col flex-shrink-0 border-r border-slate-800 select-none shadow-2xl z-20 relative">
+    <div className="app-sidebar w-72 sm:w-80 lg:w-64 h-full bg-slate-950 text-white flex flex-col flex-shrink-0 border-r border-slate-800 select-none shadow-xl z-20 relative">
       {/* Subtle Purple Glow Overlay */}
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-purple-900/20 to-transparent pointer-events-none" />
 
@@ -80,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {onCloseMobile && (
           <button
             onClick={onCloseMobile}
-            className="lg:hidden w-8 h-8 rounded-xl bg-slate-900 text-slate-400 hover:text-white flex items-center justify-center border border-slate-800 cursor-pointer"
+            className="lg:hidden w-8 h-8 rounded-2xl bg-slate-900 text-slate-400 hover:text-white flex items-center justify-center border border-slate-800 cursor-pointer"
             aria-label="Tutup Menu"
           >
             <X className="w-4 h-4" />
@@ -101,9 +101,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Landing Page */}
         <button
           onClick={() => handleItemClick('landing')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
             currentTab === 'landing'
-              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
               : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
           }`}
         >
@@ -115,9 +115,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isAdmin && (
           <button
             onClick={() => handleItemClick('dashboard')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
               currentTab === 'dashboard'
-                ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+                ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
                 : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
           >
@@ -135,9 +135,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isMember && (
           <button
             onClick={() => handleItemClick('my-card')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
               currentTab === 'my-card'
-                ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+                ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
                 : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
           >
@@ -151,9 +151,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isAdmin && (
           <button
             onClick={() => handleItemClick('members')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
               currentTab === 'members'
-                ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+                ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
                 : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
           >
@@ -165,9 +165,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Tourism Directory */}
         <button
           onClick={() => handleItemClick('tours')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
             currentTab === 'tours'
-              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
               : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
           }`}
         >
@@ -178,9 +178,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Kuliner & Cinderamata Daerah */}
         <button
           onClick={() => handleItemClick('culinary-souvenirs')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
             currentTab === 'culinary-souvenirs'
-              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
               : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
           }`}
         >
@@ -192,9 +192,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Skills & Certification */}
         <button
           onClick={() => handleItemClick('skills')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
             currentTab === 'skills'
-              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
               : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
           }`}
         >
@@ -205,9 +205,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Modul SKK & Silabus 4 Krida */}
         <button
           onClick={() => handleItemClick('krida-modules')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
             currentTab === 'krida-modules'
-              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
               : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
           }`}
         >
@@ -219,9 +219,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Activities / Agenda */}
         <button
           onClick={() => handleItemClick('activities')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
             currentTab === 'activities'
-              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
               : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
           }`}
         >
@@ -232,9 +232,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Public Portal (Wisata, Talenta, Verifikasi) */}
         <button
           onClick={() => handleItemClick('verify-portal')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
             currentTab === 'verify-portal'
-              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
               : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
           }`}
         >
@@ -253,9 +253,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {(isSuperAdmin || currentUser.role === 'ADMIN_PROVINCE') && (
               <button
                 onClick={() => handleItemClick('territories')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
                   currentTab === 'territories'
-                    ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+                    ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
                     : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
                 }`}
               >
@@ -268,7 +268,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isSuperAdmin && (
               <button
                 onClick={() => handleItemClick('audit-logs')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
                   currentTab === 'audit-logs'
                     ? 'bg-emerald-600/15 text-emerald-400 font-semibold border border-emerald-500/20 shadow-sm'
                     : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
@@ -286,7 +286,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onOpenSpreadsheetModal();
                   if (onCloseMobile) onCloseMobile();
                 }}
-                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-800/40 mt-1"
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-800/40 mt-1"
                 title="Akses Database Google Spreadsheet (Super Admin Kwarnas)"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
@@ -301,7 +301,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onOpenDriveModal();
                   if (onCloseMobile) onCloseMobile();
                 }}
-                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer bg-purple-950/40 text-purple-300 hover:bg-purple-950/70 border border-purple-800/40 mt-1"
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer bg-purple-950/40 text-purple-300 hover:bg-purple-950/70 border border-purple-800/40 mt-1"
                 title="Akses Media Google Drive Repository (Super Admin Kwarnas)"
               >
                 <FolderOpen className="w-4 h-4 text-purple-400" />
@@ -319,7 +319,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onOpenRegisterModal();
               if (onCloseMobile) onCloseMobile();
             }}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-semibold text-xs py-3 px-3 rounded-xl flex items-center justify-center gap-2 shadow-md shadow-emerald-950 transition-all active:scale-95 cursor-pointer"
+            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-semibold text-xs py-3 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-emerald-950 transition-all active:scale-95 cursor-pointer"
           >
             <Sparkles className="w-4 h-4" />
             <span>Daftar Anggota Baru</span>
@@ -329,7 +329,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* User Footer Profile */}
       <div className="p-3 border-t border-slate-800">
-        <div className="bg-slate-800/70 rounded-xl p-3 flex items-center gap-3 border border-slate-700/60">
+        <div className="bg-slate-800/70 rounded-2xl p-3 flex items-center gap-3 border border-slate-700/60">
           <img
             src={currentUser.avatarUrl}
             alt={currentUser.name}
@@ -363,7 +363,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
 
           {/* Drawer Slide-in */}
-          <div className="relative z-10 flex h-full max-w-xs w-full animate-in slide-in-from-left duration-200 shadow-2xl">
+          <div className="relative z-10 flex h-full max-w-xs w-full animate-in slide-in-from-left duration-200 shadow-xl">
             {content}
           </div>
         </div>
