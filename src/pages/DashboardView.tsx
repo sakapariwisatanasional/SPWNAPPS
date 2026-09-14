@@ -93,7 +93,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
         </span>
       )}
       <div className="flex items-start justify-between gap-3">
-        <div className={`w-11 h-11 rounded-2xl ${colorMap.iconBg} flex items-center justify-center shrink-0`}>
+        <div className={`w-11 h-11 rounded-[1.35rem] ${colorMap.iconBg} flex items-center justify-center shrink-0`}>
           {icon}
         </div>
       </div>
@@ -244,7 +244,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Saka Pariwisata
               </span>
             </div>
-            <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            <h1 className="text-2xl sm:text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-white">
               Pusat Kendali & Informasi Nasional
             </h1>
             <p className="text-emerald-100/80 text-sm max-w-2xl">
@@ -256,7 +256,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('audit-logs')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition backdrop-blur-sm border border-white/10"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[1.35rem] bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition backdrop-blur-sm border border-white/10"
             >
               <FileText className="w-4 h-4" />
               Log Audit
@@ -264,7 +264,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('members')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[1.35rem] bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
             >
               <Users className="w-4 h-4" />
               Kelola Anggota
@@ -336,7 +336,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 placeholder="Cari nama, NTA, atau Kwarcab..."
                 value={searchPending}
                 onChange={(e) => setSearchPending(e.target.value)}
-                className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-52 sm:w-64"
+                className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-[1.35rem] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-52 sm:w-64"
               />
             </div>
             <button
