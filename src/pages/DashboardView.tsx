@@ -85,7 +85,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
     <button
       type="button"
       onClick={onClick}
-      className={`relative text-left w-full bg-white rounded-2xl p-5 border border-slate-200 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${colorMap.border}`}
+      className={`relative text-left w-full bg-white rounded-[1.35rem] p-5 border border-slate-200 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${colorMap.border}`}
     >
       {badge && (
         <span className="absolute top-4 right-4 px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-bold">
@@ -93,7 +93,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
         </span>
       )}
       <div className="flex items-start justify-between gap-3">
-        <div className={`w-11 h-11 rounded-xl ${colorMap.iconBg} flex items-center justify-center shrink-0`}>
+        <div className={`w-11 h-11 rounded-2xl ${colorMap.iconBg} flex items-center justify-center shrink-0`}>
           {icon}
         </div>
       </div>
@@ -228,7 +228,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 pt-4 px-4 sm:px-6 lg:px-8 space-y-8">
       {/* Banner Utama */}
-      <div className="bg-gradient-to-r from-purple-950 via-violet-900 to-slate-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-purple-900/10 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-purple-950 via-violet-900 to-slate-950 rounded-[1.75rem] p-6 sm:p-8 text-white shadow-xl shadow-purple-900/10 relative overflow-hidden">
         <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
@@ -244,7 +244,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Saka Pariwisata
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-white">
               Pusat Kendali & Informasi Nasional
             </h1>
             <p className="text-emerald-100/80 text-sm max-w-2xl">
@@ -256,7 +256,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('audit-logs')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition backdrop-blur-sm border border-white/10"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition backdrop-blur-sm border border-white/10"
             >
               <FileText className="w-4 h-4" />
               Log Audit
@@ -264,7 +264,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('members')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
             >
               <Users className="w-4 h-4" />
               Kelola Anggota
@@ -314,7 +314,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Tabel Antrean Verifikasi */}
-      <div id="pending-verification-section" className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
+      <div id="pending-verification-section" className="bg-white rounded-[1.75rem] p-6 shadow-sm border border-slate-200/80">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
@@ -336,7 +336,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 placeholder="Cari nama, NTA, atau Kwarcab..."
                 value={searchPending}
                 onChange={(e) => setSearchPending(e.target.value)}
-                className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-52 sm:w-64"
+                className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-52 sm:w-64"
               />
             </div>
             <button
@@ -422,7 +422,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Bagian Peta Nasional & Log Audit */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-4">
+        <div className="lg:col-span-2 bg-white rounded-[1.75rem] p-6 shadow-sm border border-slate-200/80 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
               <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -447,7 +447,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-4">
+        <div className="bg-white rounded-[1.75rem] p-6 shadow-sm border border-slate-200/80 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
               <ActivityIcon className="w-4 h-4 text-teal-600" />
@@ -467,7 +467,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               recentAuditLogs.map((log, idx) => (
                 <div
                   key={log?.id || idx}
-                  className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 transition flex items-start gap-3 border border-slate-100"
+                  className="p-3 rounded-[1.35rem] bg-slate-50 hover:bg-slate-100/80 transition flex items-start gap-3 border border-slate-100"
                 >
                   <div className="w-7 h-7 rounded-lg bg-emerald-100/80 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
                     <FileText className="w-3.5 h-3.5" />
@@ -515,10 +515,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
+          <div className="bg-white rounded-[1.75rem] p-6 shadow-sm border border-slate-200/80">
             <TourPackageCarouselSection packages={safeTourPackages} />
           </div>
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
+          <div className="bg-white rounded-[1.75rem] p-6 shadow-sm border border-slate-200/80">
             <CulinarySouvenirGallerySection
               items={safeCulinaryItems}
               currentUser={currentUser}
