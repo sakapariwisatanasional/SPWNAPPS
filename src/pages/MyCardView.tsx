@@ -190,7 +190,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2">
-            <span className="px-3 py-1 bg-purple-100 text-purple-900 text-[11px] font-extrabold uppercase tracking-widest rounded-full">
+            <span className="px-3 py-1 bg-fuchsia-100 text-fuchsia-900 text-[11px] font-extrabold uppercase tracking-widest rounded-full">
               Profil Anggota & KTA Elektronik
             </span>
             {isOwner && (
@@ -213,12 +213,14 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap justify-center">
+          {/* Aksi utama: sengaja dibatasi agar header KTA tidak penuh oleh tombol. */}
           {onOpenQuickShareModal && (
             <button
               onClick={() => onOpenQuickShareModal(member)}
-              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-purple-700 to-indigo-900 hover:from-amber-600 hover:to-indigo-950 text-white rounded-[1.35rem] text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-2xl text-xs font-bold shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
+              title="Bagikan profil anggota"
             >
-              <Share2 className="w-4 h-4 text-amber-300" />
+              <Share2 className="w-4 h-4" />
               <span>Bagikan Profil</span>
             </button>
           )}
@@ -226,9 +228,10 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           {onOpenPrintPdfModal && (
             <button
               onClick={() => onOpenPrintPdfModal(member)}
-              className="px-4 py-2.5 bg-purple-900 hover:bg-purple-950 text-white rounded-[1.35rem] text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-[#241044] hover:bg-[#35165f] text-white rounded-2xl text-xs font-bold shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
+              title="Cetak atau unduh KTA dalam PDF"
             >
-              <FileDown className="w-4 h-4 text-purple-300" />
+              <FileDown className="w-4 h-4" />
               <span>Cetak / Unduh PDF</span>
             </button>
           )}
@@ -236,58 +239,71 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           {(isStrictOwner || isAdmin) && onOpenEditMemberModal && (
             <button
               onClick={() => onOpenEditMemberModal(member)}
-              className="px-4 py-2.5 bg-indigo-900 hover:bg-indigo-950 text-white rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-white hover:bg-fuchsia-50 text-slate-800 border border-fuchsia-200 rounded-2xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors"
+              title={isStrictOwner && !isAdmin ? 'Edit profil saya' : 'Koreksi data anggota'}
             >
-              <Edit3 className="w-4 h-4 text-indigo-300" />
+              <Edit3 className="w-4 h-4 text-fuchsia-600" />
               <span>{isStrictOwner && !isAdmin ? 'Edit Profil Saya' : 'Koreksi Data'}</span>
             </button>
           )}
 
-          {(isOwner || isAdmin) && onOpenEditPhotoModal && (
-            <button
-              onClick={() => onOpenEditPhotoModal(member)}
-              className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer"
-            >
-              <Camera className="w-4 h-4 text-fuchsia-600" />
-              <span>Ubah Foto</span>
-            </button>
-          )}
+          {/* Aksi sekunder tetap tersedia, tetapi tidak memenuhi header. */}
+          <details className="relative">
+            <summary className="list-none cursor-pointer select-none px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl text-xs font-bold flex items-center gap-2 transition-colors">
+              <span className="text-base leading-none">•••</span>
+              <span>Aksi Lainnya</span>
+            </summary>
 
-          {isAdmin && onOpenEditCardModal && (
-            <button
-              onClick={onOpenEditCardModal}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer"
-            >
-              <Sliders className="w-4 h-4" />
-              <span>Desain KTA</span>
-            </button>
-          )}
+            <div className="absolute right-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-[1.35rem] border border-slate-200 bg-white p-2 shadow-xl">
+              <div className="grid grid-cols-1 gap-1.5">
+                {(isOwner || isAdmin) && onOpenEditPhotoModal && (
+                  <button
+                    onClick={() => onOpenEditPhotoModal(member)}
+                    className="w-full px-3 py-2.5 bg-slate-50 hover:bg-fuchsia-50 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-2 text-left cursor-pointer transition-colors"
+                  >
+                    <Camera className="w-4 h-4 text-fuchsia-600" />
+                    <span>Ubah Foto</span>
+                  </button>
+                )}
 
-          {isStrictOwner && onOpenCulinaryFormModal && (
-            <>
-              <button
-                type="button"
-                onClick={() => onOpenCulinaryFormModal('KULINER')}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm"
-              >
-                <span>🍽️</span>
-                <span>Ajukan Kuliner</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onOpenCulinaryFormModal('CINDERAMATA')}
-                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-white rounded-[1.35rem] text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm"
-              >
-                <span>🎁</span>
-                <span>Ajukan Cinderamata</span>
-              </button>
-            </>
-          )}
+                {isAdmin && onOpenEditCardModal && (
+                  <button
+                    onClick={onOpenEditCardModal}
+                    className="w-full px-3 py-2.5 bg-slate-50 hover:bg-fuchsia-50 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-2 text-left cursor-pointer transition-colors"
+                  >
+                    <Sliders className="w-4 h-4 text-fuchsia-600" />
+                    <span>Desain KTA</span>
+                  </button>
+                )}
+
+                {isStrictOwner && onOpenCulinaryFormModal && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onOpenCulinaryFormModal('KULINER')}
+                      className="w-full px-3 py-2.5 bg-slate-50 hover:bg-emerald-50 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-2 text-left cursor-pointer transition-colors"
+                    >
+                      <span>🍽️</span>
+                      <span>Ajukan Kuliner</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenCulinaryFormModal('CINDERAMATA')}
+                      className="w-full px-3 py-2.5 bg-slate-50 hover:bg-amber-50 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-2 text-left cursor-pointer transition-colors"
+                    >
+                      <span>🎁</span>
+                      <span>Ajukan Cinderamata</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
       {/* Kartu 3D KTA Interaktif */}
-      <div className="bg-gradient-to-b from-slate-900 to-slate-950 p-8 rounded-[1.75rem] border border-slate-800 shadow-xl flex flex-col items-center justify-center space-y-6">
+      <div className="bg-[#241044] p-8 rounded-[1.75rem] border border-slate-800 shadow-xl flex flex-col items-center justify-center space-y-6">
         <DigitalMemberCard
           member={member}
           onVerifyClick={onOpenVerifyModal}
@@ -343,11 +359,11 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
       </div>
 
       {/* Bagikan Profil & Akses Cepat */}
-      <div className="bg-gradient-to-br from-purple-950 via-slate-900 to-indigo-950 text-white p-6 rounded-[1.75rem] border border-purple-800/40 shadow-xl space-y-4">
+      <div className="bg-[#241044] text-white p-6 rounded-[1.75rem] border border-white/10 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-base font-bold text-white">Bagikan Profil Anggota Ini</h3>
-            <p className="text-xs text-purple-200/80">Tautan langsung untuk verifikasi profil di lapangan</p>
+            <p className="text-xs text-white/70">Tautan langsung untuk verifikasi profil di lapangan</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -361,7 +377,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
               onClick={handleDownloadQuickQr}
               className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold border border-white/20 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <QrCode className="w-3.5 h-3.5 text-purple-300" />
+              <QrCode className="w-3.5 h-3.5 text-fuchsia-200" />
               <span>Unduh QR</span>
             </button>
           </div>
@@ -371,17 +387,17 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           <button
             type="button"
             onClick={handleCopyLink}
-            className="p-2.5 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/40 rounded-2xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-purple-200"
+            className="p-2.5 bg-white/10 hover:bg-white/15 border border-white/15 rounded-2xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-white/80"
           >
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-300" />}
+            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-fuchsia-200" />}
             <span className="font-medium">{copiedLink ? 'Tautan Profil Tersalin!' : 'Salin Tautan Profil KTA'}</span>
           </button>
           <button
             type="button"
             onClick={handleCopyNta}
-            className="p-2.5 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/40 rounded-2xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-purple-200"
+            className="p-2.5 bg-white/10 hover:bg-white/15 border border-white/15 rounded-2xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-white/80"
           >
-            {copiedNta ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-300" />}
+            {copiedNta ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-fuchsia-200" />}
             <span className="font-medium">{copiedNta ? 'NTA Tersalin!' : 'Salin Nomor NTA'}</span>
           </button>
         </div>
