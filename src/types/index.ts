@@ -103,6 +103,49 @@ export type KridaType =
   | 'Krida Mice & Event'
   | 'Krida Kuliner & Cinderamata';
 
+export type KtaInterestType = KridaType | 'Majelis Pembimbing' | 'Pimpinan Saka' | 'Pamong Saka';
+
+export type KwartirLevel = 'NASIONAL' | 'DAERAH' | 'CABANG' | 'RANTING';
+
+export const getMemberKwartirLevel = (
+  provinceId?: string,
+  regencyId?: string,
+  districtId?: string
+): KwartirLevel => {
+  if (String(provinceId || '') === '00') return 'NASIONAL';
+  if (String(districtId || '').trim()) return 'RANTING';
+  if (String(regencyId || '').trim()) return 'CABANG';
+  return 'DAERAH';
+};
+
+export const getMemberKwartirName = (
+  provinceId?: string,
+  provinceName?: string,
+  regencyId?: string,
+  regencyName?: string,
+  districtName?: string
+): string => {
+  const level = getMemberKwartirLevel(provinceId, regencyId, districtName);
+  if (level === 'NASIONAL') return 'Kwartir Nasional';
+  if (level === 'RANTING') return `Kwartir Ranting ${districtName || ''}`.trim();
+  if (level === 'CABANG') return `Kwartir Cabang ${regencyName || ''}`.trim();
+  return `Kwartir Daerah ${provinceName || ''}`.trim();
+};
+
+export const getMemberKwartirHierarchy = (
+  provinceId?: string,
+  provinceName?: string,
+  regencyName?: string,
+  districtName?: string
+): string => {
+  if (String(provinceId || '') === '00') return 'Kwartir Nasional';
+  return [
+    provinceName ? `Kwarda ${provinceName}` : '',
+    regencyName ? `Kwarcab ${regencyName}` : '',
+    districtName ? `Kwarran ${districtName}` : ''
+  ].filter(Boolean).join(' • ');
+};
+
 export interface Member {
   id: string;                  // UUID
   userId: string;
@@ -124,6 +167,10 @@ export interface Member {
   regencyName: string;
   districtId: string;
   districtName: string;
+  kwartirLevel?: KwartirLevel;
+  kwartirName?: string;
+  kwartirHierarchy?: string;
+  ktaInterest?: KtaInterestType;
   
   joinYear: number;
   status: MemberStatus;
@@ -381,7 +428,8 @@ export type KtaCardPreset = 'CR80_KTA' | 'KTP' | 'SIM' | 'CUSTOM';
 export type KtaCardSide = 'FRONT' | 'BACK';
 export type KtaMemberFieldKey =
   | 'fullName' | 'id' | 'nationalMemberNumber' | 'currentPosition'
-  | 'provinceName' | 'regencyName' | 'districtName' | 'krida' | 'phone' | 'email' | 'joinYear' | 'status';
+  | 'provinceName' | 'regencyName' | 'districtName' | 'kwartirName' | 'kwartirHierarchy'
+  | 'krida' | 'phone' | 'email' | 'joinYear' | 'status';
 
 export interface KtaDataFieldConfig {
   id: string;
