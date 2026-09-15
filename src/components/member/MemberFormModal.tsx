@@ -18,7 +18,10 @@ import {
 import { storage } from '../../services/storage';
 import { spreadsheetService } from '../../services/spreadsheetService';
 import { formatGoogleDriveUrl } from '../../services/driveRepository';
-import { Province, Regency, District, Skill, MemberSkill, SkillProficiency, KridaType, CurrentUser } from '../../types';
+import {
+  Province, Regency, District, Skill, MemberSkill, SkillProficiency, KridaType,
+  CurrentUser, KtaInterestType, getMemberKwartirName, getMemberKwartirHierarchy
+} from '../../types';
 
 interface MemberFormModalProps {
   isOpen: boolean;
@@ -54,6 +57,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [isTerritoryPickerOpen, setIsTerritoryPickerOpen] = useState(false);
   
   const [krida, setKrida] = useState<KridaType>('Krida Pemandu');
+  const [currentPosition, setCurrentPosition] = useState('Anggota');
+  const [ktaInterest, setKtaInterest] = useState<KtaInterestType>('Krida Pemandu');
   const [joinYear, setJoinYear] = useState(2024);
   const [educationLevel, setEducationLevel] = useState('SMA / SMK / Sederajat');
   const [occupation, setOccupation] = useState('Pelajar / Mahasiswa');
@@ -788,10 +793,51 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
+                <label className="block font-semibold text-slate-700 mb-1">Jabatan *</label>
+                <select
+                  value={currentPosition}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCurrentPosition(value);
+                    if (value === 'Mabisaka' || value === 'Pimpinan Saka' || value === 'Pamong Saka') {
+                      setKtaInterest(value === 'Mabisaka' ? 'Majelis Pembimbing' : value as KtaInterestType);
+                    } else if (ktaInterest === 'Majelis Pembimbing' || ktaInterest === 'Pimpinan Saka' || ktaInterest === 'Pamong Saka') {
+                      setKtaInterest(krida);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold"
+                >
+                  <option value="Mabisaka">Mabisaka</option>
+                  <option value="Pimpinan Saka">Pimpinan Saka</option>
+                  <option value="Pamong Saka">Pamong Saka</option>
+                  <option value="Anggota">Anggota</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Peminatan Krida Saka pada KTA *</label>
+                <select
+                  value={ktaInterest}
+                  onChange={(e) => setKtaInterest(e.target.value as KtaInterestType)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold"
+                >
+                  <option value="Krida Pemandu">Krida Pemandu</option>
+                  <option value="Krida Penyuluh">Krida Penyuluh</option>
+                  <option value="Krida Mice & Event">Krida MICE & Event</option>
+                  <option value="Krida Kuliner & Cinderamata">Krida Kuliner & Cinderamata</option>
+                  <option value="Majelis Pembimbing">Majelis Pembimbing</option>
+                  <option value="Pimpinan Saka">Pimpinan Saka</option>
+                  <option value="Pamong Saka">Pamong Saka</option>
+                </select>
+              </div>
+              <div>
                 <label className="block font-semibold text-slate-700 mb-1">Pilihan Krida Utama *</label>
                 <select
                   value={krida}
-                  onChange={(e: any) => setKrida(e.target.value)}
+                  onChange={(e: any) => {
+                    const value = e.target.value as KridaType;
+                    setKrida(value);
+                    if (currentPosition === 'Anggota') setKtaInterest(value);
+                  }}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold"
                 >
                   <option value="Krida Pemandu">Krida Pemandu</option>
