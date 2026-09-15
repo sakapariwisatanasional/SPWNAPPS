@@ -375,11 +375,10 @@
 .spwn-hero { background:linear-gradient(180deg,#fbfbfe 0,#f7f5fc 100%); }
 .spwn-hero-panel { position:relative; min-height:390px; border-radius:30px; box-shadow:0 24px 55px rgba(67,45,103,.18); isolation:isolate; }
 /* Background destination photo: kept behind the gradient/content and deliberately low-contrast. */
-.spwn-hero-photo { position:absolute; z-index:1; top:0; right:0; bottom:0; width:58%; overflow:hidden; pointer-events:none; }
+.spwn-hero-photo { position:absolute; z-index:0; top:0; right:0; bottom:0; width:58%; overflow:hidden; pointer-events:none; }
 .spwn-hero-photo img { width:100%; height:100%; object-fit:cover; object-position:center 42%; opacity:.24; filter:saturate(.78) contrast(.88) brightness(.92); mix-blend-mode:screen; }
-.spwn-hero-photo-wash { position:absolute; z-index:4; inset:0; pointer-events:none; background:linear-gradient(90deg, rgba(70,34,169,.98) 0%, rgba(123,44,191,.92) 27%, rgba(217,38,169,.68) 53%, rgba(255,140,36,.28) 77%, rgba(21,159,224,.14) 100%); }
-.spwn-hero-gradient { position:absolute; z-index:5; inset:0; background:linear-gradient(115deg,rgba(70,34,169,.96) 0%,rgba(123,44,191,.88) 27%,rgba(217,38,169,.72) 53%,rgba(255,140,36,.58) 74%,rgba(21,159,224,.48) 100%); }
-.spwn-hero-content { position:relative; z-index:10; }
+.spwn-hero-photo-wash { position:absolute; z-index:1; inset:0; pointer-events:none; background:linear-gradient(90deg, rgba(70,34,169,.98) 0%, rgba(123,44,191,.92) 27%, rgba(217,38,169,.68) 53%, rgba(255,140,36,.28) 77%, rgba(21,159,224,.14) 100%); }
+.spwn-hero-gradient { position:absolute; z-index:2; inset:0; background:linear-gradient(115deg,rgba(70,34,169,.96) 0%,rgba(123,44,191,.88) 27%,rgba(217,38,169,.72) 53%,rgba(255,140,36,.58) 74%,rgba(21,159,224,.48) 100%); }
 .spwn-hero-art { position:absolute; z-index:0; border-radius:999px; filter:blur(40px); pointer-events:none; }
 .spwn-hero-art-a { width:260px;height:260px;left:-90px;top:30px;background:rgba(100,197,29,.20); }
 .spwn-hero-art-b { width:280px;height:280px;right:-100px;bottom:0;background:rgba(21,159,224,.16); }
@@ -433,13 +432,24 @@
 @media (max-width: 640px) {
   .spwn-logo-frame { width:42px;height:42px;border-radius:14px; }
   .spwn-hero-panel { min-height:0; border-radius:22px; }
-  .spwn-hero-panel > .spwn-hero-content { min-height:0; z-index:10; }
-  .spwn-hero-photo { width:100%; opacity:.58; }
+  .spwn-hero-panel > .relative.grid { min-height:0; z-index:3; }
+  .spwn-hero-photo { width:100%; opacity:.72; }
   .spwn-hero-photo img { opacity:.14; object-position:62% 42%; }
-  .spwn-hero-photo-wash { background:linear-gradient(90deg, rgba(70,34,169,.90) 0%, rgba(123,44,191,.78) 52%, rgba(217,38,169,.58) 100%); }
-  .spwn-hero-gradient { background:linear-gradient(115deg, rgba(70,34,169,.88) 0%, rgba(123,44,191,.68) 48%, rgba(217,38,169,.42) 100%); }
+  .spwn-hero-photo-wash { background:linear-gradient(90deg, rgba(70,34,169,.98) 0%, rgba(123,44,191,.94) 48%, rgba(217,38,169,.82) 100%); }
   .spwn-color-card { min-height:125px; padding:.9rem .7rem; border-radius:18px; }
   .spwn-color-card-icon { width:46px;height:46px; margin-bottom:.55rem; }
   .spwn-krida-card { min-height:220px; border-radius:20px; padding:1rem; }
   .spwn-verify-panel { padding:1rem; border-radius:20px; }
+}
+
+/* Landing Hero — clean image-first design. Legacy ribbon/orb/wave ornaments are intentionally disabled. */
+.spwn-hero-ribbon, .spwn-hero-orb, .spwn-wave, .spwn-hero-art { display:none !important; }
+.spwn-hero-user-overlay { position:absolute; inset:0; z-index:4; pointer-events:none; background:linear-gradient(115deg, rgba(70,34,169,.92) 0%, rgba(123,44,191,.68) 50%, rgba(217,38,169,.42) 100%); }
+.spwn-hero-content { position:relative; z-index:10; }
+.spwn-hero-photo { position:absolute; z-index:1; top:0; right:0; bottom:0; width:58%; overflow:hidden; pointer-events:none; }
+.spwn-hero-photo img { width:100%; height:100%; object-fit:cover; opacity:1; filter:saturate(.82) contrast(.9) brightness(.94); mix-blend-mode:screen; }
+@media (max-width: 640px) {
+  .spwn-hero-photo { width:100%; opacity:.3; }
+  .spwn-hero-photo img { opacity:.55; object-position:center center; }
+  .spwn-hero-user-overlay { background:linear-gradient(115deg, rgba(70,34,169,.9) 0%, rgba(123,44,191,.72) 55%, rgba(217,38,169,.48) 100%); }
 }
