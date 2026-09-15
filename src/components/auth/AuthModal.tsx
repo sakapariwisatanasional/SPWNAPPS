@@ -16,13 +16,15 @@ interface AuthModalProps {
   onClose: () => void;
   initialTab?: 'login' | 'register' | 'forgot';
   onLoginSuccess: (user: CurrentUser) => void;
+  currentUser?: CurrentUser;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   initialTab = 'login',
-  onLoginSuccess
+  onLoginSuccess,
+  currentUser
 }) => {
   const [tab, setTab] = useState<'login' | 'register' | 'forgot'>(initialTab);
   const [isLoading, setIsLoading] = useState(false);
@@ -143,10 +145,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Pendaftaran publik hanya boleh memilih Kwartir Daerah (provinsi).
-  // Kwartir Nasional (id 00) tetap tersedia di data master untuk dashboard/admin,
-  // tetapi tidak ditampilkan kepada pengunjung umum.
-  const provinces = PROVINCES_DATA.filter(p => p.id !== '00');
+  const provinces = PROVINCES_DATA;
 
   // ============================================================
   // IMAGE COMPRESSION
@@ -666,74 +665,76 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         requestId: result?.requestId
       });
       // --------------------------------------------------------
-      // BARU DI SINI BOLEH MENYIMPAN KE LOCAL STORAGE
-      //
-      // Karena server sudah mengonfirmasi keberhasilan.
+      // SIMPAN DATA ANGGOTA KE CACHE LOKAL
       // --------------------------------------------------------
-      const registeredMember =
-        result.member;
+      // Data anggota tetap boleh dicache setelah server berhasil.
+      // Tetapi ketika pendaftaran dilakukan oleh SuperAdmin, JANGAN
+      // mengganti sesi SuperAdmin dengan akun anggota baru.
+      const registeredMember = result.member;
+      const registeredUser = result.user as CurrentUser;
+      const isAdminRegistration = currentUser?.role === 'SUPER_ADMIN';
 
-      const registeredUser =
-        result.user as CurrentUser;
-
-      const existingMembers =
-        storage.getMembers();
-
-      storage.setMembers([
-        registeredMember,
-        ...existingMembers.filter(
-          m =>
-            m.id !==
-            registeredMember.id
-        )
-      ]);
-
-      const existingUsers =
-        storage.getUsers();
-
-      storage.setUsers([
-        registeredUser,
-        ...existingUsers.filter(
-          u =>
-            u.id !==
-            registeredUser.id
-        )
-      ]);
-
-      // --------------------------------------------------------
-      // SIMPAN TOKEN SESI
-      // --------------------------------------------------------
-      if (result.token) {
-        storage.setAuthToken(
-          result.token
-        );
+      if (registeredMember) {
+        const existingMembers = storage.getMembers();
+        storage.setMembers([
+          registeredMember,
+          ...existingMembers.filter(m => m.id !== registeredMember.id)
+        ]);
       }
 
-      storage.setCurrentUser(
-        registeredUser
-      );
+      if (registeredUser) {
+        const existingUsers = storage.getUsers();
+        storage.setUsers([
+          registeredUser,
+          ...existingUsers.filter(u => u.id !== registeredUser.id)
+        ]);
+      }
+
+      // --------------------------------------------------------
+      // JANGAN MENGAMBIL ALIH SESI SUPERADMIN
+      // --------------------------------------------------------
+      // Pendaftaran publik tetap menggunakan perilaku lama: akun baru
+      // langsung menjadi sesi pengguna tersebut.
+      // Pendaftaran dari dashboard SuperAdmin hanya membuat akun anggota;
+      // sesi yang sedang aktif tetap SuperAdmin.
+      if (!isAdminRegistration) {
+        if (result.token) {
+          storage.setAuthToken(result.token);
+        }
+
+        if (registeredUser) {
+          storage.setCurrentUser(registeredUser);
+        }
+      }
 
       // --------------------------------------------------------
       // SUKSES
       // --------------------------------------------------------
       setRegSuccessMsg(
-        `Pendaftaran berhasil dan data telah dikirim ke sistem. Selamat datang, ${fullName}.`
+        isAdminRegistration
+          ? `Anggota ${fullName} berhasil didaftarkan. Sesi SuperAdmin tetap aktif.`
+          : `Pendaftaran berhasil dan data telah dikirim ke sistem. Selamat datang, ${fullName}.`
       );
 
       setRegError('');
-
       setIsLoading(false);
 
       // --------------------------------------------------------
-      // MASUK OTOMATIS
+      // AUTO LOGIN HANYA UNTUK PENDAFTARAN PUBLIK
       // --------------------------------------------------------
-      setTimeout(() => {
-        onLoginSuccess(
-          registeredUser
-        );
-
-        onClose();
-      }, 1200);
+      if (!isAdminRegistration) {
+        setTimeout(() => {
+          if (registeredUser) {
+            onLoginSuccess(registeredUser);
+          }
+          onClose();
+        }, 1200);
+      } else {
+        // SuperAdmin tetap berada di dashboard setelah membuat anggota.
+        setTimeout(() => {
+          onClose();
+        }, 1200);
+      }
 
     } catch (err: any) {
       console.error(
