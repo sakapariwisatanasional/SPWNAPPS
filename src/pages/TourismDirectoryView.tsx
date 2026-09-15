@@ -94,7 +94,7 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
     }
   };
 
-  const isAdmin = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+  const isAdmin = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
 
   return (
     <div className="space-y-6 pb-12">
