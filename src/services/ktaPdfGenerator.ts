@@ -77,9 +77,29 @@ async function captureRenderedKtaSide(
 ): Promise<string | null> {
   if (typeof document === 'undefined') return null;
 
-  const element = Array.from(
-    document.querySelectorAll<HTMLElement>(`[data-kta-render-side="${side}"]`)
-  ).find(el => el.dataset.ktaMemberId === String(member.id || '')) || null;
+  const memberId = String(member.id || '');
+
+  // Prefer the preview inside KtaPrintPdfModal. There can be another
+  // DigitalMemberCard on the page (for example the normal My Card view),
+  // and that instance may use an older/stale settings snapshot. The PDF
+  // must capture the exact preview that is currently shown in the export
+  // modal, including the published designer settings.
+  const pdfPreview = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '[data-kta-pdf-preview="true"]'
+    )
+  ).find(el => el.dataset.ktaPdfMemberId === memberId) || null;
+
+  const element = (pdfPreview
+    ? pdfPreview.querySelector<HTMLElement>(
+        `[data-kta-render-side="${side}"]`
+      )
+    : null) || Array.from(
+      document.querySelectorAll<HTMLElement>(
+        `[data-kta-render-side="${side}"]`
+      )
+    ).find(el => el.dataset.ktaMemberId === memberId) || null;
+
   if (!element) return null;
 
   // The back side normally has rotateY(180deg) and backface-visibility:hidden
@@ -454,6 +474,10 @@ function fieldValue(member: Member, field: string): string {
     provinceName: member.provinceName,
     regencyName: member.regencyName,
     districtName: member.districtName,
+    kwartirName: member.kwartirName,
+    kwartirHierarchy: member.kwartirHierarchy,
+    branchName: member.branchName,
+    gugusDepan: member.gugusDepan,
     krida: member.krida,
     phone: member.phone,
     email: member.email,
@@ -474,16 +498,25 @@ function drawConfiguredText(ctx: CanvasRenderingContext2D, text: string, cfg: an
   const x = pxX(cfg.x);
   const y = pxY(cfg.y);
   const maxW = pxW(cfg.width);
-  const lineHeight = Number(cfg.lineHeight || 1.2) * Math.max(7, Number(cfg.fontSize) || 9);
+  const fontSize = Math.max(7, Number(cfg.fontSize) || 9);
+  const lineHeight = Number(cfg.lineHeight || 1.2) * fontSize;
   const value = cfg.textTransform === 'uppercase' ? text.toUpperCase() : cfg.textTransform === 'lowercase' ? text.toLowerCase() : text;
   applyTextStyle(ctx, cfg, fallbackColor);
   ctx.save();
-  if (cfg.letterSpacing) {
-    // Canvas has no portable letterSpacing; draw the normal text and keep the setting for browser parity.
+
+  // DigitalMemberCard uses nowrap by default. Only wrap when the designer
+  // explicitly selects whiteSpace="normal". This keeps the fallback renderer
+  // visually aligned with the live card instead of unexpectedly reflowing
+  // names, headings, and labels.
+  if (cfg.whiteSpace !== 'normal') {
+    ctx.fillText(String(value), x, y + fontSize, maxW);
+    ctx.restore();
+    return;
   }
+
   const words = String(value).split(/\s+/);
   let line = '';
-  let yy = y + Math.max(7, Number(cfg.fontSize) || 9);
+  let yy = y + fontSize;
   for (const word of words) {
     const candidate = line ? `${line} ${word}` : word;
     if (ctx.measureText(candidate).width > maxW && line) {
@@ -526,13 +559,23 @@ function drawConfiguredLogos(ctx: CanvasRenderingContext2D, logoImages: Array<{c
 }
 
 function drawBackground(ctx: CanvasRenderingContext2D, settings: KtaCardSettings, side:'FRONT'|'BACK', bgImg:HTMLImageElement|null, theme:any) {
-  const grad=ctx.createLinearGradient(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-  const colors=side==='FRONT'?theme.frontGrad:theme.backGrad;
-  grad.addColorStop(0,colors[0]); grad.addColorStop(.55,colors[1]); grad.addColorStop(1,colors[2]);
-  ctx.fillStyle=grad; ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-  if(bgImg && (bgImg.naturalWidth||bgImg.width)) { ctx.save(); ctx.globalAlpha=settings.bgOpacity ?? .10; ctx.drawImage(bgImg,0,0,CANVAS_WIDTH,CANVAS_HEIGHT); ctx.restore(); }
-  const custom = side==='FRONT'?settings.customBackgroundColorFront:settings.customBackgroundColorBack;
-  if(custom) { ctx.save(); ctx.globalAlpha=Math.min(1, settings.bgOpacity ?? .10); ctx.fillStyle=custom; ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT); ctx.restore(); }
+  const custom = side==='FRONT' ? settings.customBackgroundColorFront : settings.customBackgroundColorBack;
+
+  // Match DigitalMemberCard.bgStyle exactly: a configured solid color is
+  // the actual background, not a translucent overlay on top of a gradient.
+  // This was the main source of the large visual difference in the exported
+  // PDF when no background image was configured.
+  ctx.fillStyle = custom || (side === 'FRONT' ? '#24105b' : '#111827');
+  ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+
+  if (bgImg && (bgImg.naturalWidth || bgImg.width)) {
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.drawImage(bgImg,0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+    ctx.restore();
+  }
 }
 
 function drawFrontSystemElements(ctx: CanvasRenderingContext2D, member: Member, settings: KtaCardSettings, logoImg:HTMLImageElement, avatarImg:HTMLImageElement, qrImg:HTMLImageElement, theme:any) {
