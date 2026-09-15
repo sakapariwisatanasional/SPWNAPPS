@@ -283,7 +283,9 @@ function saveDatabase() {
   }
 }
 
+let serverHasSnapshot = false;
 loadDatabase();
+if (db.members.length > 0 || db.tours.length > 0 || db.culinaryItems.length > 0 || db.activities.length > 0 || db.users.length > 0) serverHasSnapshot = true;
 initializeUsersAndSuperAdmin();
 
 // GViz API fetcher helper
@@ -378,9 +380,20 @@ function getColVal(row: Record<string, any>, aliases: string[]): string {
 }
 
 // Full sync from Google Spreadsheet to Central Server DB
+let syncInFlight: Promise<{ success: boolean; message: string }> | null = null;
+const SERVER_DATA_CACHE_TTL_MS = 60_000;
+const SERVER_DATA_STALE_MAX_MS = 10 * 60_000;
+
+function serverSnapshotAgeMs(): number {
+  const t = Date.parse(String(db.lastUpdated || ''));
+  return Number.isFinite(t) ? Math.max(0, Date.now() - t) : Number.POSITIVE_INFINITY;
+}
+
 async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message: string }> {
-  console.log('[Sync] Starting full sync from Google Spreadsheet...');
-  try {
+  if (syncInFlight) return syncInFlight;
+  syncInFlight = (async () => {
+    console.log('[Sync] Starting full sync from Google Spreadsheet...');
+    try {
     // 1. Sync Anggota
     const memberRows = await fetchSheetGViz('Anggota');
     if (Array.isArray(memberRows)) {
@@ -597,12 +610,17 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
     db.config.lastSyncedAt = new Date().toISOString();
     db.config.status = 'CONNECTED';
     saveDatabase();
-    console.log(`[Sync] Full sync complete: ${db.members.length} members, ${db.tours.length} tours, ${db.culinaryItems.length} culinary, ${db.activities.length} activities.`);
-    return { success: true, message: 'Sinkronisasi berhasil' };
-  } catch (e: any) {
-    console.error('[Sync] Error syncing from spreadsheet:', e);
-    return { success: false, message: e.message };
-  }
+      serverHasSnapshot = true;
+      console.log(`[Sync] Full sync complete: ${db.members.length} members, ${db.tours.length} tours, ${db.culinaryItems.length} culinary, ${db.activities.length} activities.`);
+      return { success: true, message: 'Sinkronisasi berhasil' };
+    } catch (e: any) {
+      console.error('[Sync] Error syncing from spreadsheet:', e);
+      return { success: false, message: e.message };
+    } finally {
+      syncInFlight = null;
+    }
+  })();
+  return syncInFlight;
 }
 
 // Initial background sync
@@ -1163,16 +1181,35 @@ function serverMemberBelongsToAdminJurisdiction(member: any, session: any): bool
 }
 
 app.get('/api/data', async (req, res) => {
-  // Always obtain the authoritative snapshot from GAS before responding.
-  // This prevents a new phone/tablet/desktop from inheriting an old in-memory
-  // server snapshot.
-  const syncResult = await syncFromGoogleSpreadsheet();
-  if (!syncResult.success) {
-    return res.status(502).json({
-      success: false,
-      message: 'Gagal mengambil data terbaru dari Google Spreadsheet melalui GAS.',
-      source: 'google-apps-script'
-    });
+  // Fast path / stale-while-revalidate: jangan membaca Spreadsheet pada setiap
+  // pembukaan aplikasi. Cold start tetap membaca sumber master; request berikutnya
+  // menggunakan snapshot server dan refresh berjalan di background.
+  const ageMs = serverSnapshotAgeMs();
+  const forceRefresh = String(req.query.refresh || '') === '1';
+  const hasSnapshot = serverHasSnapshot;
+
+  if (!hasSnapshot || forceRefresh) {
+    const syncResult = await syncFromGoogleSpreadsheet();
+    if (!syncResult.success && !hasSnapshot) {
+      return res.status(502).json({
+        success: false,
+        message: 'Gagal mengambil data terbaru dari Google Spreadsheet melalui GAS.',
+        source: 'google-apps-script'
+      });
+    }
+  } else if (ageMs > SERVER_DATA_CACHE_TTL_MS) {
+    void syncFromGoogleSpreadsheet().catch(() => {});
+  }
+
+  if (serverSnapshotAgeMs() > SERVER_DATA_STALE_MAX_MS && !syncInFlight) {
+    const syncResult = await syncFromGoogleSpreadsheet();
+    if (!syncResult.success && serverSnapshotAgeMs() > SERVER_DATA_STALE_MAX_MS) {
+      return res.status(502).json({
+        success: false,
+        message: 'Cache server terlalu lama dan Google Spreadsheet belum dapat disinkronkan.',
+        source: 'google-apps-script'
+      });
+    }
   }
 
   const session = getSessionUser(req);
@@ -1236,7 +1273,18 @@ app.get('/api/data', async (req, res) => {
         lastSyncedAt: db.config.lastSyncedAt
       };
 
+  const snapshotAge = serverSnapshotAgeMs();
+  res.set({
+    'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
+    'X-SPWAPP-Data-Age-Ms': String(snapshotAge),
+    'X-SPWAPP-Data-Source': snapshotAge <= SERVER_DATA_CACHE_TTL_MS ? 'server-cache-fresh' : 'server-cache-stale'
+  });
+
   res.json({
+    success: true,
+    dataFreshAt: db.lastUpdated,
+    dataAgeMs: snapshotAge,
+    dataSource: snapshotAge <= SERVER_DATA_CACHE_TTL_MS ? 'server-cache-fresh' : 'server-cache-stale',
     members: sanitizedMembers,
     tours: db.tours.filter(t => isSuperAdmin || isOperator || t.status === 'APPROVED_PUBLISHED'),
     culinaryItems: db.culinaryItems.filter(c => isSuperAdmin || isOperator || c.status === 'APPROVED' || (session?.role === 'MEMBER' && session.memberId && String(c.authorMemberId) === String(session.memberId))),
