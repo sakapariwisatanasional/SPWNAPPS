@@ -217,8 +217,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               return <button key={item.id} type="button" onClick={() => scrollTo(item.id)} className="spwn-mobile-menu-item"><Icon className="w-5 h-5 mx-auto mb-1 text-[#7b2cbf]" /><span>{item.label}</span></button>;
             })}
             <button type="button" onClick={() => openTool('verify')} className="spwn-mobile-menu-item"><ShieldCheck className="w-5 h-5 mx-auto mb-1 text-[#159f6b]" /><span>Verifikasi</span></button>
-            {currentUser?.role === 'PUBLIC' ? <button type="button" onClick={onOpenLoginModal} className="spwn-mobile-menu-item"><LockKeyhole className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Masuk</span></button> : <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="spwn-mobile-menu-item"><LayoutDashboard className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Panel</span></button>}
-            {currentUser?.role === 'PUBLIC' && <button type="button" onClick={onOpenRegisterModal} className="spwn-mobile-menu-item"><UserPlus className="w-5 h-5 mx-auto mb-1 text-[#f59e0b]" /><span>Daftar</span></button>}
+            {currentUser?.role === 'PUBLIC' ? <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenLoginModal(); }} className="spwn-mobile-menu-item"><LockKeyhole className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Masuk</span></button> : <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="spwn-mobile-menu-item"><LayoutDashboard className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Panel</span></button>}
+            {currentUser?.role === 'PUBLIC' && <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenRegisterModal(); }} className="spwn-mobile-menu-item"><UserPlus className="w-5 h-5 mx-auto mb-1 text-[#f59e0b]" /><span>Daftar</span></button>}
           </div>
         )}
       </header>
@@ -236,7 +236,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               <div className="spwn-hero-gradient" />
               <div className="spwn-hero-photo-wash" aria-hidden="true" />
               <div className="absolute inset-0 pointer-events-none opacity-90" style={{ backgroundImage: 'radial-gradient(circle at 73% 35%, rgba(255,255,255,.25) 0 2px, transparent 3px), radial-gradient(circle at 85% 68%, rgba(255,255,255,.18) 0 1.5px, transparent 2px)' }} />
-              <div className="relative grid lg:grid-cols-[1.02fr_.98fr] min-h-[390px] sm:min-h-[450px]">
+              <div className="spwn-hero-content relative grid lg:grid-cols-[1.02fr_.98fr] min-h-[390px] sm:min-h-[450px]">
                 <div className="p-7 sm:p-10 lg:p-12 flex flex-col justify-center text-white">
                   <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-[.13em] backdrop-blur-md"><Sparkles className="w-3.5 h-3.5 text-[#ffd166]" /> Saka Pariwisata Nasional</div>
                   <h1 className="mt-5 text-[2.6rem] sm:text-5xl lg:text-[4.35rem] font-black tracking-[-.045em] leading-[.95]">Jelajahi.<br /><span className="text-[#ffd166]">Berkarya.</span><br /><span className="text-white">Berdaya.</span></h1>
