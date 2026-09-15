@@ -33,7 +33,8 @@ import {
 } from 'lucide-react';
 import { storage } from '../../services/storage';
 import { spreadsheetService } from '../../services/spreadsheetService';
-import { Member, CurrentUser, Province, Regency, District, KridaType, MemberStatus, MemberSkill, SkillProficiency, Skill } from '../../types';
+import { Member, CurrentUser, Province, Regency, District, KridaType, KtaInterestType, MemberStatus, MemberSkill, SkillProficiency, Skill,
+  getMemberKwartirLevel, getMemberKwartirName, getMemberKwartirHierarchy } from '../../types';
 import { formatDriveImageUrl, getDriveDirectFallbackUrl, getValidAvatarUrl } from '../common/SakaLogo';
 import { GOOGLE_DRIVE_MAIN_FOLDER } from '../../services/driveRepository';
 
@@ -124,6 +125,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
   // Saka Position & Status
   const [krida, setKrida] = useState<KridaType>('Krida Pemandu');
+  const [ktaInterest, setKtaInterest] = useState<KtaInterestType>('Krida Pemandu');
   const [currentPosition, setCurrentPosition] = useState('');
   const [joinYear, setJoinYear] = useState(2024);
   const [status, setStatus] = useState<MemberStatus>('ACTIVE');
@@ -234,7 +236,12 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       setSelectedDistrictId(districtId);
 
       setKrida(member.krida || 'Krida Pemandu');
-      setCurrentPosition(member.currentPosition || 'Anggota Krida Pemandu');
+      setKtaInterest(member.ktaInterest || member.krida || 'Krida Pemandu');
+      setCurrentPosition(
+        ['Mabisaka', 'Pimpinan Saka', 'Pamong Saka', 'Anggota'].includes(member.currentPosition || '')
+          ? (member.currentPosition || 'Anggota')
+          : 'Anggota'
+      );
       setJoinYear(member.joinYear || 2024);
       setStatus(member.status || 'ACTIVE');
       setEducationLevel(member.educationLevel || 'SMA / Sederajat');
@@ -296,6 +303,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
   if (!isOpen || !member) return null;
 
+  const isNationalAdmin = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN_NATIONAL';
   const isRegencyOperator = currentUser.role === 'ADMIN_REGENCY';
   const isProvinceAdmin = currentUser.role === 'ADMIN_PROVINCE';
   const isBranchAdmin = currentUser.role === 'ADMIN_BRANCH';
@@ -477,7 +485,17 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             districtId: selectedDistrictId,
             districtName: currentDistrict?.name || member.districtName,
             krida,
-            currentPosition: currentPosition.trim() || `Anggota ${krida}`,
+            currentPosition: currentPosition.trim() || 'Anggota',
+            ktaInterest,
+            kwartirLevel: member.kwartirLevel || (
+              isSelfEditor ? getMemberKwartirLevel(selectedProvinceId, selectedRegencyId, selectedDistrictId)
+                : isNationalAdmin ? 'NASIONAL'
+                : isProvinceAdmin ? 'DAERAH'
+                : isRegencyOperator ? 'CABANG'
+                : 'RANTING'
+            ),
+            kwartirName: getMemberKwartirName(selectedProvinceId, provinces.find(p => p.id === selectedProvinceId)?.name, selectedRegencyId, regencies.find(r => r.id === selectedRegencyId)?.name, districts.find(d => d.id === selectedDistrictId)?.name),
+            kwartirHierarchy: getMemberKwartirHierarchy(selectedProvinceId, provinces.find(p => p.id === selectedProvinceId)?.name, regencies.find(r => r.id === selectedRegencyId)?.name, districts.find(d => d.id === selectedDistrictId)?.name),
             educationLevel,
             occupation: occupation.trim(),
             bio: bio.trim(),
@@ -499,7 +517,17 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             districtId: selectedDistrictId,
             districtName: currentDistrict?.name || member.districtName,
             krida,
-            currentPosition: currentPosition.trim() || `Anggota ${krida}`,
+            currentPosition: currentPosition.trim() || 'Anggota',
+            ktaInterest,
+            kwartirLevel: member.kwartirLevel || (
+              isSelfEditor ? getMemberKwartirLevel(selectedProvinceId, selectedRegencyId, selectedDistrictId)
+                : isNationalAdmin ? 'NASIONAL'
+                : isProvinceAdmin ? 'DAERAH'
+                : isRegencyOperator ? 'CABANG'
+                : 'RANTING'
+            ),
+            kwartirName: getMemberKwartirName(selectedProvinceId, provinces.find(p => p.id === selectedProvinceId)?.name, selectedRegencyId, regencies.find(r => r.id === selectedRegencyId)?.name, districts.find(d => d.id === selectedDistrictId)?.name),
+            kwartirHierarchy: getMemberKwartirHierarchy(selectedProvinceId, provinces.find(p => p.id === selectedProvinceId)?.name, regencies.find(r => r.id === selectedRegencyId)?.name, districts.find(d => d.id === selectedDistrictId)?.name),
             joinYear: Number(joinYear),
             status,
             educationLevel,
@@ -1184,10 +1212,31 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             <div className="space-y-4 animate-in fade-in duration-100">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
+                  <label className="block font-bold text-slate-800 mb-1">Peminatan Krida Saka pada KTA</label>
+                  <select
+                    value={ktaInterest}
+                    onChange={(e) => setKtaInterest(e.target.value as KtaInterestType)}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800 font-semibold"
+                  >
+                    <option value="Krida Pemandu">Krida Pemandu (Tour Guiding & Ekowisata)</option>
+                    <option value="Krida Penyuluh">Krida Penyuluh (Sadarlah Sapta Pesona & Edukasi)</option>
+                    <option value="Krida Mice & Event">Krida MICE & Event (Manajemen Acara & Atraksi)</option>
+                    <option value="Krida Kuliner & Cinderamata">Krida Kuliner & Cinderamata (UMKM & Budaya)</option>
+                    <option value="Majelis Pembimbing">Majelis Pembimbing</option>
+                    <option value="Pimpinan Saka">Pimpinan Saka</option>
+                    <option value="Pamong Saka">Pamong Saka</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="block font-bold text-slate-800 mb-1">Peminatan Krida Saka</label>
                   <select
                     value={krida}
-                    onChange={(e: any) => setKrida(e.target.value)}
+                    onChange={(e: any) => {
+                      const value = e.target.value as KridaType;
+                      setKrida(value);
+                      if (currentPosition === 'Anggota') setKtaInterest(value);
+                    }}
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800 font-semibold"
                   >
                     <option value="Krida Pemandu">Krida Pemandu (Tour Guiding & Ekowisata)</option>
@@ -1199,13 +1248,22 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
                 <div>
                   <label className="block font-bold text-slate-800 mb-1">Jabatan</label>
-                  <input
-                    type="text"
+                  <select
                     value={currentPosition}
-                    onChange={(e) => setCurrentPosition(e.target.value)}
-                    placeholder="Contoh: Anggota Krida / Dewan Saka / Instruktur / Pimpinan"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setCurrentPosition(value);
+                      if (value === 'Mabisaka' || value === 'Pimpinan Saka' || value === 'Pamong Saka') {
+                        setKtaInterest(value === 'Mabisaka' ? 'Majelis Pembimbing' : value as KtaInterestType);
+                      }
+                    }}
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800"
-                  />
+                  >
+                    <option value="Mabisaka">Mabisaka</option>
+                    <option value="Pimpinan Saka">Pimpinan Saka</option>
+                    <option value="Pamong Saka">Pamong Saka</option>
+                    <option value="Anggota">Anggota</option>
+                  </select>
                 </div>
 
                 <div>
