@@ -63,7 +63,7 @@ export const MemberSkillManagementModal: React.FC<MemberSkillManagementModalProp
   const [approvalNotesPrompt, setApprovalNotesPrompt] = useState<{ skillId: string; skillName: string } | null>(null);
   const [customApprovalNotes, setCustomApprovalNotes] = useState('');
 
-  const isAdminOrOperator = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+  const isAdminOrOperator = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
 
   useEffect(() => {
     if (isOpen) {
