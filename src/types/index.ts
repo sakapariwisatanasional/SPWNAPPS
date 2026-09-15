@@ -1,5 +1,6 @@
 export type UserRole = 
-  | 'SUPER_ADMIN'      // Kwartir Nasional (Nasional)
+  | 'SUPER_ADMIN'      // Pengendali sistem tertinggi / Kwartir Nasional
+  | 'ADMIN_NATIONAL'   // Admin operasional Kwartir Nasional
   | 'ADMIN_PROVINCE'   // Kwartir Daerah (Provinsi)
   | 'ADMIN_REGENCY'    // Kwartir Cabang (Kabupaten/Kota)
   | 'ADMIN_BRANCH'     // Kwartir Ranting (Kecamatan/Ranting)
