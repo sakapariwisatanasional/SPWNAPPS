@@ -841,15 +841,14 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
         onClose={() => setIsScannerOpen(false)}
         localMembers={members}
         onScanSuccess={(scannedMember, result) => {
+          // Setelah barcode/QR tervalidasi dari database authoritative,
+          // langsung buka profil anggota terverifikasi.
           setSearchedMember(scannedMember);
           setVerificationMeta(result);
           setVerifyInput(scannedMember.nationalMemberNumber || scannedMember.verificationToken || scannedMember.id);
           setNotFound(false);
-          // Scroll to verification card
-          const el = document.getElementById('verifikasi-kta');
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth' });
-          }
+          setIsScannerOpen(false);
+          onOpenVerifyModal(scannedMember);
         }}
       />
     </div>
