@@ -828,10 +828,15 @@ class SpreadsheetService {
           ]);
           
           let krida: any = 'Krida Pemandu';
-          if (kridaRaw.toLowerCase().includes('penyuluh')) krida = 'Krida Penyuluh';
-          else if (kridaRaw.toLowerCase().includes('mice') || kridaRaw.toLowerCase().includes('event')) krida = 'Krida Mice & Event';
-          else if (kridaRaw.toLowerCase().includes('kuliner') || kridaRaw.toLowerCase().includes('cinderamata') || kridaRaw.toLowerCase().includes('kriya')) krida = 'Krida Kuliner & Cinderamata';
-          else if (kridaRaw.toLowerCase().includes('pemandu') || kridaRaw.toLowerCase().includes('guide')) krida = 'Krida Pemandu';
+          let ktaInterest: any = kridaRaw || 'Krida Pemandu';
+          if (/^(mabisaka|majelis pembimbing)$/i.test(String(kridaRaw).trim())) ktaInterest = 'Majelis Pembimbing';
+          else if (/^pimpinan saka$/i.test(String(kridaRaw).trim())) ktaInterest = 'Pimpinan Saka';
+          else if (/^pamong saka$/i.test(String(kridaRaw).trim())) ktaInterest = 'Pamong Saka';
+          if (String(kridaRaw).toLowerCase().includes('penyuluh')) krida = 'Krida Penyuluh';
+          else if (String(kridaRaw).toLowerCase().includes('mice') || String(kridaRaw).toLowerCase().includes('event')) krida = 'Krida Mice & Event';
+          else if (String(kridaRaw).toLowerCase().includes('kuliner') || String(kridaRaw).toLowerCase().includes('cinderamata') || String(kridaRaw).toLowerCase().includes('kriya')) krida = 'Krida Kuliner & Cinderamata';
+          else if (String(kridaRaw).toLowerCase().includes('pemandu') || String(kridaRaw).toLowerCase().includes('guide')) krida = 'Krida Pemandu';
+          if (['Majelis Pembimbing', 'Pimpinan Saka', 'Pamong Saka'].includes(ktaInterest)) krida = 'Krida Pemandu';
 
           const statusRaw = (this.getRowValue(row, ['Status', 'status', 'Status Keanggotaan', 'col_10']) || 'ACTIVE').toUpperCase();
           const phone = this.normalizePhoneNumber(this.getRowValue(row, [
@@ -1533,7 +1538,7 @@ class SpreadsheetService {
       member.regencyName || '',
       member.districtName || '',
       member.currentPosition || '',
-      member.krida || '',
+      (member.ktaInterest || member.krida || ''),
       member.status || 'PENDING',
       /^data:image\//i.test(String(member.avatarUrl || '')) ? '' : (member.avatarUrl || ''),
       member.registeredAt || new Date().toISOString(),
@@ -1558,6 +1563,7 @@ class SpreadsheetService {
         districtName: member.districtName || '',
         currentPosition: member.currentPosition || '',
         krida: member.krida || '',
+        ktaInterest: member.ktaInterest || member.krida || '',
         status: member.status || 'PENDING',
         avatarUrl: /^data:image\//i.test(String(member.avatarUrl || '')) ? '' : (member.avatarUrl || ''),
         registeredAt: member.registeredAt || new Date().toISOString(),
