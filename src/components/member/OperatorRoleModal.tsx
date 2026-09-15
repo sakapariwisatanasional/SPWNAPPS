@@ -86,7 +86,10 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
       let jurisdictionId = selectedRegencyId;
       let jurisdictionName = '';
 
-      if (selectedRole === 'ADMIN_PROVINCE') {
+      if (selectedRole === 'ADMIN_NATIONAL') {
+        jurisdictionId = '00';
+        jurisdictionName = 'Kwartir Nasional';
+      } else if (selectedRole === 'ADMIN_PROVINCE') {
         jurisdictionId = selectedProvinceId;
         const prov = provinces.find(p => p.id === selectedProvinceId);
         jurisdictionName = prov ? `Kwarda ${prov.name}` : `Kwarda ID ${selectedProvinceId}`;
@@ -130,7 +133,7 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
     }
 
     const confirmRevoke = window.confirm(
-      `PERHATIAN: Anda yakin ingin MEMBATALKAN wewenang Operator dari ${member.fullName}?\n\nAnggota ini tidak lagi dapat menginput atau mengedit data anggota di kwartirnya.`
+      `PERHATIAN: Anda yakin ingin MEMBATALKAN wewenang Operator dari ${member.fullName}?\n\nAnggota ini tidak lagi dapat menginput atau mengedit data anggota di wilayah kewenangannya.`
     );
     if (!confirmRevoke) return;
 
@@ -181,7 +184,7 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tetapkan atau batalkan wewenang anggota sebagai Operator Kwartir (Kwarcab / Kwarda)
+                Tetapkan atau batalkan wewenang anggota sebagai Admin Kwartir (Nasional / Kwarda / Kwarcab / Kecamatan)
               </p>
             </div>
           </div>
@@ -225,7 +228,8 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Hak Akses</p>
             <p className={`text-xs font-extrabold ${member.isOperator ? 'text-purple-700' : 'text-slate-700'}`}>
               {member.isOperator 
-                ? (member.operatorRole === 'ADMIN_REGENCY' ? 'Operator Kwarcab' :
+                ? (member.operatorRole === 'ADMIN_NATIONAL' ? 'Admin Nasional' :
+                   member.operatorRole === 'ADMIN_REGENCY' ? 'Operator Kwarcab' :
                    member.operatorRole === 'ADMIN_PROVINCE' ? 'Operator Kwarda' : 'Operator Kecamatan')
                 : 'Anggota Reguler'}
             </p>
@@ -309,7 +313,32 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
                 <label className="block font-bold text-slate-800 mb-1.5">
                   1. Tingkat Wewenang Operator <span className="text-red-500">*</span>
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  <label className={`p-3 rounded-2xl border flex flex-col gap-1 cursor-pointer transition-all ${
+                    selectedRole === 'ADMIN_NATIONAL' 
+                      ? 'bg-purple-50/80 border-purple-500 ring-2 ring-purple-500/20 text-purple-950' 
+                      : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs">Admin Nasional</span>
+                      <input
+                        type="radio"
+                        name="operatorRole"
+                        value="ADMIN_NATIONAL"
+                        checked={selectedRole === 'ADMIN_NATIONAL'}
+                        onChange={() => {
+                          setSelectedRole('ADMIN_NATIONAL');
+                          setSelectedProvinceId('00');
+                          setSelectedRegencyId('00.00');
+                        }}
+                        className="accent-purple-600"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
+                      Pengelola Kwartir Nasional (seluruh data anggota Indonesia)
+                    </p>
+                  </label>
+
                   <label className={`p-3 rounded-2xl border flex flex-col gap-1 cursor-pointer transition-all ${
                     selectedRole === 'ADMIN_REGENCY' 
                       ? 'bg-purple-50/80 border-purple-500 ring-2 ring-purple-500/20 text-purple-950' 
@@ -376,6 +405,7 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
               </div>
 
               {/* Wilayah Yurisdiksi Dropdown */}
+              {selectedRole !== 'ADMIN_NATIONAL' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
                   <label className="block font-bold text-slate-800 mb-1">
@@ -414,6 +444,14 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
                   </div>
                 )}
               </div>
+              )}
+
+              {selectedRole === 'ADMIN_NATIONAL' && (
+                <div className="rounded-xl border border-purple-200 bg-purple-50/70 px-3 py-2.5 text-[11px] text-purple-900">
+                  <strong>Kwartir Nasional</strong> — Admin Nasional memiliki cakupan seluruh Indonesia.
+                  Pemilihan provinsi, kabupaten/kota, dan kecamatan tidak diperlukan.
+                </div>
+              )}
 
               {/* Surat Keputusan / Catatan Penugasan */}
               <div>
