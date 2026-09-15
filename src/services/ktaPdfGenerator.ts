@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
+import html2canvas from 'html2canvas';
 import { Member, KtaCardSettings } from '../types';
 import { DEFAULT_KTA_SETTINGS } from './storage';
 import { 
@@ -63,6 +64,74 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     };
     img.src = primaryUrl;
   });
+}
+
+/**
+ * Capture the actual DigitalMemberCard DOM so PDF output uses the exact same
+ * visual layout as the on-screen KTA preview. A canvas renderer is retained
+ * as a fallback for contexts where the live card is unavailable.
+ */
+async function captureRenderedKtaSide(
+  member: Member,
+  side: 'front' | 'back'
+): Promise<string | null> {
+  if (typeof document === 'undefined') return null;
+
+  const element = Array.from(
+    document.querySelectorAll<HTMLElement>(`[data-kta-render-side="${side}"]`)
+  ).find(el => el.dataset.ktaMemberId === String(member.id || '')) || null;
+  if (!element) return null;
+
+  // The back side normally has rotateY(180deg) and backface-visibility:hidden
+  // because it is part of the interactive 3D preview. Temporarily neutralize
+  // those presentation-only transforms while capturing the actual DOM.
+  const sideEl = element;
+  const innerEl = sideEl.parentElement as HTMLElement | null;
+  const outerEl = innerEl?.parentElement as HTMLElement | null;
+  const original = {
+    sideTransform: sideEl.style.transform,
+    sideBackface: sideEl.style.backfaceVisibility,
+    innerTransform: innerEl?.style.transform || '',
+    innerTransition: innerEl?.style.transition || '',
+    outerTransform: outerEl?.style.transform || ''
+  };
+
+  try {
+    if (innerEl) {
+      innerEl.style.transition = 'none';
+      innerEl.style.transform = 'none';
+    }
+    if (outerEl) outerEl.style.transform = 'none';
+    sideEl.style.transform = 'none';
+    sideEl.style.backfaceVisibility = 'visible';
+
+    // Let browser fonts/images finish painting before the snapshot.
+    if (document.fonts?.ready) await document.fonts.ready;
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+    const canvas = await html2canvas(sideEl, {
+      scale: 4,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: null,
+      logging: false,
+      imageTimeout: 15000,
+      removeContainer: true
+    });
+
+    return canvas.toDataURL('image/png');
+  } catch (error) {
+    console.warn(`[KTA PDF] Gagal menangkap DOM ${side}:`, error);
+    return null;
+  } finally {
+    sideEl.style.transform = original.sideTransform;
+    sideEl.style.backfaceVisibility = original.sideBackface;
+    if (innerEl) {
+      innerEl.style.transform = original.innerTransform;
+      innerEl.style.transition = original.innerTransition;
+    }
+    if (outerEl) outerEl.style.transform = original.outerTransform;
+  }
 }
 
 /**
@@ -385,9 +454,7 @@ function fieldValue(member: Member, field: string): string {
     provinceName: member.provinceName,
     regencyName: member.regencyName,
     districtName: member.districtName,
-    kwartirName: member.kwartirName || (member.provinceId === '00' ? 'Kwartir Nasional' : member.districtId ? `Kwartir Ranting ${member.districtName}` : member.regencyId ? `Kwartir Cabang ${member.regencyName}` : `Kwartir Daerah ${member.provinceName}`),
-    kwartirHierarchy: member.kwartirHierarchy || [member.provinceId !== '00' ? `Kwarda ${member.provinceName}` : '', member.regencyName ? `Kwarcab ${member.regencyName}` : '', member.districtName ? `Kwarran ${member.districtName}` : ''].filter(Boolean).join(' • '),
-    krida: member.ktaInterest || member.krida,
+    krida: member.krida,
     phone: member.phone,
     email: member.email,
     joinYear: member.joinYear,
@@ -626,8 +693,15 @@ export async function generateKtaPdf({
   const backCanvas = await renderBackCardCanvas(member, settings, logoImg, backBgImg);
   drawKtaConfiguredElements(backCanvas.getContext('2d')!, member, settings, 'BACK', configuredLogoImages);
 
-  const frontImgData = frontCanvas.toDataURL('image/png');
-  const backImgData = backCanvas.toDataURL('image/png');
+  // Prefer the live DigitalMemberCard DOM. This makes the exported PDF use
+  // the exact same CSS layout, fonts, spacing, images and designer settings
+  // that the member sees in the preview.
+  if (onProgress) onProgress('Menyamakan PDF dengan tampilan KTA...');
+  const domFront = await captureRenderedKtaSide(member, 'front');
+  const domBack = await captureRenderedKtaSide(member, 'back');
+
+  const frontImgData = domFront || frontCanvas.toDataURL('image/png');
+  const backImgData = domBack || backCanvas.toDataURL('image/png');
 
   if (onProgress) onProgress('Menyusun berkas PDF sesuai standar ukuran global...');
 
