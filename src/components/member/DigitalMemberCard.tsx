@@ -47,9 +47,25 @@ const valueOf = (
     provinceName: member.provinceName,
     regencyName: member.regencyName,
     districtName: member.districtName,
+    kwartirName: member.kwartirName || (member.provinceId === '00'
+      ? 'Kwartir Nasional'
+      : member.districtId
+        ? `Kwartir Ranting ${member.districtName || ''}`.trim()
+        : member.regencyId
+          ? `Kwartir Cabang ${member.regencyName || ''}`.trim()
+          : `Kwartir Daerah ${member.provinceName || ''}`.trim()),
+    kwartirHierarchy: member.kwartirHierarchy || (
+      member.provinceId === '00'
+        ? 'Kwartir Nasional'
+        : [
+            member.provinceName ? `Kwarda ${member.provinceName}` : '',
+            member.regencyName ? `Kwarcab ${member.regencyName}` : '',
+            member.districtName ? `Kwarran ${member.districtName}` : ''
+          ].filter(Boolean).join(' • ')
+    ),
     branchName: member.branchName,
     gugusDepan: member.gugusDepan,
-    krida: member.krida,
+    krida: member.ktaInterest || member.krida,
     phone: member.phone,
     email: member.email,
     joinYear: member.joinYear,
