@@ -29,7 +29,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       <nav className="flex items-center justify-around max-w-lg mx-auto">
         {/* 1. Dashboard / Beranda */}
         <button
-          onClick={() => onSelectTab('dashboard')}
+          onClick={() => onSelectTab('landing')}
           className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 min-h-[48px] rounded-2xl transition-all cursor-pointer ${
             currentTab === 'dashboard'
               ? 'text-fuchsia-700 font-bold'
