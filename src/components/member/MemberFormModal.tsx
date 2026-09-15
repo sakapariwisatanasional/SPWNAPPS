@@ -197,6 +197,15 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   }, [currentUser, isOpen]);
 
   useEffect(() => {
+    if (selectedProvinceId === '00') {
+      // Kwartir Nasional tidak memiliki Kwarcab/Kwarran.
+      setRegencies([]);
+      setDistricts([]);
+      setSelectedRegencyId('');
+      setSelectedDistrictId('');
+      return;
+    }
+
     if (selectedProvinceId) {
       // If role is ADMIN_REGENCY, keep regencies filtered to their jurisdiction or loaded
       const regs = storage.getRegencies(selectedProvinceId);
@@ -205,25 +214,32 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         setSelectedRegencyId(currentUser.jurisdictionId);
       } else if (regs.length > 0 && !regs.some(r => r.id === selectedRegencyId)) {
         setSelectedRegencyId(regs[0].id);
+      } else if (regs.length === 0) {
+        setSelectedRegencyId('');
       }
     }
   }, [selectedProvinceId]);
 
   useEffect(() => {
-    if (selectedRegencyId) {
-      const dists = storage.getDistricts(selectedRegencyId);
-      setDistricts(dists);
-      if (dists.length > 0 && !dists.some(d => d.id === selectedDistrictId)) {
-        setSelectedDistrictId(dists[0].id);
-      }
+    if (!selectedRegencyId || selectedProvinceId === '00') {
+      if (selectedProvinceId === '00') setDistricts([]);
+      return;
     }
-  }, [selectedRegencyId]);
+    const dists = storage.getDistricts(selectedRegencyId);
+    setDistricts(dists);
+    if (dists.length > 0 && !dists.some(d => d.id === selectedDistrictId)) {
+      setSelectedDistrictId(dists[0].id);
+    } else if (dists.length === 0) {
+      setSelectedDistrictId('');
+    }
+  }, [selectedRegencyId, selectedProvinceId]);
 
   if (!isOpen) return null;
 
   const isRegencyOperator = currentUser?.role === 'ADMIN_REGENCY';
   const isProvinceAdmin = currentUser?.role === 'ADMIN_PROVINCE';
   const isBranchAdmin = currentUser?.role === 'ADMIN_BRANCH';
+  const isNationalKwartir = currentUser?.role === 'SUPER_ADMIN' && selectedProvinceId === '00';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,10 +329,10 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         
         provinceId: selectedProvinceId,
         provinceName: currentProvince?.name || (selectedProvinceId === '00' ? 'Kwartir Nasional' : ''),
-        regencyId: selectedRegencyId,
-        regencyName: currentRegency?.name || 'Kwartir Cabang',
-        districtId: selectedDistrictId,
-        districtName: currentDistrict?.name || 'Kecamatan',
+        regencyId: isNationalKwartir ? '' : selectedRegencyId,
+        regencyName: isNationalKwartir ? '' : (currentRegency?.name || 'Kwartir Cabang'),
+        districtId: isNationalKwartir ? '' : selectedDistrictId,
+        districtName: isNationalKwartir ? '' : (currentDistrict?.name || 'Kecamatan'),
         joinYear,
         currentPosition: `Calon Anggota ${krida}`,
         krida,
@@ -737,7 +753,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 mb-1">Kabupaten / Kota</label>
                           <select
-                            disabled={regencyLocked}
+                            disabled={regencyLocked || isNationalKwartir}
                             value={selectedRegencyId}
                             onChange={(e) => setSelectedRegencyId(e.target.value)}
                             className={`w-full px-3 py-2.5 border rounded-xl outline-none text-xs ${
@@ -746,6 +762,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                                 : 'bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-purple-500/15 focus:border-purple-400'
                             }`}
                           >
+                            {isNationalKwartir && <option value="">Tidak berlaku untuk Kwartir Nasional</option>}
                             {regencies.map((r) => (
                               <option key={r.id} value={r.id}>{r.name}</option>
                             ))}
@@ -757,8 +774,10 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                           <select
                             value={selectedDistrictId}
                             onChange={(e) => setSelectedDistrictId(e.target.value)}
+                            disabled={isNationalKwartir}
                             className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none text-xs text-slate-800 focus:ring-2 focus:ring-purple-500/15 focus:border-purple-400"
                           >
+                            {isNationalKwartir && <option value="">Tidak berlaku untuk Kwartir Nasional</option>}
                             {districts.map((d) => (
                               <option key={d.id} value={d.id}>{d.name}</option>
                             ))}
