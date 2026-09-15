@@ -141,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* Mobile Brand Identity */}
-        <div className="flex lg:hidden items-center gap-2 cursor-pointer" onClick={() => onSelectTab('dashboard')}>
+        <div className="flex lg:hidden items-center gap-2 cursor-pointer" onClick={() => onSelectTab('landing')}>
           <SakaLogo size={28} />
           <div className="leading-tight">
             <span className="font-extrabold text-xs font-heading text-slate-900 tracking-tight block">
