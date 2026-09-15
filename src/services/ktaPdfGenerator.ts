@@ -79,32 +79,25 @@ async function captureRenderedKtaSide(
 
   const memberId = String(member.id || '');
 
-  // Prefer the preview inside KtaPrintPdfModal. There can be another
-  // DigitalMemberCard on the page (for example the normal My Card view),
-  // and that instance may use an older/stale settings snapshot. The PDF
-  // must capture the exact preview that is currently shown in the export
-  // modal, including the published designer settings.
+  // The print modal marks the exact DigitalMemberCard instance that the user
+  // is looking at. Never silently switch to another card on the page.
   const pdfPreview = Array.from(
     document.querySelectorAll<HTMLElement>(
       '[data-kta-pdf-preview="true"]'
     )
   ).find(el => el.dataset.ktaPdfMemberId === memberId) || null;
 
-  const element = (pdfPreview
+  const element = pdfPreview
     ? pdfPreview.querySelector<HTMLElement>(
-        `[data-kta-render-side="${side}"]`
+        `[data-kta-render-side="${side}"][data-kta-member-id="${memberId}"]`
       )
-    : null) || Array.from(
-      document.querySelectorAll<HTMLElement>(
-        `[data-kta-render-side="${side}"]`
-      )
-    ).find(el => el.dataset.ktaMemberId === memberId) || null;
+    : null;
 
-  if (!element) return null;
+  if (!element) {
+    console.warn(`[KTA PDF] Preview ${side} untuk member ${memberId} tidak ditemukan.`);
+    return null;
+  }
 
-  // The back side normally has rotateY(180deg) and backface-visibility:hidden
-  // because it is part of the interactive 3D preview. Temporarily neutralize
-  // those presentation-only transforms while capturing the actual DOM.
   const sideEl = element;
   const innerEl = sideEl.parentElement as HTMLElement | null;
   const outerEl = innerEl?.parentElement as HTMLElement | null;
@@ -117,6 +110,8 @@ async function captureRenderedKtaSide(
   };
 
   try {
+    // Remove the interactive 3D state while capturing. This is presentation
+    // only; the restored DOM below keeps the on-screen preview unchanged.
     if (innerEl) {
       innerEl.style.transition = 'none';
       innerEl.style.transform = 'none';
@@ -125,23 +120,80 @@ async function captureRenderedKtaSide(
     sideEl.style.transform = 'none';
     sideEl.style.backfaceVisibility = 'visible';
 
-    // Let browser fonts/images finish painting before the snapshot.
     if (document.fonts?.ready) await document.fonts.ready;
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
+    const width = Math.max(1, Math.round(sideEl.getBoundingClientRect().width));
+    const height = Math.max(1, Math.round(sideEl.getBoundingClientRect().height));
+
     const canvas = await html2canvas(sideEl, {
+      // IMPORTANT: Tailwind v4 can contain oklch() rules. html2canvas 1.4.x
+      // may fail while parsing those global styles even when the card itself
+      // does not use oklch. In onclone below we convert the visible card to
+      // computed inline styles and remove the external stylesheets/classes.
       scale: 4,
+      width,
+      height,
       useCORS: true,
       allowTaint: false,
       backgroundColor: null,
       logging: false,
       imageTimeout: 15000,
-      removeContainer: true
+      removeContainer: true,
+      onclone: (clonedDoc) => {
+        const clonedSide = clonedDoc.querySelector<HTMLElement>(
+          `[data-kta-render-side="${side}"][data-kta-member-id="${memberId}"]`
+        );
+        if (!clonedSide) return;
+
+        const nodes = [
+          clonedSide,
+          ...Array.from(clonedSide.querySelectorAll<HTMLElement>('*'))
+        ];
+
+        // Freeze the browser's already-resolved visual styles as inline CSS.
+        // This preserves the exact designer layout while avoiding Tailwind's
+        // unsupported color functions during html2canvas parsing.
+        nodes.forEach(node => {
+          const computed = clonedDoc.defaultView?.getComputedStyle(node);
+          if (!computed) return;
+
+          let cssText = '';
+          for (let i = 0; i < computed.length; i += 1) {
+            const property = computed[i];
+            if (property.startsWith('--')) continue;
+            const value = computed.getPropertyValue(property);
+            if (!value || /oklch\(|oklab\(/i.test(value)) continue;
+            cssText += `${property}:${value};`;
+          }
+          node.style.cssText = cssText;
+          node.removeAttribute('class');
+        });
+
+        // html2canvas clones the target, but the 3D transform belongs to the
+        // surrounding card wrapper. Neutralize it in the clone as well.
+        let parent = clonedSide.parentElement as HTMLElement | null;
+        for (let i = 0; i < 2 && parent; i += 1) {
+          parent.style.transform = 'none';
+          parent.style.transition = 'none';
+          parent = parent.parentElement as HTMLElement | null;
+        }
+        // The visual appearance is now frozen into inline CSS, so the
+        // application's global stylesheets are no longer needed. Removing
+        // them prevents html2canvas from parsing unrelated Tailwind v4
+        // oklch()/oklab() declarations elsewhere in the application.
+        clonedDoc.querySelectorAll('style, link[rel="stylesheet"]').forEach(node => node.remove());
+
+        clonedSide.style.transform = 'none';
+        clonedSide.style.backfaceVisibility = 'visible';
+        clonedSide.style.width = `${width}px`;
+        clonedSide.style.height = `${height}px`;
+      }
     });
 
     return canvas.toDataURL('image/png');
   } catch (error) {
-    console.warn(`[KTA PDF] Gagal menangkap DOM ${side}:`, error);
+    console.warn(`[KTA PDF] Gagal menangkap preview DOM ${side}; memakai renderer fallback.`, error);
     return null;
   } finally {
     sideEl.style.transform = original.sideTransform;
