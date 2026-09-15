@@ -144,7 +144,12 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   // Initialize territory data and default selections based on currentUser role
   useEffect(() => {
     const allProvinces = storage.getProvinces();
-    setProvinces(allProvinces);
+    // Kwartir Nasional hanya boleh dipilih dari dashboard oleh Super Admin.
+    // Admin wilayah tetap dibatasi pada provinsi/daerah operasionalnya.
+    const visibleProvinces = currentUser?.role === 'SUPER_ADMIN'
+      ? allProvinces
+      : allProvinces.filter(p => p.id !== '00');
+    setProvinces(visibleProvinces);
     setSkillsList(storage.getSkills());
 
     if (currentUser) {
