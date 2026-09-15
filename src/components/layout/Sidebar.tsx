@@ -47,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenDriveModal
 }) => {
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
-  const isAdmin = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+  const isAdmin = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
   const isMember = currentUser.role === 'MEMBER';
 
   const handleItemClick = (tab: string) => {
@@ -124,6 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <LayoutDashboard className={`w-4 h-4 ${currentTab === 'dashboard' ? 'text-purple-400' : 'text-slate-400'}`} />
             <span className="flex-1 truncate">
               {isSuperAdmin ? 'Dashboard Super Admin' : 
+               currentUser.role === 'ADMIN_NATIONAL' ? 'Dashboard Admin Nasional' :
                currentUser.role === 'ADMIN_PROVINCE' ? 'Dashboard Kwarda' :
                currentUser.role === 'ADMIN_REGENCY' ? 'Dashboard Kwarcab' : 'Dashboard Kecamatan'}
             </span>
@@ -246,11 +247,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isAdmin && (
           <div className="pt-4">
             <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest px-3 py-2 mb-1">
-              {isSuperAdmin ? 'Administrasi Nasional' : 'Administrasi Wilayah'}
+              {isSuperAdmin || currentUser.role === 'ADMIN_NATIONAL' ? 'Administrasi Nasional' : 'Administrasi Wilayah'}
             </div>
 
             {/* Master Wilayah: Super Admin & Province Admins */}
-            {(isSuperAdmin || currentUser.role === 'ADMIN_PROVINCE') && (
+            {(isSuperAdmin || currentUser.role === 'ADMIN_NATIONAL' || currentUser.role === 'ADMIN_PROVINCE') && (
               <button
                 onClick={() => handleItemClick('territories')}
                 className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
