@@ -143,7 +143,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const provinces = PROVINCES_DATA;
+  // Pendaftaran publik hanya boleh memilih Kwartir Daerah (provinsi).
+  // Kwartir Nasional (id 00) tetap tersedia di data master untuk dashboard/admin,
+  // tetapi tidak ditampilkan kepada pengunjung umum.
+  const provinces = PROVINCES_DATA.filter(p => p.id !== '00');
 
   // ============================================================
   // IMAGE COMPRESSION
