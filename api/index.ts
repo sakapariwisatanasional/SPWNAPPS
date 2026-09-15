@@ -136,6 +136,7 @@ export interface Member {
   status: MemberStatus;
   currentPosition: string;     // e.g. Anggota Krida Pemandu
   krida?: KridaType;
+  ktaInterest?: KridaType | 'Majelis Pembimbing' | 'Pimpinan Saka' | 'Pamong Saka';
   educationLevel: string;
   occupation: string;
   bio: string;
@@ -978,7 +979,13 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
         const districtId = getColVal(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || (isNational ? '00.00.00' : '');
         const districtName = isNational ? 'Nasional' : rawDistrict;
         const currentPosition = getColVal(row, ['Jabatan', 'Gudep', 'Posisi / Jabatan', 'Posisi / Jabatan Kepengurusan', 'Jabatan Kepengurusan', 'Posisi', 'currentPosition', 'current_position', 'col_8']);
-        const krida = getColVal(row, ['Krida', 'Peminatan Krida', 'Peminatan Krida Saka Pariwisata', 'col_9']) || 'Krida Pemandu';
+        const kridaRaw = getColVal(row, ['Krida', 'Peminatan Krida', 'Peminatan Krida Saka Pariwisata', 'col_9']) || 'Krida Pemandu';
+        const ktaInterest = /^(Majelis Pembimbing|Mabisaka|Pimpinan Saka|Pamong Saka)$/i.test(String(kridaRaw).trim())
+          ? (String(kridaRaw).trim().toLowerCase() === 'mabisaka' ? 'Majelis Pembimbing' : String(kridaRaw).trim())
+          : kridaRaw;
+        const krida = ktaInterest === 'Majelis Pembimbing' || ktaInterest === 'Pimpinan Saka' || ktaInterest === 'Pamong Saka'
+          ? 'Krida Pemandu'
+          : kridaRaw;
         const status = (getColVal(row, ['Status', 'Status Keanggotaan', 'status', 'col_10']) || 'ACTIVE').toUpperCase();
         const photo = cleanDriveUrl(getColVal(row, ['Foto URL', 'Foto', 'Avatar', 'Link Foto', 'col_11'])) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
         const email = getColVal(row, ['Email', 'email', 'E-mail', 'col_3']) || `member${idx + 1}@pramuka.id`;
@@ -997,7 +1004,7 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
           email, phone, address: getColVal(row, ['Alamat']) || `${districtName || regencyName}, ${regencyName}, ${provinceName}`,
           provinceId, provinceName, regencyId, regencyName, districtId, districtName,
           currentPosition: currentPosition || `Anggota ${krida}`,
-          krida, joinYear: Number(getColVal(row, ['Tahun Bergabung'])) || new Date().getFullYear(),
+          krida, ktaInterest, joinYear: Number(getColVal(row, ['Tahun Bergabung'])) || new Date().getFullYear(),
           educationLevel: getColVal(row, ['Pendidikan']) || 'SMA/SMK', occupation: getColVal(row, ['Pekerjaan']) || 'Anggota Pramuka',
           bio: getColVal(row, ['Bio']) || `Anggota resmi Saka Pariwisata ${provinceName || 'Indonesia'}.`,
           status: status === 'ACTIVE' || status === 'PENDING' || status === 'SUSPENDED' ? status : 'ACTIVE', registeredAt,
@@ -2262,6 +2269,7 @@ function publicMemberFromRow(row: Record<string, any>, index: number) {
     districtName: district || 'Nasional',
     currentPosition: jabatan || 'Anggota Saka Pariwisata',
     krida: krida || 'Krida Pemandu',
+    ktaInterest: /^(Majelis Pembimbing|Mabisaka|Pimpinan Saka|Pamong Saka)$/i.test(String(krida || '')) ? (String(krida).trim().toLowerCase() === 'mabisaka' ? 'Majelis Pembimbing' : String(krida).trim()) : (krida || 'Krida Pemandu'),
     status: status === 'PENDING' ? 'PENDING' : status,
     avatarUrl: photo,
     registeredAt: registeredAt || new Date().toISOString(),
@@ -2382,6 +2390,10 @@ app.get('/api/data', async (req, res) => {
     regencyId: m.regencyId,
     districtId: m.districtId,
     krida: m.krida,
+    ktaInterest: m.ktaInterest || m.krida,
+    kwartirLevel: m.kwartirLevel,
+    kwartirName: m.kwartirName,
+    kwartirHierarchy: m.kwartirHierarchy,
     currentPosition: m.currentPosition,
     joinYear: m.joinYear,
     status: m.status
