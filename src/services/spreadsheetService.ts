@@ -758,7 +758,12 @@ class SpreadsheetService {
           const p = (prov || '').toUpperCase();
           const k = (kab || '').toUpperCase();
 
-          if (r.includes('SUPER') || r.includes('NASIONAL') || r.includes('PIMPINAN_NASIONAL') || r === 'SUPER_ADMIN' || p.includes('NASIONAL') || k.includes('KWARTIR NASIONAL')) {
+          // Periksa ADMIN_NATIONAL lebih dulu karena nama role ini mengandung
+          // kata NASIONAL dan tidak boleh salah terbaca sebagai SUPER_ADMIN.
+          if (r === 'ADMIN_NATIONAL' || r.includes('ADMIN_NATIONAL') || r.includes('ADMIN NASIONAL')) {
+            return 'ADMIN_NATIONAL';
+          }
+          if (r.includes('SUPER') || r === 'SUPER_ADMIN' || r.includes('PIMPINAN_NASIONAL') || p.includes('NASIONAL') || k.includes('KWARTIR NASIONAL')) {
             return 'SUPER_ADMIN';
           }
           if (r.includes('KWARDA') || r.includes('PROVINSI') || r === 'ADMIN_PROVINCE') {
@@ -925,7 +930,7 @@ class SpreadsheetService {
             verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
             isOperator: role !== 'MEMBER',
             operatorRole: role !== 'MEMBER' ? role : undefined,
-            operatorJurisdictionName: role === 'SUPER_ADMIN' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? (rawDistrict || territory.regencyName) : undefined,
+            operatorJurisdictionName: role === 'SUPER_ADMIN' || role === 'ADMIN_NATIONAL' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? (rawDistrict || territory.regencyName) : undefined,
             skills: memberSkills,
             certifications: memberCerts,
             locationHistory: []
@@ -1021,8 +1026,8 @@ class SpreadsheetService {
               email: newM.email,
               name: newM.fullName,
               role: parsedRole,
-              jurisdictionName: parsedRole === 'SUPER_ADMIN' ? 'Kwartir Nasional' : `${newM.districtName}, ${newM.regencyName}`,
-              jurisdictionId: newM.regencyId,
+              jurisdictionName: parsedRole === 'SUPER_ADMIN' || parsedRole === 'ADMIN_NATIONAL' ? 'Kwartir Nasional' : `${newM.districtName}, ${newM.regencyName}`,
+              jurisdictionId: parsedRole === 'SUPER_ADMIN' || parsedRole === 'ADMIN_NATIONAL' ? '00' : newM.regencyId,
               avatarUrl: newM.avatarUrl,
               memberId: newM.id
             };
