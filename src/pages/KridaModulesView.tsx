@@ -65,7 +65,7 @@ export const KridaModulesView: React.FC<KridaModulesViewProps> = ({ currentUser,
   const [explorerModule, setExplorerModule] = useState<string | undefined>(undefined);
   const [draft, setDraft] = useState<KridaVisualConfig>({ imageUrl: '', downloadUrl: '' });
 
-  const canManageKrida = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+  const canManageKrida = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
 
   useEffect(() => {
     const unsubscribe = storage.subscribe(() => setModules(storage.getKridaModules()));
