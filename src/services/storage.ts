@@ -854,6 +854,7 @@ class StorageService {
     adminUser: CurrentUser
   ): Member | null {
     const allowedRoles: UserRole[] = [
+      'ADMIN_NATIONAL',
       'ADMIN_PROVINCE',
       'ADMIN_REGENCY',
       'ADMIN_BRANCH'
@@ -3014,6 +3015,7 @@ class StorageService {
           const role = String(user.role || 'MEMBER').toUpperCase();
 
           const isOperator =
+            role === 'ADMIN_NATIONAL' ||
             role === 'ADMIN_PROVINCE' ||
             role === 'ADMIN_REGENCY' ||
             role === 'ADMIN_BRANCH';
