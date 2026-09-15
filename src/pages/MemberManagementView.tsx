@@ -348,7 +348,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             {m.isOperator && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300 font-extrabold text-[9px] shadow-xs">
                                 <ShieldCheck className="w-3 h-3 text-fuchsia-700" />
-                                <span>{m.operatorRole === 'ADMIN_REGENCY' ? 'Kwarcab' : m.operatorRole === 'ADMIN_PROVINCE' ? 'Kwarda' : 'Kecamatan'}</span>
+                                <span>{m.operatorRole === 'ADMIN_NATIONAL' ? 'Admin Nasional' : m.operatorRole === 'ADMIN_REGENCY' ? 'Kwarcab' : m.operatorRole === 'ADMIN_PROVINCE' ? 'Kwarda' : 'Kecamatan'}</span>
                               </span>
                             )}
                           </div>
