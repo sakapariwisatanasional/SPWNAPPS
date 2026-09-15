@@ -50,6 +50,8 @@ const FIELD_OPTIONS: Array<{
   { value: 'provinceName', label: 'Kwartir / Provinsi' },
   { value: 'regencyName', label: 'Kwarcab / Kabupaten' },
   { value: 'districtName', label: 'Kwarran / Kecamatan' },
+  { value: 'kwartirName', label: 'Kwartir (sesuai yurisdiksi)' },
+  { value: 'kwartirHierarchy', label: 'Hierarki Kwartir (Kwarda • Kwarcab • Kwarran)' },
   { value: 'branchName', label: 'Gugus / Pangkalan' },
   { value: 'gugusDepan', label: 'Gugus Depan' },
   { value: 'krida', label: 'Krida' },
