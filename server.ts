@@ -1142,10 +1142,10 @@ app.get('/api/verify-member', async (req, res) => {
 });
 
 // Central Data GET with strict Privacy and Role Enforcement
-const SERVER_CONTENT_ADMIN_ROLES = ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
+const SERVER_CONTENT_ADMIN_ROLES = ['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
 function serverNormalizeText(value: unknown): string { return String(value ?? '').trim().toLowerCase(); }
 function serverMemberBelongsToAdminJurisdiction(member: any, session: any): boolean {
-  if (!session || session.role === 'SUPER_ADMIN') return true;
+  if (!session || session.role === 'SUPER_ADMIN' || session.role === 'ADMIN_NATIONAL') return true;
   if (!SERVER_CONTENT_ADMIN_ROLES.includes(session.role)) return false;
   const allowedId = serverNormalizeText(session.jurisdictionId);
   const allowedName = serverNormalizeText(session.jurisdictionName);
@@ -1177,7 +1177,7 @@ app.get('/api/data', async (req, res) => {
 
   const session = getSessionUser(req);
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
-  const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+  const isOperator = session && ['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
   // Strict member privacy policy. Never send the full member object to a
   // regional admin outside its jurisdiction, and never expose credentials to public users.
@@ -1253,7 +1253,7 @@ app.get('/api/data', async (req, res) => {
 // Manual Sync Trigger
 app.post('/api/sync-spreadsheet', async (req, res) => {
   const session = getSessionUser(req);
-  if (!session || (session.role !== 'SUPER_ADMIN' && !['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role))) {
+  if (!session || (session.role !== 'SUPER_ADMIN' && !['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role))) {
     return res.status(403).json({ success: false, message: 'Autentikasi administrator diperlukan untuk sinkronisasi database.' });
   }
 
@@ -1272,7 +1272,7 @@ app.post('/api/sync-spreadsheet', async (req, res) => {
 app.post('/api/mutate', async (req, res) => {
   const session = getSessionUser(req);
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
-  const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+  const isOperator = session && ['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
   const { type, action, payload } = req.body || {};
   if (!type || !action) {
@@ -1284,7 +1284,7 @@ app.post('/api/mutate', async (req, res) => {
     if (!session) {
       return res.status(401).json({ success: false, message: 'Sesi login tidak ditemukan. Silakan login ulang.' });
     }
-    if (!['MEMBER', 'SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role)) {
+    if (!['MEMBER', 'SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role)) {
       return res.status(403).json({ success: false, message: 'Anda tidak memiliki hak untuk mengelola produk kuliner/cinderamata.' });
     }
     if (['CREATE', 'UPDATE'].includes(action) && session.role === 'MEMBER') {
