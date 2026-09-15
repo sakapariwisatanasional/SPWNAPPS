@@ -226,7 +226,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
   const currentRegObj = REGENCIES_DATA.find(r => r.id === regencyId);
   const currentDistObj = availableDistricts.find(d => d.id === districtId);
 
-  const isOperator = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+  const isOperator = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
