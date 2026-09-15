@@ -20,14 +20,13 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { Member, TourPackage, CulinarySouvenirItem, CurrentUser, Activity, KridaId, KridaModuleItem, LandingPageSettings } from '../types';
+import { Member, TourPackage, CulinarySouvenirItem, CurrentUser, Activity, KridaId, KridaModuleItem } from '../types';
 import { SakaLogo, formatDriveImageUrl } from '../components/common/SakaLogo';
 import { CompetentGuidesSection } from '../components/common/CompetentGuidesSection';
 import { LandingActivitiesSection } from '../components/activities/LandingActivitiesSection';
 import { PROVINCES_DATA } from '../data/indonesiaTerritories';
 import { KRIDA_CATEGORIES } from '../data/kridaData';
 import { storage } from '../services/storage';
-import { spreadsheetService, DEFAULT_LANDING_PAGE_SETTINGS } from '../services/spreadsheetService';
 import { KridaExplorerModal } from '../components/krida/KridaExplorerModal';
 import { KridaMaterialEditorModal } from '../components/krida/KridaMaterialEditorModal';
 import { KridaFullScreenReaderModal } from '../components/krida/KridaFullScreenReaderModal';
@@ -46,7 +45,6 @@ interface LandingPageViewProps {
   onViewActivityDetail: (activity: Activity) => void;
   onOpenActivityForm?: () => void;
   onEnterDashboard: (tab?: string) => void;
-  landingSettings?: LandingPageSettings | null;
 }
 
 type HomeTool = 'verify' | 'krida' | 'tour' | 'agenda' | 'kuliner' | 'anggota';
@@ -87,7 +85,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   onViewActivityDetail,
   onOpenActivityForm,
   onEnterDashboard,
-  landingSettings: incomingLandingSettings,
 }) => {
   const [quickVerifyTerm, setQuickVerifyTerm] = useState('');
   const [verifyError, setVerifyError] = useState('');
@@ -101,19 +98,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   const [editingKridaModule, setEditingKridaModule] = useState<KridaModuleItem | null>(null);
   const [isFullScreenReaderOpen, setIsFullScreenReaderOpen] = useState(false);
   const [readerModuleId, setReaderModuleId] = useState<string | undefined>();
-  const [landingSettings, setLandingSettings] = useState<LandingPageSettings>(incomingLandingSettings || DEFAULT_LANDING_PAGE_SETTINGS);
-
-  useEffect(() => {
-    if (incomingLandingSettings) {
-      setLandingSettings({ ...DEFAULT_LANDING_PAGE_SETTINGS, ...incomingLandingSettings });
-      return;
-    }
-    let cancelled = false;
-    void spreadsheetService.refreshLandingPageSettings().then(remote => {
-      if (!cancelled && remote) setLandingSettings({ ...DEFAULT_LANDING_PAGE_SETTINGS, ...remote });
-    });
-    return () => { cancelled = true; };
-  }, [incomingLandingSettings]);
 
   const activeMembersCount = useMemo(() => members.filter(m => m.status === 'ACTIVE').length, [members]);
   const publishedTours = useMemo(() => tours.filter(t => t.status === 'APPROVED_PUBLISHED'), [tours]);
@@ -233,8 +217,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               return <button key={item.id} type="button" onClick={() => scrollTo(item.id)} className="spwn-mobile-menu-item"><Icon className="w-5 h-5 mx-auto mb-1 text-[#7b2cbf]" /><span>{item.label}</span></button>;
             })}
             <button type="button" onClick={() => openTool('verify')} className="spwn-mobile-menu-item"><ShieldCheck className="w-5 h-5 mx-auto mb-1 text-[#159f6b]" /><span>Verifikasi</span></button>
-            {currentUser?.role === 'PUBLIC' ? <button type="button" onClick={onOpenLoginModal} className="spwn-mobile-menu-item"><LockKeyhole className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Masuk</span></button> : <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="spwn-mobile-menu-item"><LayoutDashboard className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Panel</span></button>}
-            {currentUser?.role === 'PUBLIC' && <button type="button" onClick={onOpenRegisterModal} className="spwn-mobile-menu-item"><UserPlus className="w-5 h-5 mx-auto mb-1 text-[#f59e0b]" /><span>Daftar</span></button>}
+            {currentUser?.role === 'PUBLIC' ? <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenLoginModal(); }} className="spwn-mobile-menu-item"><LockKeyhole className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Masuk</span></button> : <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="spwn-mobile-menu-item"><LayoutDashboard className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Panel</span></button>}
+            {currentUser?.role === 'PUBLIC' && <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenRegisterModal(); }} className="spwn-mobile-menu-item"><UserPlus className="w-5 h-5 mx-auto mb-1 text-[#f59e0b]" /><span>Daftar</span></button>}
           </div>
         )}
       </header>
@@ -245,38 +229,39 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           <div className="spwn-hero-art spwn-hero-art-b" />
           <div className="relative max-w-7xl mx-auto">
             <div className="spwn-hero-panel overflow-hidden">
-              <div
-                className="spwn-hero-photo"
-                aria-hidden="true"
-                style={{ opacity: landingSettings.heroImageOpacity }}
-              >
-                <img
-                  src={landingSettings.heroImageUrl || DEFAULT_LANDING_PAGE_SETTINGS.heroImageUrl}
-                  alt=""
-                  style={{ objectPosition: `${landingSettings.heroImagePosition} ${landingSettings.heroImageY}` }}
-                />
+              {/* Decorative destination artwork: intentionally subtle so the hero copy remains dominant. */}
+              <div className="spwn-hero-photo" aria-hidden="true">
+                <img src="/hero-gatara-borobudur.png" alt="" />
               </div>
-              {landingSettings.heroOverlayEnabled && (
-                <div
-                  className="spwn-hero-user-overlay"
-                  aria-hidden="true"
-                  style={{ opacity: landingSettings.heroOverlayOpacity }}
-                />
-              )}
+              <div className="spwn-hero-gradient" />
+              <div className="spwn-hero-photo-wash" aria-hidden="true" />
+              <div className="absolute inset-0 pointer-events-none opacity-90" style={{ backgroundImage: 'radial-gradient(circle at 73% 35%, rgba(255,255,255,.25) 0 2px, transparent 3px), radial-gradient(circle at 85% 68%, rgba(255,255,255,.18) 0 1.5px, transparent 2px)' }} />
               <div className="spwn-hero-content relative grid lg:grid-cols-[1.02fr_.98fr] min-h-[390px] sm:min-h-[450px]">
                 <div className="p-7 sm:p-10 lg:p-12 flex flex-col justify-center text-white">
-                  <div className="inline-flex w-fit items-center rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-[.13em] backdrop-blur-md">{landingSettings.heroBadge}</div>
-                  <h1 className="mt-5 whitespace-pre-line text-[2.6rem] sm:text-5xl lg:text-[4.35rem] font-black tracking-[-.045em] leading-[.95]">{landingSettings.heroTitle}</h1>
-                  <p className="mt-5 max-w-xl text-sm sm:text-base text-white/90 leading-relaxed">{landingSettings.heroDescription}</p>
+                  <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-[.13em] backdrop-blur-md"><Sparkles className="w-3.5 h-3.5 text-[#ffd166]" /> Saka Pariwisata Nasional</div>
+                  <h1 className="mt-5 text-[2.6rem] sm:text-5xl lg:text-[4.35rem] font-black tracking-[-.045em] leading-[.95]">Jelajahi.<br /><span className="text-[#ffd166]">Berkarya.</span><br /><span className="text-white">Berdaya.</span></h1>
+                  <p className="mt-5 max-w-xl text-sm sm:text-base text-white/85 leading-relaxed">Satu ruang digital untuk belajar Krida, mengenal destinasi, mengembangkan kompetensi, dan terhubung bersama Saka Pariwisata Indonesia.</p>
                   <div className="mt-7 flex flex-col sm:flex-row gap-2.5">
-                    <button type="button" onClick={() => scrollTo('landing-krida')} className="spwn-hero-primary">{landingSettings.heroPrimaryText} <ArrowRight className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => openTool('verify')} className="spwn-hero-secondary"><ShieldCheck className="w-4 h-4" /> {landingSettings.heroSecondaryText}</button>
+                    <button type="button" onClick={() => scrollTo('landing-krida')} className="spwn-hero-primary"><Compass className="w-4 h-4" /> Mulai Eksplorasi <ArrowRight className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => openTool('verify')} className="spwn-hero-secondary"><ShieldCheck className="w-4 h-4" /> Verifikasi KTA</button>
                   </div>
                   <div className="mt-7 flex flex-wrap gap-2 text-[9px] font-bold text-white/85">
                     <span className="spwn-hero-chip">Jelajah Indonesia</span><span className="spwn-hero-chip">Belajar & Berkarya</span><span className="spwn-hero-chip">Kolaborasi</span>
                   </div>
                 </div>
+
+                <div className="relative hidden lg:flex items-end justify-center overflow-hidden">
+                  <div className="spwn-hero-ribbon spwn-ribbon-one" />
+                  <div className="spwn-hero-ribbon spwn-ribbon-two" />
+                  <div className="spwn-hero-orb"><Compass className="w-16 h-16 text-white/90" /></div>
+                  <div className="absolute right-10 bottom-8 w-64 rounded-[1.8rem] bg-white/90 backdrop-blur-xl p-4 shadow-2xl rotate-2">
+                    <div className="text-[9px] uppercase tracking-[.15em] font-black text-[#7b2cbf]">Wonderful Indonesia spirit</div>
+                    <div className="mt-1 text-xl font-black text-[#29233d] leading-tight">Pesona Indonesia dalam setiap langkah.</div>
+                    <div className="mt-3 flex gap-1.5"><i className="spwn-dot spwn-dot-green" /><i className="spwn-dot spwn-dot-purple" /><i className="spwn-dot spwn-dot-orange" /><i className="spwn-dot spwn-dot-blue" /><i className="spwn-dot spwn-dot-magenta" /></div>
+                  </div>
+                </div>
               </div>
+              <div className="spwn-wave spwn-wave-green" /><div className="spwn-wave spwn-wave-magenta" /><div className="spwn-wave spwn-wave-orange" />
             </div>
           </div>
         </section>
