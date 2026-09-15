@@ -126,8 +126,12 @@ export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
                 </span>
               </div>
 
-              {/* Digital Member Card */}
-              <div className="flex justify-center p-2 bg-slate-50 rounded-2xl border border-slate-200">
+              {/* Digital Member Card — this exact preview is the source for PDF capture. */}
+              <div
+                data-kta-pdf-preview="true"
+                data-kta-pdf-member-id={member.id}
+                className="flex justify-center p-2 bg-slate-50 rounded-2xl border border-slate-200"
+              >
                 <DigitalMemberCard
                   member={member}
                   previewSettings={currentSettings}
