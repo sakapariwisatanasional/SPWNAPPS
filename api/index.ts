@@ -6,7 +6,8 @@ import crypto from 'crypto';
 const app = express();
 const PORT = 3000;
 export type UserRole = 
-  | 'SUPER_ADMIN'      // Kwartir Nasional (Nasional)
+  | 'SUPER_ADMIN'      // Pengendali sistem tertinggi / Kwartir Nasional
+  | 'ADMIN_NATIONAL'   // Admin operasional Kwartir Nasional
   | 'ADMIN_PROVINCE'   // Kwartir Daerah (Provinsi)
   | 'ADMIN_REGENCY'    // Kwartir Cabang (Kabupaten/Kota)
   | 'ADMIN_BRANCH'     // Kwartir Ranting (Kecamatan/Ranting)
@@ -276,7 +277,7 @@ export interface Activity {
   contactEmail?: string;
   feeType?: 'GRATIS' | 'BERBAYAR' | 'SUBSIDI';
   feeAmount?: number;
-  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'ADMIN_BRANCH' | 'OPERATOR';
+  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_NATIONAL' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'ADMIN_BRANCH' | 'OPERATOR';
   uploadedByName?: string;
   uploadedAt?: string;
   registrationLink?: string;
@@ -2346,7 +2347,7 @@ app.get('/api/verify-member', async (req, res) => {
 app.get('/api/data', async (req, res) => {
   const session = getSessionUser(req);
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
-  const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+  const isOperator = session && ['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
   // Pada Vercel, instance serverless baru tidak menjalankan interval sync.
   // Hydrate database dari Spreadsheet saat cache server masih kosong agar
@@ -2480,8 +2481,9 @@ app.post('/api/sync-spreadsheet', async (req, res) => {
 // =========================================================
 // SUPER ADMIN - ADMIN ASSIGNMENT & JURISDICTION HELPERS
 // =========================================================
-const CONTENT_ADMIN_ROLES = ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
+const CONTENT_ADMIN_ROLES = ['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
 const ADMIN_ROLE_LABELS: Record<string, string> = {
+  ADMIN_NATIONAL: 'Admin Nasional',
   ADMIN_PROVINCE: 'Admin Provinsi',
   ADMIN_REGENCY: 'Admin Kabupaten/Kota',
   ADMIN_BRANCH: 'Admin Ranting/Kecamatan'
@@ -2492,7 +2494,7 @@ function normalizeText(value: unknown): string {
 }
 
 function memberBelongsToAdminJurisdiction(member: any, session: any): boolean {
-  if (!session || session.role === 'SUPER_ADMIN') return true;
+  if (!session || session.role === 'SUPER_ADMIN' || session.role === 'ADMIN_NATIONAL') return true;
   if (!CONTENT_ADMIN_ROLES.includes(session.role)) return false;
 
   const allowedId = normalizeText(session.jurisdictionId);
@@ -2521,7 +2523,7 @@ function memberBelongsToAdminJurisdiction(member: any, session: any): boolean {
 }
 
 function contentBelongsToAdminJurisdiction(content: any, session: any): boolean {
-  if (!session || session.role === 'SUPER_ADMIN') return true;
+  if (!session || session.role === 'SUPER_ADMIN' || session.role === 'ADMIN_NATIONAL') return true;
   if (!CONTENT_ADMIN_ROLES.includes(session.role)) return false;
 
   const allowed = normalizeText(session.jurisdictionId);
@@ -2573,6 +2575,9 @@ app.post('/api/admin/assign', async (req, res) => {
   if (!memberId && !userId) return res.status(400).json({ success:false, message:'Member yang akan dijadikan Admin belum dipilih.' });
   if (!CONTENT_ADMIN_ROLES.includes(role)) return res.status(400).json({ success:false, message:'Tingkat Admin tidak valid.' });
   if (!jurisdictionId && !jurisdictionName) return res.status(400).json({ success:false, message:'Wilayah kewenangan wajib dipilih.' });
+  if (role === 'ADMIN_NATIONAL' && normalizeText(jurisdictionId) !== '00' && normalizeText(jurisdictionName) !== 'kwartir nasional') {
+    return res.status(400).json({ success:false, message:'Admin Nasional wajib menggunakan yurisdiksi Kwartir Nasional.' });
+  }
 
   // Jangan bergantung pada cache db.members/db.users untuk menentukan apakah
   // anggota ada. Pada deployment serverless, cache dapat kosong pada cold start
@@ -2685,7 +2690,7 @@ app.post('/api/admin/revoke', async (req, res) => {
 app.post('/api/mutate', async (req, res) => {
   const session = getSessionUser(req);
   const isSuperAdmin = session?.role === 'SUPER_ADMIN';
-  const isOperator = session && ['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+  const isOperator = session && ['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
 
   const { type, action, payload, scriptUrl } = req.body || {};
   const requestScriptUrl = normalizeManualAppsScriptUrl(scriptUrl);
@@ -2780,7 +2785,7 @@ app.post('/api/mutate', async (req, res) => {
   const canEditMemberInJurisdiction = (target: any, incoming: any): boolean => {
     const current = target || {};
     const next = incoming || {};
-    if (isSuperAdmin) return true;
+    if (isSuperAdmin || session?.role === 'ADMIN_NATIONAL') return true;
     if (session?.role === 'MEMBER') {
       return !!session.memberId && String(current.id || '').trim() === String(session.memberId).trim();
     }
