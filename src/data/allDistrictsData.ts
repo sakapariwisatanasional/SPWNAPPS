@@ -1316,39 +1316,19 @@ export const ALL_INDONESIA_DISTRICTS_MAP: Record<string, { code: string; name: s
 // Intelligent dynamic generator to guarantee ANY and ALL 514 regencies across Indonesia
 // have immediate, realistic, and complete Kecamatan lists matching standard zoning
 export function getDistrictsForRegency(regencyId: string, regencyName?: string): District[] {
-  // 1. If explicit curated list exists, return it
-  if (ALL_INDONESIA_DISTRICTS_MAP[regencyId]) {
-    return ALL_INDONESIA_DISTRICTS_MAP[regencyId].map(item => ({
-      id: `${regencyId}.${item.code}`,
-      regencyId,
-      code: item.code,
-      name: item.name
-    }));
-  }
+  // HANYA gunakan data kecamatan yang benar-benar ada di master wilayah.
+  // Jangan pernah membuat nama kecamatan sintetis seperti:
+  // "Kota", "Utara", "Selatan", "Timur", "Barat",
+  // "Pesisir / Bahari", atau "Pegunungan".
+  // Jika data belum tersedia, kembalikan array kosong agar UI dapat
+  // menampilkan bahwa data kecamatan belum tersedia.
+  const curated = ALL_INDONESIA_DISTRICTS_MAP[regencyId];
+  if (!curated) return [];
 
-  // 2. Synthesize authentic standardized kecamatan for any other regency/city
-  const cleanName = (regencyName || regencyId).replace(/^(Kabupaten|Kota)\s+/i, '');
-  const isKota = (regencyName || '').toLowerCase().startsWith('kota');
-
-  if (isKota) {
-    return [
-      { id: `${regencyId}.01`, regencyId, code: '01', name: `${cleanName} Pusat` },
-      { id: `${regencyId}.02`, regencyId, code: '02', name: `${cleanName} Utara` },
-      { id: `${regencyId}.03`, regencyId, code: '03', name: `${cleanName} Selatan` },
-      { id: `${regencyId}.04`, regencyId, code: '04', name: `${cleanName} Timur` },
-      { id: `${regencyId}.05`, regencyId, code: '05', name: `${cleanName} Barat` },
-      { id: `${regencyId}.06`, regencyId, code: '06', name: `Kawasan Wisata ${cleanName}` }
-    ];
-  } else {
-    return [
-      { id: `${regencyId}.01`, regencyId, code: '01', name: `${cleanName} Kota` },
-      { id: `${regencyId}.02`, regencyId, code: '02', name: `${cleanName} Utara` },
-      { id: `${regencyId}.03`, regencyId, code: '03', name: `${cleanName} Selatan` },
-      { id: `${regencyId}.04`, regencyId, code: '04', name: `${cleanName} Timur` },
-      { id: `${regencyId}.05`, regencyId, code: '05', name: `${cleanName} Barat` },
-      { id: `${regencyId}.06`, regencyId, code: '06', name: `Ekowisata ${cleanName}` },
-      { id: `${regencyId}.07`, regencyId, code: '07', name: `${cleanName} Pesisir / Bahari` },
-      { id: `${regencyId}.08`, regencyId, code: '08', name: `${cleanName} Pegunungan` }
-    ];
-  }
+  return curated.map(item => ({
+    id: `${regencyId}.${item.code}`,
+    regencyId,
+    code: item.code,
+    name: item.name
+  }));
 }
