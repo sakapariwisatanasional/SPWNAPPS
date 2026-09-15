@@ -42,6 +42,7 @@ const PUBLIC_TABS = new Set([
 ]);
 
 const ADMIN_ROLES = new Set([
+  'ADMIN_NATIONAL',
   'ADMIN_BRANCH',
   'ADMIN_REGENCY',
   'ADMIN_PROVINCE',
@@ -53,7 +54,7 @@ function canAccessTab(tab: string, role: string): boolean {
   if (PUBLIC_TABS.has(tab)) return true;
   if (tab === 'my-card') return normalizedRole !== 'PUBLIC';
   if (tab === 'dashboard' || tab === 'members') return ADMIN_ROLES.has(normalizedRole);
-  if (tab === 'territories') return normalizedRole === 'ADMIN_PROVINCE' || normalizedRole === 'SUPER_ADMIN';
+  if (tab === 'territories') return normalizedRole === 'ADMIN_NATIONAL' || normalizedRole === 'ADMIN_PROVINCE' || normalizedRole === 'SUPER_ADMIN';
   if (tab === 'audit-logs') return normalizedRole === 'SUPER_ADMIN';
   return false;
 }
@@ -469,7 +470,7 @@ export default function App() {
   };
 
   // Super Admin: akses editor materi Krida dari area admin.
-  const canManageKrida = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+  const canManageKrida = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
 
   const handleOpenKridaEditor = (moduleItem: KridaModuleItem) => {
     if (!canManageKrida) return;
