@@ -594,6 +594,8 @@ export default function App() {
         currentTab={currentTab}
         onSelectTab={handleNavigateTab}
         currentUser={currentUser}
+        isOpenMobile={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
         onOpenSpreadsheetModal={userRole === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
         onOpenDriveModal={userRole === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
       />
@@ -784,6 +786,7 @@ export default function App() {
           currentTab={currentTab}
           onSelectTab={handleNavigateTab}
           currentUser={currentUser}
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
       </div>
 
