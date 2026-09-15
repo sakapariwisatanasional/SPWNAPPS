@@ -63,7 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [syncState, setSyncState] = useState(spreadsheetService.getSyncState());
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
-  const isAdmin = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+  const isAdmin = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
 
   const handleManualRefresh = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -295,6 +295,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <p className="font-bold text-xs text-purple-950 leading-none truncate max-w-[110px]">{currentUser.name}</p>
                 <span className="text-[10px] text-fuchsia-700 font-bold">
                   {currentUser.role === 'SUPER_ADMIN' ? 'Super Admin' :
+                   currentUser.role === 'ADMIN_NATIONAL' ? 'Admin Nasional' :
                    currentUser.role === 'ADMIN_PROVINCE' ? 'Kwarda' :
                    currentUser.role === 'ADMIN_REGENCY' ? 'Kwarcab' :
                    currentUser.role === 'ADMIN_BRANCH' ? 'Kecamatan' : 'Anggota'}
