@@ -1,7 +1,8 @@
 import { District } from '../types';
 
 // Master Kecamatan Indonesia generated from the supplied districts.csv.
-// Official code format: PP.KK.CCC (2-digit province, 2-digit regency, 3-digit district).
+// Official administrative code: PP.KK.CCC (7 digits without dots).
+// The app key is province.regency and each child code is the final 3 digits.
 // No synthetic/fallback Kecamatan names are generated.
 export const ALL_INDONESIA_DISTRICTS_MAP: Record<string, { code: string; name: string }[]> = {
   '11.01': [
@@ -8249,8 +8250,20 @@ export const ALL_INDONESIA_DISTRICTS_MAP: Record<string, { code: string; name: s
   ],
 };
 
+/**
+ * Returns the official Kecamatan list for a Regency/City.
+ * Accepts either PP.KK or the compact PPKK form.
+ */
 export function getDistrictsForRegency(regencyId: string): District[] {
-  const normalizedId = regencyId.includes('.') ? regencyId : Object.keys(ALL_INDONESIA_DISTRICTS_MAP).find(key => key.replace('.', '') === regencyId) ?? regencyId;
+  const input = String(regencyId || '').trim();
+  const normalizedId = input.includes('.')
+    ? input
+    : Object.keys(ALL_INDONESIA_DISTRICTS_MAP).find(key => key.replace('.', '') === input) ?? input;
   const districts = ALL_INDONESIA_DISTRICTS_MAP[normalizedId] ?? [];
-  return districts.map(item => ({ id: `${normalizedId}.${item.code}`, regencyId: normalizedId, code: item.code, name: item.name }));
+  return districts.map(item => ({
+    id: `${normalizedId}.${item.code}`,
+    regencyId: normalizedId,
+    code: item.code,
+    name: item.name
+  }));
 }
