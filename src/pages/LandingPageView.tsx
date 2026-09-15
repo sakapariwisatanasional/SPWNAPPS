@@ -217,8 +217,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               return <button key={item.id} type="button" onClick={() => scrollTo(item.id)} className="spwn-mobile-menu-item"><Icon className="w-5 h-5 mx-auto mb-1 text-[#7b2cbf]" /><span>{item.label}</span></button>;
             })}
             <button type="button" onClick={() => openTool('verify')} className="spwn-mobile-menu-item"><ShieldCheck className="w-5 h-5 mx-auto mb-1 text-[#159f6b]" /><span>Verifikasi</span></button>
-            {currentUser?.role === 'PUBLIC' ? <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenLoginModal(); }} className="spwn-mobile-menu-item"><LockKeyhole className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Masuk</span></button> : <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="spwn-mobile-menu-item"><LayoutDashboard className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Panel</span></button>}
-            {currentUser?.role === 'PUBLIC' && <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenRegisterModal(); }} className="spwn-mobile-menu-item"><UserPlus className="w-5 h-5 mx-auto mb-1 text-[#f59e0b]" /><span>Daftar</span></button>}
+            {currentUser?.role === 'PUBLIC' ? <button type="button" onClick={onOpenLoginModal} className="spwn-mobile-menu-item"><LockKeyhole className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Masuk</span></button> : <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="spwn-mobile-menu-item"><LayoutDashboard className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Panel</span></button>}
+            {currentUser?.role === 'PUBLIC' && <button type="button" onClick={onOpenRegisterModal} className="spwn-mobile-menu-item"><UserPlus className="w-5 h-5 mx-auto mb-1 text-[#f59e0b]" /><span>Daftar</span></button>}
           </div>
         )}
       </header>
