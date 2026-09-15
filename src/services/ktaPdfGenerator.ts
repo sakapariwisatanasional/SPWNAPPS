@@ -78,13 +78,8 @@ async function captureRenderedKtaSide(
   if (typeof document === 'undefined') return null;
 
   const memberId = String(member.id || '');
-
-  // The print modal marks the exact DigitalMemberCard instance that the user
-  // is looking at. Never silently switch to another card on the page.
   const pdfPreview = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      '[data-kta-pdf-preview="true"]'
-    )
+    document.querySelectorAll<HTMLElement>('[data-kta-pdf-preview="true"]')
   ).find(el => el.dataset.ktaPdfMemberId === memberId) || null;
 
   const element = pdfPreview
@@ -102,35 +97,81 @@ async function captureRenderedKtaSide(
   const innerEl = sideEl.parentElement as HTMLElement | null;
   const outerEl = innerEl?.parentElement as HTMLElement | null;
   const original = {
-    sideTransform: sideEl.style.transform,
-    sideBackface: sideEl.style.backfaceVisibility,
+    position: sideEl.style.position,
+    left: sideEl.style.left,
+    top: sideEl.style.top,
+    right: sideEl.style.right,
+    bottom: sideEl.style.bottom,
+    width: sideEl.style.width,
+    height: sideEl.style.height,
+    transform: sideEl.style.transform,
+    backfaceVisibility: sideEl.style.backfaceVisibility,
+    transition: sideEl.style.transition,
     innerTransform: innerEl?.style.transform || '',
     innerTransition: innerEl?.style.transition || '',
     outerTransform: outerEl?.style.transform || ''
   };
 
   try {
-    // Remove the interactive 3D state while capturing. This is presentation
-    // only; the restored DOM below keeps the on-screen preview unchanged.
+    if (document.fonts?.ready) await document.fonts.ready;
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+    const rect = sideEl.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width));
+    const height = Math.max(1, Math.round(rect.height));
+
+    // IMPORTANT:
+    // DigitalMemberCard is a 3D card. Capturing an absolutely-positioned face
+    // directly can make html2canvas lose the original containing block and
+    // produce exactly the broken result seen in PDF (background/image fills the
+    // card while positioned fields disappear). Turn the selected face into a
+    // self-contained, 2D render surface for the duration of the capture.
+    sideEl.style.position = 'relative';
+    sideEl.style.left = '0';
+    sideEl.style.top = '0';
+    sideEl.style.right = 'auto';
+    sideEl.style.bottom = 'auto';
+    sideEl.style.width = `${width}px`;
+    sideEl.style.height = `${height}px`;
+    sideEl.style.transform = 'none';
+    sideEl.style.backfaceVisibility = 'visible';
+    sideEl.style.transition = 'none';
+
     if (innerEl) {
       innerEl.style.transition = 'none';
       innerEl.style.transform = 'none';
     }
     if (outerEl) outerEl.style.transform = 'none';
-    sideEl.style.transform = 'none';
-    sideEl.style.backfaceVisibility = 'visible';
 
-    if (document.fonts?.ready) await document.fonts.ready;
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
-    const width = Math.max(1, Math.round(sideEl.getBoundingClientRect().width));
-    const height = Math.max(1, Math.round(sideEl.getBoundingClientRect().height));
+    // First attempt: render the actual DOM with the browser's resolved CSS.
+    // This is the closest possible representation of the designer preview.
+    try {
+      const canvas = await html2canvas(sideEl, {
+        scale: 4,
+        width,
+        height,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: null,
+        foreignObjectRendering: true,
+        logging: false,
+        imageTimeout: 15000,
+        removeContainer: true
+      });
 
+      if (canvas.width > 0 && canvas.height > 0) {
+        return canvas.toDataURL('image/png');
+      }
+    } catch (error) {
+      console.warn(`[KTA PDF] foreignObject capture ${side} gagal, mencoba renderer CSS-safe:`, error);
+    }
+
+    // Second attempt: freeze computed styles, but keep the face itself as a
+    // normal relative render surface. This is only a compatibility fallback
+    // for browsers/html2canvas versions where foreignObject is unavailable.
     const canvas = await html2canvas(sideEl, {
-      // IMPORTANT: Tailwind v4 can contain oklch() rules. html2canvas 1.4.x
-      // may fail while parsing those global styles even when the card itself
-      // does not use oklch. In onclone below we convert the visible card to
-      // computed inline styles and remove the external stylesheets/classes.
       scale: 4,
       width,
       height,
@@ -146,58 +187,75 @@ async function captureRenderedKtaSide(
         );
         if (!clonedSide) return;
 
-        const nodes = [
-          clonedSide,
-          ...Array.from(clonedSide.querySelectorAll<HTMLElement>('*'))
-        ];
+        // Keep the real layout classes for normal CSS properties, but remove
+        // global stylesheets that can contain unsupported Tailwind color
+        // functions. Inline styles from DigitalMemberCard remain intact.
+        clonedDoc.querySelectorAll('style, link[rel="stylesheet"]').forEach(node => node.remove());
 
-        // Freeze the browser's already-resolved visual styles as inline CSS.
-        // This preserves the exact designer layout while avoiding Tailwind's
-        // unsupported color functions during html2canvas parsing.
+        clonedSide.style.position = 'relative';
+        clonedSide.style.left = '0';
+        clonedSide.style.top = '0';
+        clonedSide.style.right = 'auto';
+        clonedSide.style.bottom = 'auto';
+        clonedSide.style.width = `${width}px`;
+        clonedSide.style.height = `${height}px`;
+        clonedSide.style.transform = 'none';
+        clonedSide.style.backfaceVisibility = 'visible';
+
+        // The face's direct children already carry most of their designer
+        // positioning in inline styles. Re-apply only computed geometry that
+        // Tailwind supplied, without overwriting those important inline rules.
+        const nodes = [clonedSide, ...Array.from(clonedSide.querySelectorAll<HTMLElement>('*'))];
         nodes.forEach(node => {
           const computed = clonedDoc.defaultView?.getComputedStyle(node);
           if (!computed) return;
 
-          let cssText = '';
-          for (let i = 0; i < computed.length; i += 1) {
-            const property = computed[i];
-            if (property.startsWith('--')) continue;
+          const keep = [
+            'box-sizing', 'display', 'position', 'overflow', 'font-family',
+            'font-size', 'font-weight', 'line-height', 'letter-spacing',
+            'text-align', 'text-transform', 'color', 'opacity', 'border-radius',
+            'border-width', 'border-style', 'border-color', 'object-fit',
+            'object-position', 'background-color', 'background-image',
+            'background-size', 'background-position', 'background-repeat',
+            'white-space', 'word-break', 'justify-content', 'align-items',
+            'flex-direction', 'flex-wrap', 'gap', 'box-shadow'
+          ];
+
+          keep.forEach(property => {
             const value = computed.getPropertyValue(property);
-            if (!value || /oklch\(|oklab\(/i.test(value)) continue;
-            cssText += `${property}:${value};`;
-          }
-          node.style.cssText = cssText;
-          node.removeAttribute('class');
+            if (!value || /oklch\(|oklab\(/i.test(value)) return;
+            // Do not overwrite inline designer coordinates for position/size.
+            if (['position', 'display', 'overflow', 'font-family', 'font-size', 'font-weight',
+                 'line-height', 'letter-spacing', 'text-align', 'text-transform', 'color',
+                 'opacity', 'border-radius', 'border-width', 'border-style', 'border-color',
+                 'object-fit', 'object-position', 'background-color', 'background-image',
+                 'background-size', 'background-position', 'background-repeat', 'white-space',
+                 'word-break', 'justify-content', 'align-items', 'flex-direction', 'flex-wrap',
+                 'gap', 'box-shadow', 'box-sizing'].includes(property)) {
+              node.style.setProperty(property, value);
+            }
+          });
         });
-
-        // html2canvas clones the target, but the 3D transform belongs to the
-        // surrounding card wrapper. Neutralize it in the clone as well.
-        let parent = clonedSide.parentElement as HTMLElement | null;
-        for (let i = 0; i < 2 && parent; i += 1) {
-          parent.style.transform = 'none';
-          parent.style.transition = 'none';
-          parent = parent.parentElement as HTMLElement | null;
-        }
-        // The visual appearance is now frozen into inline CSS, so the
-        // application's global stylesheets are no longer needed. Removing
-        // them prevents html2canvas from parsing unrelated Tailwind v4
-        // oklch()/oklab() declarations elsewhere in the application.
-        clonedDoc.querySelectorAll('style, link[rel="stylesheet"]').forEach(node => node.remove());
-
-        clonedSide.style.transform = 'none';
-        clonedSide.style.backfaceVisibility = 'visible';
-        clonedSide.style.width = `${width}px`;
-        clonedSide.style.height = `${height}px`;
       }
     });
 
-    return canvas.toDataURL('image/png');
+    return canvas.width > 0 && canvas.height > 0
+      ? canvas.toDataURL('image/png')
+      : null;
   } catch (error) {
-    console.warn(`[KTA PDF] Gagal menangkap preview DOM ${side}; memakai renderer fallback.`, error);
+    console.error(`[KTA PDF] Gagal menangkap preview DOM ${side}:`, error);
     return null;
   } finally {
-    sideEl.style.transform = original.sideTransform;
-    sideEl.style.backfaceVisibility = original.sideBackface;
+    sideEl.style.position = original.position;
+    sideEl.style.left = original.left;
+    sideEl.style.top = original.top;
+    sideEl.style.right = original.right;
+    sideEl.style.bottom = original.bottom;
+    sideEl.style.width = original.width;
+    sideEl.style.height = original.height;
+    sideEl.style.transform = original.transform;
+    sideEl.style.backfaceVisibility = original.backfaceVisibility;
+    sideEl.style.transition = original.transition;
     if (innerEl) {
       innerEl.style.transform = original.innerTransform;
       innerEl.style.transition = original.innerTransition;
