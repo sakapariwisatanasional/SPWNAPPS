@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  LayoutDashboard, 
+  Home, 
   Compass, 
   Utensils, 
   Users, 
@@ -27,19 +27,19 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <div className="app-mobile-nav lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-2 py-1 shadow-xl safe-area-bottom">
       <nav className="flex items-center justify-around max-w-lg mx-auto">
-        {/* 1. Dashboard / Beranda */}
+        {/* 1. Landing Page / Beranda */}
         <button
           onClick={() => onSelectTab('landing')}
           className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 min-h-[48px] rounded-2xl transition-all cursor-pointer ${
-            currentTab === 'dashboard'
+            currentTab === 'landing'
               ? 'text-fuchsia-700 font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
           aria-label="Beranda"
         >
           <div className="relative">
-            <LayoutDashboard className={`w-5 h-5 ${currentTab === 'dashboard' ? 'text-fuchsia-700 stroke-[2.5]' : 'text-slate-400'}`} />
-            {currentTab === 'dashboard' && (
+            <Home className={`w-5 h-5 ${currentTab === 'landing' ? 'text-fuchsia-700 stroke-[2.5]' : 'text-slate-400'}`} />
+            {currentTab === 'landing' && (
               <span className="absolute -top-1 -right-1 w-2 h-2 bg-fuchsia-600 rounded-full animate-ping" />
             )}
           </div>
