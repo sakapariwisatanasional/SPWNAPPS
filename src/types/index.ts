@@ -1,3 +1,10 @@
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
+
+const app = express();
+const PORT = 3000;
 export type UserRole = 
   | 'SUPER_ADMIN'      // Pengendali sistem tertinggi / Kwartir Nasional
   | 'ADMIN_NATIONAL'   // Admin operasional Kwartir Nasional
@@ -103,49 +110,6 @@ export type KridaType =
   | 'Krida Mice & Event'
   | 'Krida Kuliner & Cinderamata';
 
-export type KtaInterestType = KridaType | 'Majelis Pembimbing' | 'Pimpinan Saka' | 'Pamong Saka';
-
-export type KwartirLevel = 'NASIONAL' | 'DAERAH' | 'CABANG' | 'RANTING';
-
-export const getMemberKwartirLevel = (
-  provinceId?: string,
-  regencyId?: string,
-  districtId?: string
-): KwartirLevel => {
-  if (String(provinceId || '') === '00') return 'NASIONAL';
-  if (String(districtId || '').trim()) return 'RANTING';
-  if (String(regencyId || '').trim()) return 'CABANG';
-  return 'DAERAH';
-};
-
-export const getMemberKwartirName = (
-  provinceId?: string,
-  provinceName?: string,
-  regencyId?: string,
-  regencyName?: string,
-  districtName?: string
-): string => {
-  const level = getMemberKwartirLevel(provinceId, regencyId, districtName);
-  if (level === 'NASIONAL') return 'Kwartir Nasional';
-  if (level === 'RANTING') return `Kwartir Ranting ${districtName || ''}`.trim();
-  if (level === 'CABANG') return `Kwartir Cabang ${regencyName || ''}`.trim();
-  return `Kwartir Daerah ${provinceName || ''}`.trim();
-};
-
-export const getMemberKwartirHierarchy = (
-  provinceId?: string,
-  provinceName?: string,
-  regencyName?: string,
-  districtName?: string
-): string => {
-  if (String(provinceId || '') === '00') return 'Kwartir Nasional';
-  return [
-    provinceName ? `Kwarda ${provinceName}` : '',
-    regencyName ? `Kwarcab ${regencyName}` : '',
-    districtName ? `Kwarran ${districtName}` : ''
-  ].filter(Boolean).join(' • ');
-};
-
 export interface Member {
   id: string;                  // UUID
   userId: string;
@@ -167,15 +131,12 @@ export interface Member {
   regencyName: string;
   districtId: string;
   districtName: string;
-  kwartirLevel?: KwartirLevel;
-  kwartirName?: string;
-  kwartirHierarchy?: string;
-  ktaInterest?: KtaInterestType;
   
   joinYear: number;
   status: MemberStatus;
   currentPosition: string;     // e.g. Anggota Krida Pemandu
   krida?: KridaType;
+  ktaInterest?: KridaType | 'Majelis Pembimbing' | 'Pimpinan Saka' | 'Pamong Saka';
   educationLevel: string;
   occupation: string;
   bio: string;
@@ -269,6 +230,16 @@ export interface TourPackage {
   publishedAt?: string;
   reviewedBy?: string;
   rejectionReason?: string;
+  contentType?: 'DESTINATION' | 'PACKAGE';
+  krida?: KridaType;
+  authorMemberId?: string;
+  authorName?: string;
+  adminApprovalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminApprovedAt?: string;
+  adminApprovedBy?: string;
+  superAdminApprovalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  superAdminApprovedAt?: string;
+  superAdminApprovedBy?: string;
   viewsCount: number;
   featured?: boolean;
 }
@@ -307,7 +278,7 @@ export interface Activity {
   contactEmail?: string;
   feeType?: 'GRATIS' | 'BERBAYAR' | 'SUBSIDI';
   feeAmount?: number;
-  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'ADMIN_BRANCH' | 'OPERATOR';
+  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_NATIONAL' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'ADMIN_BRANCH' | 'OPERATOR';
   uploadedByName?: string;
   uploadedAt?: string;
   registrationLink?: string;
@@ -428,8 +399,7 @@ export type KtaCardPreset = 'CR80_KTA' | 'KTP' | 'SIM' | 'CUSTOM';
 export type KtaCardSide = 'FRONT' | 'BACK';
 export type KtaMemberFieldKey =
   | 'fullName' | 'id' | 'nationalMemberNumber' | 'currentPosition'
-  | 'provinceName' | 'regencyName' | 'districtName' | 'kwartirName' | 'kwartirHierarchy'
-  | 'krida' | 'phone' | 'email' | 'joinYear' | 'status';
+  | 'provinceName' | 'regencyName' | 'districtName' | 'krida' | 'phone' | 'email' | 'joinYear' | 'status';
 
 export interface KtaDataFieldConfig {
   id: string;
@@ -478,8 +448,6 @@ export interface KtaCardSettings {
   backHeaderTitle: string; backHeaderSubtitle: string; terms: string[]; issueLocationDate: string;
   barcodeType: KtaBarcodeType; barcodeCustomValue?: string; showBarcode?: boolean;
   barcodeX?: number; barcodeY?: number; barcodeWidth?: number; barcodeHeight?: number; barcodeShowText?: boolean;
-  signerMemberId?: string; showSignerQrCode?: boolean; showSignerVerified?: boolean; signerVerifiedX?: number; signerVerifiedY?: number; signerVerifiedWidth?: number; signerVerifiedFontSize?: number; signerVerifiedColor?: string;
-  signerQrX?: number; signerQrY?: number; signerQrSize?: number; signerQrPadding?: number; signerQrBackgroundColor?: string; signerQrBorderWidth?: number; signerQrBorderColor?: string; signerQrBorderRadius?: number;
   barcodeCaption?: string;
   showBarcodeFront?: boolean; barcodeFrontCustomValue?: string; barcodeFrontX?: number; barcodeFrontY?: number; barcodeFrontWidth?: number; barcodeFrontHeight?: number; barcodeFrontShowText?: boolean; barcodeFrontCaption?: string; barcodeFrontCaptionX?: number; barcodeFrontCaptionY?: number; barcodeFrontCaptionWidth?: number; barcodeFrontCaptionFontSize?: number; barcodeFrontCaptionFontWeight?: 'normal'|'medium'|'bold'|'black'; barcodeFrontCaptionColor?: string; barcodeFrontCaptionAlign?: 'left'|'center'|'right'; barcodeFrontCaptionLineHeight?: number; barcodeFrontCaptionLetterSpacing?: number;
   photoX?: number; photoY?: number; photoWidth?: number; photoHeight?: number; photoRadius?: number; photoBorderWidth?: number; photoBorderColor?: string; photoObjectFit?: 'contain'|'cover'|'fill';
@@ -488,7 +456,7 @@ export interface KtaCardSettings {
   backHeaderTitleX?: number; backHeaderTitleY?: number; backHeaderTitleWidth?: number; backHeaderTitleFontSize?: number; backHeaderTitleFontWeight?: 'normal'|'medium'|'bold'|'black'; backHeaderTitleColor?: string; backHeaderTitleAlign?: 'left'|'center'|'right'; backHeaderTitleLineHeight?: number; backHeaderTitleLetterSpacing?: number;
   backHeaderSubtitleX?: number; backHeaderSubtitleY?: number; backHeaderSubtitleWidth?: number; backHeaderSubtitleFontSize?: number; backHeaderSubtitleFontWeight?: 'normal'|'medium'|'bold'|'black'; backHeaderSubtitleColor?: string; backHeaderSubtitleAlign?: 'left'|'center'|'right'; backHeaderSubtitleLineHeight?: number; backHeaderSubtitleLetterSpacing?: number;
   termsX?: number; termsY?: number; termsWidth?: number; termsFontSize?: number; termsFontWeight?: 'normal'|'medium'|'bold'|'black'; termsColor?: string; termsAlign?: 'left'|'center'|'right'; termsLineHeight?: number; termsLetterSpacing?: number;
-  signerX?: number; signerY?: number; signerWidth?: number; signerColor?: string; signerAlign?: 'left'|'center'|'right'; signerLineHeight?: number; signerLetterSpacing?: number; signerNameXOffset?: number; signerNameYOffset?: number; issueLocationDateFontSize?: number; signerNameFontSize?: number; signerTitleFontSize?: number; signerSubtitleFontSize?: number;
+  signerX?: number; signerY?: number; signerWidth?: number; signerColor?: string; signerAlign?: 'left'|'center'|'right'; signerLineHeight?: number; signerLetterSpacing?: number; issueLocationDateFontSize?: number; signerNameFontSize?: number; signerTitleFontSize?: number; signerSubtitleFontSize?: number;
   signerName: string; signerTitle: string; signerSubtitle?: string; showStamp: boolean;
   lastUpdated?: string; updatedBy?: string;
 }
@@ -595,3 +563,2758 @@ export interface KridaModuleItem {
   };
   specialSafetyNotes?: string;
 }
+
+
+// Security & Compliance Headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self)');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-ancestors *;"
+  );
+  next();
+});
+
+// Middleware
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+// CORS handler for cross-device access
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// ==========================================
+// PASSWORD HASHING & SESSION MANAGEMENT
+// ==========================================
+function hashPassword(password: string): string {
+  // Password hash harus kompatibel dengan Google Apps Script AUTH_LOGIN.
+  // Format: GAS2:<salt>:SHA256(<salt>|<password>)
+  const salt = crypto.randomBytes(16).toString('hex');
+  const digest = crypto
+    .createHash('sha256')
+    .update(`${salt}|${String(password)}`, 'utf8')
+    .digest('hex');
+  return `GAS2:${salt}:${digest}`;
+}
+
+function verifyPassword(password: string, storedHash: string): boolean {
+  try {
+    const value = String(storedHash || '');
+
+    // Format baru yang sama dengan Google Apps Script.
+    if (value.startsWith('GAS2:')) {
+      const parts = value.split(':');
+      if (parts.length !== 3) return false;
+      const salt = parts[1];
+      const expected = parts[2].toLowerCase();
+      const actual = crypto
+        .createHash('sha256')
+        .update(`${salt}|${String(password)}`, 'utf8')
+        .digest('hex')
+        .toLowerCase();
+      return actual === expected;
+    }
+
+    // Kompatibilitas akun lama yang masih memakai format scrypt:salt:key.
+    if (!value.includes(':')) return false;
+    const [salt, key] = value.split(':');
+    if (!salt || !key) return false;
+    const derivedKey = crypto.scryptSync(password, salt, 64);
+    const storedKey = Buffer.from(key, 'hex');
+    return storedKey.length === derivedKey.length && crypto.timingSafeEqual(storedKey, derivedKey);
+  } catch {
+    return false;
+  }
+}
+
+interface ActiveSession {
+  token: string;
+  userId: string;
+  username: string;
+  role: string;
+  name: string;
+  jurisdictionName?: string;
+  jurisdictionId?: string;
+  avatarUrl?: string;
+  memberId?: string;
+  expiresAt: number;
+}
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// IMPORTANT: set SESSION_SECRET in production (especially Vercel) so every
+// serverless instance can verify the same bearer token.
+const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-this-session-secret';
+const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
+
+// URL Google Apps Script TIDAK boleh ditentukan oleh source code.
+// Super Admin mengisinya melalui Dashboard > Pengaturan API.
+
+function normalizeManualAppsScriptUrl(raw: unknown): string {
+  const value = String(raw || '').trim().replace(/\s+/g, '');
+  if (!value) return '';
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(value)) {
+    return '';
+  }
+  return value;
+}
+
+function base64UrlEncode(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64url');
+}
+
+function base64UrlDecode(value: string): string {
+  return Buffer.from(value, 'base64url').toString('utf8');
+}
+
+function signSessionPayload(payload: string): string {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+}
+
+function createSession(user: any): string {
+  const payload = {
+    userId: String(user.id),
+    username: String(user.username || user.email || ''),
+    role: String(user.role || 'MEMBER'),
+    name: String(user.name || user.fullName || ''),
+    jurisdictionName: user.jurisdictionName,
+    jurisdictionId: user.jurisdictionId,
+    avatarUrl: user.avatarUrl,
+    memberId: user.memberId,
+    exp: Date.now() + SESSION_TTL_MS
+  };
+  const encoded = base64UrlEncode(JSON.stringify(payload));
+  return `${encoded}.${signSessionPayload(encoded)}`;
+}
+
+function getSessionUser(req: express.Request): ActiveSession | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+
+  const token = authHeader.slice('Bearer '.length).trim();
+  if (!token) return null;
+
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+
+  const [encodedPayload, providedSignature] = parts;
+  const expectedSignature = signSessionPayload(encodedPayload);
+
+  try {
+    const a = Buffer.from(providedSignature);
+    const b = Buffer.from(expectedSignature);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+    const payload = JSON.parse(base64UrlDecode(encodedPayload));
+    if (!payload || typeof payload.exp !== 'number' || Date.now() > payload.exp) return null;
+
+    return {
+      token,
+      userId: payload.userId,
+      username: payload.username,
+      role: payload.role,
+      name: payload.name,
+      jurisdictionName: payload.jurisdictionName,
+      jurisdictionId: payload.jurisdictionId,
+      avatarUrl: payload.avatarUrl,
+      memberId: payload.memberId,
+      expiresAt: payload.exp
+    };
+  } catch {
+    return null;
+  }
+}
+
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DB_FILE = path.join(DATA_DIR, 'saka-database.json');
+
+const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
+const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
+
+interface DatabaseSchema {
+  config: {
+    spreadsheetId: string;
+    spreadsheetUrl: string;
+    scriptUrl: string;
+    autoSync: boolean;
+    autoRefreshIntervalSeconds: number;
+    lastSyncedAt: string;
+    status: string;
+  };
+  members: any[];
+  tours: any[];
+  culinaryItems: any[];
+  activities: any[];
+  kridaModules?: any[];
+  users: any[];
+  auditLogs: any[];
+  lastUpdated: string;
+  version: number;
+}
+
+// Initial in-memory database
+let db: DatabaseSchema = {
+  config: {
+    spreadsheetId: DEFAULT_SPREADSHEET_ID,
+    spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
+    scriptUrl: '',
+    autoSync: true,
+    autoRefreshIntervalSeconds: 6,
+    lastSyncedAt: new Date().toISOString(),
+    status: 'CONNECTED'
+  },
+  members: [],
+  tours: [],
+  culinaryItems: [],
+  activities: [],
+  kridaModules: [],
+  users: [],
+  auditLogs: [],
+  lastUpdated: new Date().toISOString(),
+  version: 1
+};
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch (e) {
+    console.warn('Could not create data dir:', e);
+  }
+}
+
+// Load database from file
+function loadDatabase() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const content = fs.readFileSync(DB_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      db = {
+        ...db,
+        ...parsed,
+        config: {
+          ...db.config,
+          ...(parsed.config || {})
+        }
+      };
+      console.log(`[DB] Loaded ${db.members.length} members, ${db.tours.length} tours, ${db.activities.length} activities from file.`);
+    }
+  } catch (err) {
+    console.error('[DB] Error loading database file:', err);
+  }
+}
+
+// Ensure users and Super Admin account are securely initialized with password hashes
+function initializeUsersAndSuperAdmin() {
+  if (!Array.isArray(db.users)) {
+    db.users = [];
+  }
+
+  // Scrub any legacy plain text passwords or insecure demo users
+  db.users = db.users.filter(u => u.username !== 'rohadiwijaya' && u.password !== 'rohadiwijaya');
+
+  const adminUsername = process.env.ADMIN_USERNAME || 'admin_saka';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'SakaPariwisata#2026!';
+
+  let superAdmin = db.users.find(u => u.role === 'SUPER_ADMIN');
+  if (!superAdmin) {
+    superAdmin = {
+      id: 'user-superadmin-nasional',
+      username: adminUsername,
+      passwordHash: hashPassword(adminPassword),
+      email: 'admin@sakapariwisata.id',
+      name: 'Super Admin Kwartir Nasional',
+      role: 'SUPER_ADMIN',
+      jurisdictionName: 'Kwartir Nasional (Pusat)',
+      jurisdictionId: '00',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      createdAt: new Date().toISOString()
+    };
+    db.users.push(superAdmin);
+    saveDatabase();
+    console.log(`[Security] Super Admin account initialized with secure hashed password (Username: ${adminUsername}).`);
+  } else if (!superAdmin.passwordHash) {
+    superAdmin.passwordHash = hashPassword(adminPassword);
+    delete (superAdmin as any).password;
+    saveDatabase();
+  }
+}
+
+// Save database to file
+function saveDatabase() {
+  try {
+    db.lastUpdated = new Date().toISOString();
+    db.version = (db.version || 0) + 1;
+    // Vercel serverless filesystems are not persistent. Keep the in-memory
+    // cache for the lifetime of the instance, but never let a read-only FS
+    // operation break an API request.
+    if (!IS_VERCEL) {
+      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    }
+  } catch (err) {
+    console.error('[DB] Error saving database file:', err);
+  }
+}
+
+let serverHasSnapshot = false;
+loadDatabase();
+if (db.members.length > 0 || db.tours.length > 0 || db.culinaryItems.length > 0 || db.activities.length > 0 || db.users.length > 0) serverHasSnapshot = true;
+initializeUsersAndSuperAdmin();
+
+// GViz API fetcher helper
+async function fetchSheetGViz(sheetName: string): Promise<Record<string, any>[]> {
+  // Google Apps Script adalah sumber data otoritatif aplikasi.
+  // Jangan membaca GViz/Spreadsheet secara langsung di server karena hasilnya
+  // dapat berbeda dari deployment GAS yang menjadi backend aplikasi.
+  const configured = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+  const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+  const defaultUrl = DEFAULT_APPS_SCRIPT_URL;
+  const scriptUrl = configured || envUrl || defaultUrl;
+
+  try {
+    const separator = scriptUrl.includes('?') ? '&' : '?';
+    const url = `${scriptUrl}${separator}sheet=${encodeURIComponent(sheetName)}&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, max-age=0',
+        'Pragma': 'no-cache'
+      },
+      redirect: 'follow'
+    });
+
+    const text = await res.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch {}
+
+    if (!res.ok) {
+      throw new Error(`Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`);
+    }
+    if (data?.status === 'error' || data?.success === false) {
+      throw new Error(data?.message || `GAS gagal membaca sheet ${sheetName}.`);
+    }
+
+    const rows = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.rows) ? data.rows
+      : Array.isArray(data?.data) ? data.data
+      : Array.isArray(data?.records) ? data.records
+      : null;
+
+    if (!rows) {
+      throw new Error(`Respons GAS untuk sheet ${sheetName} tidak berisi array data yang valid.`);
+    }
+
+    return rows;
+  } catch (err) {
+    console.warn(`[Sync] GAS fetch error for ${sheetName}:`, err);
+    // An empty sheet is valid; a failed request is not. Propagate the error so
+    // the API never replaces a good snapshot with an accidental empty cache.
+    throw err;
+  }
+}
+
+function cleanDriveUrl(raw?: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('data:image') || trimmed.startsWith('blob:')) return trimmed;
+  const match = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+                trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
+                trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+                trimmed.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return `https://lh3.googleusercontent.com/d/${match[1]}`;
+  }
+  return trimmed;
+}
+
+function getColVal(row: Record<string, any>, aliases: string[]): string {
+  if (!row) return '';
+  for (const a of aliases) {
+    if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== '') {
+      return String(row[a]).trim();
+    }
+  }
+  const keys = Object.keys(row);
+  for (const a of aliases) {
+    const cleanA = a.toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (const k of keys) {
+      const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanK === cleanA) {
+        const v = row[k];
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          return String(v).trim();
+        }
+      }
+    }
+  }
+  return '';
+}
+
+// Full sync from Google Spreadsheet to Central Server DB
+let syncInFlight: Promise<{ success: boolean; message: string }> | null = null;
+const SERVER_DATA_CACHE_TTL_MS = 60_000;
+const SERVER_DATA_STALE_MAX_MS = 10 * 60_000;
+
+function hasUsableServerSnapshot(): boolean {
+  return serverHasSnapshot;
+}
+
+function serverSnapshotAgeMs(): number {
+  const t = Date.parse(String(db.lastUpdated || ''));
+  return Number.isFinite(t) ? Math.max(0, Date.now() - t) : Number.POSITIVE_INFINITY;
+}
+
+async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message: string }> {
+  if (syncInFlight) return syncInFlight;
+  syncInFlight = (async () => {
+    console.log('[Sync] Starting full sync from Google Spreadsheet...');
+    try {
+    // 1. Sync Anggota
+    const memberRows = await fetchSheetGViz('Anggota');
+    if (Array.isArray(memberRows)) {
+      const importedMembers = memberRows.map((row, idx) => {
+        const fullName = getColVal(row, ['Nama Lengkap', 'Nama', 'Full Name', 'col_2']) || `Anggota ${idx + 1}`;
+        const kta = getColVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'NTA', 'KTA', 'No KTA', 'col_1']);
+        const rawProv = getColVal(row, ['Kwartir Daerah (Provinsi)', 'Kwartir Daerah', 'Kwarda', 'Provinsi', 'province', 'col_5']);
+        const rawReg = getColVal(row, ['Kwartir Cabang (Kab/Kota)', 'Kwartir Cabang', 'Kwarcab', 'Kabupaten/Kota', 'Kabupaten', 'Kota', 'regency', 'col_6']);
+        const rawDistrict = getColVal(row, ['Kecamatan', 'Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'Ranting', 'districtName', 'col_7']);
+        const isNational = /^(00|nasional|tingkat nasional|kwartir nasional|kwar?nas|pimpinan nasional)$/i.test(String(rawProv || '').trim()) || /kwartir\s+nasional|tingkat\s+nasional|pusat\s+nasional/i.test(String(rawReg || ''));
+        const provinceId = getColVal(row, ['ID Provinsi', 'provinceId']) || (isNational ? '00' : '');
+        const provinceName = isNational ? 'Kwartir Nasional' : rawProv;
+        const regencyId = getColVal(row, ['ID Kwarcab', 'regencyId']) || (isNational ? '00.00' : '');
+        const regencyName = isNational ? 'Pusat Nasional' : rawReg;
+        const districtId = getColVal(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || (isNational ? '00.00.00' : '');
+        const districtName = isNational ? 'Nasional' : rawDistrict;
+        const currentPosition = getColVal(row, ['Jabatan', 'Gudep', 'Posisi / Jabatan', 'Posisi / Jabatan Kepengurusan', 'Jabatan Kepengurusan', 'Posisi', 'currentPosition', 'current_position', 'col_8']);
+        const kridaRaw = getColVal(row, ['Krida', 'Peminatan Krida', 'Peminatan Krida Saka Pariwisata', 'col_9']) || 'Krida Pemandu';
+        const ktaInterest = /^(Majelis Pembimbing|Mabisaka|Pimpinan Saka|Pamong Saka)$/i.test(String(kridaRaw).trim())
+          ? (String(kridaRaw).trim().toLowerCase() === 'mabisaka' ? 'Majelis Pembimbing' : String(kridaRaw).trim())
+          : kridaRaw;
+        const krida = ktaInterest === 'Majelis Pembimbing' || ktaInterest === 'Pimpinan Saka' || ktaInterest === 'Pamong Saka'
+          ? 'Krida Pemandu'
+          : kridaRaw;
+        const status = (getColVal(row, ['Status', 'Status Keanggotaan', 'status', 'col_10']) || 'ACTIVE').toUpperCase();
+        const photo = cleanDriveUrl(getColVal(row, ['Foto URL', 'Foto', 'Avatar', 'Link Foto', 'col_11'])) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
+        const email = getColVal(row, ['Email', 'email', 'E-mail', 'col_3']) || `member${idx + 1}@pramuka.id`;
+        const phone = getColVal(row, ['Nomor WA', 'Nomor WhatsApp', 'Telepon', 'Phone', 'col_4']) || '081234567890';
+        const id = getColVal(row, ['ID', 'id', 'member_id', 'Nomor ID', 'col_0']) || `sheet-member-${idx + 1}`;
+        const registeredAt = getColVal(row, ['Tanggal Daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_12']) || new Date().toISOString();
+        let parsedSkills: any[] = [];
+        let parsedCertifications: any[] = [];
+        try { parsedSkills = JSON.parse(getColVal(row, ['Keahlian JSON']) || '[]'); } catch {}
+        try { parsedCertifications = JSON.parse(getColVal(row, ['Sertifikasi JSON']) || '[]'); } catch {}
+        return {
+          id, userId: getColVal(row, ['User ID']) || `user-${id}`, nationalMemberNumber: kta || undefined, fullName,
+          nikMasked: getColVal(row, ['NIK Tersamar']) || '3201**********01', avatarUrl: photo,
+          gender: (getColVal(row, ['Jenis Kelamin', 'Gender']) || 'LAKI_LAKI').toUpperCase().startsWith('P') ? 'PEREMPUAN' : 'LAKI_LAKI',
+          birthPlace: getColVal(row, ['Tempat Lahir']) || 'Indonesia', birthDate: getColVal(row, ['Tanggal Lahir']) || '2000-01-01',
+          email, phone, address: getColVal(row, ['Alamat']) || `${districtName || regencyName}, ${regencyName}, ${provinceName}`,
+          provinceId, provinceName, regencyId, regencyName, districtId, districtName,
+          currentPosition: currentPosition || `Anggota ${krida}`,
+          krida, ktaInterest, joinYear: Number(getColVal(row, ['Tahun Bergabung'])) || new Date().getFullYear(),
+          educationLevel: getColVal(row, ['Pendidikan']) || 'SMA/SMK', occupation: getColVal(row, ['Pekerjaan']) || 'Anggota Pramuka',
+          bio: getColVal(row, ['Bio']) || `Anggota resmi Saka Pariwisata ${provinceName || 'Indonesia'}.`,
+          status: status === 'ACTIVE' || status === 'PENDING' || status === 'SUSPENDED' ? status : 'ACTIVE', registeredAt,
+          verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : id}`, isOperator: false,
+          operatorRole: isNational ? 'SUPER_ADMIN' : undefined, operatorJurisdictionName: isNational ? 'Kwartir Nasional' : undefined,
+          skills: parsedSkills, certifications: parsedCertifications, locationHistory: []
+        };
+      });
+
+      // Deduplicate and merge members
+      const existing = [...db.members];
+      importedMembers.forEach(im => {
+        const idx = existing.findIndex(e =>
+          e.id === im.id ||
+          (e.nationalMemberNumber && im.nationalMemberNumber && e.nationalMemberNumber === im.nationalMemberNumber) ||
+          (e.email && im.email && e.email.toLowerCase() === im.email.toLowerCase())
+        );
+        if (idx !== -1) {
+          existing[idx] = { ...existing[idx], ...im };
+        } else {
+          existing.push(im);
+        }
+      });
+      db.members = existing;
+    }
+
+    // 2. Sync Paket_Wisata
+    const tourRows = await fetchSheetGViz('Paket_Wisata');
+    if (Array.isArray(tourRows)) {
+      db.tours = tourRows.map((row, idx) => {
+        const id = getColVal(row, ['ID', 'id', 'col_0']) || `tour-sheet-${idx + 1}`;
+        const title = getColVal(row, ['Nama Paket', 'title', 'col_1']) || `Paket Wisata ${idx + 1}`;
+        const category = getColVal(row, ['Kategori', 'category', 'col_2']) || 'Ekowisata';
+        const price = parseFloat(getColVal(row, ['Harga', 'price', 'col_3'])) || 450000;
+        const duration = parseInt(getColVal(row, ['Durasi (Hari)', 'duration', 'col_4']), 10) || 2;
+        const location = getColVal(row, ['Lokasi', 'location', 'col_5']) || '';
+        const prov = getColVal(row, ['Provinsi', 'province', 'col_6']) || 'Jawa Barat';
+        const reg = getColVal(row, ['Kabupaten/Kota', 'regency', 'col_7']) || 'Kabupaten Bandung';
+        const organizer = getColVal(row, ['Penyelenggara', 'organizer', 'col_8']) || 'Saka Pariwisata';
+        const phone = getColVal(row, ['Kontak WA', 'phone', 'col_9']) || '081223344556';
+        const banner = cleanDriveUrl(getColVal(row, ['Foto Banner', 'col_10'])) || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80';
+
+        return {
+          id,
+          title,
+          slug: id,
+          category,
+          pricePerPerson: price,
+          durationDays: duration,
+          locationAddress: location,
+          provinceId: '32',
+          provinceName: prov,
+          regencyId: '32.04',
+          regencyName: reg,
+          districtName: 'Sentra Saka',
+          ownerType: 'MEMBER',
+          ownerId: 'mem-jabar-01',
+          ownerName: organizer,
+          contactPhone: phone,
+          contactEmail: 'info@sakapariwisata.id',
+          coverImage: banner,
+          galleryImages: [banner],
+          description: `Paket wisata edukasi dan petualangan ${title}. Dipandu oleh kader Pramuka Saka Pariwisata tersertifikasi.`,
+          facilities: ['Pemandu Wisata Saka Pariwisata BNSP', 'Tiket Masuk Destinasi', 'Dokumentasi', 'Asuransi'],
+          minCapacity: 2,
+          maxCapacity: 30,
+          guideProvided: true,
+          itinerary: [{ day: 1, title: 'Eksplorasi Destinasi', description: 'Kunjungan dan pendampingan pemandu Saka Pariwisata' }],
+          status: 'APPROVED_PUBLISHED',
+          submittedAt: new Date().toISOString(),
+          viewsCount: 20,
+          featured: true
+        };
+      });
+    }
+
+    // 3. Sync Kuliner_Cinderamata
+    const culinaryRows = await fetchSheetGViz('Kuliner_Cinderamata');
+    if (Array.isArray(culinaryRows)) {
+      db.culinaryItems = culinaryRows.map((row, idx) => {
+        const id = getColVal(row, ['ID', 'id', 'col_0']) || `prod-sheet-${idx + 1}`;
+        const name = getColVal(row, ['Nama Produk', 'name', 'col_1']) || `Produk Saka ${idx + 1}`;
+        const kind = (getColVal(row, ['Jenis', 'kind', 'col_2']) || 'KULINER').toUpperCase() === 'CINDERAMATA' ? 'CINDERAMATA' : 'KULINER';
+        const krida = getColVal(row, ['Kategori', 'krida', 'col_3']) || 'Krida Kuliner & Cinderamata';
+        const price = parseFloat(getColVal(row, ['Harga', 'price', 'col_4'])) || 50000;
+        const author = getColVal(row, ['Produsen/Pengrajin', 'author', 'col_5']) || 'Kader Saka Pariwisata';
+        const phone = getColVal(row, ['Kontak WA', 'phone', 'col_6']) || '081223344556';
+        const prov = getColVal(row, ['Provinsi', 'province', 'col_7']) || 'Jawa Barat';
+        const reg = getColVal(row, ['Kabupaten/Kota', 'regency', 'col_8']) || 'Kabupaten Bandung';
+        const img = cleanDriveUrl(getColVal(row, ['Foto Produk', 'col_9'])) || 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80';
+        const catLabel = getColVal(row, ['Sertifikasi Halal', 'col_10']) || 'Produk UMKM Saka Pariwisata';
+
+        return {
+          id,
+          name,
+          kind,
+          krida,
+          kridaCategory: kind === 'KULINER' ? 'Kuliner & Minuman Daerah' : 'Kriya & Cinderamata Khas',
+          categoryLabel: catLabel,
+          description: `Produk karya kader Saka Pariwisata: ${name}. Terjamin mutu dan cita rasa lokal.`,
+          priceEstimate: price,
+          priceUnit: 'per kemasan / pcs',
+          imageUrl: img,
+          provinceId: '32',
+          provinceName: prov,
+          regencyId: '32.04',
+          regencyName: reg,
+          districtId: '32.04.010',
+          districtName: 'Sentra Saka',
+          authorMemberId: 'mem-jabar-01',
+          authorName: author,
+          contactPhone: phone,
+          tags: ['UMKM', 'Saka Pariwisata', 'Lokal'],
+          status: 'APPROVED',
+          createdAt: new Date().toISOString(),
+          likesCount: 20,
+          featured: true
+        };
+      });
+    }
+
+    // 4. Sync Agenda_Kegiatan
+    const actRows = await fetchSheetGViz('Agenda_Kegiatan');
+    if (Array.isArray(actRows)) {
+      db.activities = actRows.map((row, idx) => {
+        const id = getColVal(row, ['ID', 'id', 'col_0']) || `act-sheet-${idx + 1}`;
+        const title = getColVal(row, ['Nama Agenda', 'Judul Kegiatan', 'Nama Kegiatan', 'title', 'col_1']) || `Kegiatan Saka ${idx + 1}`;
+        const category = getColVal(row, ['Kategori', 'category', 'col_2']) || 'Pelatihan';
+        const scale = (getColVal(row, ['Skala Tingkat', 'Tingkat', 'Level', 'col_3']) || 'NASIONAL').toUpperCase();
+        const organizer = getColVal(row, ['Penyelenggara', 'col_4']) || 'Pimpinan Saka Pariwisata';
+        const location = getColVal(row, ['Lokasi', 'Tempat', 'col_5']) || 'Bumi Perkemahan';
+        const prov = getColVal(row, ['Provinsi', 'province', 'col_6']) || 'Jawa Barat';
+        const startD = getColVal(row, ['Tanggal Mulai', 'startDate', 'col_7']) || '2026-09-18';
+        const endD = getColVal(row, ['Tanggal Selesai', 'endDate', 'col_8']) || '2026-09-22';
+        const feeType = (getColVal(row, ['Jenis Biaya', 'Biaya', 'col_9']) || 'GRATIS').toUpperCase();
+        const fee = parseFloat(getColVal(row, ['Nominal Biaya', 'col_10'])) || 0;
+        const phone = getColVal(row, ['Kontak WA', 'Kontak Narahubung', 'phone', 'col_12']) || '081299881122';
+        const districtId = getColVal(row, ['ID Kecamatan', 'districtId', 'col_29']) || '';
+        const districtName = getColVal(row, ['Kecamatan', 'districtName', 'col_30']) || '';
+        const uploadedByName = getColVal(row, ['Uploaded By Name', 'uploadedByName', 'col_13']) || 'Pimpinan Saka Pariwisata';
+        const uploadedByMemberId = getColVal(row, ['Uploaded By Member ID', 'uploadedByMemberId', 'col_14']) || '';
+        const uploadedByRole = getColVal(row, ['Uploaded By Role', 'uploadedByRole', 'col_15']) || 'SUPER_ADMIN';
+        const contentStatus = (getColVal(row, ['Content Status', 'contentStatus', 'col_16']) || 'APPROVED_PUBLISHED').toUpperCase();
+        const adminApprovalStatus = (getColVal(row, ['Admin Approval Status', 'adminApprovalStatus', 'col_17']) || 'APPROVED').toUpperCase();
+        const superAdminApprovalStatus = (getColVal(row, ['Super Admin Approval Status', 'superAdminApprovalStatus', 'col_20']) || 'APPROVED').toUpperCase();
+        const rejectionReason = getColVal(row, ['Alasan Penolakan', 'rejectionReason', 'col_23']) || '';
+        const bannerUrl = getColVal(row, ['Foto Banner', 'Banner URL', 'bannerUrl', 'col_24']) || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200&auto=format&fit=crop&q=80';
+        const description = getColVal(row, ['Deskripsi', 'description', 'col_25']) || `Kegiatan resmi Saka Pariwisata: ${title}. Terbuka untuk seluruh anggota Gerakan Pramuka dan masyarakat.`;
+
+        return {
+          id,
+          title,
+          slug: id,
+          description,
+          bannerUrl,
+          coverImage: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200&auto=format&fit=crop&q=80',
+          category,
+          organizerLevel: scale.includes('INTER') ? 'INTERNASIONAL' : scale.includes('PROV') ? 'PROVINSI' : scale.includes('KAB') ? 'KABUPATEN' : 'NASIONAL',
+          organizerName: organizer,
+          locationName: location,
+          locationAddress: `${location}, ${prov}`,
+          provinceId: getColVal(row, ['ID Provinsi', 'provinceId', 'col_27']) || '',
+          provinceName: prov,
+          regencyId: getColVal(row, ['ID Kabupaten/Kota', 'regencyId', 'col_28']) || '',
+          regencyName: getColVal(row, ['Kabupaten/Kota', 'regencyName', 'col_7']) || 'Pusat Kegiatan',
+          districtId,
+          districtName,
+          startDate: startD.includes('Date(') ? '2026-09-18' : startD,
+          endDate: endD.includes('Date(') ? '2026-09-22' : endD,
+          timeString: '08:00 - 17:00 WIB',
+          capacity: 250,
+          registeredCount: 0,
+          isPublic: true,
+          status: 'OPEN_REGISTRATION',
+          requirements: ['Anggota Aktif Gerakan Pramuka / Saka Pariwisata'],
+          contactPhone: phone,
+          feeType: feeType.includes('SUBSIDI') ? 'SUBSIDI' : feeType.includes('BERBAYAR') ? 'BERBAYAR' : 'GRATIS',
+          feeAmount: fee,
+          uploadedByName,
+          uploadedByMemberId: uploadedByMemberId || undefined,
+          uploadedByRole,
+          contentStatus,
+          adminApprovalStatus,
+          superAdminApprovalStatus,
+          rejectionReason: rejectionReason || undefined
+        };
+      });
+    }
+
+    db.config.lastSyncedAt = new Date().toISOString();
+    db.config.status = 'CONNECTED';
+    saveDatabase();
+      serverHasSnapshot = true;
+      console.log(`[Sync] Full sync complete: ${db.members.length} members, ${db.tours.length} tours, ${db.culinaryItems.length} culinary, ${db.activities.length} activities.`);
+      return { success: true, message: 'Sinkronisasi berhasil' };
+    } catch (e: any) {
+      console.error('[Sync] Error syncing from spreadsheet:', e);
+      return { success: false, message: e.message };
+    } finally {
+      syncInFlight = null;
+    }
+  })();
+  return syncInFlight;
+}
+
+// Background spreadsheet sync. In Vercel serverless, avoid a permanent
+// interval and avoid doing a large outbound sync during cold-start import.
+if (!IS_VERCEL) {
+  syncFromGoogleSpreadsheet().catch(err => console.warn('[Sync] Initial sync notice:', err));
+  setInterval(() => {
+    syncFromGoogleSpreadsheet().catch(() => {});
+  }, 25000);
+}
+
+const DEFAULT_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
+
+// Proxy mutation to Google Apps Script Web App
+async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
+  // Browser mobile dapat membawa URL deployment lama dari localStorage.
+  // Jangan biarkan URL lama tersebut menjadi satu-satunya sumber endpoint.
+  // Server mencoba URL yang diminta terlebih dahulu, lalu URL konfigurasi,
+  // ENV Vercel, dan terakhir URL produksi yang ditanam sebagai fallback.
+  const requested = normalizeManualAppsScriptUrl(requestedScriptUrl);
+  const configured = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+  const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+  // Prioritas mutlak: URL yang dikirim halaman aktif (hasil Dashboard), lalu
+  // konfigurasi server. ENV hanya menjadi bootstrap opsional; tidak ada URL GAS
+  // tertentu yang ditanam permanen di source code.
+  const defaultUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
+  const candidates = [requested, configured, envUrl, defaultUrl]
+    .filter(Boolean)
+    .filter((url, index, arr) => arr.indexOf(url) === index);
+
+  if (candidates.length === 0) {
+    throw new Error('Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.');
+  }
+
+  const gasPayload = { ...payload };
+  delete gasPayload.scriptUrl;
+
+  let lastError = '';
+
+  for (const scriptUrl of candidates) {
+    try {
+      const res = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gasPayload),
+        redirect: 'follow'
+      });
+
+      const text = await res.text();
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch {}
+
+      if (!res.ok) {
+        lastError = `Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`;
+        // Deployment GAS lama yang sudah tidak aktif dapat mengembalikan 404/410.
+        // Untuk login, lanjutkan ke endpoint produksi terbaru yang sudah ditetapkan.
+        if (res.status === 404 || res.status === 410) continue;
+        throw new Error(lastError);
+      }
+
+      if (data?.status === 'error' || data?.success === false) {
+        throw new Error(data.message || 'Google Apps Script menolak permintaan.');
+      }
+
+      console.log(`[GAS Forward] ${payload.action} berhasil melalui ${scriptUrl}`);
+      return data || { status: 'success' };
+    } catch (err: any) {
+      lastError = err?.message || String(err);
+      // Hanya fallback untuk deployment URL yang tidak ditemukan. Error lain
+      // (mis. permission/Drive/Spreadsheet) harus langsung dikembalikan.
+      if (!/HTTP (404|410)/i.test(lastError)) throw err;
+    }
+  }
+
+  throw new Error(lastError || 'Google Apps Script Web App tidak dapat dihubungi.');
+}
+
+// ==========================================
+// API ROUTES
+// ==========================================
+
+// Health check
+// Upload image proxy: browser -> application server -> Google Apps Script -> Google Drive.
+// The browser must not call Apps Script directly because the JSON POST would
+// require cross-origin handling. This route also keeps the GAS URL server-side.
+//
+// Mobile browsers can legitimately send binary images with
+// Content-Type: application/octet-stream. Therefore MIME validation must prefer
+// the explicit X-Upload-Mime-Type header and, if that is generic/invalid, sniff
+// the binary signature instead of rejecting a valid JPG/PNG/WEBP/GIF.
+function detectImageMimeFromBuffer(buffer: Buffer): string {
+  if (!buffer || buffer.length < 4) return '';
+  // JPEG FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  // PNG 89 50 4E 47 0D 0A 1A 0A
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) return 'image/png';
+  // GIF87a / GIF89a
+  if (buffer.length >= 6) {
+    const sig = buffer.subarray(0, 6).toString('ascii');
+    if (sig === 'GIF87a' || sig === 'GIF89a') return 'image/gif';
+  }
+  // WEBP: RIFF....WEBP
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return '';
+}
+
+function resolveUploadMimeType(req: any, body: Buffer): string {
+  const hinted = String(req.headers['x-upload-mime-type'] || '').split(';')[0].trim().toLowerCase();
+  const contentType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  const allowed = /^image\/(?:png|jpe?g|webp|gif)$/i;
+  if (allowed.test(hinted)) return hinted === 'image/jpg' ? 'image/jpeg' : hinted;
+  if (allowed.test(contentType)) return contentType === 'image/jpg' ? 'image/jpeg' : contentType;
+  return detectImageMimeFromBuffer(body);
+}
+
+app.post('/api/upload-image', express.raw({ type: ['application/octet-stream', 'image/*'], limit: '4mb' }), async (req, res) => {
+  try {
+    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '');
+    if (!body.length) {
+      return res.status(400).json({ success: false, status: 'error', message: 'File foto kosong.' });
+    }
+    if (body.length > 4 * 1024 * 1024) {
+      return res.status(413).json({ success: false, status: 'error', message: 'Ukuran foto terlalu besar. Maksimal 4 MB.' });
+    }
+
+    const requestedScriptUrl = normalizeManualAppsScriptUrl(req.headers['x-script-url']);
+    const filenameHeader = String(req.headers['x-file-name'] || '').trim();
+    const category = String(req.headers['x-file-category'] || 'MEMBER_AVATAR').trim().toUpperCase();
+    const session = getSessionUser(req);
+    const privilegedUploadCategories = new Set(['TOUR_PACKAGES', 'CULINARY_SOUVENIRS', 'DOCUMENTS', 'KTA_CARD', 'ACTIVITIES']);
+    if (privilegedUploadCategories.has(category) && session?.role !== 'SUPER_ADMIN' &&
+        !CONTENT_ADMIN_ROLES.includes(session?.role || '')) {
+      return res.status(403).json({ success: false, message: 'Anda tidak memiliki wewenang mengunggah aset pada kategori ini.' });
+    }
+    if (category === 'MEMBER_AVATAR' && session?.role === 'PUBLIC') {
+      // Avatar publik hanya dipakai pada alur pendaftaran anggota baru.
+      // Tidak membuka kategori aset administratif kepada anonymous user.
+    }
+    const filename = (() => {
+      try { return decodeURIComponent(filenameHeader); } catch { return filenameHeader; }
+    })().replace(/[^a-zA-Z0-9._-]/g, '_') || `image_${Date.now()}.jpg`;
+
+    const mimeType = resolveUploadMimeType(req, body);
+    if (!mimeType) {
+      return res.status(415).json({ success: false, status: 'error', message: 'Format foto tidak didukung. Gunakan JPG, PNG, WEBP, atau GIF.' });
+    }
+
+    // 1) Xin resumable upload session từ GAS.
+    const sessionResult = await forwardToGoogleAppsScript({
+      action: 'GET_UPLOAD_URL',
+      fileName: filename,
+      mimeType,
+      category
+    }, requestedScriptUrl);
+
+    const uploadUrl = String(sessionResult?.uploadUrl || sessionResult?.url || '').trim();
+    if (!uploadUrl) {
+      throw new Error(sessionResult?.message || 'Google Apps Script tidak mengembalikan URL sesi upload Google Drive.');
+    }
+
+    // 2) Stream binary langsung ke Google Drive.
+    const driveResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': mimeType,
+        'Content-Length': String(body.length)
+      },
+      body: body
+    });
+    const driveText = await driveResponse.text();
+    let driveData: any = null;
+    try { driveData = driveText ? JSON.parse(driveText) : null; } catch {}
+    if (!driveResponse.ok) {
+      throw new Error(driveData?.error?.message || `Google Drive upload gagal (HTTP ${driveResponse.status}).`);
+    }
+
+    // ID file baru tersedia setelah binary benar-benar diterima oleh Drive.
+    // GET_UPLOAD_URL hanya membuat resumable session, bukan file final.
+    const fileId = String(driveData?.id || '').trim();
+    if (!fileId) {
+      throw new Error('Google Drive menerima upload tetapi tidak mengembalikan File ID. Respons Drive tidak lengkap.');
+    }
+
+    // 3) Finalize file di GAS dan ambil URL Drive.
+    const finalized = await forwardToGoogleAppsScript({
+      action: 'FINALIZE_UPLOAD',
+      fileId,
+      fileName: filename,
+      mimeType,
+      category
+    }, requestedScriptUrl);
+
+    const finalUrl = String(finalized?.url || finalized?.directUrl || finalized?.viewUrl || '').trim();
+    if (!finalUrl) throw new Error(finalized?.message || 'Google Apps Script tidak mengembalikan URL file setelah finalize.');
+
+    return res.json({
+      success: true,
+      status: 'success',
+      action: 'UPLOAD_IMAGE',
+      requestId: `upload_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
+      fileId,
+      url: finalUrl,
+      directUrl: String(finalized?.directUrl || finalUrl),
+      viewUrl: String(finalized?.viewUrl || `https://drive.google.com/uc?export=view&id=${fileId}`),
+      folderId: finalized?.folderId || null,
+      filename,
+      category,
+      message: finalized?.message || 'Foto berhasil disimpan ke Google Drive.'
+    });
+  } catch (error: any) {
+    console.error('[Upload Image] Error:', error);
+    const message = error?.message || 'Upload foto gagal.';
+    const statusMatch = message.match(/HTTP (\d{3})/i);
+    const status = statusMatch ? Number(statusMatch[1]) : 502;
+    return res.status(status >= 400 && status < 600 ? status : 502).json({
+      success: false,
+      status: 'error',
+      message
+    });
+  }
+});
+
+// ------------------------------------------
+// AUTHENTICATION ROUTES
+// ------------------------------------------
+
+// POST /api/auth/login
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password, scriptUrl } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: 'Nama pengguna dan kata sandi wajib diisi.' });
+  }
+
+  const cleanUser = String(username).trim().toLowerCase();
+  const rawPass = String(password);
+
+  // Google Spreadsheet / Users adalah sumber autentikasi utama.
+  // Cache Vercel tidak dipakai lebih dahulu agar login setelah logout/cold-start
+  // selalu menggunakan kredensial yang tersimpan secara persisten.
+  let matchedUser: any = null;
+  let persistentAuthSucceeded = false;
+  let persistentAuthMessage = '';
+
+  try {
+    // Login harus menggunakan deployment GAS produksi terbaru.
+    // Ini mencegah URL lama yang tersimpan di localStorage perangkat
+    // menyebabkan HTTP 404 sebelum autentikasi mencapai Users sheet.
+    const gasResult = await forwardToGoogleAppsScript({
+      action: 'AUTH_LOGIN',
+      username: cleanUser,
+      password: rawPass
+    }, DEFAULT_APPS_SCRIPT_URL);
+
+    if (gasResult?.success === true && gasResult?.user) {
+      matchedUser = {
+        ...gasResult.user,
+        passwordHash: '',
+        status: gasResult.user.status || 'ACTIVE'
+      };
+      persistentAuthSucceeded = true;
+
+      // Cache hanya setelah Google Apps Script berhasil mengautentikasi.
+      const existingIndex = db.users.findIndex(u =>
+        String(u.id || '') === String(matchedUser.id || '')
+      );
+      if (existingIndex >= 0) {
+        db.users[existingIndex] = { ...db.users[existingIndex], ...matchedUser };
+      } else {
+        db.users.push(matchedUser);
+      }
+      saveDatabase();
+    } else {
+      persistentAuthMessage = String(
+        gasResult?.message || 'Kombinasi nama pengguna atau kata sandi tidak valid.'
+      );
+    }
+  } catch (gasError: any) {
+    persistentAuthMessage = gasError?.message || String(gasError);
+    console.warn('[Auth] AUTH_LOGIN Google Apps Script gagal:', persistentAuthMessage);
+  }
+
+  // Jangan gunakan password cache jika Google secara eksplisit menolak login.
+  // Ini mencegah kredensial lama mengalahkan Users sheet.
+  const explicitCredentialFailure = /username|nama pengguna|email|password|kata sandi|tidak valid|salah|credential|akun.*(tidak|belum)|belum disetujui|pending|ditolak/i.test(persistentAuthMessage);
+  if (!persistentAuthSucceeded && explicitCredentialFailure) {
+    const isPending = /belum disetujui|pending|menunggu.*persetujuan/i.test(persistentAuthMessage);
+    return res.status(isPending ? 403 : 401).json({
+      success: false,
+      message: isPending ? 'Akun belum disetujui administrator.' : persistentAuthMessage
+    });
+  }
+
+  // Fallback legacy hanya ketika Google Apps Script benar-benar tidak tersedia.
+  if (!matchedUser) {
+    const cachedUser = db.users.find(u =>
+      (u.username && String(u.username).toLowerCase() === cleanUser) ||
+      (u.email && String(u.email).toLowerCase() === cleanUser)
+    );
+
+    if (cachedUser?.passwordHash && verifyPassword(rawPass, String(cachedUser.passwordHash))) {
+      matchedUser = cachedUser;
+    }
+  }
+
+  // Kompatibilitas akun legacy yang hanya tersimpan bersama member cache.
+  if (!matchedUser) {
+    const member = db.members.find(m =>
+      (m.email && String(m.email).toLowerCase() === cleanUser) ||
+      (m.nationalMemberNumber && String(m.nationalMemberNumber).toLowerCase() === cleanUser)
+    );
+    if (member?.passwordHash && verifyPassword(rawPass, String(member.passwordHash))) {
+      matchedUser = {
+        id: member.userId || `USER-${String(member.id || '').replace(/^SPW-/, '')}`,
+        username: member.email.split('@')[0],
+        email: member.email,
+        name: member.fullName,
+        role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
+        jurisdictionName: member.provinceId === '00' ? 'Kwartir Nasional' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
+        jurisdictionId: member.provinceId === '00' ? '00' : member.regencyId,
+        avatarUrl: member.avatarUrl,
+        memberId: member.id,
+        passwordHash: member.passwordHash
+      };
+    }
+  }
+
+  if (!matchedUser) {
+    console.warn(`[Auth] Failed login attempt for user: ${cleanUser}`);
+    return res.status(401).json({
+      success: false,
+      message: persistentAuthMessage || 'Kombinasi nama pengguna atau kata sandi tidak valid.'
+    });
+  }
+
+  // Bila memakai fallback legacy, password tetap harus diverifikasi lokal.
+  if (!persistentAuthSucceeded && (!matchedUser.passwordHash || !verifyPassword(rawPass, String(matchedUser.passwordHash)))) {
+    return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid.' });
+  }
+
+  const token = createSession(matchedUser);
+
+  db.auditLogs.unshift({
+    id: `log-${Date.now()}`,
+    userId: matchedUser.id,
+    userName: matchedUser.name,
+    userRole: matchedUser.role,
+    action: 'LOGIN',
+    targetType: 'AUTH',
+    targetId: matchedUser.id,
+    description: `Login berhasil sebagai ${matchedUser.role} (${matchedUser.jurisdictionName || 'Nasional'})`,
+    timestamp: new Date().toISOString()
+  });
+  if (db.auditLogs.length > 500) db.auditLogs.pop();
+  saveDatabase();
+
+  const sanitizedUser = {
+    id: matchedUser.id,
+    username: matchedUser.username,
+    name: matchedUser.name,
+    email: matchedUser.email,
+    role: matchedUser.role,
+    jurisdictionName: matchedUser.jurisdictionName,
+    jurisdictionId: matchedUser.jurisdictionId,
+    avatarUrl: matchedUser.avatarUrl,
+    memberId: matchedUser.memberId
+  };
+
+  res.json({ success: true, token, user: sanitizedUser });
+});
+
+// GET /api/auth/me - Verify current session token
+app.get('/api/auth/me', (req, res) => {
+  const session = getSessionUser(req);
+  if (!session) {
+    return res.status(401).json({ success: false, message: 'Sesi tidak valid atau telah kedaluwarsa.' });
+  }
+  res.json({
+    success: true,
+    user: {
+      id: session.userId,
+      username: session.username,
+      name: session.name,
+      role: session.role,
+      jurisdictionName: session.jurisdictionName,
+      jurisdictionId: session.jurisdictionId,
+      avatarUrl: session.avatarUrl,
+      memberId: session.memberId
+    }
+  });
+});
+
+// POST /api/auth/logout - Invalidate session
+app.post('/api/auth/logout', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1]?.trim();
+    // Sessions are stateless. Clearing the bearer token on the client is the
+    // logout action; persistent revocation would require a shared session store.
+  }
+  res.json({ success: true, message: 'Berhasil keluar.' });
+});
+
+// POST /api/auth/change-password
+app.post('/api/auth/change-password', async (req, res) => {
+  const session = getSessionUser(req);
+  if (!session) {
+    return res.status(401).json({ success: false, message: 'Harap masuk terlebih dahulu.' });
+  }
+
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword || String(newPassword).length < 6) {
+    return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
+  }
+
+  const user = db.users.find(u => String(u.id || '') === String(session.userId || '')) || {
+    id: session.userId,
+    username: session.username,
+    name: session.name,
+    memberId: session.memberId
+  };
+
+  // Google Spreadsheet / Users adalah sumber autentikasi utama.
+  // Perubahan password WAJIB ditulis ke Users sheet agar password baru
+  // yang dipakai AUTH_LOGIN tidak berbeda dengan password lokal Vercel.
+  try {
+    const gasResult = await forwardToGoogleAppsScript({
+      action: 'AUTH_CHANGE_PASSWORD',
+      userId: String(user.id || session.userId || ''),
+      username: String(user.username || session.username || '').trim().toLowerCase(),
+      email: String(user.email || '').trim().toLowerCase(),
+      memberId: String(user.memberId || session.memberId || ''),
+      currentPassword: String(currentPassword),
+      newPassword: String(newPassword)
+    }, DEFAULT_APPS_SCRIPT_URL);
+
+    if (!gasResult?.success) {
+      return res.status(400).json({
+        success: false,
+        message: gasResult?.message || 'Kata sandi gagal diperbarui di Google Spreadsheet.'
+      });
+    }
+
+    // Sinkronkan cache lokal hanya setelah Google Apps Script berhasil.
+    const newHash = hashPassword(String(newPassword));
+    const existingIndex = db.users.findIndex(u => String(u.id || '') === String(session.userId || ''));
+    if (existingIndex >= 0) {
+      db.users[existingIndex].passwordHash = newHash;
+    } else {
+      db.users.push({
+        id: session.userId,
+        username: session.username,
+        email: user.email || '',
+        name: session.name,
+        role: session.role,
+        jurisdictionName: session.jurisdictionName,
+        jurisdictionId: session.jurisdictionId,
+        avatarUrl: session.avatarUrl,
+        memberId: session.memberId,
+        status: 'ACTIVE',
+        passwordHash: newHash
+      });
+    }
+    saveDatabase();
+
+    return res.json({ success: true, message: 'Kata sandi berhasil diperbarui.' });
+  } catch (error: any) {
+    console.error('[Auth] Perubahan password ke Google Apps Script gagal:', error);
+    return res.status(502).json({
+      success: false,
+      message: error?.message || 'Gagal menyimpan kata sandi ke Google Spreadsheet.'
+    });
+  }
+});
+
+// POST /api/auth/register - Public new member registration
+app.post('/api/auth/register', async (req, res) => {
+  const requestId = `REG-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+
+  try {
+    const { memberData, password, photoData, photoUrl, photoFileName, scriptUrl } = req.body || {};
+    const registrationScriptUrl =
+      normalizeManualAppsScriptUrl(scriptUrl) ||
+      normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
+      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+
+    console.log(`[Register][${requestId}] START`, {
+      hasMemberData: Boolean(memberData),
+      hasPassword: typeof password === 'string' && password.length > 0,
+      hasPhotoData: typeof photoData === 'string' && photoData.startsWith('data:image/'),
+      hasPhotoUrl: Boolean(photoUrl),
+      scriptConfigured: Boolean(registrationScriptUrl)
+    });
+
+    if (!memberData || !memberData.fullName) {
+      return res.status(400).json({ success: false, requestId, message: 'Data anggota wajib dilengkapi.' });
+    }
+
+    // SECURITY: /api/auth/register adalah endpoint pendaftaran PUBLIC.
+    // Akun publik tidak boleh membuat/menetapkan anggota tingkat Nasional.
+    // Nasional hanya dapat ditetapkan melalui alur admin yang terotorisasi.
+    const requestedProvinceId = String(memberData.provinceId || '').trim();
+    const requestedProvinceName = String(memberData.provinceName || '').trim().toLowerCase();
+    const requestedRegencyId = String(memberData.regencyId || '').trim();
+    const requestedRegencyName = String(memberData.regencyName || '').trim().toLowerCase();
+    const requestedDistrictName = String(memberData.districtName || '').trim().toLowerCase();
+    const requestsNational =
+      requestedProvinceId === '00' ||
+      requestedRegencyId === '00.00' ||
+      requestedProvinceName === 'kwartir nasional' ||
+      requestedRegencyName === 'pusat nasional' ||
+      requestedDistrictName === 'nasional';
+
+    if (requestsNational) {
+      return res.status(403).json({
+        success: false,
+        requestId,
+        message: 'Pendaftaran Kwartir Nasional hanya dapat ditetapkan oleh Super Admin.'
+      });
+    }
+
+    if (!requestedProvinceId || !requestedRegencyId || !String(memberData.districtId || '').trim() || !String(memberData.districtName || '').trim()) {
+      return res.status(400).json({
+        success: false,
+        requestId,
+        message: 'Kwarda, Kwarcab, dan Kecamatan wajib dipilih.'
+      });
+    }
+
+    const rawPassword = typeof password === 'string' ? password : '';
+    if (rawPassword.length < 6) {
+      return res.status(400).json({ success: false, requestId, message: 'Kata sandi minimal 6 karakter.' });
+    }
+
+    const email = String(memberData.email || '').trim().toLowerCase();
+    const requestedUsername = String(memberData.username || '').trim().toLowerCase();
+    const username = requestedUsername || (email ? email.split('@')[0] : '');
+
+    if (!email) {
+      return res.status(400).json({ success: false, requestId, message: 'Email wajib diisi untuk membuat akun.' });
+    }
+    if (!username) {
+      return res.status(400).json({ success: false, requestId, message: 'Nama pengguna tidak dapat ditentukan dari data pendaftaran.' });
+    }
+
+    if (!registrationScriptUrl) {
+      return res.status(400).json({
+        success: false,
+        requestId,
+        message: 'Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API sebelum pendaftaran.'
+      });
+    }
+
+    const hasPhotoData = typeof photoData === 'string' && /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(photoData.trim());
+    let resolvedPhotoUrl = typeof photoUrl === 'string' && /^https?:\/\//i.test(photoUrl.trim()) ? photoUrl.trim() : '';
+
+    // Backward compatibility: if an older browser still sends Base64, upload it
+    // before REGISTER_MEMBER and forward only the resulting Drive URL.
+    if (hasPhotoData && !resolvedPhotoUrl) {
+      const uploadResult = await forwardToGoogleAppsScript({
+        action: 'UPLOAD_IMAGE',
+        base64: photoData.trim(),
+        filename: String(photoFileName || `KTA_${Date.now()}.jpg`).trim(),
+        category: 'MEMBER_AVATAR'
+      }, registrationScriptUrl);
+
+      if (!uploadResult?.success || !uploadResult?.url) {
+        return res.status(502).json({
+          success: false,
+          requestId,
+          message: uploadResult?.message || 'Foto gagal disimpan ke Google Drive.'
+        });
+      }
+      resolvedPhotoUrl = String(uploadResult.url).trim();
+    }
+
+    if (!resolvedPhotoUrl) {
+      return res.status(400).json({
+        success: false,
+        requestId,
+        message: 'Pas foto wajib dipilih atau diberikan melalui URL gambar.'
+      });
+    }
+
+    // Foto sudah diunggah lebih dahulu dari browser melalui /api/upload-image.
+    // REGISTER_MEMBER hanya mengirim URL Drive sehingga payload mobile tetap kecil.
+    const duplicateUser = db.users.find(u =>
+      (u.username && String(u.username).toLowerCase() === username) ||
+      (u.email && String(u.email).toLowerCase() === email)
+    );
+    if (duplicateUser) {
+      return res.status(409).json({
+        success: false,
+        requestId,
+        message: 'Username atau email sudah terdaftar. Silakan gunakan akun yang sudah ada.'
+      });
+    }
+
+    const duplicateMember = db.members.find(m =>
+      (m.email && String(m.email).toLowerCase() === email) ||
+      (memberData.nationalMemberNumber && m.nationalMemberNumber &&
+        String(m.nationalMemberNumber).toLowerCase() === String(memberData.nationalMemberNumber).toLowerCase())
+    );
+    if (duplicateMember) {
+      return res.status(409).json({ success: false, requestId, message: 'Email atau Nomor KTA sudah terdaftar.' });
+    }
+
+    const generatedMemberNumber = String(Date.now()).slice(-6).padStart(6, '0');
+    const suppliedMemberId = String(memberData.id || '').trim();
+    const memberId = suppliedMemberId.startsWith('SPW-') ? suppliedMemberId : `SPW-${generatedMemberNumber}`;
+    const userId = String(memberData.userId || `USER-${Date.now().toString().slice(-10)}`);
+    const registeredAt = new Date().toISOString();
+    const passHash = hashPassword(rawPassword);
+
+    const newMember = {
+      ...memberData,
+      id: memberId,
+      userId,
+      email,
+      status: 'PENDING',
+      registeredAt,
+      passwordHash: passHash,
+      avatarUrl: resolvedPhotoUrl
+    };
+
+    const newUser = {
+      id: userId,
+      username,
+      email,
+      passwordHash: passHash,
+      name: newMember.fullName,
+      role: 'MEMBER',
+      jurisdictionName: newMember.provinceId === '00'
+        ? 'Kwartir Nasional'
+        : (newMember.districtName
+          ? `${newMember.districtName}, ${newMember.regencyName || ''}`.replace(/,\s*$/, '')
+          : (newMember.regencyName || newMember.provinceName || 'Indonesia')),
+      jurisdictionId: newMember.provinceId === '00' ? '00' : (newMember.regencyId || ''),
+      avatarUrl: newMember.avatarUrl,
+      memberId,
+      createdAt: registeredAt,
+      status: 'PENDING'
+    };
+
+    console.log(`[Register][${requestId}] Sending REGISTER_MEMBER to GAS`, {
+      memberId,
+      userId,
+      hasPhotoData,
+      hasPhotoUrl: Boolean(resolvedPhotoUrl)
+    });
+
+    const gasRawResult = await forwardToGoogleAppsScript({
+      action: 'REGISTER_MEMBER',
+      requestId,
+      memberId,
+      userId,
+      passwordHash: passHash,
+      photoData: '',
+      photoUrl: resolvedPhotoUrl,
+      photoFileName: String(photoFileName || `KTA_${memberId}.jpg`).trim(),
+      member: newMember,
+      user: newUser
+    }, registrationScriptUrl);
+
+    // Be tolerant of Apps Script deployments that wrap the actual payload
+    // inside `data` or `result`. Some older Web App deployments also return
+    // only `success/status/message` even though the rows were saved.
+    const gasResult = (gasRawResult?.data && typeof gasRawResult.data === 'object')
+      ? gasRawResult.data
+      : ((gasRawResult?.result && typeof gasRawResult.result === 'object')
+        ? gasRawResult.result
+        : gasRawResult);
+
+    if (!gasResult || gasResult.success !== true) {
+      throw new Error(gasResult?.message || 'Google Apps Script tidak mengonfirmasi keberhasilan pendaftaran.');
+    }
+
+    // GAS is the source of truth. Accept both the current response (with IDs)
+    // and older successful responses that omitted IDs; the request IDs are
+    // already generated by this server and the success response confirms the
+    // transaction was accepted by Apps Script.
+    const confirmedMemberId = String(
+      gasResult.memberId || gasResult.member?.id || gasResult.member?.memberId || memberId
+    );
+    const confirmedUserId = String(
+      gasResult.userId || gasResult.user?.id || gasResult.user?.userId || userId
+    );
+
+    if (confirmedMemberId !== memberId || confirmedUserId !== userId) {
+      throw new Error('Konfirmasi ID anggota dari Google Apps Script tidak sesuai dengan permintaan pendaftaran.');
+    }
+
+    // GAS is the source of truth for the transaction. Use returned objects when
+    // available; otherwise synthesize complete objects from the exact payload
+    // that GAS acknowledged as successful. This keeps mobile registration from
+    // failing only because an older GAS response omitted member/user objects.
+    const savedMember = gasResult.member && typeof gasResult.member === 'object'
+      ? { ...newMember, ...gasResult.member, id: memberId, userId, avatarUrl: gasResult.member.avatarUrl || resolvedPhotoUrl }
+      : { ...newMember, id: memberId, userId, avatarUrl: resolvedPhotoUrl };
+    const savedUser = gasResult.user && typeof gasResult.user === 'object'
+      ? { ...newUser, ...gasResult.user, id: userId, memberId, avatarUrl: gasResult.user.avatarUrl || resolvedPhotoUrl }
+      : { ...newUser, id: userId, memberId, avatarUrl: resolvedPhotoUrl };
+
+    db.members = db.members.filter(m => m.id !== memberId && m.email !== email);
+    db.members.unshift(savedMember);
+    db.users = db.users.filter(u => u.id !== userId && String(u.email || '').toLowerCase() !== email);
+    db.users.push(savedUser);
+
+    db.auditLogs.unshift({
+      id: `log-${Date.now()}`,
+      userId: 'public-register',
+      userName: savedMember.fullName,
+      userRole: 'PUBLIC',
+      action: 'REGISTER',
+      targetType: 'MEMBER',
+      targetId: memberId,
+      description: `Pendaftaran mandiri calon anggota baru: ${savedMember.fullName}`,
+      timestamp: registeredAt
+    });
+    if (db.auditLogs.length > 500) db.auditLogs.pop();
+    saveDatabase();
+
+    const token = createSession(savedUser);
+    const sanitizedUser = {
+      id: savedUser.id,
+      username: savedUser.username,
+      name: savedUser.name,
+      email: savedUser.email,
+      role: savedUser.role,
+      jurisdictionName: savedUser.jurisdictionName,
+      jurisdictionId: savedUser.jurisdictionId,
+      avatarUrl: savedUser.avatarUrl,
+      memberId: savedUser.memberId,
+      status: savedUser.status || 'PENDING'
+    };
+
+    console.log(`[Register][${requestId}] SUCCESS`, {
+      memberId,
+      userId,
+      driveFileId: gasResult.drive?.fileId || null,
+      memberRow: gasResult.memberRow || null,
+      userRow: gasResult.userRow || null
+    });
+
+    return res.status(201).json({
+      success: true,
+      status: 'success',
+      requestId,
+      message: 'Pendaftaran keanggotaan berhasil diajukan dan sedang menunggu verifikasi.',
+      memberId,
+      userId,
+      member: savedMember,
+      user: sanitizedUser,
+      drive: gasResult.drive || null,
+      memberRow: gasResult.memberRow || null,
+      userRow: gasResult.userRow || null,
+      token
+    });
+  } catch (error: any) {
+    console.error(`[Register][${requestId}] FAILED`, error);
+    const message = error?.message || 'Pendaftaran gagal diproses.';
+    return res.status(502).json({
+      success: false,
+      status: 'error',
+      requestId,
+      message: `Pendaftaran gagal diproses: ${message}`
+    });
+  }
+});
+
+// ------------------------------------------
+// DATA & CONFIGURATION ROUTES (ROLE-ENFORCED)
+// ------------------------------------------
+
+// Config GET & POST
+app.get('/api/config', (req, res) => {
+  const session = getSessionUser(req);
+  const isSuperAdmin = session?.role === 'SUPER_ADMIN';
+
+  if (!isSuperAdmin) {
+    // Only return safe public operational status
+    return res.json({
+      config: {
+        // Web App URL bukan credential rahasia; browser pengguna membutuhkannya
+        // agar dapat melakukan sinkronisasi langsung ke Google Apps Script.
+        scriptUrl: normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
+          normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) || '',
+        spreadsheetId: db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID,
+        spreadsheetUrl: db.config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
+        status: db.config.status || 'CONNECTED',
+        autoSync: db.config.autoSync,
+        autoRefreshIntervalSeconds: db.config.autoRefreshIntervalSeconds || 6,
+        lastSyncedAt: db.config.lastSyncedAt
+      },
+      lastUpdated: db.lastUpdated,
+      version: db.version
+    });
+  }
+
+  // Full config for Super Admin
+  res.json({
+    config: db.config,
+    lastUpdated: db.lastUpdated,
+    version: db.version
+  });
+});
+
+app.post('/api/config', (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Wewenang Super Admin diperlukan untuk memperbarui konfigurasi pusat.' });
+  }
+
+  const updates = req.body || {};
+  const incomingScriptUrl = normalizeManualAppsScriptUrl(updates.scriptUrl);
+  if (updates.scriptUrl !== undefined && !incomingScriptUrl) {
+    return res.status(400).json({ success: false, message: 'Google Apps Script Web App URL tidak valid. Gunakan URL deployment /exec.' });
+  }
+  db.config = {
+    ...db.config,
+    ...updates,
+    ...(updates.scriptUrl !== undefined ? { scriptUrl: incomingScriptUrl } : {})
+  };
+  saveDatabase();
+  console.log('[Config] Updated shared configuration by Super Admin:', session.name);
+  res.json({ success: true, config: db.config });
+});
+
+
+// =========================================================
+// KTA DESIGN SETTINGS — CENTRAL SOURCE OF TRUTH
+// =========================================================
+// GET is intentionally available to authenticated and public/member browsers:
+// KTA layout is presentation configuration, not private member data.
+// The actual source of truth remains the Google Spreadsheet via Apps Script.
+app.get('/api/kta-settings', async (req, res) => {
+  try {
+    const scriptUrl = normalizeManualAppsScriptUrl(req.query?.scriptUrl) || normalizeManualAppsScriptUrl(db.config.scriptUrl) || normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL) || '';
+    if (!scriptUrl) {
+      return res.status(503).json({
+        success: false,
+        message: 'Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.'
+      });
+    }
+
+    const url = scriptUrl.includes('?')
+      ? `${scriptUrl}&action=GET_KTA_SETTINGS&_t=${Date.now()}`
+      : `${scriptUrl}?action=GET_KTA_SETTINGS&_t=${Date.now()}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || data?.status === 'error' || data?.success === false) {
+      throw new Error(data?.message || `Gagal membaca pengaturan KTA (HTTP ${response.status}).`);
+    }
+
+    return res.json({
+      success: true,
+      status: 'success',
+      action: 'GET_KTA_SETTINGS',
+      settings: data.settings || null,
+      updatedAt: data.updatedAt || null,
+      updatedBy: data.updatedBy || null
+    });
+  } catch (error: any) {
+    console.error('[KTA Settings] GET error:', error);
+    return res.status(502).json({
+      success: false,
+      status: 'error',
+      message: error?.message || 'Gagal membaca pengaturan KTA pusat.'
+    });
+  }
+});
+
+// Only Super Admin may publish a new KTA layout.
+app.put('/api/kta-settings', async (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Wewenang Super Admin diperlukan.' });
+  }
+
+  try {
+    const settings = req.body?.settings;
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      return res.status(400).json({ success: false, message: 'Pengaturan KTA tidak valid.' });
+    }
+
+    const scriptUrl = normalizeManualAppsScriptUrl(req.body?.scriptUrl || db.config.scriptUrl);
+    if (!scriptUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.'
+      });
+    }
+
+    const result = await forwardToGoogleAppsScript({
+      action: 'UPSERT_KTA_SETTINGS',
+      settings,
+      updatedBy: session.name || session.username || 'Super Admin'
+    }, scriptUrl);
+
+    return res.json({
+      success: true,
+      status: 'success',
+      action: 'UPSERT_KTA_SETTINGS',
+      settings: result?.settings || settings,
+      updatedAt: result?.updatedAt || new Date().toISOString(),
+      updatedBy: result?.updatedBy || session.name || session.username || 'Super Admin',
+      message: result?.message || 'Pengaturan KTA tersimpan di Google Spreadsheet.'
+    });
+  } catch (error: any) {
+    console.error('[KTA Settings] PUT error:', error);
+    const message = error?.message || 'Gagal menyimpan pengaturan KTA pusat.';
+    const statusMatch = message.match(/HTTP (\d{3})/i);
+    const upstreamStatus = statusMatch ? Number(statusMatch[1]) : 502;
+    return res.status(upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 502).json({
+      success: false,
+      status: 'error',
+      message
+    });
+  }
+});
+
+// Read Google Spreadsheet data through the Vercel server so the browser never
+// depends on Google Apps Script redirect/CORS behaviour. The active GAS URL is
+// supplied by the SuperAdmin-configured runtime setting.
+app.get('/api/spreadsheet-data', async (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Akses spreadsheet mentah hanya tersedia untuk Super Admin Nasional.' });
+  }
+
+  const sheet = String(req.query?.sheet || 'Anggota').trim() || 'Anggota';
+  // The browser may not choose an arbitrary Apps Script deployment. The
+  // server-side configured deployment is the only upstream allowed here.
+  const configuredScriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+  const envScriptUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+  const scriptUrl = configuredScriptUrl || envScriptUrl;
+
+  if (!scriptUrl) {
+    return res.status(400).json({
+      success: false,
+      message: 'Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.'
+    });
+  }
+
+  try {
+    const separator = scriptUrl.includes('?') ? '&' : '?';
+    const url = `${scriptUrl}${separator}sheet=${encodeURIComponent(sheet)}&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+    const upstream = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, max-age=0',
+        'Pragma': 'no-cache'
+      },
+      redirect: 'follow'
+    });
+
+    const text = await upstream.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch {}
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({
+        success: false,
+        message: `Google Apps Script HTTP ${upstream.status}${data?.message ? `: ${data.message}` : ''}`
+      });
+    }
+
+    if (data?.status === 'error' || data?.success === false) {
+      return res.status(502).json({
+        success: false,
+        message: data?.message || `Google Apps Script gagal membaca sheet ${sheet}.`
+      });
+    }
+
+    const rows = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.rows) ? data.rows
+      : Array.isArray(data?.data) ? data.data
+      : Array.isArray(data?.records) ? data.records
+      : null;
+
+    if (!rows) {
+      return res.status(502).json({
+        success: false,
+        message: `Respons Google Apps Script untuk sheet ${sheet} tidak berisi array data yang valid.`
+      });
+    }
+
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    return res.json({ success: true, sheet, rows, count: rows.length, fetchedAt: new Date().toISOString() });
+  } catch (error: any) {
+    console.error(`[Spreadsheet Proxy] Gagal membaca ${sheet}:`, error);
+    return res.status(502).json({
+      success: false,
+      message: error?.message || `Gagal membaca sheet ${sheet} melalui Google Apps Script.`
+    });
+  }
+});
+
+// Public KTA verification endpoint.
+// IMPORTANT: this endpoint NEVER depends on the visitor's localStorage.
+// It reads the authoritative Google Spreadsheet from the server-side
+// configuration (or the configured public Spreadsheet as a fallback), so a QR
+// scanned on a new phone/tablet/incognito browser can still resolve the member.
+function normalizeVerifyValue(value: unknown): string {
+  return String(value ?? '')
+    .replace(/^['"`]+|['"`]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function compactVerifyValue(value: unknown): string {
+  return normalizeVerifyValue(value).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function digitVerifyValue(value: unknown): string {
+  return normalizeVerifyValue(value).replace(/\D/g, '');
+}
+
+function verifyIdentifierMatches(a: unknown, b: unknown): boolean {
+  const aa = normalizeVerifyValue(a);
+  const bb = normalizeVerifyValue(b);
+  if (!aa || !bb) return false;
+  if (aa.toLowerCase() === bb.toLowerCase()) return true;
+  if (compactVerifyValue(aa) === compactVerifyValue(bb)) return true;
+  const ad = digitVerifyValue(aa);
+  const bd = digitVerifyValue(bb);
+  if (ad && bd) {
+    if (ad === bd) return true;
+    if (ad.replace(/^0+/, '') === bd.replace(/^0+/, '')) return true;
+  }
+  return false;
+}
+
+function extractVerificationCandidates(req: express.Request): string[] {
+  const values: string[] = [];
+  const add = (value: unknown) => {
+    const v = normalizeVerifyValue(value);
+    if (!v) return;
+    if (!values.some(existing => verifyIdentifierMatches(existing, v))) values.push(v);
+  };
+
+  ['verifyId', 'memberId', 'id', 'nta', 'kta', 'userId', 'verificationToken', 'token'].forEach(key => add(req.query?.[key]));
+
+  const raw = normalizeVerifyValue(req.query?.url || req.query?.q || '');
+  if (raw) {
+    try {
+      const url = new URL(raw, 'https://sakapariwisata-nasional.vercel.app');
+      ['verifyId', 'memberId', 'id', 'nta', 'kta', 'userId', 'verificationToken', 'token'].forEach(key => add(url.searchParams.get(key)));
+      const match = url.pathname.match(/\/verify\/?([^/?#]+)?/i);
+      if (match?.[1]) add(decodeURIComponent(match[1]));
+    } catch {
+      add(raw);
+    }
+  }
+
+  return values;
+}
+
+function publicMemberFromRow(row: Record<string, any>, index: number) {
+  const fullName = getColVal(row, ['Nama Lengkap', 'Nama', 'nama_lengkap', 'Full Name', 'Name', 'col_2']) || `Anggota ${index + 1}`;
+  const kta = getColVal(row, ['Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'col_1']);
+  const id = getColVal(row, ['ID', 'id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']) || `sheet-member-${index + 1}`;
+  const userId = getColVal(row, ['User ID', 'ID User', 'user_id', 'userId']);
+  const email = getColVal(row, ['Email', 'email', 'E-mail', 'col_3']);
+  const phone = getColVal(row, ['Nomor WA', 'Nomor WhatsApp', 'No WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_4']);
+  const province = getColVal(row, ['Kwartir Daerah (Provinsi)', 'Kwartir Daerah', 'Kwarda', 'Provinsi', 'province', 'col_5']);
+  const regency = getColVal(row, ['Kwartir Cabang (Kab/Kota)', 'Kwartir Cabang', 'Kwarcab', 'Kabupaten/Kota', 'Kabupaten', 'Kota', 'regency', 'col_6']);
+  const district = getColVal(row, ['Kecamatan', 'Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'Ranting', 'districtName', 'col_7']);
+  const jabatan = getColVal(row, ['Jabatan', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi / Jabatan Kepengurusan', 'Posisi', 'currentPosition', 'current_position', 'col_8']);
+  const krida = getColVal(row, ['Krida', 'Peminatan Krida', 'Peminatan Krida Saka Pariwisata', 'col_9']);
+  const status = (getColVal(row, ['Status', 'Status Keanggotaan', 'status', 'col_10']) || 'ACTIVE').toUpperCase();
+  const photo = cleanDriveUrl(getColVal(row, ['Foto URL', 'Foto', 'Avatar', 'Link Foto', 'col_11']));
+  const registeredAt = getColVal(row, ['Tanggal Daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'tanggal_daftar', 'col_12']);
+  const verificationToken = getColVal(row, ['Verification Token', 'Token Verifikasi', 'verificationToken', 'verification_token']);
+  const linkVerification = getColVal(row, ['Link Verifikasi', 'Verification Link', 'verificationLink', 'link_verifikasi', 'col_13']);
+
+  return {
+    id,
+    userId: userId || `user-${id}`,
+    nationalMemberNumber: kta || undefined,
+    fullName,
+    email,
+    phone,
+    provinceName: province || 'Kwartir Nasional',
+    regencyName: regency || 'Pusat Nasional',
+    districtName: district || 'Nasional',
+    currentPosition: jabatan || 'Anggota Saka Pariwisata',
+    krida: krida || 'Krida Pemandu',
+    ktaInterest: /^(Majelis Pembimbing|Mabisaka|Pimpinan Saka|Pamong Saka)$/i.test(String(krida || '')) ? (String(krida).trim().toLowerCase() === 'mabisaka' ? 'Majelis Pembimbing' : String(krida).trim()) : (krida || 'Krida Pemandu'),
+    status: status === 'PENDING' ? 'PENDING' : status,
+    avatarUrl: photo,
+    registeredAt: registeredAt || new Date().toISOString(),
+    verificationToken: verificationToken || `VERIFY-SP-${digitVerifyValue(kta || id)}`,
+    verificationLink: linkVerification || '',
+    verifiedFrom: 'Google Spreadsheet'
+  };
+}
+
+app.get('/api/verify-member', async (req, res) => {
+  const candidates = extractVerificationCandidates(req);
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+
+  if (candidates.length === 0) {
+    return res.status(400).json({ success: false, found: false, code: 'MISSING_IDENTIFIER', message: 'Nomor KTA atau ID anggota tidak diberikan.' });
+  }
+
+  try {
+    // Server-side configured GAS URL is authoritative. Do not accept scriptUrl
+    // from the public browser, because QR verification must not depend on a
+    // device-local configuration or on an arbitrary external endpoint.
+    const scriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl) ||
+      normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+
+    let rows: Record<string, any>[] = [];
+    let source = 'GOOGLE_APPS_SCRIPT';
+
+    if (scriptUrl) {
+      const separator = scriptUrl.includes('?') ? '&' : '?';
+      const upstreamUrl = `${scriptUrl}${separator}sheet=Anggota&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+      const upstream = await fetch(upstreamUrl, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0', Pragma: 'no-cache' },
+        redirect: 'follow'
+      });
+      const text = await upstream.text();
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch {}
+      if (!upstream.ok) throw new Error(`Google Apps Script HTTP ${upstream.status}${data?.message ? `: ${data.message}` : ''}`);
+      rows = Array.isArray(data) ? data : Array.isArray(data?.rows) ? data.rows : Array.isArray(data?.data) ? data.data : Array.isArray(data?.records) ? data.records : [];
+      if (!rows.length && data?.status === 'error') throw new Error(data?.message || 'Google Apps Script gagal membaca sheet Anggota.');
+    } else {
+      // Fallback for deployments where the Spreadsheet is published/readable by
+      // GViz. This also makes verification resilient when GAS configuration is
+      // temporarily absent, while still avoiding localStorage entirely.
+      source = 'GOOGLE_SPREADSHEET_GVIZ';
+      rows = await fetchSheetGViz('Anggota');
+    }
+
+    if (!rows.length) {
+      return res.status(502).json({ success: false, found: false, code: 'SHEET_UNAVAILABLE', message: 'Sheet Anggota tidak dapat dibaca dari server. Periksa koneksi Google Apps Script dan izin Spreadsheet.' });
+    }
+
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
+      const member = publicMemberFromRow(row, index);
+      const link = member.verificationLink;
+      const identifiers = [
+        member.id,
+        member.userId,
+        member.nationalMemberNumber,
+        member.verificationToken,
+        link,
+        getColVal(row, ['NIK', 'NIK Tersamar', 'NIK Masked']),
+        member.email
+      ];
+      const matched = candidates.some(candidate => identifiers.some(value => verifyIdentifierMatches(value, candidate)));
+      if (matched) {
+        return res.json({ success: true, found: true, source, member, matchedBy: candidates.find(candidate => identifiers.some(value => verifyIdentifierMatches(value, candidate))) || candidates[0], fetchedAt: new Date().toISOString() });
+      }
+    }
+
+    return res.status(404).json({ success: true, found: false, code: 'MEMBER_NOT_FOUND', message: 'Nomor Anggota Tidak Ditemukan. Data KTA tidak ditemukan pada Google Spreadsheet terbaru.', candidates, count: rows.length, fetchedAt: new Date().toISOString() });
+  } catch (error: any) {
+    console.error('[KTA VERIFY API] error:', error);
+    return res.status(502).json({ success: false, found: false, code: 'VERIFICATION_UPSTREAM_ERROR', message: error?.message || 'Gagal membaca data anggota dari Google Spreadsheet.' });
+  }
+});
+
+// Central Data GET with strict Privacy and Role Enforcement
+app.get('/api/data', async (req, res) => {
+  const session = getSessionUser(req);
+  const isSuperAdmin = session?.role === 'SUPER_ADMIN';
+  const isOperator = session && ['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+
+  // FAST PATH / STALE-WHILE-REVALIDATE
+  // Jangan membaca Google Spreadsheet pada setiap pembukaan aplikasi.
+  // Cache server yang masih segar langsung dikirim. Cache yang sudah stale
+  // tetap dikirim agar UI cepat, sementara refresh dilakukan di background.
+  // Hanya cold start atau cache yang terlalu tua yang menunggu Spreadsheet.
+  const ageMs = serverSnapshotAgeMs();
+  const forceRefresh = String(req.query.refresh || '') === '1';
+  const hasSnapshot = hasUsableServerSnapshot();
+
+  if (!hasSnapshot || forceRefresh) {
+    const syncResult = await syncFromGoogleSpreadsheet();
+    if (!syncResult.success && !hasSnapshot) {
+      console.warn('[Data] Spreadsheet refresh gagal:', syncResult.message);
+      return res.status(502).json({
+        success: false,
+        message: 'Gagal mengambil data terbaru dari Google Spreadsheet melalui GAS.',
+        source: 'google-apps-script'
+      });
+    }
+  } else if (ageMs > SERVER_DATA_CACHE_TTL_MS) {
+    void syncFromGoogleSpreadsheet().catch(err =>
+      console.warn('[Data] Background Spreadsheet refresh gagal:', err?.message || err)
+    );
+  }
+
+  if (serverSnapshotAgeMs() > SERVER_DATA_STALE_MAX_MS && !syncInFlight) {
+    const syncResult = await syncFromGoogleSpreadsheet();
+    if (!syncResult.success && serverSnapshotAgeMs() > SERVER_DATA_STALE_MAX_MS) {
+      return res.status(502).json({
+        success: false,
+        message: 'Cache server terlalu lama dan Google Spreadsheet belum dapat disinkronkan.',
+        source: 'google-apps-script'
+      });
+    }
+  }
+
+  // Strict member privacy policy:
+  // - SUPER_ADMIN: seluruh anggota
+  // - ADMIN wilayah: hanya anggota dalam jurisdiction-nya
+  // - MEMBER: profil sendiri secara penuh + direktori publik anggota lain
+  // - PUBLIC: hanya field direktori publik, tanpa token/email/credential internal
+  const publicMember = (m: any) => ({
+    id: m.id,
+    fullName: m.fullName,
+    avatarUrl: m.avatarUrl,
+    gender: m.gender,
+    provinceName: m.provinceName,
+    regencyName: m.regencyName,
+    districtName: m.districtName,
+    provinceId: m.provinceId,
+    regencyId: m.regencyId,
+    districtId: m.districtId,
+    krida: m.krida,
+    ktaInterest: m.ktaInterest || m.krida,
+    kwartirLevel: m.kwartirLevel,
+    kwartirName: m.kwartirName,
+    kwartirHierarchy: m.kwartirHierarchy,
+    currentPosition: m.currentPosition,
+    joinYear: m.joinYear,
+    status: m.status
+  });
+
+  const sanitizedMembers = db.members
+    .filter(m => {
+      if (isSuperAdmin) return true;
+      if (isOperator) return memberBelongsToAdminJurisdiction(m, session);
+      return true;
+    })
+    .map(m => {
+      if (isSuperAdmin || isOperator) return m;
+      if (session?.role === 'MEMBER' && String(m.id || '') === String(session.memberId || '')) return m;
+      return publicMember(m);
+    });
+
+
+  // Only return users list if Super Admin
+  const sanitizedUsers = isSuperAdmin 
+    ? db.users.map(u => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        jurisdictionName: u.jurisdictionName,
+        jurisdictionId: u.jurisdictionId,
+        avatarUrl: u.avatarUrl
+      }))
+    : [];
+
+  // Only return audit logs if Super Admin or Operator
+  const sanitizedAuditLogs = isSuperAdmin 
+    ? db.auditLogs.slice(0, 100) 
+    : isOperator 
+      ? db.auditLogs.filter(l => l.userId === session.userId).slice(0, 50) 
+      : [];
+
+  // Sanitize spreadsheet config for public
+  const sanitizedConfig = isSuperAdmin
+    ? db.config
+    : {
+        status: db.config.status || 'CONNECTED',
+        lastSyncedAt: db.config.lastSyncedAt
+      };
+
+  const snapshotAge = serverSnapshotAgeMs();
+  res.set({
+    'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
+    'X-SPWAPP-Data-Age-Ms': String(snapshotAge),
+    'X-SPWAPP-Data-Source': snapshotAge <= SERVER_DATA_CACHE_TTL_MS ? 'server-cache-fresh' : 'server-cache-stale'
+  });
+
+  res.json({
+    success: true,
+    dataFreshAt: db.lastUpdated,
+    dataAgeMs: snapshotAge,
+    dataSource: snapshotAge <= SERVER_DATA_CACHE_TTL_MS ? 'server-cache-fresh' : 'server-cache-stale',
+    members: sanitizedMembers,
+    tours: db.tours.filter(t => isSuperAdmin || (isOperator && contentBelongsToAdminJurisdiction(t, session)) || (session?.role === 'MEMBER' && String(t.authorMemberId || t.ownerId || '') === String(session.memberId || '')) || t.status === 'APPROVED_PUBLISHED'),
+    culinaryItems: db.culinaryItems.filter(c => isSuperAdmin || (isOperator && contentBelongsToAdminJurisdiction(c, session)) || (session?.role === 'MEMBER' && String(c.authorMemberId || '') === String(session.memberId || '')) || c.status === 'APPROVED'),
+    activities: db.activities.filter(a => isSuperAdmin || (isOperator && contentBelongsToAdminJurisdiction(a, session)) || (session?.role === 'MEMBER' && String(a.uploadedByMemberId || '') === String(session.memberId || '')) || (a.contentStatus === 'APPROVED_PUBLISHED' && a.isPublic !== false)),
+    kridaModules: db.kridaModules || [],
+    users: sanitizedUsers,
+    auditLogs: sanitizedAuditLogs,
+    config: sanitizedConfig,
+    lastUpdated: db.lastUpdated,
+    version: db.version
+  });
+});
+
+// Manual / forced Spreadsheet Sync. Response is explicitly no-cache so the
+// SuperAdmin dashboard never receives an HTTP/browser cached snapshot.
+app.get('/api/sync-spreadsheet', async (req, res) => {
+  const session = getSessionUser(req);
+  if (!session || (session.role !== 'SUPER_ADMIN' && !['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role))) {
+    return res.status(403).json({ success: false, message: 'Autentikasi administrator diperlukan untuk sinkronisasi database.' });
+  }
+  res.set({ 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate', Pragma: 'no-cache', Expires: '0' });
+  const result = await syncFromGoogleSpreadsheet();
+  return res.status(result.success ? 200 : 502).json({
+    ...result, membersCount: db.members.length, toursCount: db.tours.length,
+    activitiesCount: db.activities.length, culinaryCount: db.culinaryItems.length,
+    lastUpdated: db.lastUpdated, version: db.version
+  });
+});
+
+// Manual Sync Trigger
+app.post('/api/sync-spreadsheet', async (req, res) => {
+  const session = getSessionUser(req);
+  if (!session || (session.role !== 'SUPER_ADMIN' && !['ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role))) {
+    return res.status(403).json({ success: false, message: 'Autentikasi administrator diperlukan untuk sinkronisasi database.' });
+  }
+
+  res.set({ 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate', Pragma: 'no-cache', Expires: '0' });
+  const result = await syncFromGoogleSpreadsheet();
+  res.status(result.success ? 200 : 502).json({
+    ...result,
+    membersCount: db.members.length,
+    toursCount: db.tours.length,
+    activitiesCount: db.activities.length,
+    culinaryCount: db.culinaryItems.length,
+    lastUpdated: db.lastUpdated
+  });
+});
+
+// =========================================================
+// SUPER ADMIN - ADMIN ASSIGNMENT & JURISDICTION HELPERS
+// =========================================================
+const CONTENT_ADMIN_ROLES = ['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
+const ADMIN_ROLE_LABELS: Record<string, string> = {
+  ADMIN_NATIONAL: 'Admin Nasional',
+  ADMIN_PROVINCE: 'Admin Provinsi',
+  ADMIN_REGENCY: 'Admin Kabupaten/Kota',
+  ADMIN_BRANCH: 'Admin Ranting/Kecamatan'
+};
+
+function normalizeText(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function memberBelongsToAdminJurisdiction(member: any, session: any): boolean {
+  if (!session || session.role === 'SUPER_ADMIN' || session.role === 'ADMIN_NATIONAL') return true;
+  if (!CONTENT_ADMIN_ROLES.includes(session.role)) return false;
+
+  const allowedId = normalizeText(session.jurisdictionId);
+  const allowedName = normalizeText(session.jurisdictionName);
+  if (!allowedId && !allowedName) return false;
+
+  const provinceId = normalizeText(member?.provinceId);
+  const regencyId = normalizeText(member?.regencyId);
+  const districtId = normalizeText(member?.districtId);
+  const provinceName = normalizeText(member?.provinceName);
+  const regencyName = normalizeText(member?.regencyName);
+  const districtName = normalizeText(member?.districtName);
+  const branchName = normalizeText(member?.branchName);
+
+  if (session.role === 'ADMIN_PROVINCE') {
+    return (allowedId && provinceId === allowedId) || (allowedName && provinceName === allowedName);
+  }
+  if (session.role === 'ADMIN_REGENCY') {
+    return (allowedId && regencyId === allowedId) || (allowedName && regencyName === allowedName);
+  }
+  if (session.role === 'ADMIN_BRANCH') {
+    return (allowedId && districtId === allowedId) ||
+      (allowedName && (districtName === allowedName || branchName === allowedName));
+  }
+  return false;
+}
+
+function contentBelongsToAdminJurisdiction(content: any, session: any): boolean {
+  if (!session || session.role === 'SUPER_ADMIN' || session.role === 'ADMIN_NATIONAL') return true;
+  if (!CONTENT_ADMIN_ROLES.includes(session.role)) return false;
+
+  const allowed = normalizeText(session.jurisdictionId);
+  const allowedName = normalizeText(session.jurisdictionName);
+  if (!allowed && !allowedName) return false;
+
+  const provinceId = normalizeText(content?.provinceId);
+  const regencyId = normalizeText(content?.regencyId);
+  const districtId = normalizeText(content?.districtId);
+  const provinceName = normalizeText(content?.provinceName);
+  const regencyName = normalizeText(content?.regencyName);
+  const districtName = normalizeText(content?.districtName);
+  const branchName = normalizeText(content?.branchName);
+
+  if (session.role === 'ADMIN_PROVINCE') {
+    return (allowed && provinceId === allowed) || (allowedName && provinceName === allowedName);
+  }
+  if (session.role === 'ADMIN_REGENCY') {
+    return (allowed && regencyId === allowed) || (allowedName && regencyName === allowedName);
+  }
+  if (session.role === 'ADMIN_BRANCH') {
+    return (allowed && districtId === allowed) ||
+      (allowedName && (districtName === allowedName || branchName === allowedName));
+  }
+  return false;
+}
+
+// Content moderation helpers
+const isContentAdmin = (session: any) => !!session && CONTENT_ADMIN_ROLES.includes(session.role);
+const isContentReviewer = (session: any) => !!session && (session.role === 'SUPER_ADMIN' || isContentAdmin(session));
+
+// =========================================================
+// SUPER ADMIN - PENETAPAN / PENCABUTAN ADMIN WILAYAH
+// =========================================================
+app.post('/api/admin/assign', async (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat menetapkan Admin wilayah.' });
+  }
+
+  const body = req.body || {};
+  const requestScriptUrl = normalizeManualAppsScriptUrl(body.scriptUrl);
+  const memberId = String(body.memberId || '').trim();
+  const userId = String(body.userId || '').trim();
+  const role = String(body.role || '').trim().toUpperCase();
+  const jurisdictionId = String(body.jurisdictionId || '').trim();
+  const jurisdictionName = String(body.jurisdictionName || '').trim();
+
+  if (!memberId && !userId) return res.status(400).json({ success:false, message:'Member yang akan dijadikan Admin belum dipilih.' });
+  if (!CONTENT_ADMIN_ROLES.includes(role)) return res.status(400).json({ success:false, message:'Tingkat Admin tidak valid.' });
+  if (!jurisdictionId && !jurisdictionName) return res.status(400).json({ success:false, message:'Wilayah kewenangan wajib dipilih.' });
+  if (role === 'ADMIN_NATIONAL' && normalizeText(jurisdictionId) !== '00' && normalizeText(jurisdictionName) !== 'kwartir nasional') {
+    return res.status(400).json({ success:false, message:'Admin Nasional wajib menggunakan yurisdiksi Kwartir Nasional.' });
+  }
+
+  // Jangan bergantung pada cache db.members/db.users untuk menentukan apakah
+  // anggota ada. Pada deployment serverless, cache dapat kosong pada cold start
+  // walaupun data anggota dan akun sudah ada di Google Spreadsheet.
+  const targetMember = db.members.find(m => String(m.id || '') === memberId);
+  const targetUser = db.users.find(u =>
+    (userId && String(u.id || '') === userId) ||
+    (memberId && String(u.memberId || '') === memberId)
+  );
+
+  const resolvedMemberId = memberId || String(targetUser?.memberId || targetMember?.id || '');
+  if (!resolvedMemberId && !userId) {
+    return res.status(400).json({ success:false, message:'Member yang akan dijadikan Admin belum memiliki ID yang valid.' });
+  }
+
+  const resolvedUserId = String(targetUser?.id || userId || '');
+  const resolvedName = String(targetMember?.fullName || targetUser?.name || '').trim();
+  const resolvedEmail = String(targetMember?.email || targetUser?.email || '').trim();
+  const resolvedUsername = String(targetUser?.username || resolvedEmail || '').trim();
+  const now = new Date().toISOString();
+
+  // GAS mencari akun berdasarkan username/email/memberId. Karena memberId
+  // merupakan kunci utama yang dikirim dari Dashboard, akun tetap dapat
+  // ditemukan walaupun db.users lokal belum tersinkron pada instance Vercel.
+  const userPayload = {
+    id: resolvedUserId, username: resolvedUsername, email: resolvedEmail,
+    name: resolvedName, role, jurisdictionName, jurisdictionId,
+    avatarUrl: targetMember?.avatarUrl || targetUser?.avatarUrl || '',
+    memberId: resolvedMemberId, status: targetUser?.status || targetMember?.status || 'ACTIVE',
+    passwordHash: targetUser?.passwordHash || '', createdAt: targetUser?.createdAt || now
+  };
+
+  const gasResult = await forwardToGoogleAppsScript(
+    { action:'ASSIGN_ADMIN', user:userPayload, assignedBy:session.name || session.username || 'Super Admin' },
+    requestScriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || ''
+  );
+  if (gasResult?.success === false || gasResult?.status === 'error') return res.status(502).json(gasResult);
+
+  // Gunakan identitas yang dikembalikan GAS sebagai sumber kebenaran setelah
+  // penulisan berhasil. Ini penting jika userId lokal kosong/stale.
+  const confirmedUser = gasResult?.user && typeof gasResult.user === 'object' ? gasResult.user : {};
+  const finalUserId = String(confirmedUser.id || resolvedUserId || '');
+  const finalMemberId = String(confirmedUser.memberId || resolvedMemberId || '');
+  const finalName = String(confirmedUser.name || resolvedName || 'Member');
+
+  const idx = db.users.findIndex(u =>
+    (finalUserId && String(u.id || '') === finalUserId) ||
+    (finalMemberId && String(u.memberId || '') === finalMemberId)
+  );
+  const saved = {
+    ...(idx >= 0 ? db.users[idx] : targetUser || {}),
+    ...userPayload,
+    id: finalUserId || userPayload.id,
+    memberId: finalMemberId || userPayload.memberId,
+    name: finalName,
+    role,
+    jurisdictionName,
+    jurisdictionId,
+    operatorRole:role,
+    operatorJurisdictionId:jurisdictionId,
+    operatorJurisdictionName:jurisdictionName,
+    operatorAssignedAt:now,
+    operatorAssignedBy:session.name || session.username || 'Super Admin'
+  };
+  if (idx >= 0) db.users[idx] = saved; else db.users.push(saved);
+
+  const mi = db.members.findIndex(m => String(m.id || '') === finalMemberId);
+  if (mi >= 0) {
+    db.members[mi] = {
+      ...db.members[mi],
+      isOperator:true,
+      operatorRole:role,
+      operatorJurisdictionId:jurisdictionId,
+      operatorJurisdictionName:jurisdictionName,
+      operatorAssignedAt:now,
+      operatorAssignedBy:session.name || session.username || 'Super Admin'
+    };
+  }
+  saveDatabase();
+
+  return res.json({
+    success:true, status:'success',
+    message:`${finalName} berhasil ditetapkan sebagai ${ADMIN_ROLE_LABELS[role]}.`,
+    user:{ id:finalUserId, memberId:finalMemberId, name:finalName, role, jurisdictionId, jurisdictionName }
+  });
+});
+
+app.post('/api/admin/revoke', async (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') return res.status(403).json({ success:false, message:'Hanya Super Admin yang dapat mencabut Admin wilayah.' });
+  const body = req.body || {};
+  const requestScriptUrl = normalizeManualAppsScriptUrl(body.scriptUrl);
+  const memberId = String(body.memberId || '').trim();
+  const userId = String(body.userId || '').trim();
+  const targetUser = db.users.find(u => (userId && String(u.id || '') === userId) || (memberId && String(u.memberId || '') === memberId));
+  const resolvedMemberId = String(targetUser?.memberId || memberId || '');
+  if (!targetUser && !resolvedMemberId && !userId) return res.status(400).json({ success:false, message:'Akun Admin yang akan dicabut belum memiliki identitas yang valid.' });
+  if (targetUser?.role === 'SUPER_ADMIN') return res.status(400).json({ success:false, message:'Akun SuperAdmin tidak dapat dicabut melalui menu ini.' });
+  const gasResult = await forwardToGoogleAppsScript({ action:'REVOKE_ADMIN', userId:String(targetUser?.id || userId || ''), memberId:resolvedMemberId, assignedBy:session.name || session.username || 'Super Admin' }, requestScriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '');
+  if (gasResult?.success === false || gasResult?.status === 'error') return res.status(502).json(gasResult);
+  const idx = db.users.findIndex(u => String(u.id || '') === String(targetUser?.id || userId || ''));
+  if (idx >= 0) db.users[idx] = { ...db.users[idx], role:'MEMBER', jurisdictionName:'', jurisdictionId:'' };
+  const mi = db.members.findIndex(m => String(m.id || '') === resolvedMemberId);
+  if (mi >= 0) db.members[mi] = { ...db.members[mi], isOperator:false, operatorRole:undefined, operatorJurisdictionId:undefined, operatorJurisdictionName:undefined, operatorAssignedAt:undefined, operatorAssignedBy:undefined };
+  saveDatabase();
+  return res.json({ success:true, status:'success', message:'Status Admin dicabut. Akun kembali menjadi Member.', user:{ id:targetUser?.id || userId || '', memberId:resolvedMemberId, role:'MEMBER', jurisdictionId:'', jurisdictionName:'' } });
+});
+
+// Central Mutation API - Receives any create/update/delete with Server Role Enforcement
+app.post('/api/mutate', async (req, res) => {
+  const session = getSessionUser(req);
+  const isSuperAdmin = session?.role === 'SUPER_ADMIN';
+  const isOperator = session && ['ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(session.role);
+
+  const { type, action, payload, scriptUrl } = req.body || {};
+  const requestScriptUrl = normalizeManualAppsScriptUrl(scriptUrl);
+  if (!type || !action) {
+    return res.status(400).json({ success: false, message: 'Parameter type atau action tidak lengkap.' });
+  }
+
+  // Role Validation for sensitive actions
+  if (type === 'MEMBER') {
+    if (action === 'DELETE') {
+      if (!isSuperAdmin) {
+        return res.status(403).json({ success: false, message: 'Hanya Super Admin Nasional yang berhak menghapus data anggota.' });
+      }
+    } else if (action === 'SELF_UPDATE') {
+      if (session?.role !== 'MEMBER' || !session?.memberId) {
+        return res.status(403).json({ success: false, message: 'Hanya anggota yang sedang login yang dapat memperbarui profilnya sendiri.' });
+      }
+    } else if (action === 'UPDATE' || action === 'STATUS' || action === 'BATCH_DELETE_DUMMY') {
+      if (!isSuperAdmin && !isOperator) {
+        return res.status(403).json({ success: false, message: 'Wewenang administrator diperlukan untuk memperbarui data anggota.' });
+      }
+    }
+  }
+
+  // CONTENT POLICY: member dapat mengajukan, tetapi tidak dapat menerbitkan.
+  // Urutan wajib: MEMBER -> ADMIN -> SUPER_ADMIN -> PUBLISHED.
+  if (type === 'TOUR' || type === 'CULINARY') {
+    const isMember = session?.role === 'MEMBER';
+    if (['CREATE', 'UPDATE', 'DELETE'].includes(action)) {
+      if (!isMember && !isContentReviewer(session)) return res.status(403).json({ success: false, message: 'Hanya anggota terdaftar atau administrator yang dapat mengelola konten.' });
+      if (isMember && ['UPDATE', 'DELETE'].includes(action) && payload?.authorMemberId && String(payload.authorMemberId) !== String(session.memberId || '')) return res.status(403).json({ success: false, message: 'Anda hanya dapat mengelola posting milik Anda sendiri.' });
+    } else if (action === 'APPROVE_ADMIN') {
+      if (!isContentAdmin(session)) return res.status(403).json({ success: false, message: 'Persetujuan tahap Admin hanya dapat dilakukan oleh Admin.' });
+    } else if (action === 'APPROVE_SUPER_ADMIN') {
+      if (!isSuperAdmin) return res.status(403).json({ success: false, message: 'Persetujuan akhir hanya dapat dilakukan oleh Super Admin.' });
+    } else if (action === 'REJECT') {
+      if (!isContentReviewer(session)) return res.status(403).json({ success: false, message: 'Penolakan hanya dapat dilakukan oleh Admin atau Super Admin.' });
+    } else {
+      return res.status(400).json({ success: false, message: 'Aksi konten tidak dikenal.' });
+    }
+  }
+
+  // AGENDA KEGIATAN: MEMBER dapat mengajukan/mengubah miliknya sendiri.
+  // Admin wilayah hanya boleh meninjau konten di yurisdiksinya.
+  // Super Admin melakukan persetujuan akhir.
+  if (type === 'ACTIVITY') {
+    const isMember = session?.role === 'MEMBER';
+    if (['CREATE', 'UPDATE'].includes(action)) {
+      if (!session || (!isMember && !isContentReviewer(session))) {
+        return res.status(403).json({ success: false, message: 'Hanya anggota terdaftar atau administrator yang dapat mengelola agenda.' });
+      }
+      if (isMember && action === 'UPDATE') {
+        const existingActivity = db.activities.find(a => String(a.id || '') === String(payload?.id || ''));
+        if (!existingActivity) {
+          return res.status(404).json({ success: false, message: 'Agenda kegiatan tidak ditemukan.' });
+        }
+        if (String(existingActivity.uploadedByMemberId || '') !== String(session.memberId || '')) {
+          return res.status(403).json({ success: false, message: 'Anda hanya dapat mengubah agenda milik Anda sendiri.' });
+        }
+      }
+    } else if (['APPROVE_ADMIN', 'APPROVE_SUPER_ADMIN', 'REJECT'].includes(action)) {
+      if (!isContentReviewer(session)) {
+        return res.status(403).json({ success: false, message: 'Wewenang reviewer diperlukan untuk memoderasi agenda.' });
+      }
+      if (action === 'APPROVE_ADMIN' && !isContentAdmin(session)) {
+        return res.status(403).json({ success: false, message: 'Persetujuan tahap Admin hanya dapat dilakukan oleh Admin wilayah.' });
+      }
+      if (action === 'APPROVE_SUPER_ADMIN' && !isSuperAdmin) {
+        return res.status(403).json({ success: false, message: 'Persetujuan akhir hanya dapat dilakukan oleh Super Admin.' });
+      }
+    } else if (action === 'DELETE') {
+      if (!session || (!isMember && !isContentReviewer(session))) {
+        return res.status(403).json({ success: false, message: 'Wewenang administrator atau pemilik agenda diperlukan untuk menghapus agenda.' });
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'Aksi agenda tidak dikenal.' });
+    }
+  }
+
+  if (!requestScriptUrl) {
+    return res.status(400).json({
+      success: false,
+      status: 'error',
+      message: 'Google Apps Script Web App URL belum dikonfigurasi. Isi URL /exec melalui Dashboard > Pengaturan API.'
+    });
+  }
+
+  const forwardMutation = (gasPayload: any) =>
+    forwardToGoogleAppsScript(gasPayload, requestScriptUrl);
+
+  // Validasi kewenangan wilayah dilakukan di server, bukan hanya di browser.
+  const canEditMemberInJurisdiction = (target: any, incoming: any): boolean => {
+    const current = target || {};
+    const next = incoming || {};
+    if (isSuperAdmin || session?.role === 'ADMIN_NATIONAL') return true;
+    if (session?.role === 'MEMBER') {
+      return !!session.memberId && String(current.id || '').trim() === String(session.memberId).trim();
+    }
+    if (!isOperator || !session) return false;
+    if (session.role === 'ADMIN_PROVINCE') {
+      const allowed = String(session.jurisdictionId || '').trim();
+      return !!allowed && String(current.provinceId || '').trim() === allowed && String(next.provinceId || current.provinceId || '').trim() === allowed;
+    }
+    if (session.role === 'ADMIN_REGENCY') {
+      const allowed = String(session.jurisdictionId || '').trim();
+      return !!allowed && String(current.regencyId || '').trim() === allowed && String(next.regencyId || current.regencyId || '').trim() === allowed;
+    }
+    if (session.role === 'ADMIN_BRANCH') {
+      const allowed = String(session.jurisdictionId || '').trim();
+      return !!allowed && String(current.districtId || '').trim() === allowed && String(next.districtId || current.districtId || '').trim() === allowed;
+    }
+    return false;
+  };
+
+  const spreadsheetMemberPayload = (member: any) => ({
+    action: 'UPSERT_MEMBER',
+    sheet: 'Anggota',
+    memberId: member.id,
+    rowData: [
+      member.id || '',
+      member.nationalMemberNumber || '',
+      member.fullName || '',
+      member.email || '',
+      member.phone || '',
+      member.provinceName || '',
+      member.regencyName || '',
+      member.districtName || '',
+      member.currentPosition || '',
+      member.krida || '',
+      member.status || 'PENDING',
+      member.avatarUrl || '',
+      member.registeredAt || new Date().toISOString(),
+      `https://sakapariwisata-nasional.vercel.app/verify?verifyId=${encodeURIComponent(member.nationalMemberNumber || member.id)}`
+    ]
+  });
+
+  // Audit Logging
+  db.auditLogs.unshift({
+    id: `log-${Date.now()}`,
+    userId: session?.userId || 'guest-user',
+    userName: session?.name || 'Pengunjung / Publik',
+    userRole: session?.role || 'PUBLIC',
+    action: `${type}_${action}`,
+    targetType: type,
+    targetId: payload?.id || payload?.memberId || 'unknown',
+    description: `Operasi mutasi ${action} pada ${type} (${payload?.fullName || payload?.title || payload?.name || payload?.id || ''})`,
+    timestamp: new Date().toISOString()
+  });
+  if (db.auditLogs.length > 500) db.auditLogs.pop();
+
+  console.log(`[Mutation] [${session?.role || 'PUBLIC'}] Received ${type}:${action} from client.`);
+
+  try {
+    if (type === 'MEMBER') {
+      let member = payload;
+      if (action === 'CREATE' || action === 'REGISTER') {
+        const idx = db.members.findIndex(m => m.id === member.id || (member.nationalMemberNumber && m.nationalMemberNumber === member.nationalMemberNumber));
+        if (idx !== -1) {
+          db.members[idx] = { ...db.members[idx], ...member };
+        } else {
+          db.members.unshift(member);
+        }
+        await forwardMutation(spreadsheetMemberPayload(member));
+      } else if (action === 'SELF_UPDATE' || action === 'UPDATE' || action === 'STATUS' || action === 'PHOTO_UPDATE') {
+        let idx = db.members.findIndex(m => m.id === member.id);
+        let existingMember = idx !== -1 ? db.members[idx] : null;
+
+        // Serverless instances (terutama Vercel) memiliki cache database in-memory
+        // yang dapat masih kosong ketika browser sudah memiliki data hasil sinkronisasi
+        // Spreadsheet. Jangan langsung mengembalikan 404. Lakukan lazy-sync dari
+        // Spreadsheet, lalu cari ulang berdasarkan ID, Nomor KTA/NTA, atau email.
+        if (!existingMember && member?.id) {
+          const syncResult = await syncFromGoogleSpreadsheet();
+          if (syncResult.success) {
+            idx = db.members.findIndex(m =>
+              m.id === member.id ||
+              (!!member.nationalMemberNumber && String(m.nationalMemberNumber || '') === String(member.nationalMemberNumber)) ||
+              (!!member.email && String(m.email || '').toLowerCase() === String(member.email).toLowerCase())
+            );
+            existingMember = idx !== -1 ? db.members[idx] : null;
+          }
+        }
+
+        if (!existingMember) {
+          return res.status(404).json({
+            success: false,
+            code: 'MEMBER_NOT_FOUND_AFTER_SYNC',
+            message: 'Anggota tidak ditemukan pada database server maupun hasil sinkronisasi Google Spreadsheet. Pastikan ID, Nomor KTA/NTA, atau email anggota sesuai dengan data pada sheet Anggota.'
+          });
+        }
+
+        if (action === 'SELF_UPDATE') {
+          if (String(existingMember.id || '').trim() !== String(session?.memberId || '').trim()) {
+            return res.status(403).json({ success: false, message: 'Anda hanya dapat mengubah profil Anda sendiri.' });
+          }
+          const allowed = [
+            'fullName', 'nikMasked', 'gender', 'birthPlace', 'birthDate',
+            'phone', 'email', 'address', 'educationLevel', 'occupation',
+            'bio', 'avatarUrl'
+          ];
+          const safeMember: any = { id: existingMember.id };
+          for (const key of allowed) {
+            if (Object.prototype.hasOwnProperty.call(member || {}, key)) safeMember[key] = member[key];
+          }
+          member = safeMember;
+        }
+
+        if (!canEditMemberInJurisdiction(existingMember, member)) {
+          return res.status(403).json({ success: false, message: 'Anda tidak memiliki kewenangan wilayah untuk mengubah data anggota ini atau memindahkannya ke wilayah lain.' });
+        }
+
+        // Operator wilayah tidak boleh mengubah Nomor KTA/NTA yang sudah diterbitkan.
+        if (!isSuperAdmin && String(member.nationalMemberNumber || '') !== String(existingMember.nationalMemberNumber || '')) {
+          return res.status(403).json({ success: false, message: 'Nomor KTA/NTA hanya dapat dikoreksi oleh Super Admin.' });
+        }
+
+        const updatedMember = { ...existingMember, ...member, id: existingMember.id, userId: member.userId || existingMember.userId };
+        db.members[idx] = updatedMember;
+
+        await forwardMutation(spreadsheetMemberPayload(updatedMember));
+        // Re-read the authoritative Spreadsheet after every successful member write.
+        // This keeps server cache and browser refreshes aligned with the actual row.
+        await syncFromGoogleSpreadsheet();
+        if ((action === 'STATUS' || action === 'UPDATE') && member.id && member.status) {
+          await forwardMutation({
+            action: 'UPDATE_AUTH_STATUS',
+            memberId: member.id,
+            status: member.status
+          });
+        }
+      } else if (action === 'DELETE') {
+        const memberId = payload.id || payload.memberId;
+        db.members = db.members.filter(m => m.id !== memberId);
+        await forwardMutation({
+          action: 'DELETE_ROW',
+          sheet: 'Anggota',
+          id: memberId,
+          secondaryId: payload.kta || payload.nationalMemberNumber
+        });
+        await syncFromGoogleSpreadsheet();
+      }
+    } else if (type === 'TOUR') {
+      let tour = { ...(payload || {}) };
+      const now = new Date().toISOString();
+      const isMember = session?.role === 'MEMBER';
+      const rowForTour = (x: any) => [x.id,x.title||'',x.slug||x.id,x.contentType||'PACKAGE',x.category||'',x.description||'',x.pricePerPerson||0,x.durationDays||0,x.locationAddress||'',x.provinceName||'',x.regencyName||'',x.districtName||'',x.ownerName||'',x.ownerId||'',x.ownerType||'MEMBER',x.contactPhone||'',x.contactEmail||'',x.coverImage||'',JSON.stringify(x.galleryImages||[]),JSON.stringify(x.facilities||[]),JSON.stringify(x.itinerary||[]),x.krida||'',x.authorMemberId||'',x.authorName||'',x.adminApprovalStatus||'PENDING',x.adminApprovedAt||'',x.adminApprovedBy||'',x.superAdminApprovalStatus||'PENDING',x.superAdminApprovedAt||'',x.superAdminApprovedBy||'',x.status||'SUBMITTED',x.submittedAt||now,x.publishedAt||'',x.rejectionReason||'',x.viewsCount||0,x.featured?'TRUE':'FALSE',now];
+      if (action === 'CREATE' || action === 'UPDATE') {
+        const idx = db.tours.findIndex(t => t.id === tour.id); const existing = idx >= 0 ? db.tours[idx] : null;
+        if (isMember) {
+          const memberRecord = db.members.find(m => String(m.id) === String(session.memberId || ''));
+          if (!memberRecord) return res.status(403).json({ success: false, message: 'Data anggota aktif tidak ditemukan.' });
+          tour = {
+            ...(existing || {}), ...tour,
+            id: tour.id || `tour-${Date.now()}`,
+            ownerType: 'MEMBER',
+            ownerId: String(session.memberId || ''),
+            ownerName: session.name || tour.ownerName || 'Anggota Saka Pariwisata',
+            authorMemberId: String(session.memberId || ''),
+            authorName: session.name || tour.authorName || 'Anggota Saka Pariwisata',
+            provinceId: memberRecord.provinceId,
+            provinceName: memberRecord.provinceName,
+            regencyId: memberRecord.regencyId,
+            regencyName: memberRecord.regencyName,
+            districtName: memberRecord.districtName,
+            krida: tour.krida || existing?.krida || 'Krida Pemandu',
+            status: 'SUBMITTED',
+            adminApprovalStatus: 'PENDING',
+            superAdminApprovalStatus: 'PENDING',
+            submittedAt: existing?.submittedAt || now,
+            publishedAt: undefined,
+            reviewedBy: undefined,
+            rejectionReason: undefined
+          };
+        } else tour={...(existing||{}),...tour};
+        const ti=db.tours.findIndex(t=>t.id===tour.id); if(ti>=0) db.tours[ti]=tour; else db.tours.unshift(tour);
+        await forwardMutation({action:'UPSERT_ROW',sheet:'Paket_Wisata',id:tour.id,rowData:rowForTour(tour)});
+      } else if (['APPROVE_ADMIN','APPROVE_SUPER_ADMIN','REJECT'].includes(action)) {
+        const idx=db.tours.findIndex(t=>t.id===tour.id); if(idx<0)return res.status(404).json({success:false,message:'Posting wisata tidak ditemukan.'}); const current=db.tours[idx];
+        if(action==='APPROVE_ADMIN' && !contentBelongsToAdminJurisdiction(current, session)) return res.status(403).json({success:false,message:'Posting ini berada di luar wilayah kewenangan Admin Anda.'});
+        if(action==='APPROVE_ADMIN'){current.adminApprovalStatus='APPROVED';current.adminApprovedAt=now;current.adminApprovedBy=session.name||session.username||'Admin';current.status='SUBMITTED';}
+        else if(action==='APPROVE_SUPER_ADMIN'){if(current.adminApprovalStatus!=='APPROVED')return res.status(409).json({success:false,message:'Konten belum disetujui Admin.'});current.superAdminApprovalStatus='APPROVED';current.superAdminApprovedAt=now;current.superAdminApprovedBy=session.name||session.username||'Super Admin';current.status='APPROVED_PUBLISHED';current.publishedAt=now;current.reviewedBy=current.superAdminApprovedBy;current.rejectionReason=undefined;}
+        else{current.status='REJECTED';current.rejectionReason=String(payload.rejectionReason||'Posting ditolak oleh reviewer.');current.reviewedBy=session.name||session.username||'Reviewer';if(isSuperAdmin)current.superAdminApprovalStatus='REJECTED';else current.adminApprovalStatus='REJECTED';}
+        await forwardMutation({action:'UPSERT_ROW',sheet:'Paket_Wisata',id:current.id,rowData:rowForTour(current)}); tour=current;
+      } else if(action==='DELETE'){db.tours=db.tours.filter(t=>t.id!==payload.id);await forwardMutation({action:'DELETE_ROW',sheet:'Paket_Wisata',id:payload.id});}
+    } else if (type === 'CULINARY') {
+      let item={...(payload||{})}; const now=new Date().toISOString(); const isMember=session?.role==='MEMBER';
+      const rowForCulinary=(x:any)=>[x.id,x.name||'',x.kind||'KULINER',x.krida||'Krida Kuliner & Cinderamata',x.priceEstimate||0,x.authorName||'',x.contactPhone||'',x.provinceName||'',x.regencyName||'',x.imageUrl||'',x.categoryLabel||'',x.description||'',x.kridaCategory||'',x.authorMemberId||'',x.authorNta||'',x.districtId||'',x.districtName||'',x.address||'',x.contactEmail||'',JSON.stringify(x.galleryImages||[]),JSON.stringify(x.tags||[]),x.adminApprovalStatus||'PENDING',x.adminApprovedAt||'',x.adminApprovedBy||'',x.superAdminApprovalStatus||'PENDING',x.superAdminApprovedAt||'',x.superAdminApprovedBy||'',x.status||'PENDING_APPROVAL',x.submittedAt||now,x.createdAt||now,x.rejectionReason||'',x.featured?'TRUE':'FALSE',now];
+      if(action==='CREATE'||action==='UPDATE'){const idx=db.culinaryItems.findIndex(c=>c.id===item.id);const existing=idx>=0?db.culinaryItems[idx]:null;if(isMember){const memberRecord=db.members.find(m=>String(m.id)===String(session.memberId||''));if(!memberRecord)return res.status(403).json({success:false,message:'Data anggota aktif tidak ditemukan.'});item={...(existing||{}),...item,id:item.id||`culinary-${Date.now()}`,authorMemberId:String(session.memberId||''),authorName:session.name||item.authorName||'Anggota Saka Pariwisata',authorRole:'MEMBER',provinceId:memberRecord.provinceId,provinceName:memberRecord.provinceName,regencyId:memberRecord.regencyId,regencyName:memberRecord.regencyName,districtId:memberRecord.districtId,districtName:memberRecord.districtName,status:'PENDING_APPROVAL',adminApprovalStatus:'PENDING',superAdminApprovalStatus:'PENDING',submittedAt:existing?.submittedAt||now,rejectionReason:undefined};}else item={...(existing||{}),...item};const ti=db.culinaryItems.findIndex(c=>c.id===item.id);if(ti>=0)db.culinaryItems[ti]=item;else db.culinaryItems.unshift(item);await forwardMutation({action:'UPSERT_ROW',sheet:'Kuliner_Cinderamata',id:item.id,rowData:rowForCulinary(item)});}
+      else if(['APPROVE_ADMIN','APPROVE_SUPER_ADMIN','REJECT'].includes(action)){const idx=db.culinaryItems.findIndex(c=>c.id===item.id);if(idx<0)return res.status(404).json({success:false,message:'Posting kuliner/cinderamata tidak ditemukan.'});const current=db.culinaryItems[idx];if(action==='APPROVE_ADMIN' && !contentBelongsToAdminJurisdiction(current, session)) return res.status(403).json({success:false,message:'Posting ini berada di luar wilayah kewenangan Admin Anda.'});if(action==='APPROVE_ADMIN'){current.adminApprovalStatus='APPROVED';current.adminApprovedAt=now;current.adminApprovedBy=session.name||session.username||'Admin';current.status='PENDING_APPROVAL';}else if(action==='APPROVE_SUPER_ADMIN'){if(current.adminApprovalStatus!=='APPROVED')return res.status(409).json({success:false,message:'Konten belum disetujui Admin.'});current.superAdminApprovalStatus='APPROVED';current.superAdminApprovedAt=now;current.superAdminApprovedBy=session.name||session.username||'Super Admin';current.status='APPROVED';current.approvedAt=now;current.approvedBy=current.superAdminApprovedBy;current.approverRole='SUPER_ADMIN';current.rejectionReason=undefined;}else{current.status='REJECTED';current.rejectionReason=String(payload.rejectionReason||'Posting ditolak oleh reviewer.');if(isSuperAdmin)current.superAdminApprovalStatus='REJECTED';else current.adminApprovalStatus='REJECTED';}await forwardMutation({action:'UPSERT_ROW',sheet:'Kuliner_Cinderamata',id:current.id,rowData:rowForCulinary(current)});item=current;}
+      else if(action==='DELETE'){db.culinaryItems=db.culinaryItems.filter(c=>c.id!==payload.id);await forwardMutation({action:'DELETE_ROW',sheet:'Kuliner_Cinderamata',id:payload.id});}
+    } else if (type === 'ACTIVITY') {
+      let act = { ...(payload || {}) };
+      const now = new Date().toISOString();
+      const isMember = session?.role === 'MEMBER';
+      const rowForActivity = (x: any) => [
+        x.id || '', x.title || '', x.category || '', x.organizerLevel || '', x.organizerName || '',
+        x.locationName || '', x.provinceName || '', x.regencyName || '', x.startDate || '', x.endDate || '',
+        x.feeType || 'GRATIS', x.feeAmount || 0, x.contactPhone || '',
+        x.uploadedByName || '', x.uploadedByMemberId || '', x.uploadedByRole || 'MEMBER', x.contentStatus || 'SUBMITTED',
+        x.adminApprovalStatus || 'PENDING', x.adminApprovedAt || '', x.adminApprovedBy || '',
+        x.superAdminApprovalStatus || 'PENDING', x.superAdminApprovedAt || '', x.superAdminApprovedBy || '',
+        x.rejectionReason || '', x.bannerUrl || '', x.description || '', now,
+        x.provinceId || '', x.regencyId || '', x.districtId || '', x.districtName || ''
+      ];
+
+      if (action === 'CREATE' || action === 'UPDATE') {
+        const idx = db.activities.findIndex(a => a.id === act.id);
+        const existing = idx >= 0 ? db.activities[idx] : null;
+        if (isMember) {
+          const memberRecord = db.members.find(m => String(m.id) === String(session.memberId || ''));
+          if (!memberRecord) return res.status(403).json({ success: false, message: 'Data anggota aktif tidak ditemukan.' });
+          act = {
+            ...(existing || {}), ...act,
+            id: act.id || `activity-${Date.now()}`,
+            slug: act.slug || `${act.title || 'agenda'}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            uploadedByRole: 'MEMBER',
+            uploadedByName: session.name || act.uploadedByName || 'Anggota Saka Pariwisata',
+            uploadedByMemberId: String(session.memberId || ''),
+            provinceId: memberRecord.provinceId,
+            provinceName: memberRecord.provinceName,
+            regencyId: memberRecord.regencyId,
+            regencyName: memberRecord.regencyName,
+            districtId: memberRecord.districtId,
+            districtName: memberRecord.districtName,
+            contentStatus: 'SUBMITTED',
+            adminApprovalStatus: 'PENDING',
+            superAdminApprovalStatus: 'PENDING',
+            isPublic: false,
+            rejectionReason: undefined
+          };
+        } else if (action === 'CREATE') {
+          if (!isSuperAdmin && !contentBelongsToAdminJurisdiction(act, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda yang dibuat harus berada di dalam wilayah kewenangan Admin Anda.' });
+          }
+          if (isSuperAdmin) {
+            act.contentStatus = 'APPROVED_PUBLISHED';
+            act.adminApprovalStatus = 'APPROVED';
+            act.superAdminApprovalStatus = 'APPROVED';
+            act.isPublic = true;
+          } else {
+            // Agenda yang dibuat Admin wilayah tetap menunggu penerbitan Super Admin.
+            act.contentStatus = 'SUBMITTED';
+            act.adminApprovalStatus = 'APPROVED';
+            act.adminApprovedAt = now;
+            act.adminApprovedBy = session.name || session.username || 'Admin';
+            act.superAdminApprovalStatus = 'PENDING';
+            act.isPublic = false;
+          }
+        } else if (action === 'UPDATE') {
+          if (!existing) return res.status(404).json({ success: false, message: 'Agenda kegiatan tidak ditemukan.' });
+          if (!isSuperAdmin && !contentBelongsToAdminJurisdiction(existing, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda berada di luar wilayah kewenangan Admin Anda.' });
+          }
+          // Operator tidak boleh memindahkan agenda ke luar yurisdiksinya.
+          if (!isSuperAdmin && !contentBelongsToAdminJurisdiction({ ...existing, ...act }, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda tidak dapat dipindahkan ke luar wilayah kewenangan Admin Anda.' });
+          }
+          if (!isSuperAdmin) {
+            // Perubahan oleh Admin harus melewati penerbitan Super Admin lagi.
+            act.contentStatus = 'SUBMITTED';
+            act.adminApprovalStatus = 'APPROVED';
+            act.adminApprovedAt = now;
+            act.adminApprovedBy = session.name || session.username || 'Admin';
+            act.superAdminApprovalStatus = 'PENDING';
+            act.superAdminApprovedAt = undefined;
+            act.superAdminApprovedBy = undefined;
+            act.isPublic = false;
+          }
+        }
+        if (idx >= 0) db.activities[idx] = { ...db.activities[idx], ...act };
+        else db.activities.unshift(act);
+
+        await forwardMutation({
+          action: 'UPSERT_ROW',
+          sheet: 'Agenda_Kegiatan',
+          id: act.id,
+          rowData: rowForActivity(act)
+        });
+      } else if (['APPROVE_ADMIN', 'APPROVE_SUPER_ADMIN', 'REJECT'].includes(action)) {
+        const idx = db.activities.findIndex(a => a.id === act.id);
+        if (idx < 0) return res.status(404).json({ success: false, message: 'Agenda kegiatan tidak ditemukan.' });
+        const current = db.activities[idx];
+
+        if (action === 'APPROVE_ADMIN') {
+          if (!isContentAdmin(session) || !contentBelongsToAdminJurisdiction(current, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda berada di luar wilayah kewenangan Admin Anda.' });
+          }
+          if (current.contentStatus === 'APPROVED_PUBLISHED') {
+            return res.status(409).json({ success: false, message: 'Agenda sudah diterbitkan.' });
+          }
+          current.adminApprovalStatus = 'APPROVED';
+          current.adminApprovedAt = now;
+          current.adminApprovedBy = session.name || session.username || 'Admin';
+          current.superAdminApprovalStatus = current.superAdminApprovalStatus === 'APPROVED' ? 'PENDING' : (current.superAdminApprovalStatus || 'PENDING');
+          current.contentStatus = 'SUBMITTED';
+          current.isPublic = false;
+        } else if (action === 'APPROVE_SUPER_ADMIN') {
+          if (current.adminApprovalStatus !== 'APPROVED') {
+            return res.status(409).json({ success: false, message: 'Agenda belum disetujui Admin wilayah.' });
+          }
+          current.superAdminApprovalStatus = 'APPROVED';
+          current.superAdminApprovedAt = now;
+          current.superAdminApprovedBy = session.name || session.username || 'Super Admin';
+          current.contentStatus = 'APPROVED_PUBLISHED';
+          current.isPublic = true;
+          current.rejectionReason = undefined;
+        } else {
+          if (!isSuperAdmin && !contentBelongsToAdminJurisdiction(current, session)) {
+            return res.status(403).json({ success: false, message: 'Agenda berada di luar wilayah kewenangan Admin Anda.' });
+          }
+          current.contentStatus = 'REJECTED';
+          current.isPublic = false;
+          current.rejectionReason = String(payload.rejectionReason || 'Agenda ditolak oleh reviewer.');
+          if (isSuperAdmin) current.superAdminApprovalStatus = 'REJECTED';
+          else current.adminApprovalStatus = 'REJECTED';
+        }
+
+        await forwardMutation({
+          action: 'UPSERT_ROW',
+          sheet: 'Agenda_Kegiatan',
+          id: current.id,
+          rowData: rowForActivity(current)
+        });
+        act = current;
+      } else if (action === 'DELETE') {
+        const idx = db.activities.findIndex(a => a.id === payload.id);
+        if (idx < 0) return res.status(404).json({ success: false, message: 'Agenda kegiatan tidak ditemukan.' });
+        const current = db.activities[idx];
+        if (session?.role === 'MEMBER') {
+          if (String(current.uploadedByMemberId || '') !== String(session.memberId || '')) {
+            return res.status(403).json({ success: false, message: 'Anda hanya dapat menghapus agenda milik Anda sendiri.' });
+          }
+        } else if (!isSuperAdmin && !contentBelongsToAdminJurisdiction(current, session)) {
+          return res.status(403).json({ success: false, message: 'Agenda berada di luar wilayah kewenangan Admin Anda.' });
+        }
+        db.activities = db.activities.filter(a => a.id !== payload.id);
+        await forwardMutation({
+          action: 'DELETE_ROW',
+          sheet: 'Agenda_Kegiatan',
+          id: payload.id
+        });
+      }
+    } else if (type === 'KRIDA_MODULE') {
+      const moduleItem = payload;
+      if (!Array.isArray(db.kridaModules)) db.kridaModules = [];
+      if (action === 'UPDATE' || action === 'CREATE') {
+        const idx = db.kridaModules.findIndex(m => m.id === moduleItem.id);
+        if (idx !== -1) {
+          db.kridaModules[idx] = { ...db.kridaModules[idx], ...moduleItem };
+        } else {
+          db.kridaModules.push(moduleItem);
+        }
+      } else if (action === 'BATCH_UPDATE') {
+        if (Array.isArray(payload)) {
+          db.kridaModules = payload;
+        }
+      }
+    }
+
+    saveDatabase();
+    res.json({
+      success: true,
+      lastUpdated: db.lastUpdated,
+      version: db.version
+    });
+  } catch (err: any) {
+    console.error('[Mutation Error]:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Bulk sync endpoint from client to server (Super Admin only)
+app.post('/api/sync-bulk', (req, res) => {
+  const session = getSessionUser(req);
+  if (session?.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Hanya Super Admin yang berhak melakukan sinkronisasi massal.' });
+  }
+
+  const { members, tours, culinaryItems, activities, config } = req.body || {};
+
+  if (config) {
+    db.config = { ...db.config, ...config };
+  }
+
+  if (Array.isArray(members) && members.length > 0) {
+    const map = new Map<string, any>();
+    db.members.forEach(m => map.set(m.id, m));
+    members.forEach(m => map.set(m.id, { ...map.get(m.id), ...m }));
+    db.members = Array.from(map.values());
+  }
+
+  if (Array.isArray(tours) && tours.length > 0) {
+    const map = new Map<string, any>();
+    db.tours.forEach(t => map.set(t.id, t));
+    tours.forEach(t => map.set(t.id, { ...map.get(t.id), ...t }));
+    db.tours = Array.from(map.values());
+  }
+
+  if (Array.isArray(culinaryItems) && culinaryItems.length > 0) {
+    const map = new Map<string, any>();
+    db.culinaryItems.forEach(c => map.set(c.id, c));
+    culinaryItems.forEach(c => map.set(c.id, { ...map.get(c.id), ...c }));
+    db.culinaryItems = Array.from(map.values());
+  }
+
+  if (Array.isArray(activities) && activities.length > 0) {
+    const map = new Map<string, any>();
+    db.activities.forEach(a => map.set(a.id, a));
+    activities.forEach(a => map.set(a.id, { ...map.get(a.id), ...a }));
+    db.activities = Array.from(map.values());
+  }
+
+  saveDatabase();
+  res.json({ success: true, lastUpdated: db.lastUpdated, version: db.version });
+});
+
+// Final API error handler. This ensures unexpected route errors return JSON
+// instead of terminating the serverless invocation.
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[API Error]', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({
+    success: false,
+    message: err?.message || 'Terjadi kesalahan pada server.',
+    error: IS_VERCEL ? 'SERVERLESS_API_ERROR' : 'API_ERROR'
+  });
+});
+
+// Vercel serverless entrypoint: export the Express app directly.
+export default app;
+export { app };
