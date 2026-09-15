@@ -51,7 +51,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // ============================================================
   // WILAYAH
   // ============================================================
-  const [kwartirLevel, setKwartirLevel] = useState<'NASIONAL' | 'DAERAH'>('DAERAH');
+  // Pendaftaran publik selalu berada pada tingkat daerah.
+  // Tingkat NASIONAL hanya boleh ditetapkan oleh Super Admin/Admin Nasional.
+  const [kwartirLevel] = useState<'DAERAH'>('DAERAH');
   const [regProvinceId, setRegProvinceId] = useState('32');
   const [regRegencyId, setRegRegencyId] = useState('32.04');
   const [regDistrictId, setRegDistrictId] = useState('');
@@ -132,7 +134,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const dists = storage.getDistricts(regRegencyId) || [];
     setDistrictsList(dists);
 
-    if (dists.length > 0 && !dists.some(d => d.id === regDistrictId)) {
+    if (dists.length === 0) {
+      setRegDistrictId('');
+    } else if (!dists.some(d => d.id === regDistrictId)) {
       setRegDistrictId(dists[0].id);
     }
   }, [regRegencyId, regDistrictId]);
@@ -409,6 +413,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
+    // SECURITY: endpoint registrasi publik tidak boleh membuat anggota Nasional.
+    // Wilayah Nasional hanya ditetapkan melalui dashboard admin.
+    if (kwartirLevel !== 'DAERAH') {
+      setRegError('Pendaftaran tingkat Kwartir Nasional hanya dapat ditetapkan oleh Super Admin.');
+      return;
+    }
+
+    if (!regProvinceId || !regRegencyId || !regDistrictId) {
+      setRegError('Kwarda, Kwarcab, dan Kecamatan wajib dipilih.');
+      return;
+    }
+
     if (isUploadingPhoto) {
       setRegError(
         'Mohon tunggu sampai proses foto selesai.'
@@ -431,8 +447,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // --------------------------------------------------------
       // DATA WILAYAH
       // --------------------------------------------------------
-      const isNasional =
-        kwartirLevel === 'NASIONAL';
+      // Public registration is ALWAYS DAERAH.
+      const isNasional = false;
 
       const provObj =
         provinces.find(
@@ -583,8 +599,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           isNasional
             ? '00.00.00'
             : (
-              regDistrictId ||
-              `${regRegencyId}.01`
+              regDistrictId
             ),
 
         districtName:
@@ -1531,59 +1546,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setKwartirLevel(
-                        'DAERAH'
-                      )
-                    }
-                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      kwartirLevel ===
-                      'DAERAH'
-                        ? 'bg-white text-emerald-900 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <MapPin className="w-3.5 h-3.5" />
-
-                    <span>
-                      Kwarda / Kwarcab / Kecamatan
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setKwartirLevel(
-                        'NASIONAL'
-                      )
-                    }
-                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      kwartirLevel ===
-                      'NASIONAL'
-                        ? 'bg-emerald-800 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Globe2 className="w-3.5 h-3.5" />
-
-                    <span>
-                      Kwartir Nasional (Kwarnas)
-                    </span>
-                  </button>
-
-                </div>
-
-                {kwartirLevel ===
-                'NASIONAL' ? (
-                  <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[11px] text-emerald-800">
-                    Pendaftaran anggota terhubung langsung ke <strong>Kwartir Nasional (Pusat)</strong>.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
 
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">
@@ -1673,7 +1636,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </div>
 
                   </div>
-                )}
 
               </div>
 
