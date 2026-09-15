@@ -532,6 +532,7 @@ export default function App() {
         <AuthModal
           isOpen={isAuthModalOpen}
           initialTab={authModalTab}
+          currentUser={currentUser}
           onClose={() => setIsAuthModalOpen(false)}
           onLoginSuccess={(user) => {
             setCurrentUser(user);
@@ -794,6 +795,7 @@ export default function App() {
       <AuthModal
         isOpen={isAuthModalOpen}
         initialTab={authModalTab}
+        currentUser={currentUser}
         onClose={() => setIsAuthModalOpen(false)}
         onLoginSuccess={(user) => {
           setCurrentUser(user);
