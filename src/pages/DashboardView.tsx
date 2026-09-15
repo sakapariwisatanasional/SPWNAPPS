@@ -131,24 +131,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const safeAuditLogs = useMemo(() => (Array.isArray(auditLogs) ? auditLogs : []), [auditLogs]);
 
   // Evaluasi peran akun
-  const isSuperAdmin = useMemo(() => {
+  const isNationalScopeAdmin = useMemo(() => {
     const role = (currentUser?.role || '').toLowerCase();
     return (
       role === 'superadmin' ||
       role === 'super_admin' ||
       role === 'kwarnas' ||
+      role === 'admin_national' ||
       currentUser?.isSuperAdmin === true
     );
   }, [currentUser]);
 
   const canManageKrida = useMemo(() => {
     const role = currentUser?.role || '';
-    return ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(role);
+    return ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(role);
   }, [currentUser]);
 
   // Cakupan data anggota (Super admin membaca seluruh data nasional)
   const scopedMembers = useMemo(() => {
-    if (isSuperAdmin) {
+    if (isNationalScopeAdmin) {
       return safeMembers;
     }
 
@@ -167,7 +168,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
 
     return safeMembers;
-  }, [safeMembers, isSuperAdmin, currentUser]);
+  }, [safeMembers, isNationalScopeAdmin, currentUser]);
 
   // Statistik anggota
   const verifiedMembers = useMemo(() => {
@@ -243,9 +244,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-                {isSuperAdmin
-                  ? 'SUPER ADMIN — TINGKAT NASIONAL'
-                  : `ADMINISTRATOR — ${currentUser?.kwarcab || currentUser?.kwarda || 'REGIONAL'}`}
+                {currentUser?.role === 'ADMIN_NATIONAL'
+                  ? 'ADMIN NASIONAL — TINGKAT NASIONAL'
+                  : isNationalScopeAdmin
+                    ? 'SUPER ADMIN — TINGKAT NASIONAL'
+                    : `ADMINISTRATOR — ${currentUser?.kwarcab || currentUser?.kwarda || 'REGIONAL'}`}
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-emerald-100">
                 <Sparkles className="w-3 h-3 text-amber-300" />
@@ -314,7 +317,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <MetricCard
           title="Total Anggota"
           value={scopedMembers.length.toLocaleString('id-ID')}
-          subtitle={isSuperAdmin ? 'Cakupan Seluruh Indonesia' : 'Wilayah Terdaftar'}
+          subtitle={isNationalScopeAdmin ? 'Cakupan Seluruh Indonesia' : 'Wilayah Terdaftar'}
           icon={<Users className="w-6 h-6 text-emerald-600" />}
           color="emerald"
           onClick={() => handleNavigate('members')}
