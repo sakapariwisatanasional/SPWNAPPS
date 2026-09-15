@@ -1723,6 +1723,37 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ success: false, requestId, message: 'Data anggota wajib dilengkapi.' });
     }
 
+    // SECURITY: /api/auth/register adalah endpoint pendaftaran PUBLIC.
+    // Akun publik tidak boleh membuat/menetapkan anggota tingkat Nasional.
+    // Nasional hanya dapat ditetapkan melalui alur admin yang terotorisasi.
+    const requestedProvinceId = String(memberData.provinceId || '').trim();
+    const requestedProvinceName = String(memberData.provinceName || '').trim().toLowerCase();
+    const requestedRegencyId = String(memberData.regencyId || '').trim();
+    const requestedRegencyName = String(memberData.regencyName || '').trim().toLowerCase();
+    const requestedDistrictName = String(memberData.districtName || '').trim().toLowerCase();
+    const requestsNational =
+      requestedProvinceId === '00' ||
+      requestedRegencyId === '00.00' ||
+      requestedProvinceName === 'kwartir nasional' ||
+      requestedRegencyName === 'pusat nasional' ||
+      requestedDistrictName === 'nasional';
+
+    if (requestsNational) {
+      return res.status(403).json({
+        success: false,
+        requestId,
+        message: 'Pendaftaran Kwartir Nasional hanya dapat ditetapkan oleh Super Admin.'
+      });
+    }
+
+    if (!requestedProvinceId || !requestedRegencyId || !String(memberData.districtId || '').trim() || !String(memberData.districtName || '').trim()) {
+      return res.status(400).json({
+        success: false,
+        requestId,
+        message: 'Kwarda, Kwarcab, dan Kecamatan wajib dipilih.'
+      });
+    }
+
     const rawPassword = typeof password === 'string' ? password : '';
     if (rawPassword.length < 6) {
       return res.status(400).json({ success: false, requestId, message: 'Kata sandi minimal 6 karakter.' });
