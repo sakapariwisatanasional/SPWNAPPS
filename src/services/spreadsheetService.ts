@@ -1177,7 +1177,7 @@ class SpreadsheetService {
               provinceName: prov,
               regencyId: '32.04',
               regencyName: reg,
-              districtId: '32.04.01',
+              districtId: '32.04.010',
               districtName: 'Sentra Saka',
               authorMemberId: 'mem-jabar-01',
               authorName: author,
