@@ -229,7 +229,12 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           <div className="spwn-hero-art spwn-hero-art-b" />
           <div className="relative max-w-7xl mx-auto">
             <div className="spwn-hero-panel overflow-hidden">
+              {/* Decorative destination artwork: intentionally subtle so the hero copy remains dominant. */}
+              <div className="spwn-hero-photo" aria-hidden="true">
+                <img src="/hero-gatara-borobudur.png" alt="" />
+              </div>
               <div className="spwn-hero-gradient" />
+              <div className="spwn-hero-photo-wash" aria-hidden="true" />
               <div className="absolute inset-0 pointer-events-none opacity-90" style={{ backgroundImage: 'radial-gradient(circle at 73% 35%, rgba(255,255,255,.25) 0 2px, transparent 3px), radial-gradient(circle at 85% 68%, rgba(255,255,255,.18) 0 1.5px, transparent 2px)' }} />
               <div className="relative grid lg:grid-cols-[1.02fr_.98fr] min-h-[390px] sm:min-h-[450px]">
                 <div className="p-7 sm:p-10 lg:p-12 flex flex-col justify-center text-white">
