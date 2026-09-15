@@ -42,7 +42,7 @@ export const SkillDirectoryView: React.FC<SkillDirectoryViewProps> = ({
   const [selectedSkillId, setSelectedSkillId] = useState<string>('ALL');
   const [selectedApprovalStatus, setSelectedApprovalStatus] = useState<'ALL' | 'VERIFIED_ONLY' | 'PENDING_ONLY'>('ALL');
 
-  const isAdminOrOperator = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+  const isAdminOrOperator = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
   const loggedInMember = members.find(m => m.id === currentUser.memberId);
 
   // Categories extracted
