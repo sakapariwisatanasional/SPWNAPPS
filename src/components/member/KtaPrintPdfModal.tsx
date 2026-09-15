@@ -54,15 +54,14 @@ export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
     setProgressStep('Mempersiapkan render KTA...');
 
     try {
-      let publishedSettings = currentSettings;
-      try {
-        const { spreadsheetService } = await import('../../services/spreadsheetService');
-        const remote = await spreadsheetService.refreshKtaSettings();
-        if (remote) publishedSettings = remote;
-      } catch (e) {
-        console.warn('[KTA Settings] Gagal refresh sebelum PDF, memakai konfigurasi cache terakhir.', e);
-      }
-      await downloadKtaPdfFile(member, publishedSettings, formatToDownload, (step) => {
+      // IMPORTANT: PDF must use the exact settings currently shown in this
+      // modal. Do not refresh KTA_Settings from the remote spreadsheet here,
+      // because the remote copy may be older than the designer preview.
+      // Refreshing it caused the preview and generated PDF to use different
+      // layouts, fonts, positions, and background settings.
+      const exportSettings = { ...currentSettings };
+
+      await downloadKtaPdfFile(member, exportSettings, formatToDownload, (step) => {
         setProgressStep(step);
       });
       setDownloadSuccess(true);
