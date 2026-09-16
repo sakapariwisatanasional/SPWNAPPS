@@ -167,6 +167,8 @@ export interface Member {
   regencyName: string;
   districtId: string;
   districtName: string;
+  branchName?: string;
+  gugusDepan?: string;
   kwartirLevel?: KwartirLevel;
   kwartirName?: string;
   kwartirHierarchy?: string;
@@ -474,9 +476,9 @@ export interface KtaCardSettings {
   frontOrganizationSubtitleFontSize?: number; frontOrganizationSubtitleFontWeight?: 'normal'|'medium'|'bold'|'black';
   frontOrganizationSubtitleColor?: string; frontOrganizationSubtitleAlign?: 'left'|'center'|'right';
   frontValidityText: string; watermarkOpacity: number; showKridaBadge: boolean;
-  showPhoto: boolean; showQrCode: boolean; qrX?: number; qrY?: number; qrSize?: number;
+  showPhoto: boolean; showQrCode: boolean; qrX?: number; qrY?: number; qrSize?: number; qrBorderWidth?: number; qrBorderColor?: string; qrBorderRadius?: number; qrPadding?: number; qrBackgroundColor?: string;
   backHeaderTitle: string; backHeaderSubtitle: string; terms: string[]; issueLocationDate: string;
-  barcodeType: KtaBarcodeType; barcodeCustomValue?: string; showBarcode?: boolean;
+  barcodeType: KtaBarcodeType; barcodeCustomValue?: string; showBarcode?: boolean; issueLocationDateX?: number; issueLocationDateY?: number;
   barcodeX?: number; barcodeY?: number; barcodeWidth?: number; barcodeHeight?: number; barcodeShowText?: boolean;
   signerMemberId?: string; showSignerQrCode?: boolean; showSignerVerified?: boolean; signerVerifiedX?: number; signerVerifiedY?: number; signerVerifiedWidth?: number; signerVerifiedFontSize?: number; signerVerifiedColor?: string;
   signerQrX?: number; signerQrY?: number; signerQrSize?: number; signerQrPadding?: number; signerQrBackgroundColor?: string; signerQrBorderWidth?: number; signerQrBorderColor?: string; signerQrBorderRadius?: number;
