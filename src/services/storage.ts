@@ -126,6 +126,8 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   barcodeShowText: false,
   signerMemberId: '',
   showSignerQrCode: true,
+  showSignerName: true,
+  showSignerTitle: false,
   showSignerVerified: true,
   signerVerifiedX: 5,
   signerVerifiedY: 60,
