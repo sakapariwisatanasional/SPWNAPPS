@@ -237,6 +237,30 @@ function memberFieldValue(member: Member, field: string): string {
   return String(values[field] ?? '');
 }
 
+function isNationalKwartirMember(member: Member): boolean {
+  return (
+    String((member as any).provinceId || '') === '00' ||
+    String((member as any).kwartirLevel || '').toUpperCase() === 'NASIONAL' ||
+    String((member as any).kwartirName || '').trim().toUpperCase() === 'KWARTIR NASIONAL'
+  );
+}
+
+function isHiddenForNationalKwartir(member: Member, field: string): boolean {
+  return (
+    isNationalKwartirMember(member) &&
+    ['regencyName', 'districtName', 'kwartirHierarchy'].includes(field)
+  );
+}
+
+function formatKwartirText(field: string, raw: string): string {
+  if (!raw) return raw;
+  if (field === 'kwartirName' || field === 'kwartirHierarchy') return raw.toUpperCase();
+  if (field === 'provinceName' && /^\s*kwartir\s+(nasional|daerah|cabang|ranting)\b/i.test(raw)) {
+    return raw.toUpperCase();
+  }
+  return raw;
+}
+
 function transformedText(text: string, cfg: any): string {
   if (cfg.textTransform === 'uppercase') return text.toUpperCase();
   if (cfg.textTransform === 'lowercase') return text.toLowerCase();
@@ -316,7 +340,8 @@ function drawDataFields(
   (settings.dataFields || [])
     .filter((field: any) => field.side === side && field.visible)
     .forEach((field: any) => {
-      const raw = memberFieldValue(member, field.field);
+      if (isHiddenForNationalKwartir(member, field.field)) return;
+      const raw = formatKwartirText(field.field, memberFieldValue(member, field.field));
       const text = field.showLabel && field.label
         ? `${field.label}: ${raw}`
         : raw;
@@ -408,8 +433,7 @@ function drawQr(
 }
 
 function getVerificationValue(member: Member): string {
-  // Must match KtaQrCode.tsx exactly: verificationToken -> id -> NTA.
-  return String(member.verificationToken || member.id || member.nationalMemberNumber || '');
+  return String(member.nationalMemberNumber || member.verificationToken || member.id || '');
 }
 
 function drawPseudoBarcode(
@@ -496,11 +520,16 @@ async function renderFront(
 
   drawBackground(ctx, settings, 'FRONT', assets.background);
 
-  // DigitalMemberCard renders only the configured `logos` collection.
-  // Do not inject a legacy/default logo here because that makes PDF differ
-  // from the designer preview when no logo item is configured.
   const frontLogos = assets.logos.filter(item => item.cfg.side === 'FRONT');
-  frontLogos.forEach(item => drawConfiguredImage(ctx, item.img, item.cfg));
+  if (frontLogos.length) {
+    frontLogos.forEach(item => drawConfiguredImage(ctx, item.img, item.cfg));
+  } else if (settings.frontLogoUrl) {
+    drawConfiguredImage(ctx, assets.frontLogoImg?.naturalWidth ? assets.frontLogoImg : assets.officialLogo, {
+      x: 4, y: 5, width: 10, height: 16, objectFit: 'contain', opacity: 1
+    });
+  } else {
+    drawConfiguredImage(ctx, assets.officialLogo, { x: 4, y: 5, width: 10, height: 16, objectFit: 'contain', opacity: 1 });
+  }
 
   drawText(ctx, settings.frontOrganizationTitle || '', {
     x: settings.frontOrganizationTitleX ?? 15,
@@ -644,9 +673,6 @@ async function renderBack(
   canvas.height = CANVAS_HEIGHT;
   const ctx = canvas.getContext('2d')!;
 
-  const previewHeightPx = 380 / Math.max(0.45, Number(settings.widthMm || CR80_WIDTH_MM) / Math.max(Number(settings.heightMm || CR80_HEIGHT_MM), 1));
-  const canvasPxPerPreviewPx = CANVAS_HEIGHT / previewHeightPx;
-
   const radius = Number(settings.cornerRadiusMm || CR80_CORNER_RADIUS_MM) * CANVAS_WIDTH / Number(settings.widthMm || CR80_WIDTH_MM);
   ctx.save();
   roundedRect(ctx, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, radius);
@@ -654,10 +680,12 @@ async function renderBack(
 
   drawBackground(ctx, settings, 'BACK', assets.background);
 
-  // DigitalMemberCard renders only the configured `logos` collection.
-  // No legacy backLogoUrl fallback is injected into the PDF.
   const backLogos = assets.logos.filter(item => item.cfg.side === 'BACK');
-  backLogos.forEach(item => drawConfiguredImage(ctx, item.img, item.cfg));
+  if (backLogos.length) {
+    backLogos.forEach(item => drawConfiguredImage(ctx, item.img, item.cfg));
+  } else if (settings.backLogoUrl) {
+    drawConfiguredImage(ctx, assets.backLogoImg?.naturalWidth ? assets.backLogoImg : assets.officialLogo, { x: 4, y: 3, width: 10, height: 16, objectFit: 'contain', opacity: 1 });
+  }
 
   drawText(ctx, settings.backHeaderTitle || '', {
     x: (settings as any).backHeaderTitleX ?? 5,
@@ -685,9 +713,12 @@ async function renderBack(
     whiteSpace: 'normal'
   }, '#e5e7eb');
 
-  // The preview renders exactly settings.terms. An empty list means no terms;
-  // never inject PDF-only fallback text.
-  const terms = Array.isArray(settings.terms) ? settings.terms : [];
+  const terms = (settings.terms || []).length
+    ? settings.terms
+    : [
+        'Kartu ini merupakan tanda pengenal sah anggota Satuan Karya Pramuka Pariwisata.',
+        'Keaslian data kartu dapat diverifikasi melalui QR Code.'
+      ];
 
   const termsCfg = {
     x: (settings as any).termsX ?? 5,
@@ -702,18 +733,10 @@ async function renderBack(
     whiteSpace: 'normal'
   };
 
-  // In DigitalMemberCard each term is a separate block with Tailwind `mb-1`
-  // (4px) and inherits the configured line-height. The designer is 380px wide,
-  // so convert that exact preview-pixel spacing into the PDF render surface.
-  // This fixes the large vertical drift previously caused by mixing px and %.
-  const termBlockAdvanceCanvasPx =
-    (Number(termsCfg.fontSize) * Number(termsCfg.lineHeight) + 4) * canvasPxPerPreviewPx;
-  const termBlockAdvancePercent = (termBlockAdvanceCanvasPx / CANVAS_HEIGHT) * 100;
-
   let termY = Number(termsCfg.y);
   terms.forEach((term, index) => {
     drawText(ctx, `${index + 1}. ${term}`, { ...termsCfg, y: termY }, '#ffffff');
-    termY += termBlockAdvancePercent;
+    termY += Number(termsCfg.fontSize) * Number(termsCfg.lineHeight) + 2;
   });
 
   drawDataFields(ctx, member, settings, 'BACK', '#e2e8f0');
@@ -772,14 +795,9 @@ async function renderBack(
       fontWeight: 'bold'
     }, '#ffffff');
 
-    const signerNameFontSize = Number((settings as any).signerNameFontSize ?? 9);
-    const signerNameLineHeight = Number((settings as any).signerLineHeight ?? 1.2);
-    const signerNameFlowPercent =
-      (signerNameFontSize * signerNameLineHeight * canvasPxPerPreviewPx / CANVAS_HEIGHT) * 100;
-
-    drawText(ctx, String(signer.currentPosition || ''), {
+    drawText(ctx, signer.currentPosition || '', {
       ...base,
-      y: sy + signerNameFlowPercent,
+      y: sy + 10,
       fontSize: (settings as any).signerTitleFontSize ?? 7,
       fontWeight: 'normal'
     }, '#ffffff');
@@ -787,25 +805,43 @@ async function renderBack(
     const sx = (settings as any).signerX ?? 5;
     const sy = (settings as any).signerY ?? 88;
     drawText(ctx, String((settings as any).signerName || ''), {
-      x: sx + Number((settings as any).signerNameXOffset ?? 0), y: sy + Number((settings as any).signerNameYOffset ?? 0), width: (settings as any).signerWidth ?? 55,
+      x: sx, y: sy, width: (settings as any).signerWidth ?? 55,
       fontSize: (settings as any).signerNameFontSize ?? 9,
       fontWeight: 'bold', color: (settings as any).signerColor ?? '#ffffff',
       align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
     }, '#ffffff');
-    const signerNameFontSize = Number((settings as any).signerNameFontSize ?? 9);
-    const signerNameLineHeight = Number((settings as any).signerLineHeight ?? 1.2);
-    const signerNameFlowPercent =
-      (signerNameFontSize * signerNameLineHeight * canvasPxPerPreviewPx / CANVAS_HEIGHT) * 100;
     drawText(ctx, String((settings as any).signerTitle || ''), {
-      x: sx, y: sy + signerNameFlowPercent, width: (settings as any).signerWidth ?? 55,
+      x: sx, y: sy + 10, width: (settings as any).signerWidth ?? 55,
       fontSize: (settings as any).signerTitleFontSize ?? 7,
       fontWeight: 'normal', color: (settings as any).signerColor ?? '#ffffff',
       align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
     }, '#ffffff');
   }
 
-  // No back barcode: DigitalMemberCard does not render one on the back preview.
+  if ((settings as any).showBarcode !== false) {
+    drawPseudoBarcode(
+      ctx,
+      pctX((settings as any).barcodeX ?? 68),
+      pctY((settings as any).barcodeY ?? 70),
+      pctW((settings as any).barcodeWidth ?? 27),
+      pctH((settings as any).barcodeHeight ?? 9),
+      (settings as any).barcodeCustomValue?.trim() || getVerificationValue(member),
+      (settings as any).barcodeShowText === true
+    );
 
+    if ((settings as any).barcodeCaption) {
+      drawText(ctx, String((settings as any).barcodeCaption), {
+        x: (settings as any).barcodeX ?? 68,
+        y: Number((settings as any).barcodeY ?? 70) + Number((settings as any).barcodeHeight ?? 9) + 1,
+        width: (settings as any).barcodeWidth ?? 27,
+        fontSize: 6,
+        fontWeight: 'normal',
+        color: '#ffffff',
+        align: 'center',
+        whiteSpace: 'normal'
+      }, '#ffffff');
+    }
+  }
 
   ctx.restore();
   return canvas;
@@ -829,10 +865,13 @@ export async function generateKtaPdf({
 
   onProgress?.('Mempersiapkan KtaCardSettings dari sumber pusat...');
 
-  // Match KtaQrCode.tsx exactly so the PDF QR opens the same verification record
-  // as the QR shown in the member-card preview.
-  const verificationValue = getVerificationValue(member).trim();
-  const verificationUrl = `${window.location.origin}/verify?verifyId=${encodeURIComponent(verificationValue)}`;
+  const nta = String(member.nationalMemberNumber || member.verificationToken || '').trim();
+  const memberId = String(member.id || member.userId || '').trim();
+  const verificationParams = new URLSearchParams();
+  if (nta) verificationParams.set('verifyId', nta);
+  if (memberId) verificationParams.set('memberId', memberId);
+  verificationParams.set('tab', 'verify-portal');
+  const verificationUrl = `${window.location.origin}/verify?${verificationParams.toString()}`;
 
   onProgress?.('Memuat foto, logo, background dan aset desain...');
 
