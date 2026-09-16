@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 import { Member, KtaCardSettings } from '../types';
 import { DEFAULT_KTA_SETTINGS } from './storage';
+import { getMemberVerificationUrl } from '../components/member/KtaQrCode';
 import {
   SAKA_LOGO_URL,
   SAKA_LOGO_DRIVE_DIRECT_URL,
@@ -237,34 +238,66 @@ function memberFieldValue(member: Member, field: string): string {
   return String(values[field] ?? '');
 }
 
-function isNationalKwartirMember(member: Member): boolean {
-  return (
-    String((member as any).provinceId || '') === '00' ||
-    String((member as any).kwartirLevel || '').toUpperCase() === 'NASIONAL' ||
-    String((member as any).kwartirName || '').trim().toUpperCase() === 'KWARTIR NASIONAL'
-  );
-}
-
-function isHiddenForNationalKwartir(member: Member, field: string): boolean {
-  return (
-    isNationalKwartirMember(member) &&
-    ['regencyName', 'districtName', 'kwartirHierarchy'].includes(field)
-  );
-}
-
-function formatKwartirText(field: string, raw: string): string {
-  if (!raw) return raw;
-  if (field === 'kwartirName' || field === 'kwartirHierarchy') return raw.toUpperCase();
-  if (field === 'provinceName' && /^\s*kwartir\s+(nasional|daerah|cabang|ranting)\b/i.test(raw)) {
-    return raw.toUpperCase();
-  }
-  return raw;
-}
-
 function transformedText(text: string, cfg: any): string {
   if (cfg.textTransform === 'uppercase') return text.toUpperCase();
   if (cfg.textTransform === 'lowercase') return text.toLowerCase();
   return text;
+}
+
+function measureSpacedText(ctx: CanvasRenderingContext2D, text: string, letterSpacing: number): number {
+  if (!text) return 0;
+  const base = ctx.measureText(text).width;
+  return base + Math.max(0, text.length - 1) * letterSpacing;
+}
+
+function drawSpacedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  letterSpacing: number,
+  align: CanvasTextAlign,
+  maxWidth?: number
+) {
+  if (!text) return;
+  if (!letterSpacing) {
+    ctx.fillText(text, x, y, maxWidth);
+    return;
+  }
+
+  const chars = Array.from(text);
+  const total = measureSpacedText(ctx, text, letterSpacing);
+  let cursor = x;
+  if (align === 'center') cursor = x - total / 2;
+  else if (align === 'right') cursor = x - total;
+
+  chars.forEach(ch => {
+    ctx.fillText(ch, cursor, y);
+    cursor += ctx.measureText(ch).width + letterSpacing;
+  });
+}
+
+function wrapTextByWidth(ctx: CanvasRenderingContext2D, text: string, width: number, letterSpacing: number): string[] {
+  const result: string[] = [];
+  for (const paragraph of String(text).split(/\n/)) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    if (!words.length) {
+      result.push('');
+      continue;
+    }
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (line && measureSpacedText(ctx, candidate, letterSpacing) > width) {
+        result.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    }
+    if (line) result.push(line);
+  }
+  return result;
 }
 
 function drawText(
@@ -281,51 +314,28 @@ function drawText(
   const width = pctW(cfg.width ?? 90);
   const size = Math.max(4, Number(cfg.fontSize ?? 8) * PX_SCALE);
   const lineHeight = Number(cfg.lineHeight ?? 1.2) * size;
-  const align = cfg.align || 'left';
-  const value = transformedText(
-    options.uppercase ? text.toUpperCase() : text,
-    cfg
-  );
+  const align = (cfg.align || 'left') as CanvasTextAlign;
+  const value = transformedText(options.uppercase ? text.toUpperCase() : text, cfg);
+  const letterSpacing = Number(cfg.letterSpacing ?? 0) * PX_SCALE;
+  const shouldWrap = cfg.whiteSpace === 'normal' || cfg.wrap === true;
 
   ctx.save();
   ctx.fillStyle = cfg.color || fallbackColor;
   ctx.font = `${fontWeight(cfg.fontWeight)} ${size}px Arial, sans-serif`;
-  const letterSpacing = Number(cfg.letterSpacing ?? 0) * PX_SCALE;
-  void letterSpacing;
   ctx.textAlign = align;
   ctx.textBaseline = 'top';
   ctx.globalAlpha = Number(cfg.opacity ?? 1);
 
-  // Designer data fields are nowrap by default. Explicitly configured
-  // multiline text is wrapped to the configured width.
-  const shouldWrap = cfg.whiteSpace === 'normal' || cfg.wrap === true;
-  const lines: string[] = [];
+  const lines = shouldWrap ? wrapTextByWidth(ctx, value, width, letterSpacing) : [value];
+  const anchorX = align === 'center' ? x + width / 2 : align === 'right' ? x + width : x;
 
-  if (!shouldWrap) {
-    lines.push(value);
-  } else {
-    for (const paragraph of String(value).split(/\n/)) {
-      const words = paragraph.split(/\s+/).filter(Boolean);
-      if (!words.length) {
-        lines.push('');
-        continue;
-      }
-      let line = '';
-      for (const word of words) {
-        const candidate = line ? `${line} ${word}` : word;
-        if (line && ctx.measureText(candidate).width > width) {
-          lines.push(line);
-          line = word;
-        } else {
-          line = candidate;
-        }
-      }
-      if (line) lines.push(line);
-    }
-  }
+  // Match the preview's overflow-hidden container for nowrap text.
+  ctx.beginPath();
+  ctx.rect(x, y, width, Math.max(lineHeight, lines.length * lineHeight + 2));
+  ctx.clip();
 
   lines.forEach((line, index) => {
-    ctx.fillText(line, x, y + index * lineHeight, width);
+    drawSpacedText(ctx, line, anchorX, y + index * lineHeight, letterSpacing, align);
   });
   ctx.restore();
 }
@@ -340,8 +350,7 @@ function drawDataFields(
   (settings.dataFields || [])
     .filter((field: any) => field.side === side && field.visible)
     .forEach((field: any) => {
-      if (isHiddenForNationalKwartir(member, field.field)) return;
-      const raw = formatKwartirText(field.field, memberFieldValue(member, field.field));
+      const raw = memberFieldValue(member, field.field);
       const text = field.showLabel && field.label
         ? `${field.label}: ${raw}`
         : raw;
@@ -369,19 +378,19 @@ function drawBackground(
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   if (image?.naturalWidth) {
-    ctx.save();
     drawCoverImage(ctx, image, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    // Same dark overlay used by DigitalMemberCard.bgStyle().
+    // This is the linear-gradient overlay used by DigitalMemberCard.bgStyle().
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    ctx.restore();
   }
 
-  // DigitalMemberCard has a second configurable black overlay.
-  const opacity = Math.max(0, Math.min(1, Number(settings.bgOpacity ?? 0.1)));
-  if (opacity > 0) {
-    ctx.fillStyle = `rgba(0,0,0,${0.1 * opacity})`;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  // DigitalMemberCard adds the configurable bgOpacity overlay on FRONT only.
+  if (side === 'FRONT') {
+    const opacity = Math.max(0, Math.min(1, Number(settings.bgOpacity ?? 0.1)));
+    if (opacity > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${opacity * 0.1})`;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
   }
 }
 
@@ -436,53 +445,6 @@ function getVerificationValue(member: Member): string {
   return String(member.nationalMemberNumber || member.verificationToken || member.id || '');
 }
 
-function drawPseudoBarcode(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  value: string,
-  showText: boolean
-) {
-  ctx.save();
-  ctx.fillStyle = '#ffffff';
-  roundedRect(ctx, x, y, width, height, Math.min(5, height / 5));
-  ctx.fill();
-
-  const clean = String(value || 'SAKA-2026');
-  const pattern: number[] = [2, 1, 2, 1];
-  for (let i = 0; i < clean.length; i++) {
-    const c = clean.charCodeAt(i);
-    pattern.push((c % 3) + 1, ((c * 3) % 2) + 1, ((c * 5) % 3) + 1, ((c * 7) % 2) + 1);
-  }
-  pattern.push(2, 1, 2, 1, 2);
-
-  const total = pattern.reduce((sum, n) => sum + n, 0);
-  const innerX = x + 5;
-  const innerY = y + 4;
-  const innerW = Math.max(1, width - 10);
-  const innerH = showText ? Math.max(4, height - 10) : Math.max(4, height - 8);
-  const unit = innerW / total;
-  let cursor = innerX;
-
-  ctx.fillStyle = '#000000';
-  pattern.forEach((n, i) => {
-    const w = n * unit;
-    if (i % 2 === 0) ctx.fillRect(cursor, innerY, w, innerH);
-    cursor += w;
-  });
-
-  if (showText) {
-    ctx.fillStyle = '#111827';
-    ctx.font = '5px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(clean, x + width / 2, y + height - 1, width - 8);
-  }
-  ctx.restore();
-}
-
 async function loadSignerMember(settings: KtaCardSettings): Promise<Member | null> {
   const id = String((settings as any).signerMemberId || '').trim();
   if (!id) return null;
@@ -513,7 +475,7 @@ async function renderFront(
   canvas.height = CANVAS_HEIGHT;
   const ctx = canvas.getContext('2d')!;
 
-  const radius = Number(settings.cornerRadiusMm || CR80_CORNER_RADIUS_MM) * CANVAS_WIDTH / Number(settings.widthMm || CR80_WIDTH_MM);
+  const radius = Math.max(8, Number(settings.cornerRadiusMm || CR80_CORNER_RADIUS_MM) * PX_SCALE);
   ctx.save();
   roundedRect(ctx, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, radius);
   ctx.clip();
@@ -604,36 +566,6 @@ async function renderFront(
     );
   }
 
-  if ((settings as any).showBarcodeFront !== false) {
-    const x = pctX((settings as any).barcodeFrontX ?? 4);
-    const y = pctY((settings as any).barcodeFrontY ?? 77);
-    const w = pctW((settings as any).barcodeFrontWidth ?? 32);
-    const h = pctH((settings as any).barcodeFrontHeight ?? 9);
-    drawPseudoBarcode(
-      ctx,
-      x,
-      y,
-      w,
-      h,
-      (settings as any).barcodeFrontCustomValue?.trim() || getVerificationValue(member),
-      (settings as any).barcodeFrontShowText === true
-    );
-
-    if ((settings as any).barcodeFrontCaption) {
-      drawText(ctx, String((settings as any).barcodeFrontCaption), {
-        x: (settings as any).barcodeFrontCaptionX ?? (settings as any).barcodeFrontX ?? 4,
-        y: (settings as any).barcodeFrontCaptionY ?? ((settings as any).barcodeFrontY ?? 77) + ((settings as any).barcodeFrontHeight ?? 9) + 1,
-        width: (settings as any).barcodeFrontCaptionWidth ?? (settings as any).barcodeFrontWidth ?? 32,
-        fontSize: (settings as any).barcodeFrontCaptionFontSize ?? 6,
-        fontWeight: (settings as any).barcodeFrontCaptionFontWeight ?? 'normal',
-        color: (settings as any).barcodeFrontCaptionColor ?? '#ffffff',
-        align: (settings as any).barcodeFrontCaptionAlign ?? 'center',
-        lineHeight: (settings as any).barcodeFrontCaptionLineHeight ?? 1.1,
-        letterSpacing: (settings as any).barcodeFrontCaptionLetterSpacing ?? 0,
-        whiteSpace: 'normal'
-      }, '#ffffff');
-    }
-  }
 
   drawDataFields(ctx, member, settings, 'FRONT', '#e9d5ff');
 
@@ -673,7 +605,7 @@ async function renderBack(
   canvas.height = CANVAS_HEIGHT;
   const ctx = canvas.getContext('2d')!;
 
-  const radius = Number(settings.cornerRadiusMm || CR80_CORNER_RADIUS_MM) * CANVAS_WIDTH / Number(settings.widthMm || CR80_WIDTH_MM);
+  const radius = Math.max(8, Number(settings.cornerRadiusMm || CR80_CORNER_RADIUS_MM) * PX_SCALE);
   ctx.save();
   roundedRect(ctx, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, radius);
   ctx.clip();
@@ -734,9 +666,24 @@ async function renderBack(
   };
 
   let termY = Number(termsCfg.y);
+  ctx.save();
+  ctx.font = `${fontWeight(termsCfg.fontWeight)} ${Math.max(4, Number(termsCfg.fontSize) * PX_SCALE)}px Arial, sans-serif`;
+  const termsLetterSpacing = Number(termsCfg.letterSpacing ?? 0) * PX_SCALE;
+  const termsWidthPx = pctW(termsCfg.width);
+  const termsLineHeightPx = Number(termsCfg.lineHeight) * Math.max(4, Number(termsCfg.fontSize) * PX_SCALE);
+  ctx.restore();
+
   terms.forEach((term, index) => {
-    drawText(ctx, `${index + 1}. ${term}`, { ...termsCfg, y: termY }, '#ffffff');
-    termY += Number(termsCfg.fontSize) * Number(termsCfg.lineHeight) + 2;
+    const numbered = `${index + 1}. ${term}`;
+    const lines = (() => {
+      ctx.save();
+      ctx.font = `${fontWeight(termsCfg.fontWeight)} ${Math.max(4, Number(termsCfg.fontSize) * PX_SCALE)}px Arial, sans-serif`;
+      const wrapped = wrapTextByWidth(ctx, numbered, termsWidthPx, termsLetterSpacing);
+      ctx.restore();
+      return wrapped;
+    })();
+    drawText(ctx, numbered, { ...termsCfg, y: termY }, '#ffffff');
+    termY += lines.length * termsLineHeightPx / PX_SCALE + 1.5;
   });
 
   drawDataFields(ctx, member, settings, 'BACK', '#e2e8f0');
@@ -788,14 +735,14 @@ async function renderBack(
       whiteSpace: 'normal'
     };
 
-    drawText(ctx, signer.fullName, {
+    drawText(ctx, String((settings as any).signerName || signer.fullName), {
       ...base,
       y: sy + ((settings as any).signerNameYOffset ?? 0),
       fontSize: (settings as any).signerNameFontSize ?? 9,
       fontWeight: 'bold'
     }, '#ffffff');
 
-    drawText(ctx, signer.currentPosition || '', {
+    drawText(ctx, String((settings as any).signerTitle || signer.currentPosition || ''), {
       ...base,
       y: sy + 10,
       fontSize: (settings as any).signerTitleFontSize ?? 7,
@@ -818,30 +765,6 @@ async function renderBack(
     }, '#ffffff');
   }
 
-  if ((settings as any).showBarcode !== false) {
-    drawPseudoBarcode(
-      ctx,
-      pctX((settings as any).barcodeX ?? 68),
-      pctY((settings as any).barcodeY ?? 70),
-      pctW((settings as any).barcodeWidth ?? 27),
-      pctH((settings as any).barcodeHeight ?? 9),
-      (settings as any).barcodeCustomValue?.trim() || getVerificationValue(member),
-      (settings as any).barcodeShowText === true
-    );
-
-    if ((settings as any).barcodeCaption) {
-      drawText(ctx, String((settings as any).barcodeCaption), {
-        x: (settings as any).barcodeX ?? 68,
-        y: Number((settings as any).barcodeY ?? 70) + Number((settings as any).barcodeHeight ?? 9) + 1,
-        width: (settings as any).barcodeWidth ?? 27,
-        fontSize: 6,
-        fontWeight: 'normal',
-        color: '#ffffff',
-        align: 'center',
-        whiteSpace: 'normal'
-      }, '#ffffff');
-    }
-  }
 
   ctx.restore();
   return canvas;
