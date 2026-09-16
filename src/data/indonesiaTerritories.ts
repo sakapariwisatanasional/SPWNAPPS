@@ -4,7 +4,7 @@ import { ALL_INDONESIA_DISTRICTS_MAP, getDistrictsForRegency } from './allDistri
 // Master wilayah administratif generated from the supplied provinces.csv and regencies.csv.
 // memberCount is application data and is preserved by matching the existing territory ID.
 export const PROVINCES_DATA: Province[] = [
-  { id: '00', code: '00', name: 'Kwartir Nasional', island: 'Pusat / Nasional', memberCount: 180 },
+  { id: '00', code: '00', name: 'KWARTIR NASIONAL', island: 'Pusat / Nasional', memberCount: 180 },
   { id: '11', code: '11', name: 'ACEH', island: 'Sumatera', memberCount: 1420 },
   { id: '12', code: '12', name: 'SUMATERA UTARA', island: 'Sumatera', memberCount: 3120 },
   { id: '13', code: '13', name: 'SUMATERA BARAT', island: 'Sumatera', memberCount: 2240 },
@@ -42,7 +42,7 @@ export const PROVINCES_DATA: Province[] = [
 ];
 
 export const REGENCIES_DATA: Regency[] = [
-  { id: '00.00', provinceId: '00', code: '00', name: 'Kwartir Nasional (Pusat)', type: 'PUSAT', memberCount: 180 },
+  { id: '00.00', provinceId: '00', code: '00', name: 'KWARTIR NASIONAL (TINGKAT NASIONAL)', type: 'PUSAT', memberCount: 180 },
   { id: '11.01', provinceId: '11', code: '01', name: 'KABUPATEN SIMEULUE', type: 'KABUPATEN', memberCount: 120 },
   { id: '11.02', provinceId: '11', code: '02', name: 'KABUPATEN ACEH SINGKIL', type: 'KABUPATEN', memberCount: 110 },
   { id: '11.03', provinceId: '11', code: '03', name: 'KABUPATEN ACEH SELATAN', type: 'KABUPATEN', memberCount: 190 },
@@ -566,3 +566,4 @@ export const DISTRICTS_DATA: District[] = Object.keys(ALL_INDONESIA_DISTRICTS_MA
 );
 
 export { getDistrictsForRegency };
+
