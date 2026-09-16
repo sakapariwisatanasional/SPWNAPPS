@@ -71,6 +71,7 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // IMPORTANT: set SESSION_SECRET in production (especially Vercel) so every
 // serverless instance can verify the same bearer token.
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-this-session-secret';
+const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
 
 function base64UrlEncode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url');
@@ -285,8 +286,17 @@ function saveDatabase() {
 
 loadDatabase();
 initializeUsersAndSuperAdmin();
+serverHasSnapshot = db.members.length > 0 || db.tours.length > 0 || db.culinaryItems.length > 0 || db.activities.length > 0 || db.users.length > 0;
 
 // GViz API fetcher helper
+const GAS_FETCH_TIMEOUT_MS = 8_000;
+let syncInFlight: Promise<{ success: boolean; message: string }> | null = null;
+let serverHasSnapshot = false;
+
+function hasUsableServerSnapshot(): boolean {
+  return serverHasSnapshot || db.members.length > 0 || db.tours.length > 0 || db.culinaryItems.length > 0 || db.activities.length > 0 || db.users.length > 0;
+}
+
 async function fetchSheetGViz(sheetName: string): Promise<Record<string, any>[]> {
   // Google Apps Script adalah sumber data otoritatif aplikasi.
   // Jangan membaca GViz/Spreadsheet secara langsung di server karena hasilnya
@@ -299,15 +309,23 @@ async function fetchSheetGViz(sheetName: string): Promise<Record<string, any>[]>
   try {
     const separator = scriptUrl.includes('?') ? '&' : '?';
     const url = `${scriptUrl}${separator}sheet=${encodeURIComponent(sheetName)}&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
-    const res = await fetch(url, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, max-age=0',
-        'Pragma': 'no-cache'
-      },
-      redirect: 'follow'
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GAS_FETCH_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache'
+        },
+        redirect: 'follow',
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const text = await res.text();
     let data: any = null;
@@ -379,8 +397,10 @@ function getColVal(row: Record<string, any>, aliases: string[]): string {
 
 // Full sync from Google Spreadsheet to Central Server DB
 async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message: string }> {
-  console.log('[Sync] Starting full sync from Google Spreadsheet...');
-  try {
+  if (syncInFlight) return syncInFlight;
+  syncInFlight = (async () => {
+    console.log('[Sync] Starting full sync from Google Spreadsheet...');
+    try {
     // 1. Sync Anggota
     const memberRows = await fetchSheetGViz('Anggota');
     if (Array.isArray(memberRows)) {
@@ -597,21 +617,28 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
     db.config.lastSyncedAt = new Date().toISOString();
     db.config.status = 'CONNECTED';
     saveDatabase();
+    serverHasSnapshot = true;
     console.log(`[Sync] Full sync complete: ${db.members.length} members, ${db.tours.length} tours, ${db.culinaryItems.length} culinary, ${db.activities.length} activities.`);
     return { success: true, message: 'Sinkronisasi berhasil' };
   } catch (e: any) {
     console.error('[Sync] Error syncing from spreadsheet:', e);
-    return { success: false, message: e.message };
+    return { success: false, message: e?.name === 'AbortError' ? 'Google Spreadsheet timeout.' : (e?.message || 'Sinkronisasi Spreadsheet gagal.') };
+  } finally {
+    syncInFlight = null;
   }
+  })();
+  return syncInFlight;
 }
 
-// Initial background sync
-syncFromGoogleSpreadsheet().catch(err => console.warn('[Sync] Initial sync notice:', err));
-
-// Periodic sync every 25 seconds
-setInterval(() => {
-  syncFromGoogleSpreadsheet().catch(() => {});
-}, 25000);
+// On Vercel, do not start a blocking Spreadsheet sync during module import and
+// do not keep a permanent timer alive. Local/server deployments keep the old
+// periodic background refresh behavior.
+if (!IS_VERCEL) {
+  syncFromGoogleSpreadsheet().catch(err => console.warn('[Sync] Initial sync notice:', err));
+  setInterval(() => {
+    syncFromGoogleSpreadsheet().catch(() => {});
+  }, 25000);
+}
 
 // Proxy mutation to Google Apps Script Web App
 async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
@@ -1163,16 +1190,27 @@ function serverMemberBelongsToAdminJurisdiction(member: any, session: any): bool
 }
 
 app.get('/api/data', async (req, res) => {
-  // Always obtain the authoritative snapshot from GAS before responding.
-  // This prevents a new phone/tablet/desktop from inheriting an old in-memory
-  // server snapshot.
-  const syncResult = await syncFromGoogleSpreadsheet();
-  if (!syncResult.success) {
-    return res.status(502).json({
-      success: false,
-      message: 'Gagal mengambil data terbaru dari Google Spreadsheet melalui GAS.',
-      source: 'google-apps-script'
-    });
+  // Fast/stale-while-revalidate: serve the current snapshot immediately when
+  // possible. A slow/unavailable GAS endpoint must never freeze the browser.
+  const hasSnapshot = hasUsableServerSnapshot();
+  const parsedLastUpdated = Date.parse(String(db.lastUpdated || ''));
+  const snapshotAgeMs = Number.isFinite(parsedLastUpdated) ? Math.max(0, Date.now() - parsedLastUpdated) : Number.POSITIVE_INFINITY;
+
+  if (!hasSnapshot) {
+    // Cold start with no local data: do one bounded sync. Every GAS sheet
+    // request is protected by the 8-second upstream timeout above.
+    const syncResult = await syncFromGoogleSpreadsheet();
+    if (!syncResult.success && !hasUsableServerSnapshot()) {
+      return res.status(502).json({
+        success: false,
+        message: 'Google Spreadsheet belum dapat dibaca. Silakan coba lagi.',
+        source: 'google-apps-script'
+      });
+    }
+  } else if (snapshotAgeMs > 60_000) {
+    void syncFromGoogleSpreadsheet().catch(err =>
+      console.warn('[Data] Background Spreadsheet refresh gagal:', err?.message || err)
+    );
   }
 
   const session = getSessionUser(req);
