@@ -257,7 +257,7 @@ function initializeUsersAndSuperAdmin() {
       email: 'admin@sakapariwisata.id',
       name: 'Super Admin Kwartir Nasional',
       role: 'SUPER_ADMIN',
-      jurisdictionName: 'Kwartir Nasional (Pusat)',
+      jurisdictionName: 'KWARTIR NASIONAL (TINGKAT NASIONAL)',
       jurisdictionId: '00',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       createdAt: new Date().toISOString()
@@ -1054,8 +1054,8 @@ function publicMemberFromRow(row: Record<string, any>, index: number) {
     fullName,
     email,
     phone,
-    provinceName: province || 'Kwartir Nasional',
-    regencyName: regency || 'Pusat Nasional',
+    provinceName: province || 'KWARTIR NASIONAL',
+    regencyName: regency || 'TINGKAT NASIONAL',
     districtName: district || 'Nasional',
     currentPosition: jabatan || 'Anggota Saka Pariwisata',
     krida: krida || 'Krida Pemandu',
@@ -1659,3 +1659,4 @@ async function startServer() {
 startServer();
 
 export { app };
+
