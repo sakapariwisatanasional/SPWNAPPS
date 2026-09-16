@@ -713,34 +713,42 @@ async function renderBack(
       whiteSpace: 'normal'
     };
 
-    drawText(ctx, signer.fullName, {
-      ...base,
-      y: sy + ((settings as any).signerNameYOffset ?? 0),
-      fontSize: (settings as any).signerNameFontSize ?? 9,
-      fontWeight: 'bold'
-    }, '#ffffff');
+    if ((settings as any).showSignerName !== false) {
+      drawText(ctx, signer.fullName, {
+        ...base,
+        y: sy + ((settings as any).signerNameYOffset ?? 0),
+        fontSize: (settings as any).signerNameFontSize ?? 9,
+        fontWeight: 'bold'
+      }, '#ffffff');
+    }
 
-    drawText(ctx, signer.currentPosition || '', {
-      ...base,
-      y: sy + 10,
-      fontSize: (settings as any).signerTitleFontSize ?? 7,
-      fontWeight: 'normal'
-    }, '#ffffff');
+    if ((settings as any).showSignerTitle === true) {
+      drawText(ctx, signer.currentPosition || '', {
+        ...base,
+        y: sy + 10,
+        fontSize: (settings as any).signerTitleFontSize ?? 7,
+        fontWeight: 'normal'
+      }, '#ffffff');
+    }
   } else if ((settings as any).signerName || (settings as any).signerTitle) {
     const sx = (settings as any).signerX ?? 5;
     const sy = (settings as any).signerY ?? 82;
-    drawText(ctx, String((settings as any).signerName || ''), {
-      x: sx, y: sy, width: (settings as any).signerWidth ?? 55,
-      fontSize: (settings as any).signerNameFontSize ?? 9,
-      fontWeight: 'bold', color: (settings as any).signerColor ?? '#ffffff',
-      align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
-    }, '#ffffff');
-    drawText(ctx, String((settings as any).signerTitle || ''), {
-      x: sx, y: sy + 10, width: (settings as any).signerWidth ?? 55,
-      fontSize: (settings as any).signerTitleFontSize ?? 7,
-      fontWeight: 'normal', color: (settings as any).signerColor ?? '#ffffff',
-      align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
-    }, '#ffffff');
+    if ((settings as any).showSignerName !== false) {
+      drawText(ctx, String((settings as any).signerName || ''), {
+        x: sx, y: sy, width: (settings as any).signerWidth ?? 55,
+        fontSize: (settings as any).signerNameFontSize ?? 9,
+        fontWeight: 'bold', color: (settings as any).signerColor ?? '#ffffff',
+        align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
+      }, '#ffffff');
+    }
+    if ((settings as any).showSignerTitle === true) {
+      drawText(ctx, String((settings as any).signerTitle || ''), {
+        x: sx, y: sy + 10, width: (settings as any).signerWidth ?? 55,
+        fontSize: (settings as any).signerTitleFontSize ?? 7,
+        fontWeight: 'normal', color: (settings as any).signerColor ?? '#ffffff',
+        align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
+      }, '#ffffff');
+    }
   }
 
   ctx.restore();
