@@ -224,7 +224,7 @@ function makeMemberFromAnggotaRow(row: Record<string, any>, idx: number): Member
   const phone = getVal(row, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'col_4']);
   const memberId = getVal(row, ['ID', 'id', 'Id', 'member_id', 'Member ID', 'Nomor ID', 'col_0']) || `sheet-member-${idx}`;
   const prov = getVal(row, ['Provinsi', 'Kwarda', 'provinsi', 'col_5']) || 'Tingkat Nasional';
-  const kab = getVal(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'Kabupaten', 'Kota', 'col_6']) || 'Kwartir Nasional';
+  const kab = getVal(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'Kabupaten', 'Kota', 'col_6']) || 'KWARTIR NASIONAL';
   const kec = getVal(row, ['Kecamatan', 'Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'kecamatan_ranting', 'Ranting', 'col_7']) || 'Pimpinan Nasional';
   const jabatan = getVal(row, ['Jabatan', 'Posisi / Jabatan', 'Jabatan Kepengurusan', 'Posisi', 'col_8']);
   const krida = getVal(row, ['Krida', 'krida', 'Peminatan Krida', 'col_9']) || 'Krida Pemandu';
@@ -421,8 +421,8 @@ export async function verifyMemberUniversal(
             fullName: String(member.fullName || 'Anggota'),
             email: String(member.email || ''),
             phone: String(member.phone || ''),
-            provinceName: String(member.provinceName || 'Kwartir Nasional'),
-            regencyName: String(member.regencyName || 'Pusat Nasional'),
+            provinceName: String(member.provinceName || 'KWARTIR NASIONAL'),
+            regencyName: String(member.regencyName || 'TINGKAT NASIONAL'),
             districtName: String(member.districtName || 'Nasional'),
             currentPosition: String(member.currentPosition || 'Anggota Saka Pariwisata'),
             krida: (member.krida || 'Krida Pemandu') as any,
@@ -491,3 +491,4 @@ export async function verifyMemberUniversal(
     message: 'Nomor Anggota Tidak Ditemukan. Pastikan ID anggota atau Nomor KTA sesuai dengan Google Spreadsheet.'
   };
 }
+
