@@ -131,7 +131,12 @@ function replaceUnsupportedCssColors(value: string, cloneDocument: Document): st
   // html2canvas 1.4.x does not understand several CSS Color 4 functions.
   // Let the browser convert each token to a legacy rgb()/rgba() value.
   const pattern = /(?:oklch|oklab|lch|lab|color)\([^)]*\)/gi;
-  return value.replace(pattern, token => cssColorFunctionToRgb(cloneDocument, token));
+  return value.replace(pattern, token => {
+    const converted = cssColorFunctionToRgb(cloneDocument, token);
+    return /^(?:oklch|oklab|lch|lab|color)\(/i.test(converted.trim())
+      ? 'transparent'
+      : converted;
+  });
 }
 
 function sanitizeHtml2CanvasClone(cloneDocument: Document): void {
@@ -971,39 +976,13 @@ export async function generateKtaPdf({
     ? await loadImage(await generateQrDataUrl(signerVerificationUrl))
     : null;
 
-  onProgress?.('Me-render sisi depan berdasarkan KtaCardSettings...');
-  const frontCanvas = await renderFront(member, design, {
-    background: frontBackground,
-    officialLogo,
-    frontLogoImg,
-    backLogoImg,
-    avatar,
-    qrImg,
-    signerQrImg,
-    logos: configuredLogos
-  });
-
-  onProgress?.('Me-render sisi belakang berdasarkan KtaCardSettings...');
-  const backCanvas = await renderBack(member, design, {
-    background: backBackground,
-    officialLogo,
-    frontLogoImg,
-    backLogoImg,
-    qrImg,
-    signerQrImg,
-    logos: configuredLogos
-  }, signerMember);
-
-  // Untuk export dari UI, gunakan DOM preview yang sama persis.
-  // Ini menghindari perbedaan font, wrapping, padding, logo, dan posisi
-  // antara renderer Canvas dan tampilan KTA di aplikasi. Renderer Canvas
-  // tetap dipertahankan sebagai fallback untuk pemanggilan non-UI.
-  let frontImg = frontCanvas.toDataURL('image/png', 1);
-  let backImg = backCanvas.toDataURL('image/png', 1);
+  let frontImg: string;
+  let backImg: string;
 
   if (frontElement && backElement) {
     onProgress?.('Menyalin tampilan preview KTA secara 1:1 ke PDF...');
-    const capture = async (element: HTMLElement) => {
+
+    const capture = async (element: HTMLElement): Promise<string> => {
       const canvas = await html2canvas(element, {
         backgroundColor: null,
         scale: 1,
@@ -1014,16 +993,45 @@ export async function generateKtaPdf({
         height: CANVAS_HEIGHT,
         windowWidth: CANVAS_WIDTH,
         windowHeight: CANVAS_HEIGHT,
-        onclone: (clonedDocument) => {
+        onclone: clonedDocument => {
           sanitizeHtml2CanvasClone(clonedDocument);
         }
       });
       return canvas.toDataURL('image/png', 1);
     };
+
     [frontImg, backImg] = await Promise.all([
       capture(frontElement),
       capture(backElement)
     ]);
+  } else {
+    onProgress?.('Preview tidak tersedia — menggunakan renderer Canvas sebagai fallback...');
+
+    onProgress?.('Me-render sisi depan berdasarkan KtaCardSettings...');
+    const frontCanvas = await renderFront(member, design, {
+      background: frontBackground,
+      officialLogo,
+      frontLogoImg,
+      backLogoImg,
+      avatar,
+      qrImg,
+      signerQrImg,
+      logos: configuredLogos
+    });
+
+    onProgress?.('Me-render sisi belakang berdasarkan KtaCardSettings...');
+    const backCanvas = await renderBack(member, design, {
+      background: backBackground,
+      officialLogo,
+      frontLogoImg,
+      backLogoImg,
+      qrImg,
+      signerQrImg,
+      logos: configuredLogos
+    }, signerMember);
+
+    frontImg = frontCanvas.toDataURL('image/png', 1);
+    backImg = backCanvas.toDataURL('image/png', 1);
   }
 
   onProgress?.('Menyusun PDF dengan ukuran fisik KTA...');
