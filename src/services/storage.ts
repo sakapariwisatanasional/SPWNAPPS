@@ -3153,4 +3153,3 @@ class StorageService {
 
 export const storage =
   new StorageService();
-
