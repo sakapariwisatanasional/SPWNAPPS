@@ -113,7 +113,7 @@ export type KridaType =
 export interface Member {
   id: string;                  // UUID
   userId: string;
-  nationalMemberNumber?: string; // Format: PP.KK.KC.NNNNNN
+  nationalMemberNumber?: string; // Format: PP.KK.KKK.NNNNNN
   fullName: string;
   nikMasked: string;           // E.g. 320612******0004
   avatarUrl: string;
@@ -833,7 +833,7 @@ function initializeUsersAndSuperAdmin() {
       email: 'admin@sakapariwisata.id',
       name: 'Super Admin Kwartir Nasional',
       role: 'SUPER_ADMIN',
-      jurisdictionName: 'Kwartir Nasional (Pusat)',
+      jurisdictionName: 'KWARTIR NASIONAL (TINGKAT NASIONAL)',
       jurisdictionId: '00',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       createdAt: new Date().toISOString()
@@ -990,9 +990,9 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
         const rawDistrict = getColVal(row, ['Kecamatan', 'Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'Ranting', 'districtName', 'col_7']);
         const isNational = /^(00|nasional|tingkat nasional|kwartir nasional|kwar?nas|pimpinan nasional)$/i.test(String(rawProv || '').trim()) || /kwartir\s+nasional|tingkat\s+nasional|pusat\s+nasional/i.test(String(rawReg || ''));
         const provinceId = getColVal(row, ['ID Provinsi', 'provinceId']) || (isNational ? '00' : '');
-        const provinceName = isNational ? 'Kwartir Nasional' : rawProv;
+        const provinceName = isNational ? 'KWARTIR NASIONAL' : rawProv;
         const regencyId = getColVal(row, ['ID Kwarcab', 'regencyId']) || (isNational ? '00.00' : '');
-        const regencyName = isNational ? 'Pusat Nasional' : rawReg;
+        const regencyName = isNational ? 'TINGKAT NASIONAL' : rawReg;
         const districtId = getColVal(row, ['ID Kecamatan', 'ID Kwarran', 'districtId']) || (isNational ? '00.00.00' : '');
         const districtName = isNational ? 'Nasional' : rawDistrict;
         const currentPosition = getColVal(row, ['Jabatan', 'Gudep', 'Posisi / Jabatan', 'Posisi / Jabatan Kepengurusan', 'Jabatan Kepengurusan', 'Posisi', 'currentPosition', 'current_position', 'col_8']);
@@ -1026,7 +1026,7 @@ async function syncFromGoogleSpreadsheet(): Promise<{ success: boolean; message:
           bio: getColVal(row, ['Bio']) || `Anggota resmi Saka Pariwisata ${provinceName || 'Indonesia'}.`,
           status: status === 'ACTIVE' || status === 'PENDING' || status === 'SUSPENDED' ? status : 'ACTIVE', registeredAt,
           verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : id}`, isOperator: false,
-          operatorRole: isNational ? 'SUPER_ADMIN' : undefined, operatorJurisdictionName: isNational ? 'Kwartir Nasional' : undefined,
+          operatorRole: isNational ? 'SUPER_ADMIN' : undefined, operatorJurisdictionName: isNational ? 'KWARTIR NASIONAL' : undefined,
           skills: parsedSkills, certifications: parsedCertifications, locationHistory: []
         };
       });
@@ -1543,7 +1543,7 @@ app.post('/api/auth/login', async (req, res) => {
         email: member.email,
         name: member.fullName,
         role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
-        jurisdictionName: member.provinceId === '00' ? 'Kwartir Nasional' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
+        jurisdictionName: member.provinceId === '00' ? 'KWARTIR NASIONAL' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
         jurisdictionId: member.provinceId === '00' ? '00' : member.regencyId,
         avatarUrl: member.avatarUrl,
         memberId: member.id,
@@ -1858,7 +1858,7 @@ app.post('/api/auth/register', async (req, res) => {
       name: newMember.fullName,
       role: 'MEMBER',
       jurisdictionName: newMember.provinceId === '00'
-        ? 'Kwartir Nasional'
+        ? 'KWARTIR NASIONAL'
         : (newMember.districtName
           ? `${newMember.districtName}, ${newMember.regencyName || ''}`.replace(/,\s*$/, '')
           : (newMember.regencyName || newMember.provinceName || 'Indonesia')),
@@ -2317,8 +2317,8 @@ function publicMemberFromRow(row: Record<string, any>, index: number) {
     fullName,
     email,
     phone,
-    provinceName: province || 'Kwartir Nasional',
-    regencyName: regency || 'Pusat Nasional',
+    provinceName: province || 'KWARTIR NASIONAL',
+    regencyName: regency || 'TINGKAT NASIONAL',
     districtName: district || 'Nasional',
     currentPosition: jabatan || 'Anggota Saka Pariwisata',
     krida: krida || 'Krida Pemandu',
@@ -3318,3 +3318,4 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Vercel serverless entrypoint: export the Express app directly.
 export default app;
 export { app };
+
