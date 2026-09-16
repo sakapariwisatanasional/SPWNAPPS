@@ -252,6 +252,15 @@ const normalizeKtaSettings = (
    */
   merged.showSignerVerified = false;
 
+  // Elemen penandatangan dibuat independen agar Super Admin dapat
+  // memilih QR Code, Nama, dan Jabatan secara terpisah.
+  if (merged.showSignerName === undefined || merged.showSignerName === null) {
+    merged.showSignerName = true;
+  }
+  if (merged.showSignerTitle === undefined || merged.showSignerTitle === null) {
+    merged.showSignerTitle = false;
+  }
+
   return merged as KtaCardSettings;
 };
 
@@ -1721,34 +1730,9 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     </span>
                   </div>
 
-                  <label className="text-xs font-bold flex items-center gap-2 text-purple-950">
-                    <input
-                      type="checkbox"
-                      checked={
-                        (settings as any)
-                          .showSignerQrCode !==
-                        false
-                      }
-                      onChange={(event) =>
-                        setSettings(
-                          (current) => ({
-                            ...current,
-                            showSignerQrCode:
-                              event.target
-                                .checked,
-                            /**
-                             * Badge lama dipaksa
-                             * tetap nonaktif.
-                             */
-                            showSignerVerified:
-                              false,
-                          } as any)
-                        )
-                      }
-                    />
-
-                    Tampilkan QR Penandatangan
-                  </label>
+                  <div className="text-xs font-bold text-purple-950">
+                    Elemen Penandatangan
+                  </div>
                 </div>
 
                 <div className="p-3 rounded-xl bg-white border border-purple-100">
@@ -1760,21 +1744,70 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     <strong>1.</strong> Tempat &
                     tanggal
                     <br />
-                    <strong>2.</strong> QR Code
+                    <strong>2.</strong> QR Code (opsional)
                     <br />
-                    <strong>3.</strong> Nama
-                    penandatangan
+                    <strong>3.</strong> Nama penandatangan (opsional)
                     <br />
-                    <strong>4.</strong> Jabatan
-                    penandatangan
+                    <strong>4.</strong> Jabatan penandatangan (opsional)
                   </div>
                 </div>
 
                 <p className="text-[10px] text-purple-900/70">
-                  QR belakang khusus untuk pejabat
-                  yang ditunjuk SuperAdmin. QR membuka
-                  profil verifikasi pejabat tersebut.
+                  QR belakang khusus untuk pejabat yang ditunjuk SuperAdmin.
+                  Pilih elemen yang ingin ditampilkan pada bagian belakang KTA.
+                  Pengaturan ini tersimpan bersama KTA Settings di Spreadsheet.
                 </p>
+
+                <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-2">
+                  <div className="text-[10px] font-black text-purple-950">
+                    Tampilkan Elemen
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <label className="flex items-center gap-2 text-[10px] font-bold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={(settings as any).showSignerQrCode !== false}
+                        onChange={(event) =>
+                          setSettings((current) => ({
+                            ...current,
+                            showSignerQrCode: event.target.checked,
+                            showSignerVerified: false,
+                          } as any))
+                        }
+                      />
+                      QR CODE
+                    </label>
+
+                    <label className="flex items-center gap-2 text-[10px] font-bold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={(settings as any).showSignerName !== false}
+                        onChange={(event) =>
+                          setSettings((current) => ({
+                            ...current,
+                            showSignerName: event.target.checked,
+                          } as any))
+                        }
+                      />
+                      NAMA
+                    </label>
+
+                    <label className="flex items-center gap-2 text-[10px] font-bold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={(settings as any).showSignerTitle === true}
+                        onChange={(event) =>
+                          setSettings((current) => ({
+                            ...current,
+                            showSignerTitle: event.target.checked,
+                          } as any))
+                        }
+                      />
+                      JABATAN
+                    </label>
+                  </div>
+                </div>
 
                 <label className="block text-[10px] font-bold text-purple-950">
                   Penandatangan
@@ -1826,12 +1859,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                           key={member.id}
                           value={member.id}
                         >
-                          {member.fullName} —{' '}
-                          {member.currentPosition ||
-                            'Tanpa jabatan'}
-                          {member.provinceName
-                            ? ` · ${member.provinceName}`
-                            : ''}
+                          {member.fullName}
                         </option>
                       )
                     )}
@@ -1845,10 +1873,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                         {signerMember.fullName}
                       </strong>
 
-                      <br />
 
-                      {signerMember.currentPosition ||
-                        'Tanpa jabatan'}
                     </>
                   ) : (
                     'Belum ada penandatangan yang dipilih.'
@@ -1931,7 +1956,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                 {/* SIGNER POSITION */}
                 <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-2">
                   <div className="text-[10px] font-black text-purple-950">
-                    Posisi Nama & Jabatan
+                    Posisi Nama / Jabatan
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -2003,9 +2028,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   </div>
 
                   <p className="text-[9px] text-slate-500">
-                    Nama dan jabatan berada di bawah QR
-                    Code. X/Y Nama hanya menggeser nama
-                    tanpa memindahkan jabatan.
+                    Posisi elemen mengikuti checkbox di atas. X/Y Nama hanya menggeser nama.
                   </p>
                 </div>
 
