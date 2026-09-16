@@ -234,7 +234,32 @@ function memberFieldValue(member: Member, field: string): string {
     joinYear: member.joinYear,
     status: member.status
   };
-  return String(values[field] ?? '');
+  const value = String(values[field] ?? '');
+
+  if (field === 'currentPosition') {
+    return value.toUpperCase();
+  }
+
+  if (field === 'provinceName') {
+    return value.replace(/Kwartir Nasional/gi, 'KWARTIR NASIONAL').toUpperCase();
+  }
+
+  if (field === 'regencyName') {
+    return value
+      .replace(/KWARTIR NASIONAL\s*\(PUSAT\)/gi, 'TINGKAT NASIONAL')
+      .replace(/^PUSAT NASIONAL$/i, 'TINGKAT NASIONAL')
+      .toUpperCase();
+  }
+
+  if (field === 'districtName' && /^(nasional|pusat nasional)$/i.test(value.trim())) {
+    return 'TINGKAT NASIONAL';
+  }
+
+  if (field === 'krida') {
+    return value.toUpperCase();
+  }
+
+  return value;
 }
 
 function transformedText(text: string, cfg: any): string {
@@ -695,7 +720,12 @@ async function renderBack(
       fontWeight: 'bold'
     }, '#ffffff');
 
-
+    drawText(ctx, signer.currentPosition || '', {
+      ...base,
+      y: sy + 10,
+      fontSize: (settings as any).signerTitleFontSize ?? 7,
+      fontWeight: 'normal'
+    }, '#ffffff');
   } else if ((settings as any).signerName || (settings as any).signerTitle) {
     const sx = (settings as any).signerX ?? 5;
     const sy = (settings as any).signerY ?? 82;
@@ -705,7 +735,12 @@ async function renderBack(
       fontWeight: 'bold', color: (settings as any).signerColor ?? '#ffffff',
       align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
     }, '#ffffff');
-
+    drawText(ctx, String((settings as any).signerTitle || ''), {
+      x: sx, y: sy + 10, width: (settings as any).signerWidth ?? 55,
+      fontSize: (settings as any).signerTitleFontSize ?? 7,
+      fontWeight: 'normal', color: (settings as any).signerColor ?? '#ffffff',
+      align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
+    }, '#ffffff');
   }
 
   ctx.restore();
