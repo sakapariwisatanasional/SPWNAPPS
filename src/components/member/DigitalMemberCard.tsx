@@ -55,7 +55,32 @@ const valueOf = (
     status: member.status
   };
 
-  return String(values[field] ?? '');
+  const value = String(values[field] ?? '');
+
+  if (field === 'currentPosition') {
+    return value.toUpperCase();
+  }
+
+  if (field === 'provinceName') {
+    return value.replace(/Kwartir Nasional/gi, 'KWARTIR NASIONAL').toUpperCase();
+  }
+
+  if (field === 'regencyName') {
+    return value
+      .replace(/KWARTIR NASIONAL\s*\(PUSAT\)/gi, 'TINGKAT NASIONAL')
+      .replace(/^PUSAT NASIONAL$/i, 'TINGKAT NASIONAL')
+      .toUpperCase();
+  }
+
+  if (field === 'districtName' && /^(nasional|pusat nasional)$/i.test(value.trim())) {
+    return 'TINGKAT NASIONAL';
+  }
+
+  if (field === 'krida') {
+    return value.toUpperCase();
+  }
+
+  return value;
 };
 
 const weight = (
@@ -267,7 +292,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
    * Nama dan jabatan diambil langsung dari anggota
    * yang dipilih sebagai signerMemberId.
    *
-   * signerName hanya menjadi fallback
+   * signerName / signerTitle hanya menjadi fallback
    * untuk kompatibilitas data lama.
    * =========================================================
    */
@@ -292,6 +317,12 @@ export const DigitalMemberCard: React.FC<Props> = ({
         ''
     );
 
+  const signerTitle =
+    signerMember?.currentPosition ||
+    String(
+      (settings as any)?.signerTitle ||
+        ''
+    );
 
   const ratio = Math.max(
     0.45,
@@ -1528,10 +1559,11 @@ export const DigitalMemberCard: React.FC<Props> = ({
               })()}
 
             {/* =================================================
-                3. NAMA PENANDATANGAN
+                3 & 4. NAMA + JABATAN
 
-                Nama berasal dari signerMemberId.
-                Jabatan tidak dirender karena akan dibuat manual.
+                Default Y = 88
+
+                Nama dan jabatan berasal dari signerMemberId.
             ================================================== */}
 
             {signerMember && (
@@ -1602,7 +1634,17 @@ export const DigitalMemberCard: React.FC<Props> = ({
                   {signerName}
                 </div>
 
-
+                <div
+                  style={{
+                    fontSize: `${
+                      (settings as any)
+                        .signerTitleFontSize ??
+                      7
+                    }px`
+                  }}
+                >
+                  {signerTitle}
+                </div>
               </div>
             )}
           </div>
