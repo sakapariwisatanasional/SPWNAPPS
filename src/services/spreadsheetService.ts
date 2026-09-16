@@ -705,7 +705,7 @@ class SpreadsheetService {
     }
 
     const provinceId = foundProv ? foundProv.id : '00';
-    const provinceName = foundProv ? foundProv.name : (rawProvince || 'Kwartir Nasional');
+    const provinceName = foundProv ? foundProv.name : (rawProvince || 'KWARTIR NASIONAL');
 
     let foundReg = REGENCIES_DATA.find(r => 
       (r.provinceId === provinceId || !foundProv) && 
@@ -713,7 +713,7 @@ class SpreadsheetService {
     );
 
     const regencyId = foundReg ? foundReg.id : (provinceId === '00' ? '00.00' : `${provinceId}.00`);
-    const regencyName = foundReg ? foundReg.name : (rawRegency || (provinceId === '00' ? 'Pusat Nasional' : 'Kabupaten/Kota belum ditentukan'));
+    const regencyName = foundReg ? foundReg.name : (rawRegency || (provinceId === '00' ? 'TINGKAT NASIONAL' : 'Kabupaten/Kota belum ditentukan'));
 
     return {
       provinceId,
@@ -805,7 +805,7 @@ class SpreadsheetService {
           ) || /kwartir\s+nasional|tingkat\s+nasional|pusat\s+nasional/i.test(String(rawReg || ''));
 
           const territory = isNationalRow
-            ? { provinceId: '00', provinceName: 'Kwartir Nasional', regencyId: '00.00', regencyName: 'Pusat Nasional' }
+            ? { provinceId: '00', provinceName: 'KWARTIR NASIONAL', regencyId: '00.00', regencyName: 'TINGKAT NASIONAL' }
             : this.resolveTerritory(rawProv, rawReg);
 
           const rawDistrict = this.getRowValue(row, [
@@ -930,7 +930,7 @@ class SpreadsheetService {
             verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
             isOperator: role !== 'MEMBER',
             operatorRole: role !== 'MEMBER' ? role : undefined,
-            operatorJurisdictionName: role === 'SUPER_ADMIN' || role === 'ADMIN_NATIONAL' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? (rawDistrict || territory.regencyName) : undefined,
+            operatorJurisdictionName: role === 'SUPER_ADMIN' || role === 'ADMIN_NATIONAL' ? 'KWARTIR NASIONAL' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? (rawDistrict || territory.regencyName) : undefined,
             skills: memberSkills,
             certifications: memberCerts,
             locationHistory: []
@@ -1026,7 +1026,7 @@ class SpreadsheetService {
               email: newM.email,
               name: newM.fullName,
               role: parsedRole,
-              jurisdictionName: parsedRole === 'SUPER_ADMIN' || parsedRole === 'ADMIN_NATIONAL' ? 'Kwartir Nasional' : `${newM.districtName}, ${newM.regencyName}`,
+              jurisdictionName: parsedRole === 'SUPER_ADMIN' || parsedRole === 'ADMIN_NATIONAL' ? 'KWARTIR NASIONAL' : `${newM.districtName}, ${newM.regencyName}`,
               jurisdictionId: parsedRole === 'SUPER_ADMIN' || parsedRole === 'ADMIN_NATIONAL' ? '00' : newM.regencyId,
               avatarUrl: newM.avatarUrl,
               memberId: newM.id
@@ -2792,3 +2792,4 @@ function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
 }
 
 export const spreadsheetService = new SpreadsheetService();
+
