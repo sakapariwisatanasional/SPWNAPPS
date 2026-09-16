@@ -1,1112 +1,293 @@
-import jsPDF from 'jspdf';
-import QRCode from 'qrcode';
-import html2canvas from 'html2canvas';
-import { Member, KtaCardSettings } from '../types';
-import { DEFAULT_KTA_SETTINGS } from './storage';
-import { 
-  SAKA_LOGO_URL, 
-  SAKA_LOGO_DRIVE_DIRECT_URL,
-  SAKA_CARD_BG_DRIVE_DIRECT_URL,
-  SAKA_CARD_BG_FALLBACK_URL,
-  formatDriveImageUrl,
-  getDriveDirectFallbackUrl
-} from '../components/common/SakaLogo';
+import React, { useEffect, useState } from 'react';
+import {
+  X,
+  Printer,
+  FileDown,
+  CreditCard,
+  Layers,
+  CheckCircle2,
+  ShieldCheck,
+  RotateCw,
+  Info,
+  Scissors,
+  ExternalLink
+} from 'lucide-react';
+import { Member, KtaCardSettings } from '../../types';
+import { storage } from '../../services/storage';
+import { spreadsheetService } from '../../services/spreadsheetService';
+import {
+  CR80_WIDTH_MM,
+  CR80_HEIGHT_MM,
+  downloadKtaPdfFile,
+  KtaPdfFormat
+} from '../../services/ktaPdfGenerator';
+import { DigitalMemberCard } from './DigitalMemberCard';
 
-// Global Standard ISO/IEC 7810 ID-1 Dimensions (CR80)
-export const CR80_WIDTH_MM = 85.60;
-export const CR80_HEIGHT_MM = 53.98;
-export const CR80_CORNER_RADIUS_MM = 3.18;
-
-// Canvas render resolution (300+ DPI equivalent for CR80 card: 1012px x 638px)
-const CANVAS_WIDTH = 1012;
-const CANVAS_HEIGHT = 638;
-
-export type KtaPdfFormat = 'CR80_STANDARD' | 'A4_PRINT_SHEET';
+interface KtaPrintPdfModalProps {
+  isOpen: boolean;
+  member: Member | null;
+  settings?: KtaCardSettings;
+  onClose: () => void;
+  onOpenEditCard?: () => void;
+}
 
 /**
- * Safely load an image from URL or data URI with fallback
+ * KTA PDF export flow:
+ *
+ * Google Spreadsheet (KTA_Settings)
+ *        ↓
+ * spreadsheetService.refreshKtaSettings()
+ *        ↓
+ * KtaCardSettings
+ *        ↓
+ * ┌───────────────────────┐
+ * │ DigitalMemberCard     │  ← preview
+ * │ downloadKtaPdfFile    │  ← PDF renderer
+ * └───────────────────────┘
+ *
+ * The preview and PDF therefore receive the SAME settings object.
+ * The PDF generator does not capture the preview DOM and does not read
+ * a second/stale settings source during export.
  */
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve) => {
-    if (!src) {
-      const fallbackImg = new Image();
-      resolve(fallbackImg);
-      return;
-    }
+export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
+  isOpen,
+  member,
+  settings: propSettings,
+  onClose,
+  onOpenEditCard
+}) => {
+  const fallbackSettings = propSettings || storage.getKtaSettings();
+  const [currentSettings, setCurrentSettings] = useState<KtaCardSettings>(fallbackSettings);
+  const [settingsSource, setSettingsSource] = useState<'spreadsheet' | 'fallback'>('fallback');
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [selectedFormat, setSelectedFormat] = useState<KtaPdfFormat>('CR80_STANDARD');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [progressStep, setProgressStep] = useState('');
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
-    const primaryUrl = formatDriveImageUrl(src) || src;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => {
-      // In case of CORS or Google Drive error, attempt direct UC fallback
-      const fallbackUrl = getDriveDirectFallbackUrl(src);
-      if (fallbackUrl && fallbackUrl !== primaryUrl) {
-        const fallbackImg = new Image();
-        fallbackImg.crossOrigin = 'anonymous';
-        fallbackImg.onload = () => resolve(fallbackImg);
-        fallbackImg.onerror = () => {
-          // Retry without CORS
-          const rawImg = new Image();
-          rawImg.onload = () => resolve(rawImg);
-          rawImg.onerror = () => resolve(rawImg);
-          rawImg.src = fallbackUrl;
-        };
-        fallbackImg.src = fallbackUrl;
-      } else if (img.crossOrigin) {
-        const retryImg = new Image();
-        retryImg.onload = () => resolve(retryImg);
-        retryImg.onerror = () => resolve(retryImg);
-        retryImg.src = primaryUrl;
-      } else {
-        resolve(img);
+  useEffect(() => {
+    if (!isOpen || !member) return;
+
+    let disposed = false;
+    setDownloadSuccess(false);
+    setIsLoadingSettings(true);
+
+    // Show the caller/local settings immediately while the authoritative
+    // spreadsheet copy is being fetched.
+    const local = propSettings || storage.getKtaSettings();
+    setCurrentSettings(local);
+    setSettingsSource('fallback');
+
+    const loadAuthoritativeSettings = async () => {
+      try {
+        const remote = await spreadsheetService.refreshKtaSettings();
+        if (!disposed && remote) {
+          setCurrentSettings({ ...remote });
+          setSettingsSource('spreadsheet');
+        }
+      } catch (error) {
+        console.warn('[KTA PDF] Gagal memuat KTA_Settings dari Spreadsheet:', error);
+      } finally {
+        if (!disposed) setIsLoadingSettings(false);
       }
     };
-    img.src = primaryUrl;
-  });
-}
 
-/**
- * Capture the actual DigitalMemberCard DOM so PDF output uses the exact same
- * visual layout as the on-screen KTA preview. A canvas renderer is retained
- * as a fallback for contexts where the live card is unavailable.
- */
-async function captureRenderedKtaSide(
-  member: Member,
-  side: 'front' | 'back'
-): Promise<string | null> {
-  if (typeof document === 'undefined') return null;
+    void loadAuthoritativeSettings();
 
-  const memberId = String(member.id || '');
-  const pdfPreview = Array.from(
-    document.querySelectorAll<HTMLElement>('[data-kta-pdf-preview="true"]')
-  ).find(el => el.dataset.ktaPdfMemberId === memberId) || null;
+    return () => {
+      disposed = true;
+    };
+  }, [isOpen, member?.id]);
 
-  const element = pdfPreview
-    ? pdfPreview.querySelector<HTMLElement>(
-        `[data-kta-render-side="${side}"][data-kta-member-id="${memberId}"]`
-      )
-    : null;
+  if (!isOpen || !member) return null;
 
-  if (!element) {
-    console.warn(`[KTA PDF] Preview ${side} untuk member ${memberId} tidak ditemukan.`);
-    return null;
-  }
+  const widthMm = Number(currentSettings.widthMm || CR80_WIDTH_MM);
+  const heightMm = Number(currentSettings.heightMm || CR80_HEIGHT_MM);
 
-  const sideEl = element;
-  const innerEl = sideEl.parentElement as HTMLElement | null;
-  const outerEl = innerEl?.parentElement as HTMLElement | null;
-  const original = {
-    position: sideEl.style.position,
-    left: sideEl.style.left,
-    top: sideEl.style.top,
-    right: sideEl.style.right,
-    bottom: sideEl.style.bottom,
-    width: sideEl.style.width,
-    height: sideEl.style.height,
-    transform: sideEl.style.transform,
-    backfaceVisibility: sideEl.style.backfaceVisibility,
-    transition: sideEl.style.transition,
-    innerTransform: innerEl?.style.transform || '',
-    innerTransition: innerEl?.style.transition || '',
-    outerTransform: outerEl?.style.transform || ''
-  };
+  const handleDownloadPdf = async (formatToDownload: KtaPdfFormat = selectedFormat) => {
+    setIsGenerating(true);
+    setDownloadSuccess(false);
+    setProgressStep('Mempersiapkan desain KTA dari KTA_Settings...');
 
-  try {
-    if (document.fonts?.ready) await document.fonts.ready;
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-
-    const rect = sideEl.getBoundingClientRect();
-    const width = Math.max(1, Math.round(rect.width));
-    const height = Math.max(1, Math.round(rect.height));
-
-    // IMPORTANT:
-    // DigitalMemberCard is a 3D card. Capturing an absolutely-positioned face
-    // directly can make html2canvas lose the original containing block and
-    // produce exactly the broken result seen in PDF (background/image fills the
-    // card while positioned fields disappear). Turn the selected face into a
-    // self-contained, 2D render surface for the duration of the capture.
-    sideEl.style.position = 'relative';
-    sideEl.style.left = '0';
-    sideEl.style.top = '0';
-    sideEl.style.right = 'auto';
-    sideEl.style.bottom = 'auto';
-    sideEl.style.width = `${width}px`;
-    sideEl.style.height = `${height}px`;
-    sideEl.style.transform = 'none';
-    sideEl.style.backfaceVisibility = 'visible';
-    sideEl.style.transition = 'none';
-
-    if (innerEl) {
-      innerEl.style.transition = 'none';
-      innerEl.style.transform = 'none';
-    }
-    if (outerEl) outerEl.style.transform = 'none';
-
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-
-    // First attempt: render the actual DOM with the browser's resolved CSS.
-    // This is the closest possible representation of the designer preview.
     try {
-      const canvas = await html2canvas(sideEl, {
-        scale: 4,
-        width,
-        height,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: null,
-        foreignObjectRendering: true,
-        logging: false,
-        imageTimeout: 15000,
-        removeContainer: true
+      // IMPORTANT: currentSettings is the exact object used by the preview.
+      // Do not refresh again here. This guarantees that the preview and PDF
+      // use one immutable settings snapshot for the whole export transaction.
+      const exportSettings: KtaCardSettings = JSON.parse(JSON.stringify(currentSettings));
+
+      await downloadKtaPdfFile(member, exportSettings, formatToDownload, (step) => {
+        setProgressStep(step);
       });
 
-      if (canvas.width > 0 && canvas.height > 0) {
-        return canvas.toDataURL('image/png');
-      }
-    } catch (error) {
-      console.warn(`[KTA PDF] foreignObject capture ${side} gagal, mencoba renderer CSS-safe:`, error);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 3500);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert(err instanceof Error ? err.message : 'Terjadi kendala saat membuat file PDF. Silakan coba lagi.');
+    } finally {
+      setIsGenerating(false);
+      setProgressStep('');
     }
-
-    // Second attempt: freeze computed styles, but keep the face itself as a
-    // normal relative render surface. This is only a compatibility fallback
-    // for browsers/html2canvas versions where foreignObject is unavailable.
-    const canvas = await html2canvas(sideEl, {
-      scale: 4,
-      width,
-      height,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: null,
-      logging: false,
-      imageTimeout: 15000,
-      removeContainer: true,
-      onclone: (clonedDoc) => {
-        const clonedSide = clonedDoc.querySelector<HTMLElement>(
-          `[data-kta-render-side="${side}"][data-kta-member-id="${memberId}"]`
-        );
-        if (!clonedSide) return;
-
-        // Keep the real layout classes for normal CSS properties, but remove
-        // global stylesheets that can contain unsupported Tailwind color
-        // functions. Inline styles from DigitalMemberCard remain intact.
-        clonedDoc.querySelectorAll('style, link[rel="stylesheet"]').forEach(node => node.remove());
-
-        clonedSide.style.position = 'relative';
-        clonedSide.style.left = '0';
-        clonedSide.style.top = '0';
-        clonedSide.style.right = 'auto';
-        clonedSide.style.bottom = 'auto';
-        clonedSide.style.width = `${width}px`;
-        clonedSide.style.height = `${height}px`;
-        clonedSide.style.transform = 'none';
-        clonedSide.style.backfaceVisibility = 'visible';
-
-        // The face's direct children already carry most of their designer
-        // positioning in inline styles. Re-apply only computed geometry that
-        // Tailwind supplied, without overwriting those important inline rules.
-        const nodes = [clonedSide, ...Array.from(clonedSide.querySelectorAll<HTMLElement>('*'))];
-        nodes.forEach(node => {
-          const computed = clonedDoc.defaultView?.getComputedStyle(node);
-          if (!computed) return;
-
-          // IMPORTANT: the stylesheet is removed below, so every layout
-          // property that Tailwind normally supplies must be frozen inline.
-          // In particular, w-full/h-full on the photo and absolute/inset-0
-          // on positioned layers MUST survive the clone. Omitting width/height
-          // here causes the photo to expand to its natural image size and the
-          // QR/SVG layers to jump to the top-left of the PDF.
-          const keep = [
-            'box-sizing', 'display', 'position', 'left', 'top', 'right', 'bottom',
-            'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
-            'overflow', 'overflow-x', 'overflow-y', 'margin', 'margin-top',
-            'margin-right', 'margin-bottom', 'margin-left', 'padding', 'padding-top',
-            'padding-right', 'padding-bottom', 'padding-left', 'font-family',
-            'font-size', 'font-weight', 'line-height', 'letter-spacing',
-            'text-align', 'text-transform', 'color', 'opacity', 'visibility',
-            'border-radius', 'border-width', 'border-style', 'border-color',
-            'object-fit', 'object-position', 'background-color', 'background-image',
-            'background-size', 'background-position', 'background-repeat',
-            'white-space', 'word-break', 'text-overflow', 'justify-content',
-            'align-items', 'align-content', 'flex-direction', 'flex-wrap',
-            'flex-grow', 'flex-shrink', 'flex-basis', 'gap', 'column-gap',
-            'row-gap', 'z-index', 'box-shadow', 'transform', 'transform-origin'
-          ];
-
-          keep.forEach(property => {
-            const value = computed.getPropertyValue(property);
-            if (!value || /oklch\(|oklab\(/i.test(value)) return;
-
-            // Freeze the browser-resolved geometry. This is deliberately based
-            // on computed CSS rather than the original class names, because
-            // the clone no longer has the application's Tailwind stylesheet.
-            node.style.setProperty(property, value);
-          });
-        });
-      }
-    });
-
-    return canvas.width > 0 && canvas.height > 0
-      ? canvas.toDataURL('image/png')
-      : null;
-  } catch (error) {
-    console.error(`[KTA PDF] Gagal menangkap preview DOM ${side}:`, error);
-    return null;
-  } finally {
-    sideEl.style.position = original.position;
-    sideEl.style.left = original.left;
-    sideEl.style.top = original.top;
-    sideEl.style.right = original.right;
-    sideEl.style.bottom = original.bottom;
-    sideEl.style.width = original.width;
-    sideEl.style.height = original.height;
-    sideEl.style.transform = original.transform;
-    sideEl.style.backfaceVisibility = original.backfaceVisibility;
-    sideEl.style.transition = original.transition;
-    if (innerEl) {
-      innerEl.style.transform = original.innerTransform;
-      innerEl.style.transition = original.innerTransition;
-    }
-    if (outerEl) outerEl.style.transform = original.outerTransform;
-  }
-}
-
-/**
- * Generate QR Code as high-resolution data URL
- */
-async function generateQrDataUrl(text: string): Promise<string> {
-  try {
-    return await QRCode.toDataURL(text, {
-      width: 400,
-      margin: 1,
-      color: {
-        dark: '#1e0842',
-        light: '#ffffff'
-      }
-    });
-  } catch {
-    return '';
-  }
-}
-
-/**
- * Load the exact authentic Saka Pariwisata logo image matching the preview
- */
-async function loadOfficialSakaLogo(): Promise<HTMLImageElement> {
-  // 1. Try local public logo first
-  try {
-    const localImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        if (img.naturalWidth > 0) resolve(img);
-        else reject(new Error('Empty local logo'));
-      };
-      img.onerror = () => reject(new Error('Failed local logo'));
-      img.src = SAKA_LOGO_URL;
-    });
-    return localImg;
-  } catch {
-    // 2. Fallback to direct cloud asset
-    try {
-      const driveImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          if (img.naturalWidth > 0) resolve(img);
-          else reject(new Error('Empty drive logo'));
-        };
-        img.onerror = () => reject(new Error('Failed drive logo'));
-        img.src = SAKA_LOGO_DRIVE_DIRECT_URL;
-      });
-      return driveImg;
-    } catch {
-      // 3. Fallback placeholder if offline
-      const fallbackSvg = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(getSakaLogoSvg())}`;
-      return await loadImage(fallbackSvg);
-    }
-  }
-}
-
-/**
- * Load Card Background Image from Settings or Default Drive URL
- */
-async function loadCardBgImage(url?: string): Promise<HTMLImageElement | null> {
-  const rawUrl = url || SAKA_CARD_BG_DRIVE_DIRECT_URL;
-  if (!rawUrl) return null;
-  const targetUrl = formatDriveImageUrl(rawUrl);
-
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.crossOrigin = 'anonymous';
-      el.onload = () => {
-        if (el.naturalWidth > 0) resolve(el);
-        else reject(new Error('Empty bg'));
-      };
-      el.onerror = () => {
-        // Retry with fallback URL without crossOrigin if CORS issues occur
-        const retryEl = new Image();
-        retryEl.onload = () => resolve(retryEl);
-        retryEl.onerror = () => resolve(el);
-        retryEl.src = SAKA_CARD_BG_FALLBACK_URL;
-      };
-      el.src = targetUrl;
-    });
-    return img;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Generates an SVG string representation for the official Saka logo for emergency offline fallback
- */
-function getSakaLogoSvg(): string {
-  return `
-    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-      <path d="M 100 8 L 188 72 L 154 184 L 46 184 L 12 72 Z" fill="#2e1065" stroke="#e9d5ff" stroke-width="6"/>
-      <path d="M 100 22 L 174 76 L 146 170 L 54 170 L 26 76 Z" fill="#4c1d95" stroke="#fbbf24" stroke-width="4"/>
-      <circle cx="100" cy="98" r="42" fill="#6b21a8" stroke="#ffffff" stroke-width="3"/>
-      <path d="M 100 68 L 108 90 L 132 90 L 112 104 L 120 126 L 100 112 L 80 126 L 88 104 L 68 90 L 92 90 Z" fill="#fbbf24"/>
-      <path d="M 85 142 Q 100 134 115 142" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round"/>
-    </svg>
-  `;
-}
-
-/**
- * Draw image with aspect ratio fit
- */
-function drawFitImage(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  x: number,
-  y: number,
-  maxWidth: number,
-  maxHeight: number
-) {
-  const w = img.naturalWidth || img.width;
-  const h = img.naturalHeight || img.height;
-  if (!img.complete || w === 0 || h === 0) return;
-
-  const imgAspect = w / h;
-  const targetAspect = maxWidth / maxHeight;
-
-  let drawW = maxWidth;
-  let drawH = maxHeight;
-  let drawX = x;
-  let drawY = y;
-
-  if (imgAspect > targetAspect) {
-    drawH = maxWidth / imgAspect;
-    drawY = y + (maxHeight - drawH) / 2;
-  } else {
-    drawW = maxHeight * imgAspect;
-    drawX = x + (maxWidth - drawW) / 2;
-  }
-
-  ctx.drawImage(img, drawX, drawY, drawW, drawH);
-}
-
-/**
- * Helper to draw rounded rectangle path
- */
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number
-) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-}
-
-/**
- * Helper to wrap text cleanly in Canvas 2D
- */
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number
-): number {
-  const words = text.split(' ');
-  let line = '';
-  let currentY = y;
-
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + ' ';
-    const metrics = ctx.measureText(testLine);
-    const testWidth = metrics.width;
-    if (testWidth > maxWidth && n > 0) {
-      ctx.fillText(line.trim(), x, currentY);
-      line = words[n] + ' ';
-      currentY += lineHeight;
-    } else {
-      line = testLine;
-    }
-  }
-  ctx.fillText(line.trim(), x, currentY);
-  return currentY + lineHeight;
-}
-
-/**
- * Draw crisp barcode into canvas
- */
-function drawBarcode(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  value: string
-) {
-  // White background container
-  ctx.fillStyle = '#ffffff';
-  roundRect(ctx, x, y, width, height, 8);
-  ctx.fill();
-
-  const cleanVal = (value || 'SAKA-2026').toUpperCase();
-  const pattern: number[] = [2, 1, 1, 2];
-  for (let i = 0; i < cleanVal.length; i++) {
-    const code = cleanVal.charCodeAt(i);
-    pattern.push(((code * 3 + 1) % 3) + 1);
-    pattern.push(((code * 7 + 2) % 2) + 1);
-    pattern.push(((code * 5 + 3) % 3) + 1);
-    pattern.push(((code * 2 + 1) % 2) + 1);
-  }
-  pattern.push(2, 1, 2, 1, 2);
-
-  const totalUnits = pattern.reduce((acc, curr) => acc + curr, 0);
-  const paddingX = 14;
-  const paddingY = 6;
-  const barAreaWidth = width - (paddingX * 2);
-  const barAreaHeight = height - (paddingY * 2);
-  const unitWidth = barAreaWidth / totalUnits;
-
-  let currentX = x + paddingX;
-  ctx.fillStyle = '#0f172a';
-
-  pattern.forEach((w, idx) => {
-    const barW = w * unitWidth;
-    if (idx % 2 === 0) {
-      ctx.fillRect(currentX, y + paddingY, barW, barAreaHeight);
-    }
-    currentX += barW;
-  });
-}
-
-/**
- * Get Color Palette for theme
- */
-function getThemePalette(themeName?: string) {
-  switch (themeName) {
-    case 'emerald_pesona':
-      return {
-        frontGrad: ['#064e3b', '#022c22', '#0f172a'],
-        backGrad: ['#022c22', '#064e3b', '#0f172a'],
-        accent: '#6ee7b7',
-        accentLight: '#a7f3d0',
-        badgeBg: '#34d399',
-        badgeText: '#022c22',
-        boxBg: 'rgba(6, 78, 59, 0.85)',
-        border: 'rgba(52, 211, 153, 0.45)'
-      };
-    case 'indigo_navy':
-      return {
-        frontGrad: ['#1e3a8a', '#1e1b4b', '#0f172a'],
-        backGrad: ['#1e1b4b', '#1e3a8a', '#0f172a'],
-        accent: '#93c5fd',
-        accentLight: '#bfdbfe',
-        badgeBg: '#60a5fa',
-        badgeText: '#1e1b4b',
-        boxBg: 'rgba(30, 27, 75, 0.85)',
-        border: 'rgba(96, 165, 250, 0.45)'
-      };
-    case 'dark_slate':
-      return {
-        frontGrad: ['#334155', '#0f172a', '#000000'],
-        backGrad: ['#000000', '#1e293b', '#0f172a'],
-        accent: '#cbd5e1',
-        accentLight: '#e2e8f0',
-        badgeBg: '#f8fafc',
-        badgeText: '#0f172a',
-        boxBg: 'rgba(30, 41, 59, 0.85)',
-        border: 'rgba(148, 163, 184, 0.45)'
-      };
-    case 'gold_amber':
-      return {
-        frontGrad: ['#78350f', '#292524', '#000000'],
-        backGrad: ['#000000', '#451a03', '#1c1917'],
-        accent: '#fcd34d',
-        accentLight: '#fde68a',
-        badgeBg: '#fbbf24',
-        badgeText: '#451a03',
-        boxBg: 'rgba(69, 26, 3, 0.85)',
-        border: 'rgba(251, 191, 36, 0.45)'
-      };
-    case 'purple_saka':
-    default:
-      return {
-        frontGrad: ['#3b0764', '#1e1b4b', '#0f172a'],
-        backGrad: ['#0f172a', '#2e1065', '#1e1b4b'],
-        accent: '#d8b4fe',
-        accentLight: '#e9d5ff',
-        badgeBg: '#c084fc',
-        badgeText: '#2e1065',
-        boxBg: 'rgba(59, 7, 100, 0.85)',
-        border: 'rgba(192, 132, 252, 0.45)'
-      };
-  }
-}
-
-/** Convert percentage-based designer coordinates into canvas pixels. */
-const pxX = (v: number | undefined) => CANVAS_WIDTH * (v ?? 0) / 100;
-const pxY = (v: number | undefined) => CANVAS_HEIGHT * (v ?? 0) / 100;
-const pxW = (v: number | undefined) => CANVAS_WIDTH * (v ?? 0) / 100;
-const pxH = (v: number | undefined) => CANVAS_HEIGHT * (v ?? 0) / 100;
-
-function weightValue(w?: string): string {
-  return ({ normal: '400', medium: '500', bold: '700', black: '900' } as Record<string,string>)[w || 'normal'] || '400';
-}
-
-function fieldValue(member: Member, field: string): string {
-  const values: Record<string, unknown> = {
-    fullName: member.fullName,
-    id: member.id,
-    nationalMemberNumber: member.nationalMemberNumber,
-    currentPosition: member.currentPosition,
-    provinceName: member.provinceName,
-    regencyName: member.regencyName,
-    districtName: member.districtName,
-    kwartirName: member.kwartirName,
-    kwartirHierarchy: member.kwartirHierarchy,
-    branchName: member.branchName,
-    gugusDepan: member.gugusDepan,
-    krida: member.krida,
-    phone: member.phone,
-    email: member.email,
-    joinYear: member.joinYear,
-    status: member.status,
   };
-  return String(values[field] ?? '');
-}
 
-function applyTextStyle(ctx: CanvasRenderingContext2D, cfg: any, fallbackColor: string, minSize = 7) {
-  ctx.fillStyle = cfg.color || fallbackColor;
-  ctx.textAlign = cfg.align || 'left';
-  ctx.font = `${weightValue(cfg.fontWeight)} ${Math.max(minSize, Number(cfg.fontSize) || minSize)}px Arial, sans-serif`;
-}
+  const handleDirectPrint = () => {
+    window.print();
+  };
 
-function drawConfiguredText(ctx: CanvasRenderingContext2D, text: string, cfg: any, fallbackColor: string) {
-  if (!text) return;
-  const x = pxX(cfg.x);
-  const y = pxY(cfg.y);
-  const maxW = pxW(cfg.width);
-  const fontSize = Math.max(7, Number(cfg.fontSize) || 9);
-  const lineHeight = Number(cfg.lineHeight || 1.2) * fontSize;
-  const value = cfg.textTransform === 'uppercase' ? text.toUpperCase() : cfg.textTransform === 'lowercase' ? text.toLowerCase() : text;
-  applyTextStyle(ctx, cfg, fallbackColor);
-  ctx.save();
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[94vh]">
+        <div className="p-5 bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white flex items-center justify-between border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300">
+              <Printer className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-base font-heading">Cetak & Ekspor KTA ke PDF</h3>
+                <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-bold rounded-full">
+                  ISO/IEC 7810 ID-1 Standard
+                </span>
+              </div>
+              <p className="text-xs text-purple-200/80">
+                Konversi otomatis Kartu Tanda Anggota {member.fullName} ke format cetak standar global
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
-  // DigitalMemberCard uses nowrap by default. Only wrap when the designer
-  // explicitly selects whiteSpace="normal". This keeps the fallback renderer
-  // visually aligned with the live card instead of unexpectedly reflowing
-  // names, headings, and labels.
-  if (cfg.whiteSpace !== 'normal') {
-    ctx.fillText(String(value), x, y + fontSize, maxW);
-    ctx.restore();
-    return;
-  }
+        <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="lg:col-span-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Pratinjau KTA 3D</span>
+                <span className="text-[10px] bg-purple-100 text-purple-900 px-2 py-0.5 rounded-full font-bold">
+                  {widthMm.toFixed(2)} × {heightMm.toFixed(2)} mm
+                </span>
+              </div>
 
-  const words = String(value).split(/\s+/);
-  let line = '';
-  let yy = y + fontSize;
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (ctx.measureText(candidate).width > maxW && line) {
-      ctx.fillText(line, x, yy, maxW);
-      yy += lineHeight;
-      line = word;
-    } else {
-      line = candidate;
-    }
-  }
-  if (line) ctx.fillText(line, x, yy, maxW);
-  ctx.restore();
-}
+              <div className="flex justify-center p-2 bg-slate-50 rounded-2xl border border-slate-200">
+                <DigitalMemberCard
+                  key={`${member.id}-${JSON.stringify(currentSettings)}`}
+                  member={member}
+                  previewSettings={currentSettings}
+                  showControls={false}
+                />
+              </div>
 
-function drawConfiguredFields(ctx: CanvasRenderingContext2D, member: Member, settings: KtaCardSettings, side: 'FRONT'|'BACK', fallbackColor: string) {
-  (settings.dataFields || []).filter((f: any) => f.side === side && f.visible).forEach((f: any) => {
-    const raw = fieldValue(member, f.field);
-    const text = f.showLabel && f.label ? `${f.label}: ${raw}` : raw;
-    drawConfiguredText(ctx, text, f, fallbackColor);
-  });
-  (settings.textElements || []).filter((t: any) => t.side === side).forEach((t: any) => {
-    drawConfiguredText(ctx, String(t.text || ''), t, fallbackColor);
-  });
-}
+              <div className={`px-3 py-2 rounded-xl border text-[10px] font-semibold flex items-center gap-2 ${
+                settingsSource === 'spreadsheet'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}>
+                {isLoadingSettings ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                <span>
+                  {isLoadingSettings
+                    ? 'Mengambil desain pusat KTA_Settings dari Google Spreadsheet...'
+                    : settingsSource === 'spreadsheet'
+                      ? 'Desain pusat KTA_Settings aktif — Preview & PDF memakai konfigurasi yang sama.'
+                      : 'Spreadsheet belum dapat dibaca; menggunakan desain lokal sebagai fallback.'}
+                </span>
+              </div>
 
-function drawConfiguredLogos(ctx: CanvasRenderingContext2D, logoImages: Array<{cfg:any; img:HTMLImageElement}>, side:'FRONT'|'BACK') {
-  logoImages.filter(({cfg}) => cfg.side === side).forEach(({cfg,img}) => {
-    if (!img || !img.complete || !(img.naturalWidth || img.width)) return;
-    const x=pxX(cfg.x), y=pxY(cfg.y), w=pxW(cfg.width), h=pxH(cfg.height);
-    ctx.save(); ctx.globalAlpha=cfg.opacity ?? 1;
-    if (cfg.objectFit === 'cover') {
-      const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
-      const scale=Math.max(w/iw,h/ih); const dw=iw*scale, dh=ih*scale;
-      ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); ctx.drawImage(img,x+(w-dw)/2,y+(h-dh)/2,dw,dh);
-    } else {
-      drawFitImage(ctx,img,x,y,w,h);
-    }
-    ctx.restore();
-  });
-}
+              <div className="p-3 bg-purple-50/70 border border-purple-200/60 rounded-2xl text-xs space-y-1 text-purple-950">
+                <div className="flex items-center justify-between font-bold text-[11px]">
+                  <span>Standar Dimensi Global:</span>
+                  <span className="font-mono text-purple-800">ISO/IEC 7810 ID-1 (CR80)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-purple-900/80 pt-1 border-t border-purple-200/40">
+                  <div>• Panjang: <strong>{widthMm.toFixed(2)} mm</strong></div>
+                  <div>• Lebar: <strong>{heightMm.toFixed(2)} mm</strong></div>
+                  <div>• Radius Sudut: <strong>{Number(currentSettings.cornerRadiusMm || 3.18).toFixed(2)} mm</strong></div>
+                  <div>• Resolusi: <strong>300+ DPI Crisp</strong></div>
+                </div>
+              </div>
 
-function drawBackground(ctx: CanvasRenderingContext2D, settings: KtaCardSettings, side:'FRONT'|'BACK', bgImg:HTMLImageElement|null, theme:any) {
-  const custom = side==='FRONT' ? settings.customBackgroundColorFront : settings.customBackgroundColorBack;
+              {onOpenEditCard && (
+                <button
+                  type="button"
+                  onClick={() => { onClose(); onOpenEditCard(); }}
+                  className="w-full py-2 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-purple-700" />
+                  <span>Kustomisasi Tampilan & Desain KTA</span>
+                </button>
+              )}
+            </div>
 
-  // Match DigitalMemberCard.bgStyle exactly: a configured solid color is
-  // the actual background, not a translucent overlay on top of a gradient.
-  // This was the main source of the large visual difference in the exported
-  // PDF when no background image was configured.
-  ctx.fillStyle = custom || (side === 'FRONT' ? '#24105b' : '#111827');
-  ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Pilih Format Cetak PDF</h4>
+                <span className="text-[11px] text-slate-400">Siap Cetak & Potong</span>
+              </div>
 
-  if (bgImg && (bgImg.naturalWidth || bgImg.width)) {
-    ctx.save();
-    ctx.globalAlpha = 1;
-    ctx.drawImage(bgImg,0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-    ctx.fillStyle = 'rgba(0,0,0,0.12)';
-    ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-    ctx.restore();
-  }
-}
+              <div onClick={() => setSelectedFormat('CR80_STANDARD')} className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${selectedFormat === 'CR80_STANDARD' ? 'border-purple-600 bg-purple-50/40 ring-2 ring-purple-600/20 shadow-sm' : 'border-slate-200 hover:border-purple-300 bg-white'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2.5 rounded-xl flex-shrink-0 ${selectedFormat === 'CR80_STANDARD' ? 'bg-purple-900 text-white' : 'bg-slate-100 text-slate-700'}`}><CreditCard className="w-5 h-5" /></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-bold text-sm text-slate-900 font-heading">Format Kartu CR80 Standar Global (2 Halaman)</h5>
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-900 text-[10px] font-bold rounded-full">{widthMm.toFixed(1)} × {heightMm.toFixed(1)} mm</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">Format ukuran pas kartu PVC standar internasional. Halaman 1 memuat sisi depan dan Halaman 2 memuat sisi belakang.</p>
+                    <div className="flex items-center gap-3 mt-2 text-[11px] text-purple-900 font-medium"><span>✓ Mesin Cetak PVC (Fargo/Zebra/Evolis)</span><span>✓ Digital Wallet</span></div>
+                  </div>
+                </div>
+              </div>
 
-function drawFrontSystemElements(ctx: CanvasRenderingContext2D, member: Member, settings: KtaCardSettings, logoImg:HTMLImageElement, avatarImg:HTMLImageElement, qrImg:HTMLImageElement, theme:any) {
-  const logoUrl = settings.frontLogoUrl;
-  if (!settings.logos?.some((l:any)=>l.side==='FRONT' && l.url) && !logoUrl && logoImg.complete && (logoImg.naturalWidth||logoImg.width)) {
-    drawFitImage(ctx,logoImg,pxX(4),pxY(3),pxW(10),pxH(16));
-  }
+              <div onClick={() => setSelectedFormat('A4_PRINT_SHEET')} className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${selectedFormat === 'A4_PRINT_SHEET' ? 'border-purple-600 bg-purple-50/40 ring-2 ring-purple-600/20 shadow-sm' : 'border-slate-200 hover:border-purple-300 bg-white'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2.5 rounded-xl flex-shrink-0 ${selectedFormat === 'A4_PRINT_SHEET' ? 'bg-purple-900 text-white' : 'bg-slate-100 text-slate-700'}`}><Layers className="w-5 h-5" /></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-bold text-sm text-slate-900 font-heading">Lembar Cetak Dokumen A4 (Siap Potong & Lipat)</h5>
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-900 text-[10px] font-bold rounded-full">210 × 297 mm</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">Memuat sisi depan & belakang bersisian dan model lipat vertikal, dilengkapi <strong>garis potong (crop marks)</strong> dan <strong>garis lipat</strong>.</p>
+                    <div className="flex items-center gap-3 mt-2 text-[11px] text-blue-900 font-medium"><span className="flex items-center gap-1"><Scissors className="w-3.5 h-3.5" /> Garis Potong Presisi</span><span>✓ Printer Kertas Biasa / Photo Paper</span></div>
+                  </div>
+                </div>
+              </div>
 
-  drawConfiguredText(ctx, settings.frontOrganizationTitle || '', {
-    x:settings.frontOrganizationTitleX ?? 15,y:settings.frontOrganizationTitleY ?? 6,width:settings.frontOrganizationTitleWidth ?? 65,
-    fontSize:settings.frontOrganizationTitleFontSize ?? 11,fontWeight:settings.frontOrganizationTitleFontWeight ?? 'bold',color:settings.frontOrganizationTitleColor ?? '#fff',align:settings.frontOrganizationTitleAlign ?? 'left',
-    lineHeight:settings.frontOrganizationTitleLineHeight ?? 1.15,letterSpacing:settings.frontOrganizationTitleLetterSpacing ?? 0,textTransform:'uppercase'
-  }, '#fff');
-  drawConfiguredText(ctx, settings.frontOrganizationSubtitle || '', {
-    x:settings.frontOrganizationSubtitleX ?? 15,y:settings.frontOrganizationSubtitleY ?? 12,width:settings.frontOrganizationSubtitleWidth ?? 70,
-    fontSize:settings.frontOrganizationSubtitleFontSize ?? 8,fontWeight:settings.frontOrganizationSubtitleFontWeight ?? 'normal',color:settings.frontOrganizationSubtitleColor ?? theme.accent,align:settings.frontOrganizationSubtitleAlign ?? 'left',
-    lineHeight:settings.frontOrganizationSubtitleLineHeight ?? 1.2,letterSpacing:settings.frontOrganizationSubtitleLetterSpacing ?? 0
-  }, theme.accent);
+              <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-1.5">
+                <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs"><Info className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" /><span>Petunjuk Penting Percetakan KTA:</span></div>
+                <ul className="text-[11px] text-amber-800/90 space-y-1 list-disc list-inside">
+                  <li>Saat mencetak PDF, pilih skala <strong>"Actual Size" / 100%</strong> (bukan Fit to Page).</li>
+                  <li>Untuk hasil terbaik, gunakan kertas <em>PVC Card</em> atau <em>Photo Paper Glossy 230-260 gsm</em>.</li>
+                  <li>QR Code dan Barcode dirender dengan resolusi tinggi agar terbaca scanner.</li>
+                </ul>
+              </div>
 
-  if(settings.showPhoto !== false && avatarImg && (avatarImg.naturalWidth||avatarImg.width)) {
-    const x=pxX(settings.photoX ?? 4), y=pxY(settings.photoY ?? 27), w=pxW(settings.photoWidth ?? 22), h=pxH(settings.photoHeight ?? 48), r=Number(settings.photoRadius ?? 12);
-    ctx.save(); roundRect(ctx,x,y,w,h,r); ctx.clip();
-    const fit=settings.photoObjectFit || 'cover';
-    if(fit==='contain') drawFitImage(ctx,avatarImg,x,y,w,h); else if(fit==='fill') ctx.drawImage(avatarImg,x,y,w,h); else {
-      const iw=avatarImg.naturalWidth||avatarImg.width, ih=avatarImg.naturalHeight||avatarImg.height, scale=Math.max(w/iw,h/ih), dw=iw*scale, dh=ih*scale;
-      ctx.drawImage(avatarImg,x+(w-dw)/2,y+(h-dh)/2,dw,dh);
-    }
-    ctx.restore();
-    ctx.save(); ctx.strokeStyle=settings.photoBorderColor || theme.accent; ctx.lineWidth=Number(settings.photoBorderWidth ?? 2); roundRect(ctx,x,y,w,h,r); ctx.stroke(); ctx.restore();
-  }
+              {isGenerating && (
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl flex items-center gap-3 text-purple-900 text-xs font-semibold animate-pulse">
+                  <RotateCw className="w-4 h-4 animate-spin text-purple-700 flex-shrink-0" /><span>{progressStep || 'Membuat file PDF KTA...'}</span>
+                </div>
+              )}
 
-  if(settings.showQrCode !== false && qrImg && (qrImg.naturalWidth||qrImg.width)) {
-    const x=pxX(settings.qrX ?? 78), y=pxY(settings.qrY ?? 29), size=Math.max(36,Math.min(pxW(settings.qrSize ?? 18),pxH(settings.qrSize ?? 18)));
-    const qrPadding=Math.max(0,Number(settings.qrPadding ?? 6));
-    const qrRadius=Math.max(0,Number(settings.qrBorderRadius ?? 10));
-    const qrBorderWidth=Math.max(0,Number(settings.qrBorderWidth ?? 1));
-    const qrBorderColor=settings.qrBorderColor || '#e9d5ff';
-    const qrBg=settings.qrBackgroundColor || '#ffffff';
-    ctx.save();
-    ctx.fillStyle=qrBg; roundRect(ctx,x,y,size,size,qrRadius); ctx.fill();
-    if(qrBorderWidth>0){ ctx.strokeStyle=qrBorderColor; ctx.lineWidth=qrBorderWidth; roundRect(ctx,x,y,size,size,qrRadius); ctx.stroke(); }
-    const innerSize=Math.max(1,size-(qrPadding*2));
-    ctx.drawImage(qrImg,x+qrPadding,y+qrPadding,innerSize,innerSize);
-    ctx.restore();
-  }
+              {downloadSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2 text-emerald-900 text-xs font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" /><span>File PDF KTA berhasil dibuat menggunakan KTA_Settings.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
-  if(settings.showBarcodeFront !== false) {
-    const x=pxX(settings.barcodeFrontX ?? 4), y=pxY(settings.barcodeFrontY ?? 77), w=pxW(settings.barcodeFrontWidth ?? 32), h=pxH(settings.barcodeFrontHeight ?? 9);
-    drawBarcode(ctx,x,y,w,h,settings.barcodeFrontCustomValue?.trim() || getMemberVerificationValue(member));
-    if(settings.barcodeFrontShowText) { ctx.save(); ctx.fillStyle='#111827'; ctx.font='8px Arial'; ctx.textAlign='center'; ctx.fillText(settings.barcodeFrontCustomValue?.trim() || getMemberVerificationValue(member),x+w/2,y+h-2,w-8); ctx.restore(); }
-    if(settings.barcodeFrontCaption) drawConfiguredText(ctx,settings.barcodeFrontCaption,{x:settings.barcodeFrontCaptionX ?? settings.barcodeFrontX ?? 4,y:settings.barcodeFrontCaptionY ?? ((settings.barcodeFrontY ?? 77)+(settings.barcodeFrontHeight ?? 9)+1),width:settings.barcodeFrontCaptionWidth ?? settings.barcodeFrontWidth ?? 32,fontSize:settings.barcodeFrontCaptionFontSize ?? 6,fontWeight:settings.barcodeFrontCaptionFontWeight ?? 'normal',color:settings.barcodeFrontCaptionColor ?? '#fff',align:settings.barcodeFrontCaptionAlign ?? 'center',lineHeight:settings.barcodeFrontCaptionLineHeight ?? 1.1,letterSpacing:settings.barcodeFrontCaptionLetterSpacing ?? 0},'#fff');
-  }
-
-  if(settings.frontValidityText) drawConfiguredText(ctx,settings.frontValidityText,{x:settings.frontValidityTextX ?? 4,y:settings.frontValidityTextY ?? 92,width:settings.frontValidityTextWidth ?? 92,fontSize:settings.frontValidityTextFontSize ?? 7,fontWeight:settings.frontValidityTextFontWeight ?? 'normal',color:settings.frontValidityTextColor ?? '#fff',align:settings.frontValidityTextAlign ?? 'left',lineHeight:settings.frontValidityTextLineHeight ?? 1.2,letterSpacing:settings.frontValidityTextLetterSpacing ?? 0},'#fff');
-  if(settings.showKridaBadge && member.krida) drawConfiguredText(ctx,member.krida,{x:75,y:92,width:21,fontSize:6,fontWeight:'black',color:'#111827',align:'center',lineHeight:1.1},'#111827');
-}
-
-function getMemberVerificationValue(member: Member): string {
-  return member.nationalMemberNumber || member.verificationToken || member.id;
-}
-
-async function renderFrontCardCanvas(member: Member, settings: KtaCardSettings, logoImg: HTMLImageElement, avatarImg: HTMLImageElement, qrImg: HTMLImageElement, bgImg: HTMLImageElement|null): Promise<HTMLCanvasElement> {
-  const canvas=document.createElement('canvas'); canvas.width=CANVAS_WIDTH; canvas.height=CANVAS_HEIGHT; const ctx=canvas.getContext('2d')!; const theme=getThemePalette(settings.cardTheme);
-  ctx.save(); roundRect(ctx,0,0,CANVAS_WIDTH,CANVAS_HEIGHT,Math.max(1,Number(settings.cornerRadiusMm||CR80_CORNER_RADIUS_MM)*CANVAS_WIDTH/(settings.widthMm||CR80_WIDTH_MM))); ctx.clip();
-  drawBackground(ctx,settings,'FRONT',bgImg,theme);
-  drawFrontSystemElements(ctx,member,settings,logoImg,avatarImg,qrImg,theme);
-  drawConfiguredFields(ctx,member,settings,'FRONT',theme.accentLight);
-  return canvas;
-}
-
-async function renderBackCardCanvas(member: Member, settings: KtaCardSettings, logoImg: HTMLImageElement, bgImg: HTMLImageElement|null): Promise<HTMLCanvasElement> {
-  const canvas=document.createElement('canvas'); canvas.width=CANVAS_WIDTH; canvas.height=CANVAS_HEIGHT; const ctx=canvas.getContext('2d')!; const theme=getThemePalette(settings.cardTheme);
-  ctx.save(); roundRect(ctx,0,0,CANVAS_WIDTH,CANVAS_HEIGHT,Math.max(1,Number(settings.cornerRadiusMm||CR80_CORNER_RADIUS_MM)*CANVAS_WIDTH/(settings.widthMm||CR80_WIDTH_MM))); ctx.clip();
-  drawBackground(ctx,settings,'BACK',bgImg,theme);
-
-  if(!settings.logos?.some((l:any)=>l.side==='BACK' && l.url) && settings.backLogoUrl && logoImg.complete && (logoImg.naturalWidth||logoImg.width)) drawFitImage(ctx,logoImg,pxX(4),pxY(3),pxW(10),pxH(16));
-  drawConfiguredText(ctx,settings.backHeaderTitle || '',{x:settings.backHeaderTitleX ?? 5,y:settings.backHeaderTitleY ?? 6,width:settings.backHeaderTitleWidth ?? 90,fontSize:settings.backHeaderTitleFontSize ?? 11,fontWeight:settings.backHeaderTitleFontWeight ?? 'bold',color:settings.backHeaderTitleColor ?? theme.accent,align:settings.backHeaderTitleAlign ?? 'left',lineHeight:settings.backHeaderTitleLineHeight ?? 1.15,letterSpacing:settings.backHeaderTitleLetterSpacing ?? 0},theme.accent);
-  drawConfiguredText(ctx,settings.backHeaderSubtitle || '',{x:settings.backHeaderSubtitleX ?? 5,y:settings.backHeaderSubtitleY ?? 14,width:settings.backHeaderSubtitleWidth ?? 90,fontSize:settings.backHeaderSubtitleFontSize ?? 8,fontWeight:settings.backHeaderSubtitleFontWeight ?? 'normal',color:settings.backHeaderSubtitleColor ?? '#e5e7eb',align:settings.backHeaderSubtitleAlign ?? 'left',lineHeight:settings.backHeaderSubtitleLineHeight ?? 1.2,letterSpacing:settings.backHeaderSubtitleLetterSpacing ?? 0},'#e5e7eb');
-
-  const terms=(settings.terms||[]).length?settings.terms:['Kartu ini merupakan tanda pengenal sah anggota Satuan Karya Pramuka Pariwisata.','Keaslian data kartu dapat diverifikasi melalui QR Code.'];
-  const termsCfg={x:settings.termsX ?? 5,y:settings.termsY ?? 25,width:settings.termsWidth ?? 90,fontSize:settings.termsFontSize ?? 7,fontWeight:settings.termsFontWeight ?? 'normal',color:settings.termsColor ?? '#fff',align:settings.termsAlign ?? 'left',lineHeight:settings.termsLineHeight ?? 1.35,letterSpacing:settings.termsLetterSpacing ?? 0};
-  terms.forEach((t,i)=>drawConfiguredText(ctx,`${i+1}. ${t}`,{...termsCfg,y:(termsCfg.y as number)+i*(Number(termsCfg.fontSize||7)*Number(termsCfg.lineHeight||1.35)+2)},'#fff'));
-
-  drawConfiguredFields(ctx,member,settings,'BACK','#e2e8f0');
-
-  if(settings.issueLocationDate || settings.signerName || settings.signerTitle) {
-    const sx=settings.signerX ?? 5, sy=settings.signerY ?? 78, sw=settings.signerWidth ?? 55;
-    const cfgBase={x:sx,y:sy,width:sw,color:settings.signerColor ?? '#fff',align:settings.signerAlign ?? 'left',lineHeight:settings.signerLineHeight ?? 1.2,letterSpacing:settings.signerLetterSpacing ?? 0};
-    drawConfiguredText(ctx,settings.issueLocationDate||'',{...cfgBase,fontSize:settings.issueLocationDateFontSize ?? 7},'#fff');
-    drawConfiguredText(ctx,settings.signerName||'',{...cfgBase,y:(sy as number)+8,fontSize:settings.signerNameFontSize ?? 9,fontWeight:'bold'},'#fff');
-    drawConfiguredText(ctx,settings.signerTitle||'',{...cfgBase,y:(sy as number)+18,fontSize:settings.signerTitleFontSize ?? 7,fontWeight:'normal'},theme.accent);
-    if(settings.signerSubtitle) drawConfiguredText(ctx,settings.signerSubtitle,{...cfgBase,y:(sy as number)+26,fontSize:settings.signerSubtitleFontSize ?? 6,fontWeight:'normal'},'#fff');
-  }
-  if(settings.showBarcode !== false) drawBarcode(ctx,pxX(settings.barcodeX ?? 68),pxY(settings.barcodeY ?? 70),pxW(settings.barcodeWidth ?? 27),pxH(settings.barcodeHeight ?? 9),settings.barcodeCustomValue?.trim() || getMemberVerificationValue(member));
-  if(settings.barcodeCaption) drawConfiguredText(ctx,settings.barcodeCaption,{x:settings.barcodeX ?? 68,y:(settings.barcodeY ?? 70)+(settings.barcodeHeight ?? 9)+1,width:settings.barcodeWidth ?? 27,fontSize:6,fontWeight:'normal',color:'#fff',align:'center',lineHeight:1.1},'#fff');
-  return canvas;
-}
-
-function drawKtaConfiguredElements(ctx: CanvasRenderingContext2D, member: Member, settings: KtaCardSettings, side: 'FRONT'|'BACK', logoImages: Array<{cfg:any; img:HTMLImageElement}>) {
-  drawConfiguredLogos(ctx,logoImages,side);
-}
-
-export interface GenerateKtaOptions {
-  member: Member;
-  settings?: KtaCardSettings;
-  format?: KtaPdfFormat;
-  onProgress?: (step: string) => void;
-}
-
-/**
- * Main function to generate standard ISO/IEC 7810 ID-1 KTA PDF without CSS / oklch issues
- */
-export async function generateKtaPdf({
-  member,
-  settings = DEFAULT_KTA_SETTINGS,
-  format = 'CR80_STANDARD',
-  onProgress
-}: GenerateKtaOptions): Promise<jsPDF> {
-  if (onProgress) onProgress('Mempersiapkan data dan aset KTA...');
-
-  const nta = String(member.nationalMemberNumber || member.verificationToken || '').trim();
-  const memberId = String(member.id || member.userId || '').trim();
-  const verificationParams = new URLSearchParams();
-  if (nta) verificationParams.set('verifyId', nta);
-  if (memberId) verificationParams.set('memberId', memberId);
-  verificationParams.set('tab', 'verify-portal');
-  const verificationUrl = `${window.location.origin}/verify?${verificationParams.toString()}`;
-
-  const [qrDataUrl, avatarImg, logoImg, frontBgImg, backBgImg, configuredLogoImages] = await Promise.all([
-    generateQrDataUrl(verificationUrl),
-    loadImage(member.avatarUrl),
-    loadOfficialSakaLogo(),
-    loadCardBgImage(settings.frontBackgroundUrl || settings.bgImageUrl),
-    loadCardBgImage(settings.backBackgroundUrl || settings.bgImageUrl),
-    Promise.all([
-      ...(settings.logos || []).filter((l:any)=>l.url).map(async (cfg:any) => ({ cfg, img: await loadImage(cfg.url) })),
-      ...(settings.frontLogoUrl ? [{ cfg: { id: '__front-logo', name: 'Logo Depan', url: settings.frontLogoUrl, side: 'FRONT', x: 4, y: 3, width: 10, height: 16, opacity: 1, objectFit: 'contain' }, img: await loadImage(settings.frontLogoUrl) }] : []),
-      ...(settings.backLogoUrl ? [{ cfg: { id: '__back-logo', name: 'Logo Belakang', url: settings.backLogoUrl, side: 'BACK', x: 4, y: 3, width: 10, height: 16, opacity: 1, objectFit: 'contain' }, img: await loadImage(settings.backLogoUrl) }] : [])
-    ])
-  ]);
-
-  const qrImg = await loadImage(qrDataUrl);
-
-  if (onProgress) onProgress('Me-render tampilan KTA resolusi tinggi (300 DPI)...');
-
-  // Render front and back canvases directly with Canvas 2D API
-  const frontCanvas = await renderFrontCardCanvas(
-    member,
-    settings,
-    logoImg,
-    avatarImg,
-    qrImg,
-    frontBgImg
+        <div className="p-5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-xs text-slate-500 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" /><span>Dokumen PDF dilengkapi QR Code Verifikasi Online & Barcode Resmi.</span></div>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <button type="button" onClick={handleDirectPrint} disabled={isGenerating} className="flex-1 sm:flex-none px-4 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer">
+              <Printer className="w-3.5 h-3.5 text-slate-600" /><span>Cetak Cepat</span>
+            </button>
+            <button type="button" onClick={() => handleDownloadPdf(selectedFormat)} disabled={isGenerating || isLoadingSettings} className="flex-1 sm:flex-none px-6 py-2.5 bg-purple-900 hover:bg-purple-950 active:bg-purple-900 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer">
+              {isGenerating ? <><RotateCw className="w-4 h-4 animate-spin" /><span>Mengonversi PDF...</span></> : downloadSuccess ? <><CheckCircle2 className="w-4 h-4 text-emerald-400" /><span>Berhasil Diunduh!</span></> : <><FileDown className="w-4 h-4" /><span>Unduh PDF KTA ({selectedFormat === 'CR80_STANDARD' ? 'CR80' : 'Lembar A4'})</span></>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
-
-  drawKtaConfiguredElements(frontCanvas.getContext('2d')!, member, settings, 'FRONT', configuredLogoImages);
-
-  const backCanvas = await renderBackCardCanvas(member, settings, logoImg, backBgImg);
-  drawKtaConfiguredElements(backCanvas.getContext('2d')!, member, settings, 'BACK', configuredLogoImages);
-
-  // Prefer the live DigitalMemberCard DOM. This makes the exported PDF use
-  // the exact same CSS layout, fonts, spacing, images and designer settings
-  // that the member sees in the preview.
-  if (onProgress) onProgress('Menyamakan PDF dengan tampilan KTA...');
-  const domFront = await captureRenderedKtaSide(member, 'front');
-  const domBack = await captureRenderedKtaSide(member, 'back');
-
-  const frontImgData = domFront || frontCanvas.toDataURL('image/png');
-  const backImgData = domBack || backCanvas.toDataURL('image/png');
-
-  if (onProgress) onProgress('Menyusun berkas PDF sesuai standar ukuran global...');
-
-  if (format === 'CR80_STANDARD') {
-    // Direct CR80 (ISO/IEC 7810 ID-1) Plastic Card Dimensions: 85.60 mm x 53.98 mm
-    const doc = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: [settings.widthMm || CR80_WIDTH_MM, settings.heightMm || CR80_HEIGHT_MM]
-    });
-
-    // Page 1: Front Side
-    doc.addImage(frontImgData, 'PNG', 0, 0, settings.widthMm || CR80_WIDTH_MM, settings.heightMm || CR80_HEIGHT_MM, undefined, 'FAST');
-
-    // Page 2: Back Side
-    doc.addPage([settings.widthMm || CR80_WIDTH_MM, settings.heightMm || CR80_HEIGHT_MM], 'landscape');
-    doc.addImage(backImgData, 'PNG', 0, 0, settings.widthMm || CR80_WIDTH_MM, settings.heightMm || CR80_HEIGHT_MM, undefined, 'FAST');
-
-    return doc;
-  } else {
-    // A4 Sheet Layout (210 x 297 mm) with front & back side side-by-side or stacked, with cut/fold lines
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    const a4Width = 210;
-    const a4Height = 297;
-
-    // Header Banner on A4
-    doc.setFillColor(30, 8, 66);
-    doc.rect(0, 0, a4Width, 24, 'F');
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('LEMBAR CETAK RESMI KTA SAKA PARIWISATA', a4Width / 2, 11, {
-      align: 'center'
-    });
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(216, 180, 254);
-    doc.text(
-      'Standar Global ISO/IEC 7810 ID-1 (CR80: 85.60 mm × 53.98 mm) - Skala 100% (Actual Size)',
-      a4Width / 2,
-      18,
-      { align: 'center' }
-    );
-
-    // Information Box
-    doc.setTextColor(51, 65, 85);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Nama Anggota: ${member.fullName.toUpperCase()}`, 15, 33);
-    doc.text(`NTA: ${member.nationalMemberNumber || '-'}`, 15, 39);
-    doc.text(`Wilayah: ${member.provinceName} / ${member.districtName}`, 15, 45);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, a4Width - 15, 33, {
-      align: 'right'
-    });
-    doc.text(
-      'Instruksi: Cetak dengan opsi "Actual Size / 100%" (Jangan Scale/Fit)',
-      a4Width - 15,
-      39,
-      { align: 'right' }
-    );
-    doc.text(
-      'Gunakan kertas PVC Card / Photo Glossy 230-260 gsm lalu laminasi',
-      a4Width - 15,
-      45,
-      { align: 'right' }
-    );
-
-    // Divider line
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.5);
-    doc.line(15, 49, a4Width - 15, 49);
-
-    // Card Positions on A4 (Side by Side)
-    const cardY = 60;
-    const frontX = 16;
-    const backX = frontX + CR80_WIDTH_MM + 6; // 6mm gap
-
-    // Front Card
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 8, 66);
-    doc.text('SISI DEPAN (FRONT SIDE)', frontX + CR80_WIDTH_MM / 2, cardY - 3, {
-      align: 'center'
-    });
-    doc.addImage(
-      frontImgData,
-      'PNG',
-      frontX,
-      cardY,
-      CR80_WIDTH_MM,
-      CR80_HEIGHT_MM,
-      undefined,
-      'FAST'
-    );
-
-    // Back Card
-    doc.text('SISI BELAKANG (BACK SIDE)', backX + CR80_WIDTH_MM / 2, cardY - 3, {
-      align: 'center'
-    });
-    doc.addImage(
-      backImgData,
-      'PNG',
-      backX,
-      cardY,
-      CR80_WIDTH_MM,
-      CR80_HEIGHT_MM,
-      undefined,
-      'FAST'
-    );
-
-    // Crop Marks for Front
-    drawCropMarks(doc, frontX, cardY, CR80_WIDTH_MM, CR80_HEIGHT_MM);
-    // Crop Marks for Back
-    drawCropMarks(doc, backX, cardY, CR80_WIDTH_MM, CR80_HEIGHT_MM);
-
-    // Center fold guide
-    const foldX = frontX + CR80_WIDTH_MM + 3;
-    doc.setDrawColor(168, 85, 247);
-    doc.setLineDashPattern([2, 2], 0);
-    doc.line(foldX, cardY - 4, foldX, cardY + CR80_HEIGHT_MM + 4);
-    doc.setLineDashPattern([], 0);
-
-    // Second layout for Vertical folding
-    const cardY2 = cardY + CR80_HEIGHT_MM + 30;
-    doc.setTextColor(30, 8, 66);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(
-      'PANDUAN MODEL LIPAT VERTIKAL (SIAP LAMINASI DUA SISI):',
-      a4Width / 2,
-      cardY2 - 6,
-      { align: 'center' }
-    );
-
-    const centerCardX = (a4Width - CR80_WIDTH_MM) / 2;
-    const frontY2 = cardY2;
-    const backY2 = cardY2 + CR80_HEIGHT_MM;
-
-    doc.addImage(
-      frontImgData,
-      'PNG',
-      centerCardX,
-      frontY2,
-      CR80_WIDTH_MM,
-      CR80_HEIGHT_MM,
-      undefined,
-      'FAST'
-    );
-    doc.addImage(
-      backImgData,
-      'PNG',
-      centerCardX,
-      backY2,
-      CR80_WIDTH_MM,
-      CR80_HEIGHT_MM,
-      undefined,
-      'FAST'
-    );
-
-    // Cut marks for vertical card
-    drawCropMarks(doc, centerCardX, frontY2, CR80_WIDTH_MM, CR80_HEIGHT_MM * 2);
-
-    // Fold line in between
-    doc.setDrawColor(234, 88, 12);
-    doc.setLineDashPattern([2, 2], 0);
-    doc.line(centerCardX - 4, backY2, centerCardX + CR80_WIDTH_MM + 4, backY2);
-    doc.setLineDashPattern([], 0);
-
-    doc.setFontSize(8);
-    doc.setTextColor(194, 65, 12);
-    doc.text('--- Garis Lipat Tengah ---', centerCardX + CR80_WIDTH_MM / 2, backY2 - 1, {
-      align: 'center'
-    });
-
-    // Footer
-    doc.setFillColor(248, 250, 252);
-    doc.rect(0, a4Height - 18, a4Width, 18, 'F');
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.text(
-      'Sistem Informasi Terpadu Satuan Karya Pramuka Pariwisata Nasional',
-      15,
-      a4Height - 7
-    );
-    doc.text('Dokumen KTA Digital Sah & Terverifikasi Online', a4Width - 15, a4Height - 7, {
-      align: 'right'
-    });
-
-    return doc;
-  }
-}
-
-/**
- * Draw standard corner crop marks (garis potong) for print precision
- */
-function drawCropMarks(doc: jsPDF, x: number, y: number, w: number, h: number) {
-  doc.setDrawColor(71, 85, 105);
-  doc.setLineWidth(0.25);
-  const markLen = 4;
-  const offset = 1.5;
-
-  // Top-Left
-  doc.line(x - offset - markLen, y, x - offset, y);
-  doc.line(x, y - offset - markLen, x, y - offset);
-
-  // Top-Right
-  doc.line(x + w + offset, y, x + w + offset + markLen, y);
-  doc.line(x + w, y - offset - markLen, x + w, y - offset);
-
-  // Bottom-Left
-  doc.line(x - offset - markLen, y + h, x - offset, y + h);
-  doc.line(x, y + h + offset, x, y + h + offset + markLen);
-
-  // Bottom-Right
-  doc.line(x + w + offset, y + h, x + w + offset + markLen, y + h);
-  doc.line(x + w, y + h + offset, x + w, y + h + offset + markLen);
-}
-
-/**
- * Direct download helper for KTA PDF
- */
-export async function downloadKtaPdfFile(
-  member: Member,
-  settings: KtaCardSettings = DEFAULT_KTA_SETTINGS,
-  format: KtaPdfFormat = 'CR80_STANDARD',
-  onProgress?: (step: string) => void
-): Promise<void> {
-  const doc = await generateKtaPdf({ member, settings, format, onProgress });
-  const cleanName = member.fullName.replace(/[^a-zA-Z0-9]/g, '_');
-  const nta = member.nationalMemberNumber
-    ? member.nationalMemberNumber.replace(/[^a-zA-Z0-9]/g, '-')
-    : member.id;
-  const fileName = `KTA-SakaPariwisata-${nta}-${cleanName}-${
-    format === 'CR80_STANDARD' ? 'CR80' : 'A4'
-  }.pdf`;
-  doc.save(fileName);
-}
+};
