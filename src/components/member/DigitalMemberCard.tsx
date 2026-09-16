@@ -1609,42 +1609,29 @@ export const DigitalMemberCard: React.FC<Props> = ({
                     'break-word'
                 }}
               >
-                <div
-                  style={{
-                    position:
-                      'relative',
-                    left: `${
-                      (settings as any)
-                        .signerNameXOffset ??
-                      0
-                    }%`,
-                    top: `${
-                      (settings as any)
-                        .signerNameYOffset ??
-                      0
-                    }%`,
-                    fontSize: `${
-                      (settings as any)
-                        .signerNameFontSize ??
-                      9
-                    }px`,
-                    fontWeight: 700
-                  }}
-                >
-                  {signerName}
-                </div>
+                {(settings as any).showSignerName !== false && (
+                  <div
+                    style={{
+                      position: 'relative',
+                      left: `${(settings as any).signerNameXOffset ?? 0}%`,
+                      top: `${(settings as any).signerNameYOffset ?? 0}%`,
+                      fontSize: `${(settings as any).signerNameFontSize ?? 9}px`,
+                      fontWeight: 700
+                    }}
+                  >
+                    {signerName}
+                  </div>
+                )}
 
-                <div
-                  style={{
-                    fontSize: `${
-                      (settings as any)
-                        .signerTitleFontSize ??
-                      7
-                    }px`
-                  }}
-                >
-                  {signerTitle}
-                </div>
+                {(settings as any).showSignerTitle === true && (
+                  <div
+                    style={{
+                      fontSize: `${(settings as any).signerTitleFontSize ?? 7}px`
+                    }}
+                  >
+                    {signerTitle}
+                  </div>
+                )}
               </div>
             )}
           </div>
