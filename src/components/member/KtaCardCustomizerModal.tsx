@@ -1637,7 +1637,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   <div className="flex items-center gap-2 font-bold">
                     <Eye />
                     <span>
-                      6. QR / Barcode Depan
+                      6. QR Code Depan
                     </span>
                   </div>
 

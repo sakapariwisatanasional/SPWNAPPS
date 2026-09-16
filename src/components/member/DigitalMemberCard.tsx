@@ -9,7 +9,6 @@ import {
   SakaLogo,
   formatDriveImageUrl
 } from '../common/SakaLogo';
-import { Barcode } from '../common/Barcode';
 import {
   storage,
   DEFAULT_KTA_SETTINGS
@@ -47,8 +46,6 @@ const valueOf = (
     provinceName: member.provinceName,
     regencyName: member.regencyName,
     districtName: member.districtName,
-    kwartirName: (member as any).kwartirName,
-    kwartirHierarchy: (member as any).kwartirHierarchy,
     branchName: member.branchName,
     gugusDepan: member.gugusDepan,
     krida: member.krida,
@@ -505,37 +502,6 @@ export const DigitalMemberCard: React.FC<Props> = ({
 
   /*
    * =========================================================
-   * KETERANGAN KWARTIR
-   * =========================================================
-   * Anggota yang terdaftar langsung pada Kwartir Nasional
-   * tidak menampilkan keterangan Kwartir Cabang/Ranting.
-   * Anggota lainnya tetap mengikuti setting KTA.
-   */
-  const isNationalKwartirMember =
-    String((member as any).provinceId || '') === '00' ||
-    String((member as any).kwartirLevel || '').toUpperCase() === 'NASIONAL' ||
-    String((member as any).kwartirName || '').trim().toUpperCase() === 'KWARTIR NASIONAL';
-
-  const isHiddenForNationalKwartir = (field: KtaDataFieldConfig['field']) =>
-    isNationalKwartirMember &&
-    (field === 'regencyName' ||
-      field === 'districtName' ||
-      field === 'kwartirHierarchy');
-
-  const formatKwartirText = (field: KtaDataFieldConfig['field'], raw: string) => {
-    if (!raw) return raw;
-    if (field === 'kwartirName' || field === 'kwartirHierarchy') {
-      return raw.toUpperCase();
-    }
-    // provinceName is also used by legacy KTA settings for "Kwartir Nasional".
-    if (field === 'provinceName' && /^\s*kwartir\s+(nasional|daerah|cabang|ranting)\b/i.test(raw)) {
-      return raw.toUpperCase();
-    }
-    return raw;
-  };
-
-  /*
-   * =========================================================
    * RENDER DATA FIELD
    * =========================================================
    */
@@ -543,19 +509,16 @@ export const DigitalMemberCard: React.FC<Props> = ({
   const renderField = (
     f: KtaDataFieldConfig
   ) => {
-    if (isHiddenForNationalKwartir(f.field)) return null;
-
     const raw = valueOf(
       member,
       f.field
     );
 
-    const formattedRaw = formatKwartirText(f.field, raw);
     const text =
       f.textTransform ===
       'uppercase'
-        ? formattedRaw.toUpperCase()
-        : formattedRaw;
+        ? raw.toUpperCase()
+        : raw;
 
     const showLabel =
       f.showLabel === true;
@@ -1067,123 +1030,6 @@ export const DigitalMemberCard: React.FC<Props> = ({
               })()}
 
             {/* =================================================
-                BARCODE DEPAN
-            ================================================== */}
-
-            {(settings as any)
-              .showBarcodeFront !==
-              false && (
-              <div
-                className="absolute flex flex-col items-center gap-1"
-                style={{
-                  left: `${
-                    (settings as any)
-                      .barcodeFrontX ??
-                    4
-                  }%`,
-                  top: `${
-                    (settings as any)
-                      .barcodeFrontY ??
-                    77
-                  }%`,
-                  width: `${
-                    (settings as any)
-                      .barcodeFrontWidth ??
-                    32
-                  }%`,
-                  height: `${
-                    (settings as any)
-                      .barcodeFrontHeight ??
-                    9
-                  }%`
-                }}
-              >
-                <div className="bg-white rounded p-1 w-full h-full flex items-center justify-center overflow-hidden">
-                  <Barcode
-                    value={
-                      (settings as any)
-                        .barcodeFrontCustomValue?.trim() ||
-                      getMemberVerificationUrl(
-                        member
-                      )
-                    }
-                    width={Math.max(
-                      20,
-                      Math.round(
-                        widthPx *
-                          ((settings as any)
-                            .barcodeFrontWidth ??
-                            32) /
-                          100
-                      ) - 8
-                    )}
-                    height={Math.max(
-                      8,
-                      Math.round(
-                        heightPx *
-                          ((settings as any)
-                            .barcodeFrontHeight ??
-                            9) /
-                          100
-                      ) - 8
-                    )}
-                    barColor="#000"
-                    showText={
-                      (settings as any)
-                        .barcodeFrontShowText ===
-                      true
-                    }
-                  />
-                </div>
-
-                {(settings as any)
-                  .barcodeFrontCaption && (
-                  <div
-                    className="flex items-center gap-1"
-                    style={{
-                      fontSize: `${
-                        (settings as any)
-                          .barcodeFrontCaptionFontSize ??
-                        6
-                      }px`,
-                      fontWeight: weight(
-                        (settings as any)
-                          .barcodeFrontCaptionFontWeight ??
-                          'normal'
-                      ),
-                      color:
-                        (settings as any)
-                          .barcodeFrontCaptionColor ??
-                        '#ffffff',
-                      textAlign:
-                        (settings as any)
-                          .barcodeFrontCaptionAlign ??
-                        'center',
-                      lineHeight: Number(
-                        (settings as any)
-                          .barcodeFrontCaptionLineHeight ??
-                          1.1
-                      ),
-                      letterSpacing: `${
-                        (settings as any)
-                          .barcodeFrontCaptionLetterSpacing ??
-                        0
-                      }px`,
-                      width: `${
-                        (settings as any)
-                          .barcodeFrontCaptionWidth ??
-                        100
-                      }%`
-                    }}
-                  >
-                    {(settings as any)
-                      .barcodeFrontCaption}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* =================================================
                 DATA FIELD DEPAN
             ================================================== */}
 
@@ -1567,7 +1413,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
             </div>
 
             {/* =================================================
-                2. QR PENANDATANGAN
+                3. QR PENANDATANGAN
 
                 Tidak ada:
                 - badge
@@ -1620,7 +1466,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
                       Number(
                         (settings as any)
                           .signerQrY ??
-                        70
+                        68
                       )
                     )
                   );
@@ -1707,7 +1553,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
                   top: `${
                     (settings as any)
                       .signerY ??
-                    88
+                    82
                   }%`,
                   width: `${
                     (settings as any)

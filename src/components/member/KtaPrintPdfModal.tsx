@@ -19,6 +19,7 @@ import {
   CR80_WIDTH_MM,
   CR80_HEIGHT_MM,
   downloadKtaPdfFile,
+  generateKtaPdf,
   KtaPdfFormat
 } from '../../services/ktaPdfGenerator';
 import { DigitalMemberCard } from './DigitalMemberCard';
@@ -130,8 +131,32 @@ export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
     }
   };
 
-  const handleDirectPrint = () => {
-    window.print();
+  const handleDirectPrint = async () => {
+    if (isGenerating || isLoadingSettings) return;
+    setIsGenerating(true);
+    setProgressStep('Menyiapkan PDF KTA dengan ukuran fisik CR80...');
+    try {
+      const exportSettings: KtaCardSettings = JSON.parse(JSON.stringify(currentSettings));
+      const doc = await generateKtaPdf({ member, settings: exportSettings, format: 'CR80_STANDARD', onProgress: setProgressStep });
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!printWindow) {
+        URL.revokeObjectURL(url);
+        throw new Error('Jendela cetak diblokir browser. Izinkan pop-up untuk aplikasi ini lalu coba lagi.');
+      }
+      printWindow.addEventListener('load', () => {
+        printWindow.focus();
+        printWindow.print();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }, { once: true });
+    } catch (err) {
+      console.error('Error printing KTA:', err);
+      alert(err instanceof Error ? err.message : 'Terjadi kendala saat menyiapkan cetakan KTA.');
+    } finally {
+      setIsGenerating(false);
+      setProgressStep('');
+    }
   };
 
   return (
@@ -257,7 +282,7 @@ export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
                 <ul className="text-[11px] text-amber-800/90 space-y-1 list-disc list-inside">
                   <li>Saat mencetak PDF, pilih skala <strong>"Actual Size" / 100%</strong> (bukan Fit to Page).</li>
                   <li>Untuk hasil terbaik, gunakan kertas <em>PVC Card</em> atau <em>Photo Paper Glossy 230-260 gsm</em>.</li>
-                  <li>QR Code dan Barcode dirender dengan resolusi tinggi agar terbaca scanner.</li>
+                  <li>QR Code dirender dengan resolusi tinggi agar mudah dipindai dan membuka profil anggota.</li>
                 </ul>
               </div>
 
@@ -277,10 +302,10 @@ export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
         </div>
 
         <div className="p-5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-xs text-slate-500 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" /><span>Dokumen PDF dilengkapi QR Code Verifikasi Online & Barcode Resmi.</span></div>
+          <div className="text-xs text-slate-500 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" /><span>Dokumen PDF dilengkapi QR Code Verifikasi Online yang membuka profil anggota.</span></div>
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <button type="button" onClick={handleDirectPrint} disabled={isGenerating} className="flex-1 sm:flex-none px-4 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer">
-              <Printer className="w-3.5 h-3.5 text-slate-600" /><span>Cetak Cepat</span>
+              <Printer className="w-3.5 h-3.5 text-slate-600" /><span>Cetak KTA (CR80)</span>
             </button>
             <button type="button" onClick={() => handleDownloadPdf(selectedFormat)} disabled={isGenerating || isLoadingSettings} className="flex-1 sm:flex-none px-6 py-2.5 bg-purple-900 hover:bg-purple-950 active:bg-purple-900 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer">
               {isGenerating ? <><RotateCw className="w-4 h-4 animate-spin" /><span>Mengonversi PDF...</span></> : downloadSuccess ? <><CheckCircle2 className="w-4 h-4 text-emerald-400" /><span>Berhasil Diunduh!</span></> : <><FileDown className="w-4 h-4" /><span>Unduh PDF KTA ({selectedFormat === 'CR80_STANDARD' ? 'CR80' : 'Lembar A4'})</span></>}

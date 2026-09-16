@@ -30,8 +30,8 @@ export interface KtaQrCodeProps {
  */
 export function getMemberVerificationUrl(member: Member): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sakapariwisata-nasional.vercel.app';
-  const nta = member.nationalMemberNumber || member.id;
-  return `${origin}/verify?verifyId=${encodeURIComponent(member.verificationToken || member.id || nta)}`;
+  const verificationId = member.nationalMemberNumber || member.id || member.userId;
+  return `${origin}/verify?verifyId=${encodeURIComponent(String(verificationId || ''))}`;
 }
 
 export const KtaQrCode: React.FC<KtaQrCodeProps> = ({
