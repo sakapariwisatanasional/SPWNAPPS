@@ -221,15 +221,16 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         allProvinces.find(p => p.name.trim().toLowerCase() === (member.provinceName || '').trim().toLowerCase());
       const provinceId = savedProvince?.id || member.provinceId || '32';
 
-      const provinceRegencies = storage.getRegencies(provinceId);
+      const provinceIsNational = String(provinceId || '') === '00';
+      const provinceRegencies = provinceIsNational ? [] : storage.getRegencies(provinceId);
       const savedRegency = provinceRegencies.find(r => r.id === member.regencyId) ||
         provinceRegencies.find(r => r.name.trim().toLowerCase() === (member.regencyName || '').trim().toLowerCase());
-      const regencyId = savedRegency?.id || provinceRegencies[0]?.id || member.regencyId || '32.06';
+      const regencyId = provinceIsNational ? '' : (savedRegency?.id || provinceRegencies[0]?.id || member.regencyId || '32.06');
 
-      const regencyDistricts = storage.getDistricts(regencyId);
+      const regencyDistricts = regencyId ? storage.getDistricts(regencyId) : [];
       const savedDistrict = regencyDistricts.find(d => d.id === member.districtId) ||
         regencyDistricts.find(d => d.name.trim().toLowerCase() === (member.districtName || '').trim().toLowerCase());
-      const districtId = savedDistrict?.id || regencyDistricts[0]?.id || member.districtId || '';
+      const districtId = provinceIsNational ? '' : (savedDistrict?.id || regencyDistricts[0]?.id || member.districtId || '');
 
       setSelectedProvinceId(provinceId);
       setSelectedRegencyId(regencyId);
@@ -260,8 +261,11 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
   // Load Regencies when Province changes
   useEffect(() => {
-    if (!selectedProvinceId) {
+    if (!selectedProvinceId || selectedProvinceId === '00') {
       setRegencies([]);
+      setDistricts([]);
+      setSelectedRegencyId('');
+      setSelectedDistrictId('');
       return;
     }
 
@@ -271,6 +275,8 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
     // Kabupaten/Kota WAJIB berasal dari provinsi yang sedang dipilih.
     if (regs.length === 0) {
       setSelectedRegencyId('');
+      setSelectedDistrictId('');
+      setDistricts([]);
       return;
     }
 
@@ -281,7 +287,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
   // Load Districts when Regency changes
   useEffect(() => {
-    if (!selectedRegencyId) {
+    if (!selectedRegencyId || selectedProvinceId === '00') {
       setDistricts([]);
       setSelectedDistrictId('');
       return;
@@ -304,6 +310,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   if (!isOpen || !member) return null;
 
   const isNationalAdmin = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN_NATIONAL';
+  const isNationalKwartir = currentUser.role === 'SUPER_ADMIN' && selectedProvinceId === '00';
   const isRegencyOperator = currentUser.role === 'ADMIN_REGENCY';
   const isProvinceAdmin = currentUser.role === 'ADMIN_PROVINCE';
   const isBranchAdmin = currentUser.role === 'ADMIN_BRANCH';
@@ -323,11 +330,11 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       alert('Nomor KTA/NTA hanya dapat dibuat atau dikoreksi oleh Super Admin.');
       return;
     }
-    if (currentProvince && currentRegency && currentDistrict) {
+    if (currentProvince) {
       const newNta = storage.generateNationalMemberNumber(
-        currentProvince.code,
-        currentRegency.code,
-        currentDistrict.code
+        currentProvince.code || '00',
+        currentRegency?.code || '00',
+        currentDistrict?.code || '00'
       );
       setNationalMemberNumber(newNta);
     }
@@ -427,13 +434,24 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
     {
       const validProvince = storage.getProvinces().find(p => p.id === selectedProvinceId);
-      const validRegency = storage.getRegencies(selectedProvinceId).find(r => r.id === selectedRegencyId);
-      const validDistrict = storage.getDistricts(selectedRegencyId).find(d => d.id === selectedDistrictId);
-
-      if (!validProvince || !validRegency || validRegency.provinceId !== validProvince.id ||
-          !validDistrict || validDistrict.regencyId !== validRegency.id) {
-        alert('Struktur wilayah tidak valid. Provinsi, Kabupaten/Kota, dan Kecamatan harus berasal dari hierarki wilayah yang sama.');
+      if (!validProvince) {
+        alert('Provinsi/Kwartir tidak valid.');
         return;
+      }
+
+      if (selectedProvinceId === '00') {
+        if (currentUser.role !== 'SUPER_ADMIN') {
+          alert('Kwartir Nasional hanya dapat ditetapkan oleh Super Admin.');
+          return;
+        }
+      } else {
+        const validRegency = storage.getRegencies(selectedProvinceId).find(r => r.id === selectedRegencyId);
+        const validDistrict = storage.getDistricts(selectedRegencyId).find(d => d.id === selectedDistrictId);
+        if (!validRegency || validRegency.provinceId !== validProvince.id ||
+            !validDistrict || validDistrict.regencyId !== validRegency.id) {
+          alert('Struktur wilayah tidak valid. Provinsi, Kabupaten/Kota, dan Kecamatan harus berasal dari hierarki wilayah yang sama.');
+          return;
+        }
       }
       if (isSelfEditor && selectedProvinceId === '00') {
         alert('Kwartir Nasional tidak dapat dipilih atau diubah oleh anggota.');
@@ -446,11 +464,11 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
     try {
       // Determine final NTA
       let finalNta = currentUser.role === 'SUPER_ADMIN' ? nationalMemberNumber : (member.nationalMemberNumber || '');
-      if (currentUser.role === 'SUPER_ADMIN' && autoRegenerateNta && currentProvince && currentRegency && currentDistrict) {
+      if (currentUser.role === 'SUPER_ADMIN' && autoRegenerateNta && currentProvince) {
         finalNta = storage.generateNationalMemberNumber(
-          currentProvince.code,
-          currentRegency.code,
-          currentDistrict.code
+          currentProvince.code || '00',
+          currentRegency?.code || '00',
+          currentDistrict?.code || '00'
         );
       }
 
@@ -479,11 +497,11 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             email: email.trim(),
             address: address.trim(),
             provinceId: selectedProvinceId,
-            provinceName: currentProvince?.name || member.provinceName,
-            regencyId: selectedRegencyId,
-            regencyName: currentRegency?.name || member.regencyName,
-            districtId: selectedDistrictId,
-            districtName: currentDistrict?.name || member.districtName,
+            provinceName: currentProvince?.name || (selectedProvinceId === '00' ? 'Kwartir Nasional' : member.provinceName),
+            regencyId: isNationalKwartir ? '' : selectedRegencyId,
+            regencyName: isNationalKwartir ? '' : (currentRegency?.name || member.regencyName),
+            districtId: isNationalKwartir ? '' : selectedDistrictId,
+            districtName: isNationalKwartir ? '' : (currentDistrict?.name || member.districtName),
             krida,
             currentPosition: currentPosition.trim() || 'Anggota',
             ktaInterest,
@@ -511,11 +529,11 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             email: email.trim(),
             address: address.trim(),
             provinceId: selectedProvinceId,
-            provinceName: currentProvince?.name || member.provinceName,
-            regencyId: selectedRegencyId,
-            regencyName: currentRegency?.name || member.regencyName,
-            districtId: selectedDistrictId,
-            districtName: currentDistrict?.name || member.districtName,
+            provinceName: currentProvince?.name || (selectedProvinceId === '00' ? 'Kwartir Nasional' : member.provinceName),
+            regencyId: isNationalKwartir ? '' : selectedRegencyId,
+            regencyName: isNationalKwartir ? '' : (currentRegency?.name || member.regencyName),
+            districtId: isNationalKwartir ? '' : selectedDistrictId,
+            districtName: isNationalKwartir ? '' : (currentDistrict?.name || member.districtName),
             krida,
             currentPosition: currentPosition.trim() || 'Anggota',
             ktaInterest,
@@ -1083,7 +1101,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                 <div className="bg-purple-50 border border-purple-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-purple-900">
                   <MapPin className="w-4 h-4 text-purple-700 flex-shrink-0 mt-0.5" />
                   <p className="text-[11px] leading-relaxed">
-                    Perubahan domisili akan memindahkan keanggotaan ke Kwartir baru dan secara otomatis tercatat dalam <strong>Riwayat Mutasi / Lokasi Anggota</strong>.
+                    Perubahan domisili akan memindahkan keanggotaan ke Kwartir baru dan secara otomatis tercatat dalam <strong>Riwayat Mutasi / Lokasi Anggota</strong>. Super Admin juga dapat menetapkan <strong>Kwartir Nasional</strong> tanpa Kabupaten/Kota dan Kecamatan.
                   </p>
                 </div>
               )}
@@ -1155,7 +1173,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                       }`}
                     >
                       {provinces
-                        .filter(p => p.id !== '00' || selectedProvinceId === '00')
+                        .filter(p => currentUser.role === 'SUPER_ADMIN' || p.id !== '00')
                         .map((p) => (
                         <option key={p.id} value={p.id} disabled={isSelfEditor && p.id === '00'}>
                           {p.code} - {p.name}{p.id === '00' ? ' (Terkunci)' : ''}
@@ -1169,7 +1187,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                       Kwartir Cabang (Kabupaten / Kota) {isRegencyOperator && <span className="text-amber-700 text-[10px]">(Khusus Wilayah Anda)</span>}
                     </label>
                     <select
-                      disabled={isRegencyOperator || isBranchAdmin || (isSelfEditor && selectedProvinceId === '00')}
+                      disabled={isRegencyOperator || isBranchAdmin || isNationalKwartir || (isSelfEditor && selectedProvinceId === '00')}
                       value={selectedRegencyId}
                       onChange={(e) => setSelectedRegencyId(e.target.value)}
                       className={`w-full px-3.5 py-2 border rounded-xl outline-none ${
@@ -1178,6 +1196,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                           : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800'
                       }`}
                     >
+                      {isNationalKwartir && <option value="">Tidak berlaku untuk Kwartir Nasional</option>}
                       {regencies.map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.name} ({r.code})
@@ -1189,11 +1208,12 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                   <div>
                     <label className="block font-bold text-slate-800 mb-1">Kecamatan (Distrik / Kwarran)</label>
                     <select
-                      disabled={isSelfEditor && selectedProvinceId === '00'}
+                      disabled={isNationalKwartir || (isSelfEditor && selectedProvinceId === '00')}
                       value={selectedDistrictId}
                       onChange={(e) => setSelectedDistrictId(e.target.value)}
                       className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800"
                     >
+                      {isNationalKwartir && <option value="">Tidak berlaku untuk Kwartir Nasional</option>}
                       {districts.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name} ({d.code})
