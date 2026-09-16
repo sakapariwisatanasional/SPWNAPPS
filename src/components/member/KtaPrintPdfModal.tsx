@@ -47,8 +47,8 @@ interface KtaPrintPdfModalProps {
  * └───────────────────────┘
  *
  * The preview and PDF therefore receive the SAME settings object.
- * The PDF generator does not capture the preview DOM and does not read
- * a second/stale settings source during export.
+ * The PDF generator captures these dedicated card-only DOM instances and
+ * does not read a second/stale settings source during export.
  */
 export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
   isOpen,
@@ -324,26 +324,26 @@ export const KtaPrintPdfModal: React.FC<KtaPrintPdfModalProps> = ({
 
           <div
             aria-hidden="true"
-            style={{ position: 'fixed', left: '-1100px', top: 0, width: '1012px', pointerEvents: 'none', zIndex: -1 }}
+            style={{ position: 'fixed', left: '-1100px', top: 0, width: '380px', pointerEvents: 'none', zIndex: -1 }}
           >
-            <div ref={frontCaptureHostRef} style={{ width: '1012px' }}>
+            <div ref={frontCaptureHostRef} style={{ width: '380px' }}>
               <DigitalMemberCard
                 key={`capture-front-${member.id}-${JSON.stringify(currentSettings)}`}
                 member={member}
                 previewSettings={currentSettings}
                 showControls={false}
-                renderWidthPx={1012}
+                renderWidthPx={380}
                 initialSide="front"
                 printCapture
               />
             </div>
-            <div ref={backCaptureHostRef} style={{ width: '1012px', marginTop: 20 }}>
+            <div ref={backCaptureHostRef} style={{ width: '380px', marginTop: 20 }}>
               <DigitalMemberCard
                 key={`capture-back-${member.id}-${JSON.stringify(currentSettings)}`}
                 member={member}
                 previewSettings={currentSettings}
                 showControls={false}
-                renderWidthPx={1012}
+                renderWidthPx={380}
                 initialSide="back"
                 printCapture
               />
