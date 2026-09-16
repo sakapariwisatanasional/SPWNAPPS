@@ -2,7 +2,6 @@ import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 import { Member, KtaCardSettings } from '../types';
 import { DEFAULT_KTA_SETTINGS } from './storage';
-import { getMemberVerificationUrl } from '../components/member/KtaQrCode';
 import {
   SAKA_LOGO_URL,
   SAKA_LOGO_DRIVE_DIRECT_URL,
@@ -244,62 +243,6 @@ function transformedText(text: string, cfg: any): string {
   return text;
 }
 
-function measureSpacedText(ctx: CanvasRenderingContext2D, text: string, letterSpacing: number): number {
-  if (!text) return 0;
-  const base = ctx.measureText(text).width;
-  return base + Math.max(0, text.length - 1) * letterSpacing;
-}
-
-function drawSpacedText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  letterSpacing: number,
-  align: CanvasTextAlign,
-  maxWidth?: number
-) {
-  if (!text) return;
-  if (!letterSpacing) {
-    ctx.fillText(text, x, y, maxWidth);
-    return;
-  }
-
-  const chars = Array.from(text);
-  const total = measureSpacedText(ctx, text, letterSpacing);
-  let cursor = x;
-  if (align === 'center') cursor = x - total / 2;
-  else if (align === 'right') cursor = x - total;
-
-  chars.forEach(ch => {
-    ctx.fillText(ch, cursor, y);
-    cursor += ctx.measureText(ch).width + letterSpacing;
-  });
-}
-
-function wrapTextByWidth(ctx: CanvasRenderingContext2D, text: string, width: number, letterSpacing: number): string[] {
-  const result: string[] = [];
-  for (const paragraph of String(text).split(/\n/)) {
-    const words = paragraph.split(/\s+/).filter(Boolean);
-    if (!words.length) {
-      result.push('');
-      continue;
-    }
-    let line = '';
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (line && measureSpacedText(ctx, candidate, letterSpacing) > width) {
-        result.push(line);
-        line = word;
-      } else {
-        line = candidate;
-      }
-    }
-    if (line) result.push(line);
-  }
-  return result;
-}
-
 function drawText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -307,37 +250,61 @@ function drawText(
   fallbackColor: string,
   options: { uppercase?: boolean } = {}
 ) {
-  if (!text) return;
+  if (!text) return 0;
 
   const x = pctX(cfg.x);
   const y = pctY(cfg.y);
   const width = pctW(cfg.width ?? 90);
   const size = Math.max(4, Number(cfg.fontSize ?? 8) * PX_SCALE);
   const lineHeight = Number(cfg.lineHeight ?? 1.2) * size;
-  const align = (cfg.align || 'left') as CanvasTextAlign;
-  const value = transformedText(options.uppercase ? text.toUpperCase() : text, cfg);
-  const letterSpacing = Number(cfg.letterSpacing ?? 0) * PX_SCALE;
-  const shouldWrap = cfg.whiteSpace === 'normal' || cfg.wrap === true;
+  const align = cfg.align || 'left';
+  const value = transformedText(
+    options.uppercase ? text.toUpperCase() : text,
+    cfg
+  );
 
   ctx.save();
   ctx.fillStyle = cfg.color || fallbackColor;
   ctx.font = `${fontWeight(cfg.fontWeight)} ${size}px Arial, sans-serif`;
+  const letterSpacing = Number(cfg.letterSpacing ?? 0) * PX_SCALE;
+  void letterSpacing;
   ctx.textAlign = align;
   ctx.textBaseline = 'top';
   ctx.globalAlpha = Number(cfg.opacity ?? 1);
 
-  const lines = shouldWrap ? wrapTextByWidth(ctx, value, width, letterSpacing) : [value];
-  const anchorX = align === 'center' ? x + width / 2 : align === 'right' ? x + width : x;
+  // Designer data fields are nowrap by default. Explicitly configured
+  // multiline text is wrapped to the configured width.
+  const shouldWrap = cfg.whiteSpace === 'normal' || cfg.wrap === true;
+  const lines: string[] = [];
 
-  // Match the preview's overflow-hidden container for nowrap text.
-  ctx.beginPath();
-  ctx.rect(x, y, width, Math.max(lineHeight, lines.length * lineHeight + 2));
-  ctx.clip();
+  if (!shouldWrap) {
+    lines.push(value);
+  } else {
+    for (const paragraph of String(value).split(/\n/)) {
+      const words = paragraph.split(/\s+/).filter(Boolean);
+      if (!words.length) {
+        lines.push('');
+        continue;
+      }
+      let line = '';
+      for (const word of words) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (line && ctx.measureText(candidate).width > width) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = candidate;
+        }
+      }
+      if (line) lines.push(line);
+    }
+  }
 
   lines.forEach((line, index) => {
-    drawSpacedText(ctx, line, anchorX, y + index * lineHeight, letterSpacing, align);
+    ctx.fillText(line, x, y + index * lineHeight, width);
   });
   ctx.restore();
+  return lines.length;
 }
 
 function drawDataFields(
@@ -378,19 +345,19 @@ function drawBackground(
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   if (image?.naturalWidth) {
+    ctx.save();
     drawCoverImage(ctx, image, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    // This is the linear-gradient overlay used by DigitalMemberCard.bgStyle().
+    // Same dark overlay used by DigitalMemberCard.bgStyle().
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.restore();
   }
 
-  // DigitalMemberCard adds the configurable bgOpacity overlay on FRONT only.
-  if (side === 'FRONT') {
-    const opacity = Math.max(0, Math.min(1, Number(settings.bgOpacity ?? 0.1)));
-    if (opacity > 0) {
-      ctx.fillStyle = `rgba(0,0,0,${opacity * 0.1})`;
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    }
+  // DigitalMemberCard has a second configurable black overlay.
+  const opacity = Math.max(0, Math.min(1, Number(settings.bgOpacity ?? 0.1)));
+  if (opacity > 0) {
+    ctx.fillStyle = `rgba(0,0,0,${0.1 * opacity})`;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
 }
 
@@ -475,7 +442,7 @@ async function renderFront(
   canvas.height = CANVAS_HEIGHT;
   const ctx = canvas.getContext('2d')!;
 
-  const radius = Math.max(8, Number(settings.cornerRadiusMm || CR80_CORNER_RADIUS_MM) * PX_SCALE);
+  const radius = Number(settings.cornerRadiusMm || CR80_CORNER_RADIUS_MM) * CANVAS_WIDTH / Number(settings.widthMm || CR80_WIDTH_MM);
   ctx.save();
   roundedRect(ctx, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, radius);
   ctx.clip();
@@ -566,7 +533,6 @@ async function renderFront(
     );
   }
 
-
   drawDataFields(ctx, member, settings, 'FRONT', '#e9d5ff');
 
   drawText(ctx, settings.frontValidityText || '', {
@@ -605,7 +571,7 @@ async function renderBack(
   canvas.height = CANVAS_HEIGHT;
   const ctx = canvas.getContext('2d')!;
 
-  const radius = Math.max(8, Number(settings.cornerRadiusMm || CR80_CORNER_RADIUS_MM) * PX_SCALE);
+  const radius = Number(settings.cornerRadiusMm || CR80_CORNER_RADIUS_MM) * CANVAS_WIDTH / Number(settings.widthMm || CR80_WIDTH_MM);
   ctx.save();
   roundedRect(ctx, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, radius);
   ctx.clip();
@@ -666,24 +632,11 @@ async function renderBack(
   };
 
   let termY = Number(termsCfg.y);
-  ctx.save();
-  ctx.font = `${fontWeight(termsCfg.fontWeight)} ${Math.max(4, Number(termsCfg.fontSize) * PX_SCALE)}px Arial, sans-serif`;
-  const termsLetterSpacing = Number(termsCfg.letterSpacing ?? 0) * PX_SCALE;
-  const termsWidthPx = pctW(termsCfg.width);
-  const termsLineHeightPx = Number(termsCfg.lineHeight) * Math.max(4, Number(termsCfg.fontSize) * PX_SCALE);
-  ctx.restore();
-
   terms.forEach((term, index) => {
-    const numbered = `${index + 1}. ${term}`;
-    const lines = (() => {
-      ctx.save();
-      ctx.font = `${fontWeight(termsCfg.fontWeight)} ${Math.max(4, Number(termsCfg.fontSize) * PX_SCALE)}px Arial, sans-serif`;
-      const wrapped = wrapTextByWidth(ctx, numbered, termsWidthPx, termsLetterSpacing);
-      ctx.restore();
-      return wrapped;
-    })();
-    drawText(ctx, numbered, { ...termsCfg, y: termY }, '#ffffff');
-    termY += lines.length * termsLineHeightPx / PX_SCALE + 1.5;
+    const lineCount = drawText(ctx, `${index + 1}. ${term}`, { ...termsCfg, y: termY }, '#ffffff');
+    const lineHeightPx = Number(termsCfg.fontSize) * PX_SCALE * Number(termsCfg.lineHeight);
+    const lineHeightPercent = (lineHeightPx / CANVAS_HEIGHT) * 100;
+    termY += Math.max(3.8, lineCount * lineHeightPercent + 1.2);
   });
 
   drawDataFields(ctx, member, settings, 'BACK', '#e2e8f0');
@@ -711,7 +664,7 @@ async function renderBack(
       ctx,
       signerQrImg,
       Math.max(0, Math.min(100 - Number((settings as any).signerQrSize ?? 18), Number((settings as any).signerQrX ?? 68))),
-      Math.max(0, Math.min(100 - Number((settings as any).signerQrSize ?? 18), Number((settings as any).signerQrY ?? 70))),
+      Math.max(0, Math.min(100 - Number((settings as any).signerQrSize ?? 18), Number((settings as any).signerQrY ?? 68))),
       Math.max(8, Math.min(35, Number((settings as any).signerQrSize ?? 18))),
       Number((settings as any).signerQrPadding ?? 2),
       String((settings as any).signerQrBackgroundColor || '#ffffff'),
@@ -723,7 +676,7 @@ async function renderBack(
 
   if (signer) {
     const sx = (settings as any).signerX ?? 5;
-    const sy = (settings as any).signerY ?? 88;
+    const sy = (settings as any).signerY ?? 82;
     const sw = (settings as any).signerWidth ?? 55;
     const base = {
       x: sx,
@@ -735,14 +688,14 @@ async function renderBack(
       whiteSpace: 'normal'
     };
 
-    drawText(ctx, String((settings as any).signerName || signer.fullName), {
+    drawText(ctx, signer.fullName, {
       ...base,
       y: sy + ((settings as any).signerNameYOffset ?? 0),
       fontSize: (settings as any).signerNameFontSize ?? 9,
       fontWeight: 'bold'
     }, '#ffffff');
 
-    drawText(ctx, String((settings as any).signerTitle || signer.currentPosition || ''), {
+    drawText(ctx, signer.currentPosition || '', {
       ...base,
       y: sy + 10,
       fontSize: (settings as any).signerTitleFontSize ?? 7,
@@ -750,7 +703,7 @@ async function renderBack(
     }, '#ffffff');
   } else if ((settings as any).signerName || (settings as any).signerTitle) {
     const sx = (settings as any).signerX ?? 5;
-    const sy = (settings as any).signerY ?? 88;
+    const sy = (settings as any).signerY ?? 82;
     drawText(ctx, String((settings as any).signerName || ''), {
       x: sx, y: sy, width: (settings as any).signerWidth ?? 55,
       fontSize: (settings as any).signerNameFontSize ?? 9,
@@ -764,7 +717,6 @@ async function renderBack(
       align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
     }, '#ffffff');
   }
-
 
   ctx.restore();
   return canvas;
@@ -788,13 +740,8 @@ export async function generateKtaPdf({
 
   onProgress?.('Mempersiapkan KtaCardSettings dari sumber pusat...');
 
-  const nta = String(member.nationalMemberNumber || member.verificationToken || '').trim();
-  const memberId = String(member.id || member.userId || '').trim();
-  const verificationParams = new URLSearchParams();
-  if (nta) verificationParams.set('verifyId', nta);
-  if (memberId) verificationParams.set('memberId', memberId);
-  verificationParams.set('tab', 'verify-portal');
-  const verificationUrl = `${window.location.origin}/verify?${verificationParams.toString()}`;
+  const verificationId = String(member.nationalMemberNumber || member.id || member.userId || '').trim();
+  const verificationUrl = `${window.location.origin}/verify?verifyId=${encodeURIComponent(verificationId)}`;
 
   onProgress?.('Memuat foto, logo, background dan aset desain...');
 

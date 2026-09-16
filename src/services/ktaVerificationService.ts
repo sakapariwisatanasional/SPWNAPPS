@@ -55,7 +55,7 @@ function identifierMatches(a: unknown, b: unknown): boolean {
 }
 
 /**
- * Pembersih dan penormalisasi kueri NTA/Barcode/QR/URL.
+ * Pembersih dan penormalisasi kueri NTA/QR/URL.
  */
 export function normalizeNtaQuery(rawInput: string): {
   cleanQuery: string;
