@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { X, ArrowRightLeft, MapPin, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { Member, Province, Regency, District, CurrentUser } from '../../types';
 import { storage } from '../../services/storage';
+import { spreadsheetService } from '../../services/spreadsheetService';
 
 interface MemberTransferModalProps {
+  isOpen: boolean;
   member: Member | null;
   currentUser: CurrentUser;
   onClose: () => void;
@@ -11,6 +13,7 @@ interface MemberTransferModalProps {
 }
 
 export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
+  isOpen,
   member,
   currentUser,
   onClose,
@@ -22,57 +25,162 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
 
   const [targetProvinceId, setTargetProvinceId] = useState('32');
   const [targetRegencyId, setTargetRegencyId] = useState('32.01');
-  const [targetDistrictId, setTargetDistrictId] = useState('32.01.24');
+  const [targetDistrictId, setTargetDistrictId] = useState('32.01.240');
   const [reason, setReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    setProvinces(storage.getProvinces());
-  }, []);
+    if (!isOpen) return;
+    const all = storage.getProvinces();
+    setProvinces(all);
+    setReason('');
+    setIsSubmitting(false);
+    if (member) {
+      setTargetProvinceId(member.provinceId || '32');
+      setTargetRegencyId(member.regencyId || '');
+      setTargetDistrictId(member.districtId || '');
+    }
+  }, [isOpen, member?.id]);
 
   useEffect(() => {
-    if (targetProvinceId) {
-      const regs = storage.getRegencies(targetProvinceId);
-      setRegencies(regs);
-      if (regs.length > 0) setTargetRegencyId(regs[0].id);
+    if (!targetProvinceId || targetProvinceId === '00') {
+      setRegencies([]);
+      setDistricts([]);
+      setTargetRegencyId('');
+      setTargetDistrictId('');
+      return;
+    }
+    const regs = storage.getRegencies(targetProvinceId);
+    setRegencies(regs);
+    if (!regs.some(r => r.id === targetRegencyId)) {
+      setTargetRegencyId(regs[0]?.id || '');
     }
   }, [targetProvinceId]);
 
   useEffect(() => {
-    if (targetRegencyId) {
-      const dists = storage.getDistricts(targetRegencyId);
-      setDistricts(dists);
-      if (dists.length > 0) setTargetDistrictId(dists[0].id);
+    if (!targetRegencyId || targetProvinceId === '00') {
+      setDistricts([]);
+      setTargetDistrictId('');
+      return;
     }
-  }, [targetRegencyId]);
+    const dists = storage.getDistricts(targetRegencyId);
+    setDistricts(dists);
+    if (!dists.some(d => d.id === targetDistrictId)) {
+      setTargetDistrictId(dists[0]?.id || '');
+    }
+  }, [targetRegencyId, targetProvinceId]);
 
 
 
-  if (!member) return null;
+  if (!isOpen || !member) return null;
 
-  const handleTransfer = (e: React.FormEvent) => {
+  const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!member || isSubmitting) return;
+
     if (!reason.trim()) {
       alert('Harap tuliskan alasan perpindahan wilayah / mutasi keanggotaan.');
       return;
     }
 
     const p = provinces.find(x => x.id === targetProvinceId);
-    const r = regencies.find(x => x.id === targetRegencyId);
-    const d = districts.find(x => x.id === targetDistrictId);
+    if (!p) {
+      alert('Kwartir/Provinsi tujuan tidak valid.');
+      return;
+    }
 
+    const isNationalTarget = targetProvinceId === '00';
+    const r = isNationalTarget ? null : regencies.find(x => x.id === targetRegencyId);
+    const d = isNationalTarget ? null : districts.find(x => x.id === targetDistrictId);
 
-    if (p && r && d) {
-      storage.transferMemberLocation(
-        member.id,
-        d,
-        r,
-        p,
-        reason,
-        `${currentUser.name} (${currentUser.role})`
+    if (!isNationalTarget && (!r || !d)) {
+      alert('Kabupaten/Kota dan Kecamatan tujuan wajib dipilih.');
+      return;
+    }
+
+    // Regional admin tidak boleh memindahkan anggota keluar dari yurisdiksinya.
+    if (currentUser.role === 'ADMIN_PROVINCE' && currentUser.jurisdictionId && p.id !== currentUser.jurisdictionId) {
+      alert('Akses ditolak: Admin Provinsi hanya dapat memindahkan anggota di dalam provinsinya.');
+      return;
+    }
+    if (currentUser.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId && (!r || r.id !== currentUser.jurisdictionId)) {
+      alert('Akses ditolak: Admin Kabupaten/Kota hanya dapat memindahkan anggota di dalam Kwartir Cabangnya.');
+      return;
+    }
+    if (currentUser.role === 'ADMIN_BRANCH' && currentUser.jurisdictionId && (!d || d.id !== currentUser.jurisdictionId)) {
+      alert('Akses ditolak: Admin Ranting hanya dapat memindahkan anggota di dalam Kwartir Rantingnya.');
+      return;
+    }
+    if (isNationalTarget && currentUser.role !== 'SUPER_ADMIN') {
+      alert('Kwartir Nasional hanya dapat menjadi tujuan mutasi oleh Super Admin.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const newRegencyId = isNationalTarget ? '' : String(r?.id || '');
+      const newDistrictId = isNationalTarget ? '' : String(d?.id || '');
+      const newRegencyName = isNationalTarget ? '' : String(r?.name || '');
+      const newDistrictName = isNationalTarget ? '' : String(d?.name || '');
+      const newNta = storage.generateNationalMemberNumber(
+        p.code || p.id || '00',
+        isNationalTarget ? '00' : (r?.code || r?.id || '00'),
+        isNationalTarget ? '00' : (d?.code || d?.id || '00')
       );
-      alert(`Perpindahan wilayah untuk ${member.fullName} berhasil dicatat ke dalam audit trail & histori mutasi.`);
+
+      const history = {
+        id: `history-${Date.now()}-${member.id}`,
+        memberId: member.id,
+        prevDistrictName: member.districtName || (member.provinceName === 'Kwartir Nasional' ? 'Kwartir Nasional' : ''),
+        newDistrictName: newDistrictName || 'Kwartir Nasional',
+        prevMemberNumber: member.nationalMemberNumber || '',
+        newMemberNumber: newNta,
+        transferDate: new Date().toISOString(),
+        reason: reason.trim(),
+        authorizedByName: `${currentUser.name} (${currentUser.role})`
+      };
+
+      const updated = await storage.adminUpdateMember(
+        member.id,
+        {
+          provinceId: p.id,
+          provinceName: p.name,
+          regencyId: newRegencyId,
+          regencyName: newRegencyName,
+          districtId: newDistrictId,
+          districtName: newDistrictName,
+          nationalMemberNumber: newNta,
+          kwartirLevel: isNationalTarget ? 'NASIONAL' : (newDistrictId ? 'RANTING' : 'CABANG'),
+          kwartirName: isNationalTarget ? 'Kwartir Nasional' : (newDistrictName ? `Kwartir Ranting ${newDistrictName}` : `Kwartir Cabang ${newRegencyName}`),
+          kwartirHierarchy: isNationalTarget ? 'Kwartir Nasional' : [
+            p.name ? `Kwarda ${p.name}` : '',
+            newRegencyName ? `Kwarcab ${newRegencyName}` : '',
+            newDistrictName ? `Kwarran ${newDistrictName}` : ''
+          ].filter(Boolean).join(' • '),
+          locationHistory: [
+            ...(member.locationHistory || []),
+            history
+          ]
+        },
+        currentUser,
+        `MUTASI: ${member.provinceName || ''} / ${member.regencyName || ''} / ${member.districtName || ''} → ${p.name}${newRegencyName ? ` / ${newRegencyName}` : ''}${newDistrictName ? ` / ${newDistrictName}` : ''}. ${reason.trim()}`
+      );
+
+      if (!updated) throw new Error('Data anggota tidak ditemukan pada database aktif.');
+
+      const syncResult = await spreadsheetService.saveMemberAndWaitForSync(updated);
+      if (!syncResult.success || !syncResult.synced) {
+        throw new Error(syncResult.message || 'Perubahan belum terverifikasi di Google Spreadsheet.');
+      }
+
+      alert(`Mutasi ${member.fullName} berhasil disimpan dan diverifikasi di Google Spreadsheet${syncResult.row ? ` (baris ${syncResult.row})` : ''}. Nomor anggota baru: ${newNta}`);
       onSuccess();
       onClose();
+    } catch (error: any) {
+      console.error('[MemberTransferModal] Mutasi gagal:', error);
+      alert(`Mutasi gagal disimpan: ${error?.message || 'Kesalahan tidak diketahui.'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -123,7 +231,9 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none"
                 >
                   {provinces.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.id === '00' ? 'Kwartir Nasional' : p.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -135,6 +245,7 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
                   onChange={(e) => setTargetRegencyId(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none"
                 >
+                  {targetProvinceId === '00' && <option value="">Tidak berlaku untuk Kwartir Nasional</option>}
                   {regencies.map(r => (
                     <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
@@ -148,6 +259,7 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
                   onChange={(e) => setTargetDistrictId(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none"
                 >
+                  {targetProvinceId === '00' && <option value="">Tidak berlaku untuk Kwartir Nasional</option>}
                   {districts.map(d => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
@@ -184,9 +296,10 @@ export const MemberTransferModal: React.FC<MemberTransferModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md transition-colors"
+              disabled={isSubmitting}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-wait text-white font-bold rounded-xl shadow-md transition-colors"
             >
-              Proses Mutasi
+              {isSubmitting ? 'Menyimpan Mutasi...' : 'Proses Mutasi'}
             </button>
           </div>
         </form>
