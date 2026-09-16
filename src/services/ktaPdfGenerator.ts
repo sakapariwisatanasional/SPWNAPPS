@@ -99,41 +99,116 @@ function oklchToRgbString(input: string): string {
     : `rgba(${r}, ${g}, ${blue}, ${aClamped})`;
 }
 
-function replaceUnsupportedCssColors(value: string): string {
-  if (!value || !/oklch\(/i.test(value)) return value;
-  // Match each oklch() token independently. The generated Tailwind values
-  // use the standard 3-channel form, with an optional alpha channel.
-  return value.replace(/oklch\(\s*[^\)]*\)/gi, token => oklchToRgbString(token));
+function cssColorFunctionToRgb(cloneDocument: Document, token: string): string {
+  const trimmed = token.trim();
+  if (!trimmed) return token;
+
+  try {
+    const win = cloneDocument.defaultView;
+    if (!win || !cloneDocument.body) return token;
+
+    const probe = cloneDocument.createElement('span');
+    probe.style.color = trimmed;
+    cloneDocument.body.appendChild(probe);
+    const computed = win.getComputedStyle(probe).color;
+    probe.remove();
+
+    // Browser-computed colors are returned as rgb()/rgba(), which html2canvas
+    // can parse even when the original CSS used OKLab/OKLCH/Lab/LCH/color().
+    if (computed && !/^(?:oklab|oklch|lab|lch|color)\(/i.test(computed)) {
+      return computed;
+    }
+  } catch {
+    // Keep the original token if the browser cannot normalize it.
+  }
+
+  return token;
+}
+
+function replaceUnsupportedCssColors(value: string, cloneDocument: Document): string {
+  if (!value) return value;
+
+  // html2canvas 1.4.x does not understand several CSS Color 4 functions.
+  // Let the browser convert each token to a legacy rgb()/rgba() value.
+  const pattern = /(?:oklch|oklab|lch|lab|color)\([^)]*\)/gi;
+  return value.replace(pattern, token => cssColorFunctionToRgb(cloneDocument, token));
 }
 
 function sanitizeHtml2CanvasClone(cloneDocument: Document): void {
+  // First sanitize inline <style> blocks. html2canvas parses stylesheet rules
+  // before/while computing element styles, so fixing only computed properties
+  // is not sufficient: the original Tailwind CSS can still contain oklab().
+  const styleNodes = Array.from(cloneDocument.querySelectorAll('style'));
+  for (const styleNode of styleNodes) {
+    const css = styleNode.textContent || '';
+    const safeCss = replaceUnsupportedCssColors(css, cloneDocument);
+    if (safeCss !== css) styleNode.textContent = safeCss;
+  }
+
+  // Also sanitize same-origin linked stylesheets. Some Vite/Tailwind builds
+  // place generated CSS in <link> elements instead of inline <style> blocks.
+  const sanitizeRules = (rules: CSSRuleList) => {
+    for (let i = 0; i < rules.length; i += 1) {
+      const rule = rules.item(i) as CSSStyleRule & { cssRules?: CSSRuleList };
+      if (!rule) continue;
+
+      try {
+        if ((rule as CSSStyleRule).style) {
+          const cssText = (rule as CSSStyleRule).style.cssText || '';
+          const safeCssText = replaceUnsupportedCssColors(cssText, cloneDocument);
+          if (safeCssText !== cssText) {
+            (rule as CSSStyleRule).style.cssText = safeCssText;
+          }
+        }
+      } catch {
+        // Ignore cross-origin or read-only stylesheet rules.
+      }
+
+      try {
+        if (rule.cssRules) sanitizeRules(rule.cssRules);
+      } catch {
+        // Ignore inaccessible nested rules.
+      }
+    }
+  };
+
+  for (const sheet of Array.from(cloneDocument.styleSheets)) {
+    try {
+      if (sheet.cssRules) sanitizeRules(sheet.cssRules);
+    } catch {
+      // Cross-origin stylesheets cannot be inspected; inline computed-style
+      // sanitization below still protects the cloned elements we can inspect.
+    }
+  }
+
   const elements = Array.from(cloneDocument.querySelectorAll<HTMLElement>('*'));
 
   for (const element of elements) {
     const computed = cloneDocument.defaultView?.getComputedStyle(element);
     if (!computed) continue;
 
-    // Only copy declarations that contain oklch(). We deliberately avoid
-    // copying every computed property so the clone keeps its original layout.
+    // Copy only declarations that contain unsupported CSS Color 4 functions.
+    // This preserves the original layout while giving html2canvas parseable
+    // colors on the cloned DOM.
     for (let i = 0; i < computed.length; i += 1) {
       const property = computed.item(i);
       const value = computed.getPropertyValue(property);
-      if (!/oklch\(/i.test(value)) continue;
+      if (!/(?:oklch|oklab|lch|lab|color)\(/i.test(value)) continue;
 
-      const safeValue = replaceUnsupportedCssColors(value);
+      const safeValue = replaceUnsupportedCssColors(value, cloneDocument);
       if (safeValue !== value) {
         element.style.setProperty(property, safeValue, 'important');
       }
     }
 
-    // CSS custom properties can also contain oklch() and may be consumed by
+    // CSS custom properties can contain unsupported colors and be consumed by
     // another declaration during html2canvas parsing.
     for (let i = 0; i < computed.length; i += 1) {
       const property = computed.item(i);
       if (!property.startsWith('--')) continue;
       const value = computed.getPropertyValue(property);
-      if (/oklch\(/i.test(value)) {
-        element.style.setProperty(property, replaceUnsupportedCssColors(value));
+      if (/(?:oklch|oklab|lch|lab|color)\(/i.test(value)) {
+        element.style.setProperty(property, replaceUnsupportedCssColors(value, cloneDocument));
       }
     }
   }
