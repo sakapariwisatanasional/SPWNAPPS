@@ -154,46 +154,79 @@ function replaceUnsupportedCssColors(value: string, cloneDocument: Document): st
 }
 
 function sanitizeHtml2CanvasClone(cloneDocument: Document): void {
-  // Keep this callback deliberately lightweight. html2canvas already clones
-  // the entire application document; scanning every element and every computed
-  // CSS declaration here can freeze the browser on a large React/Tailwind app.
-  // We only sanitize stylesheet text plus the actual KTA capture subtree.
+  /**
+   * html2canvas parses CSSStyleSheet rules itself. Tailwind v4 can leave
+   * oklch() in the generated stylesheet even when the visible KTA subtree
+   * does not directly use that color. Rewriting only matching CSS rules in
+   * the clone prevents html2canvas from ever seeing the unsupported token.
+   *
+   * IMPORTANT: do not call getComputedStyle() for every node here. On the
+   * full React application that is unnecessarily expensive and was the
+   * source of the previous "Page Unresponsive" behaviour.
+   */
+  const unsupported = /(?:oklch|oklab|lch|lab|color)\(/i;
 
+  const rewriteCssText = (cssText: string): string =>
+    replaceUnsupportedCssColors(cssText, cloneDocument);
+
+  const rewriteRuleContainer = (container: any): void => {
+    const rules: CSSRuleList | undefined = container?.cssRules;
+    if (!rules) return;
+
+    // Work backwards so deleting/reinserting a rule does not change the
+    // indexes of rules that have not been visited yet.
+    for (let i = rules.length - 1; i >= 0; i -= 1) {
+      const rule = rules.item(i);
+      if (!rule) continue;
+
+      const cssText = rule.cssText || '';
+      if (!unsupported.test(cssText)) continue;
+
+      const safeCssText = rewriteCssText(cssText);
+      if (safeCssText === cssText) continue;
+
+      try {
+        container.deleteRule(i);
+        container.insertRule(safeCssText, i);
+      } catch {
+        // Some browser-generated/imported rules are not mutable. The inline
+        // style pass below still handles styles attached directly to the KTA.
+      }
+    }
+  };
+
+  // First handle inline <style> blocks. This is cheap and catches Vite-injected
+  // styles as well as application-local CSS.
   const styleNodes = Array.from(cloneDocument.querySelectorAll('style'));
   for (const styleNode of styleNodes) {
     const css = styleNode.textContent || '';
-    const safeCss = replaceUnsupportedCssColors(css, cloneDocument);
+    const safeCss = rewriteCssText(css);
     if (safeCss !== css) styleNode.textContent = safeCss;
   }
 
-  // Do not walk CSSStyleSheet.cssRules here. On a large Tailwind build that
-  // can force Chromium to materialize thousands of CSS rules and is one of the
-  // main causes of a "Page Unresponsive" dialog during export. Inline <style>
-  // blocks above plus the KTA subtree below are sufficient for the usual Vite
-  // build and keep the export responsive.
+  // Then handle external/same-origin stylesheets. html2canvas reads these
+  // through CSSOM, so changing only the DOM <style> text is not enough when
+  // Tailwind's generated CSS lives in a <link rel="stylesheet">.
+  for (const sheet of Array.from(cloneDocument.styleSheets)) {
+    try {
+      rewriteRuleContainer(sheet);
+    } catch {
+      // Cross-origin stylesheets expose no cssRules. Do not touch them; the
+      // KTA capture itself remains usable and no browser exception escapes.
+    }
+  }
 
+  // Finally sanitize explicit inline styles on the small KTA capture subtree.
+  // This does not walk the rest of the application.
   const captureNodes = Array.from(
     cloneDocument.querySelectorAll<HTMLElement>('[data-kta-render-side]')
   );
-
   for (const element of captureNodes) {
-    const descendants = Array.from(
-      element.querySelectorAll<HTMLElement>('*')
-    );
-    for (const node of [element, ...descendants]) {
-      const computed = cloneDocument.defaultView?.getComputedStyle(node);
-      if (!computed) continue;
-
-      for (let i = 0; i < computed.length; i += 1) {
-        const property = computed.item(i);
-        const value = computed.getPropertyValue(property);
-        if (!/(?:oklch|oklab|lch|lab|color)\(/i.test(value)) continue;
-
-        const safeValue = replaceUnsupportedCssColors(value, cloneDocument);
-        if (safeValue !== value) {
-          node.style.setProperty(property, safeValue, 'important');
-        }
-      }
+    for (const node of [element, ...Array.from(element.querySelectorAll<HTMLElement>('*'))]) {
+      const inlineCss = node.getAttribute('style');
+      if (!inlineCss || !unsupported.test(inlineCss)) continue;
+      const safeInlineCss = rewriteCssText(inlineCss);
+      if (safeInlineCss !== inlineCss) node.setAttribute('style', safeInlineCss);
     }
   }
 }
