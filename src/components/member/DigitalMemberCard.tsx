@@ -31,6 +31,9 @@ interface Props {
   onPreviewSettingsChange?: (
     settings: KtaCardSettings
   ) => void;
+  renderWidthPx?: number;
+  initialSide?: 'front' | 'back';
+  printCapture?: boolean;
 }
 
 const valueOf = (
@@ -100,7 +103,10 @@ export const DigitalMemberCard: React.FC<Props> = ({
   showControls = true,
   allowAdminEdit = false,
   previewSettings,
-  onPreviewSettingsChange
+  onPreviewSettingsChange,
+  renderWidthPx,
+  initialSide = 'front',
+  printCapture = false
 }) => {
   const normalizeSettings = (
     value?: Partial<KtaCardSettings> | null
@@ -143,7 +149,11 @@ export const DigitalMemberCard: React.FC<Props> = ({
     );
 
   const [flipped, setFlipped] =
-    useState(false);
+    useState(initialSide === 'back');
+
+  useEffect(() => {
+    setFlipped(initialSide === 'back');
+  }, [initialSide]);
 
   useEffect(() => {
     if (previewSettings) {
@@ -333,7 +343,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
       )
   );
 
-  const widthPx = 380;
+  const widthPx = renderWidthPx ?? 380;
   const heightPx = widthPx / ratio;
 
   const photo =
@@ -716,13 +726,16 @@ export const DigitalMemberCard: React.FC<Props> = ({
         }
       >
         <div
-          className="relative w-full h-full transition-transform duration-500"
+          className={`relative w-full h-full ${
+            printCapture ? '' : 'transition-transform duration-500'
+          }`}
           style={{
-            transformStyle:
-              'preserve-3d',
-            transform: flipped
-              ? 'rotateY(180deg)'
-              : 'none'
+            transformStyle: printCapture ? 'flat' : 'preserve-3d',
+            transform: printCapture
+              ? 'none'
+              : flipped
+                ? 'rotateY(180deg)'
+                : 'none'
           }}
         >
 
@@ -741,7 +754,16 @@ export const DigitalMemberCard: React.FC<Props> = ({
               ),
               borderRadius: radius,
               backfaceVisibility:
-                'hidden'
+                'hidden',
+              ...(printCapture
+                ? {
+                    transform: 'none',
+                    visibility:
+                      initialSide === 'front'
+                        ? 'visible'
+                        : 'hidden'
+                  }
+                : {})
             }}
           >
             <div
@@ -1166,8 +1188,17 @@ export const DigitalMemberCard: React.FC<Props> = ({
               borderRadius: radius,
               backfaceVisibility:
                 'hidden',
-              transform:
-                'rotateY(180deg)'
+              ...(printCapture
+                ? {
+                    transform: 'none',
+                    visibility:
+                      initialSide === 'back'
+                        ? 'visible'
+                        : 'hidden'
+                  }
+                : {
+                    transform: 'rotateY(180deg)'
+                  })
             }}
           >
             {renderLogos(
