@@ -423,7 +423,7 @@ export default function App() {
     }
   }, [currentTab, currentUser?.role]);
 
-  // QR/Barcode URL verification ditangani sepenuhnya oleh PublicPortalView.
+  // QR verification URL ditangani sepenuhnya oleh PublicPortalView.
   // App.tsx hanya menentukan route /verify agar tidak ada dua proses verifikasi
   // yang saling menimpa state profil anggota.
 
