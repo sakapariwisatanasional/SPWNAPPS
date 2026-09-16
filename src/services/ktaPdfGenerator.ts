@@ -777,7 +777,7 @@ async function renderBack(
     const signerNameFlowPercent =
       (signerNameFontSize * signerNameLineHeight * canvasPxPerPreviewPx / CANVAS_HEIGHT) * 100;
 
-    drawText(ctx, signer.currentPosition || '', {
+    drawText(ctx, String(signer.currentPosition || ''), {
       ...base,
       y: sy + signerNameFlowPercent,
       fontSize: (settings as any).signerTitleFontSize ?? 7,
