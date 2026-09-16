@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import QRCode from 'qrcode';
 import { Member, KtaCardSettings } from '../types';
 import { DEFAULT_KTA_SETTINGS } from './storage';
@@ -434,6 +435,7 @@ async function renderFront(
     backLogoImg: HTMLImageElement;
     avatar: HTMLImageElement;
     qrImg: HTMLImageElement;
+    signerQrImg: HTMLImageElement | null;
     logos: Array<{ cfg: any; img: HTMLImageElement }>;
   }
 ): Promise<HTMLCanvasElement> {
@@ -562,6 +564,7 @@ async function renderBack(
     frontLogoImg: HTMLImageElement;
     backLogoImg: HTMLImageElement;
     qrImg: HTMLImageElement;
+    signerQrImg: HTMLImageElement | null;
     logos: Array<{ cfg: any; img: HTMLImageElement }>;
   },
   signerMember: Member | null
@@ -657,16 +660,15 @@ async function renderBack(
     }, '#ffffff');
   }
 
-  if ((settings as any).showSignerQrCode !== false && signer) {
-    const signerQrDataUrl = await generateQrDataUrl(`${window.location.origin}/verify?verifyId=${encodeURIComponent(getVerificationValue(signer))}`);
-    const signerQrImg = await loadImage(signerQrDataUrl);
+  // QR belakang adalah QR verifikasi pejabat/penandatangan yang dipilih.
+  if (signer && (settings as any).showSignerQrCode !== false && assets.signerQrImg) {
     drawQr(
       ctx,
-      signerQrImg,
+      assets.signerQrImg,
       Math.max(0, Math.min(100 - Number((settings as any).signerQrSize ?? 18), Number((settings as any).signerQrX ?? 68))),
       Math.max(0, Math.min(100 - Number((settings as any).signerQrSize ?? 18), Number((settings as any).signerQrY ?? 68))),
-      Math.max(8, Math.min(35, Number((settings as any).signerQrSize ?? 18))),
-      Number((settings as any).signerQrPadding ?? 2),
+      Math.max(5, Math.min(40, Number((settings as any).signerQrSize ?? 18))),
+      Math.max(0, Number((settings as any).signerQrPadding ?? 2)),
       String((settings as any).signerQrBackgroundColor || '#ffffff'),
       String((settings as any).signerQrBorderColor || 'transparent'),
       Number((settings as any).signerQrBorderWidth ?? 0),
@@ -727,13 +729,18 @@ export interface GenerateKtaOptions {
   settings?: KtaCardSettings;
   format?: KtaPdfFormat;
   onProgress?: (step: string) => void;
+  /** Jika tersedia, PDF memakai DOM preview yang sama agar hasil 1:1 dengan tampilan aplikasi. */
+  frontElement?: HTMLElement | null;
+  backElement?: HTMLElement | null;
 }
 
 export async function generateKtaPdf({
   member,
   settings = DEFAULT_KTA_SETTINGS,
   format = 'CR80_STANDARD',
-  onProgress
+  onProgress,
+  frontElement,
+  backElement
 }: GenerateKtaOptions): Promise<jsPDF> {
   // Clone once. This is the immutable design snapshot for this PDF job.
   const design: KtaCardSettings = JSON.parse(JSON.stringify(settings || DEFAULT_KTA_SETTINGS));
@@ -762,6 +769,15 @@ export async function generateKtaPdf({
   ]);
 
   const qrImg = await loadImage(qrDataUrl);
+  const signerVerificationId = signerMember
+    ? String(signerMember.nationalMemberNumber || signerMember.id || signerMember.userId || '').trim()
+    : '';
+  const signerVerificationUrl = signerVerificationId
+    ? `${window.location.origin}/verify?verifyId=${encodeURIComponent(signerVerificationId)}`
+    : '';
+  const signerQrImg = signerVerificationUrl
+    ? await loadImage(await generateQrDataUrl(signerVerificationUrl))
+    : null;
 
   onProgress?.('Me-render sisi depan berdasarkan KtaCardSettings...');
   const frontCanvas = await renderFront(member, design, {
@@ -771,6 +787,7 @@ export async function generateKtaPdf({
     backLogoImg,
     avatar,
     qrImg,
+    signerQrImg,
     logos: configuredLogos
   });
 
@@ -781,11 +798,38 @@ export async function generateKtaPdf({
     frontLogoImg,
     backLogoImg,
     qrImg,
+    signerQrImg,
     logos: configuredLogos
   }, signerMember);
 
-  const frontImg = frontCanvas.toDataURL('image/png', 1);
-  const backImg = backCanvas.toDataURL('image/png', 1);
+  // Untuk export dari UI, gunakan DOM preview yang sama persis.
+  // Ini menghindari perbedaan font, wrapping, padding, logo, dan posisi
+  // antara renderer Canvas dan tampilan KTA di aplikasi. Renderer Canvas
+  // tetap dipertahankan sebagai fallback untuk pemanggilan non-UI.
+  let frontImg = frontCanvas.toDataURL('image/png', 1);
+  let backImg = backCanvas.toDataURL('image/png', 1);
+
+  if (frontElement && backElement) {
+    onProgress?.('Menyalin tampilan preview KTA secara 1:1 ke PDF...');
+    const capture = async (element: HTMLElement) => {
+      const canvas = await html2canvas(element, {
+        backgroundColor: null,
+        scale: 1,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        windowWidth: CANVAS_WIDTH,
+        windowHeight: CANVAS_HEIGHT
+      });
+      return canvas.toDataURL('image/png', 1);
+    };
+    [frontImg, backImg] = await Promise.all([
+      capture(frontElement),
+      capture(backElement)
+    ]);
+  }
 
   onProgress?.('Menyusun PDF dengan ukuran fisik KTA...');
 
@@ -914,9 +958,10 @@ export async function downloadKtaPdfFile(
   member: Member,
   settings: KtaCardSettings = DEFAULT_KTA_SETTINGS,
   format: KtaPdfFormat = 'CR80_STANDARD',
-  onProgress?: (step: string) => void
+  onProgress?: (step: string) => void,
+  captureElements?: { frontElement?: HTMLElement | null; backElement?: HTMLElement | null }
 ): Promise<void> {
-  const doc = await generateKtaPdf({ member, settings, format, onProgress });
+  const doc = await generateKtaPdf({ member, settings, format, onProgress, ...captureElements });
   const cleanName = member.fullName.replace(/[^a-zA-Z0-9]/g, '_');
   const nta = member.nationalMemberNumber
     ? member.nationalMemberNumber.replace(/[^a-zA-Z0-9]/g, '-')
