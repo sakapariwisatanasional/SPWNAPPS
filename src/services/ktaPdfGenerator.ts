@@ -210,30 +210,37 @@ async function captureRenderedKtaSide(
           const computed = clonedDoc.defaultView?.getComputedStyle(node);
           if (!computed) return;
 
+          // IMPORTANT: the stylesheet is removed below, so every layout
+          // property that Tailwind normally supplies must be frozen inline.
+          // In particular, w-full/h-full on the photo and absolute/inset-0
+          // on positioned layers MUST survive the clone. Omitting width/height
+          // here causes the photo to expand to its natural image size and the
+          // QR/SVG layers to jump to the top-left of the PDF.
           const keep = [
-            'box-sizing', 'display', 'position', 'overflow', 'font-family',
+            'box-sizing', 'display', 'position', 'left', 'top', 'right', 'bottom',
+            'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+            'overflow', 'overflow-x', 'overflow-y', 'margin', 'margin-top',
+            'margin-right', 'margin-bottom', 'margin-left', 'padding', 'padding-top',
+            'padding-right', 'padding-bottom', 'padding-left', 'font-family',
             'font-size', 'font-weight', 'line-height', 'letter-spacing',
-            'text-align', 'text-transform', 'color', 'opacity', 'border-radius',
-            'border-width', 'border-style', 'border-color', 'object-fit',
-            'object-position', 'background-color', 'background-image',
+            'text-align', 'text-transform', 'color', 'opacity', 'visibility',
+            'border-radius', 'border-width', 'border-style', 'border-color',
+            'object-fit', 'object-position', 'background-color', 'background-image',
             'background-size', 'background-position', 'background-repeat',
-            'white-space', 'word-break', 'justify-content', 'align-items',
-            'flex-direction', 'flex-wrap', 'gap', 'box-shadow'
+            'white-space', 'word-break', 'text-overflow', 'justify-content',
+            'align-items', 'align-content', 'flex-direction', 'flex-wrap',
+            'flex-grow', 'flex-shrink', 'flex-basis', 'gap', 'column-gap',
+            'row-gap', 'z-index', 'box-shadow', 'transform', 'transform-origin'
           ];
 
           keep.forEach(property => {
             const value = computed.getPropertyValue(property);
             if (!value || /oklch\(|oklab\(/i.test(value)) return;
-            // Do not overwrite inline designer coordinates for position/size.
-            if (['position', 'display', 'overflow', 'font-family', 'font-size', 'font-weight',
-                 'line-height', 'letter-spacing', 'text-align', 'text-transform', 'color',
-                 'opacity', 'border-radius', 'border-width', 'border-style', 'border-color',
-                 'object-fit', 'object-position', 'background-color', 'background-image',
-                 'background-size', 'background-position', 'background-repeat', 'white-space',
-                 'word-break', 'justify-content', 'align-items', 'flex-direction', 'flex-wrap',
-                 'gap', 'box-shadow', 'box-sizing'].includes(property)) {
-              node.style.setProperty(property, value);
-            }
+
+            // Freeze the browser-resolved geometry. This is deliberately based
+            // on computed CSS rather than the original class names, because
+            // the clone no longer has the application's Tailwind stylesheet.
+            node.style.setProperty(property, value);
           });
         });
       }
