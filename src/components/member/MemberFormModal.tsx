@@ -20,7 +20,7 @@ import { spreadsheetService } from '../../services/spreadsheetService';
 import { formatGoogleDriveUrl } from '../../services/driveRepository';
 import {
   Province, Regency, District, Skill, MemberSkill, SkillProficiency, KridaType,
-  CurrentUser, KtaInterestType, getMemberKwartirName, getMemberKwartirHierarchy
+  CurrentUser, getMemberKwartirName, getMemberKwartirHierarchy
 } from '../../types';
 
 interface MemberFormModalProps {
@@ -56,9 +56,22 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [selectedDistrictId, setSelectedDistrictId] = useState('00.00.00');
   const [isTerritoryPickerOpen, setIsTerritoryPickerOpen] = useState(false);
   
-  const [krida, setKrida] = useState<KridaType>('Krida Pemandu');
-  const [currentPosition, setCurrentPosition] = useState('Anggota');
-  const [ktaInterest, setKtaInterest] = useState<KtaInterestType>('Krida Pemandu');
+  const KRIDA_OPTIONS = [
+    'KRIDA PENYULUH',
+    'KRIDA PEMANDU',
+    'KRIDA MICE & EVENT',
+    'KRIDA KULINER & CINDERAMATA'
+  ] as const;
+
+  const ROLE_OPTIONS = [
+    'MABISAKA',
+    'PIMPINAN SAKA',
+    'PAMONG SAKA',
+    'ANGGOTA KRIDA'
+  ] as const;
+
+  const [krida, setKrida] = useState<KridaType>('KRIDA PEMANDU' as KridaType);
+  const [currentPosition, setCurrentPosition] = useState<(typeof ROLE_OPTIONS)[number]>('ANGGOTA KRIDA');
   const [joinYear, setJoinYear] = useState(2024);
   const [educationLevel, setEducationLevel] = useState('SMA / SMK / Sederajat');
   const [occupation, setOccupation] = useState('Pelajar / Mahasiswa');
@@ -334,8 +347,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         districtId: isNationalKwartir ? '' : selectedDistrictId,
         districtName: isNationalKwartir ? '' : (currentDistrict?.name || 'Kecamatan'),
         joinYear,
-        currentPosition: `Calon Anggota ${krida}`,
-        krida,
+        currentPosition,
+        krida: currentPosition === 'ANGGOTA KRIDA' ? krida : undefined,
         educationLevel,
         occupation,
         bio: bio || 'Calon anggota Saka Pariwisata yang siap berkontribusi untuk pariwisata nusantara.',
@@ -817,59 +830,35 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Jabatan *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Peran/Jabatan *</label>
                 <select
                   value={currentPosition}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setCurrentPosition(value);
-                    if (value === 'Mabisaka' || value === 'Pimpinan Saka' || value === 'Pamong Saka') {
-                      setKtaInterest(value === 'Mabisaka' ? 'Majelis Pembimbing' : value as KtaInterestType);
-                    } else if (ktaInterest === 'Majelis Pembimbing' || ktaInterest === 'Pimpinan Saka' || ktaInterest === 'Pamong Saka') {
-                      setKtaInterest(krida);
-                    }
-                  }}
+                  onChange={(e) => setCurrentPosition(e.target.value as (typeof ROLE_OPTIONS)[number])}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold"
                 >
-                  <option value="Mabisaka">Mabisaka</option>
-                  <option value="Pimpinan Saka">Pimpinan Saka</option>
-                  <option value="Pamong Saka">Pamong Saka</option>
-                  <option value="Anggota">Anggota</option>
+                  {ROLE_OPTIONS.map((role) => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
                 </select>
               </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Peminatan Krida Saka pada KTA *</label>
-                <select
-                  value={ktaInterest}
-                  onChange={(e) => setKtaInterest(e.target.value as KtaInterestType)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold"
-                >
-                  <option value="Krida Pemandu">Krida Pemandu</option>
-                  <option value="Krida Penyuluh">Krida Penyuluh</option>
-                  <option value="Krida Mice & Event">Krida MICE & Event</option>
-                  <option value="Krida Kuliner & Cinderamata">Krida Kuliner & Cinderamata</option>
-                  <option value="Majelis Pembimbing">Majelis Pembimbing</option>
-                  <option value="Pimpinan Saka">Pimpinan Saka</option>
-                  <option value="Pamong Saka">Pamong Saka</option>
-                </select>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Pilihan Krida Utama *</label>
-                <select
-                  value={krida}
-                  onChange={(e: any) => {
-                    const value = e.target.value as KridaType;
-                    setKrida(value);
-                    if (currentPosition === 'Anggota') setKtaInterest(value);
-                  }}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold"
-                >
-                  <option value="Krida Pemandu">Krida Pemandu</option>
-                  <option value="Krida Penyuluh">Krida Penyuluh</option>
-                  <option value="Krida Mice & Event">Krida Mice & Event</option>
-                  <option value="Krida Kuliner & Cinderamata">Krida Kuliner & Cinderamata</option>
-                </select>
-              </div>
+
+              {currentPosition === 'ANGGOTA KRIDA' && (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Krida *</label>
+                  <select
+                    value={krida}
+                    onChange={(e) => setKrida(e.target.value as KridaType)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-slate-800 font-semibold"
+                  >
+                    {KRIDA_OPTIONS.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Krida hanya berlaku untuk ANGGOTA KRIDA.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Pendidikan Terakhir</label>
