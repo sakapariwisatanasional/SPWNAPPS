@@ -47,6 +47,8 @@ const valueOf = (
     provinceName: member.provinceName,
     regencyName: member.regencyName,
     districtName: member.districtName,
+    kwartirName: (member as any).kwartirName,
+    kwartirHierarchy: (member as any).kwartirHierarchy,
     branchName: member.branchName,
     gugusDepan: member.gugusDepan,
     krida: member.krida,
@@ -503,6 +505,37 @@ export const DigitalMemberCard: React.FC<Props> = ({
 
   /*
    * =========================================================
+   * KETERANGAN KWARTIR
+   * =========================================================
+   * Anggota yang terdaftar langsung pada Kwartir Nasional
+   * tidak menampilkan keterangan Kwartir Cabang/Ranting.
+   * Anggota lainnya tetap mengikuti setting KTA.
+   */
+  const isNationalKwartirMember =
+    String((member as any).provinceId || '') === '00' ||
+    String((member as any).kwartirLevel || '').toUpperCase() === 'NASIONAL' ||
+    String((member as any).kwartirName || '').trim().toUpperCase() === 'KWARTIR NASIONAL';
+
+  const isHiddenForNationalKwartir = (field: KtaDataFieldConfig['field']) =>
+    isNationalKwartirMember &&
+    (field === 'regencyName' ||
+      field === 'districtName' ||
+      field === 'kwartirHierarchy');
+
+  const formatKwartirText = (field: KtaDataFieldConfig['field'], raw: string) => {
+    if (!raw) return raw;
+    if (field === 'kwartirName' || field === 'kwartirHierarchy') {
+      return raw.toUpperCase();
+    }
+    // provinceName is also used by legacy KTA settings for "Kwartir Nasional".
+    if (field === 'provinceName' && /^\s*kwartir\s+(nasional|daerah|cabang|ranting)\b/i.test(raw)) {
+      return raw.toUpperCase();
+    }
+    return raw;
+  };
+
+  /*
+   * =========================================================
    * RENDER DATA FIELD
    * =========================================================
    */
@@ -510,16 +543,19 @@ export const DigitalMemberCard: React.FC<Props> = ({
   const renderField = (
     f: KtaDataFieldConfig
   ) => {
+    if (isHiddenForNationalKwartir(f.field)) return null;
+
     const raw = valueOf(
       member,
       f.field
     );
 
+    const formattedRaw = formatKwartirText(f.field, raw);
     const text =
       f.textTransform ===
       'uppercase'
-        ? raw.toUpperCase()
-        : raw;
+        ? formattedRaw.toUpperCase()
+        : formattedRaw;
 
     const showLabel =
       f.showLabel === true;
