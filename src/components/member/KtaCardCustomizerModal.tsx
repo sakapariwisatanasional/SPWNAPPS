@@ -1764,9 +1764,6 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                     <br />
                     <strong>3.</strong> Nama
                     penandatangan
-                    <br />
-                    <strong>4.</strong> Jabatan
-                    penandatangan
                   </div>
                 </div>
 
@@ -1803,9 +1800,10 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                           signerName:
                             member?.fullName ||
                             current.signerName,
+                          // Jabatan tidak ditampilkan/diambil otomatis.
+                          // Jabatan akan ditambahkan manual pada desain KTA.
                           signerTitle:
-                            member?.currentPosition ||
-                            current.signerTitle,
+                            '', 
                           signerSubtitle:
                             '',
                           showSignerVerified:
@@ -1820,18 +1818,19 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                       berwenang
                     </option>
 
-                    {activeMembers.map(
+                    {activeMembers
+                      .filter((member) =>
+                        /^(mabisaka|pimpinan saka|pamong saka)$/i.test(
+                          String(member.currentPosition || '').trim()
+                        )
+                      )
+                      .map(
                       (member) => (
                         <option
                           key={member.id}
                           value={member.id}
                         >
-                          {member.fullName} —{' '}
-                          {member.currentPosition ||
-                            'Tanpa jabatan'}
-                          {member.provinceName
-                            ? ` · ${member.provinceName}`
-                            : ''}
+                          {member.fullName}
                         </option>
                       )
                     )}
@@ -1845,10 +1844,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                         {signerMember.fullName}
                       </strong>
 
-                      <br />
 
-                      {signerMember.currentPosition ||
-                        'Tanpa jabatan'}
                     </>
                   ) : (
                     'Belum ada penandatangan yang dipilih.'
@@ -1931,7 +1927,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                 {/* SIGNER POSITION */}
                 <div className="p-3 rounded-xl bg-white border border-purple-100 space-y-2">
                   <div className="text-[10px] font-black text-purple-950">
-                    Posisi Nama & Jabatan
+                    Posisi Nama Penandatangan
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -2003,9 +1999,9 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                   </div>
 
                   <p className="text-[9px] text-slate-500">
-                    Nama dan jabatan berada di bawah QR
-                    Code. X/Y Nama hanya menggeser nama
-                    tanpa memindahkan jabatan.
+                    Nama berada di bawah QR Code.
+                    Jabatan sengaja dikosongkan agar dapat
+                    ditambahkan secara manual pada desain KTA.
                   </p>
                 </div>
 
@@ -2920,3 +2916,4 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 const CreditCardIcon = () => (
   <LayoutTemplate className="w-4 h-4" />
 );
+
