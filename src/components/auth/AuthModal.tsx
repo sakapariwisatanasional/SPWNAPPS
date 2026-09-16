@@ -468,11 +468,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         );
 
       const provName = isNasional
-        ? 'Kwartir Nasional'
+        ? 'KWARTIR NASIONAL'
         : (provObj?.name || 'Jawa Barat');
 
       const regName = isNasional
-        ? 'Pusat Nasional'
+        ? 'TINGKAT NASIONAL'
         : (regObj?.name || 'Kabupaten Bandung');
 
       const distName = isNasional
@@ -2038,3 +2038,4 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     </div>
   );
 };
+
