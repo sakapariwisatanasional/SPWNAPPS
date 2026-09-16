@@ -31,12 +31,6 @@ interface Props {
   onPreviewSettingsChange?: (
     settings: KtaCardSettings
   ) => void;
-  /** Lebar render khusus untuk export/capture (mis. 1012px untuk 300 DPI). */
-  renderWidthPx?: number;
-  /** Menentukan sisi awal saat dipakai sebagai sumber cetak. */
-  initialSide?: 'front' | 'back';
-  /** Mode statis untuk capture PDF, tanpa interaksi flip. */
-  printCapture?: boolean;
 }
 
 const valueOf = (
@@ -81,10 +75,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
   showControls = true,
   allowAdminEdit = false,
   previewSettings,
-  onPreviewSettingsChange,
-  renderWidthPx,
-  initialSide = 'front',
-  printCapture = false
+  onPreviewSettingsChange
 }) => {
   const normalizeSettings = (
     value?: Partial<KtaCardSettings> | null
@@ -127,7 +118,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
     );
 
   const [flipped, setFlipped] =
-    useState(initialSide === 'back');
+    useState(false);
 
   useEffect(() => {
     if (previewSettings) {
@@ -276,7 +267,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
    * Nama dan jabatan diambil langsung dari anggota
    * yang dipilih sebagai signerMemberId.
    *
-   * signerName / signerTitle hanya menjadi fallback
+   * signerName hanya menjadi fallback
    * untuk kompatibilitas data lama.
    * =========================================================
    */
@@ -301,12 +292,6 @@ export const DigitalMemberCard: React.FC<Props> = ({
         ''
     );
 
-  const signerTitle =
-    signerMember?.currentPosition ||
-    String(
-      (settings as any)?.signerTitle ||
-        ''
-    );
 
   const ratio = Math.max(
     0.45,
@@ -317,7 +302,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
       )
   );
 
-  const widthPx = renderWidthPx ?? 380;
+  const widthPx = 380;
   const heightPx = widthPx / ratio;
 
   const photo =
@@ -694,13 +679,13 @@ export const DigitalMemberCard: React.FC<Props> = ({
           height: heightPx,
           perspective: '1000px'
         }}
-        className={printCapture ? '' : 'cursor-pointer'}
-        onClick={() => {
-          if (!printCapture) setFlipped(v => !v);
-        }}
+        className="cursor-pointer"
+        onClick={() =>
+          setFlipped(v => !v)
+        }
       >
         <div
-          className={`relative w-full h-full ${printCapture ? '' : 'transition-transform duration-500'}`}
+          className="relative w-full h-full transition-transform duration-500"
           style={{
             transformStyle:
               'preserve-3d',
@@ -1421,28 +1406,133 @@ export const DigitalMemberCard: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* QR BELAKANG: verifikasi pejabat/penandatangan */}
-            {signerMember && (settings as any).showSignerQrCode !== false && (
-              <div
-                className="absolute"
-                style={{
-                  left: `${Math.max(0, Math.min(100 - Number((settings as any).signerQrSize ?? 18), Number((settings as any).signerQrX ?? 68)))}%`,
-                  top: `${Math.max(0, Math.min(100 - Number((settings as any).signerQrSize ?? 18), Number((settings as any).signerQrY ?? 68)))}%`,
-                  width: `${Math.max(5, Math.min(40, Number((settings as any).signerQrSize ?? 18)))}%`,
-                  aspectRatio: '1 / 1'
-                }}
-              >
-                <KtaQrCode
-                  member={signerMember}
-                  size={Math.max(32, Math.round(Math.min(widthPx, heightPx) * (Number((settings as any).signerQrSize ?? 18) / 100)))}
-                  showLabel={false}
-                  interactive={false}
-                  margin={Number((settings as any).signerQrPadding ?? 2)}
-                  darkColor="#1e0842"
-                  lightColor={String((settings as any).signerQrBackgroundColor || '#ffffff')}
-                />
-              </div>
-            )}
+            {/* =================================================
+                3. QR PENANDATANGAN
+
+                Tidak ada:
+                - badge
+                - ShieldCheck
+                - background dekoratif
+                - border
+                - label
+                - "Tanda Tangan Terverifikasi"
+            ================================================== */}
+
+            {(
+              settings as any
+            ).showSignerQrCode !==
+              false &&
+              signerMember &&
+              (() => {
+                const qrPercent =
+                  Math.max(
+                    8,
+                    Math.min(
+                      35,
+                      Number(
+                        (settings as any)
+                          .signerQrSize ??
+                        18
+                      )
+                    )
+                  );
+
+                const qrX =
+                  Math.max(
+                    0,
+                    Math.min(
+                      100 -
+                        qrPercent,
+                      Number(
+                        (settings as any)
+                          .signerQrX ??
+                        68
+                      )
+                    )
+                  );
+
+                const qrY =
+                  Math.max(
+                    0,
+                    Math.min(
+                      100 -
+                        qrPercent,
+                      Number(
+                        (settings as any)
+                          .signerQrY ??
+                        68
+                      )
+                    )
+                  );
+
+                const qrPx =
+                  Math.max(
+                    36,
+                    Math.round(
+                      Math.min(
+                        widthPx,
+                        heightPx
+                      ) *
+                        (qrPercent /
+                          100)
+                    )
+                  );
+
+                const qrMargin =
+                  Math.max(
+                    0,
+                    Number(
+                      (settings as any)
+                        .signerQrPadding ??
+                      2
+                    )
+                  );
+
+                return (
+                  <div
+                    className="absolute"
+                    style={{
+                      left: `${qrX}%`,
+                      top: `${qrY}%`,
+                      width: `${qrPercent}%`,
+                      aspectRatio:
+                        '1 / 1',
+                      display:
+                        'flex',
+                      alignItems:
+                        'center',
+                      justifyContent:
+                        'center'
+                    }}
+                  >
+                    <KtaQrCode
+                      member={
+                        signerMember
+                      }
+                      size={Math.max(
+                        24,
+                        qrPx
+                      )}
+                      showLabel={false}
+                      interactive={false}
+                      borderWidth={0}
+                      borderRadius={0}
+                      borderColor="transparent"
+                      margin={
+                        qrMargin
+                      }
+                      lightColor="#ffffff"
+                    />
+                  </div>
+                );
+              })()}
+
+            {/* =================================================
+                3. NAMA PENANDATANGAN
+
+                Nama berasal dari signerMemberId.
+                Jabatan tidak dirender karena akan dibuat manual.
+            ================================================== */}
 
             {signerMember && (
               <div
@@ -1512,17 +1602,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
                   {signerName}
                 </div>
 
-                <div
-                  style={{
-                    fontSize: `${
-                      (settings as any)
-                        .signerTitleFontSize ??
-                      7
-                    }px`
-                  }}
-                >
-                  {signerTitle}
-                </div>
+
               </div>
             )}
           </div>
@@ -1578,3 +1658,4 @@ export const DigitalMemberCard: React.FC<Props> = ({
     </div>
   );
 };
+
