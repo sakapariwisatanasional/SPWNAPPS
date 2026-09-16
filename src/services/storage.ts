@@ -115,12 +115,12 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   terms: [],
   issueLocationDate: 'Jakarta, 14 Agustus 2026',
   issueLocationDateX: 5,
-  issueLocationDateY: 70,
+  issueLocationDateY: 60,
   barcodeType: 'CODE128',
   barcodeCustomValue: '',
-  showBarcode: true,
+  showBarcode: false,
   barcodeX: 68,
-  barcodeY: 70,
+  barcodeY: 55,
   barcodeWidth: 27,
   barcodeHeight: 9,
   barcodeShowText: false,
@@ -128,12 +128,29 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   showSignerQrCode: true,
   showSignerVerified: true,
   signerVerifiedX: 5,
-  signerVerifiedY: 62,
+  signerVerifiedY: 60,
   signerVerifiedWidth: 55,
   signerVerifiedFontSize: 7,
   signerVerifiedColor: '#ffffff',
   signerName: 'Reza Pahlevi',
   signerNameXOffset: 0,
+  signerX: 5,
+  signerY: 82,
+  signerWidth: 55,
+  signerAlign: 'left',
+  signerLineHeight: 1.2,
+  signerLetterSpacing: 0,
+  signerColor: '#ffffff',
+  signerNameFontSize: 9,
+  signerTitleFontSize: 7,
+  signerQrX: 68,
+  signerQrY: 68,
+  signerQrSize: 18,
+  signerQrPadding: 2,
+  signerQrBackgroundColor: '#ffffff',
+  signerQrBorderColor: 'transparent',
+  signerQrBorderWidth: 0,
+  signerQrBorderRadius: 0,
   signerNameYOffset: 0,
   signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
   signerSubtitle: '',
@@ -1656,6 +1673,13 @@ class StorageService {
     regencyCode: string,
     districtCode: string
   ): string {
+    // Format final: PP.KK.KKK.NNNNNN
+    // Contoh: 11.01.010.000001
+    //
+    // provinceCode : 2 digit kode provinsi
+    // regencyCode  : kode wilayah seperti 11.01 -> ambil 01
+    // districtCode : kode wilayah seperti 11.01.010 -> ambil 010
+
     const pp =
       String(
         provinceCode || '00'
@@ -1664,29 +1688,31 @@ class StorageService {
         .slice(-2)
         .padStart(2, '0');
 
-    const kk =
+    const regencyParts =
       String(
         regencyCode || '00.00'
       )
         .split('.')
-        .filter(Boolean)
-        .pop()
-        ?.replace(/\D/g, '')
-        .slice(-2)
-        .padStart(2, '0') ||
-      '00';
+        .filter(Boolean);
 
-    const kc =
+    const kk =
+      (regencyParts[regencyParts.length - 1] || '00')
+        .replace(/\D/g, '')
+        .slice(-2)
+        .padStart(2, '0');
+
+    const districtParts =
       String(
-        districtCode || '00.00.00'
+        districtCode || '00.00.000'
       )
         .split('.')
-        .filter(Boolean)
-        .pop()
-        ?.replace(/\D/g, '')
-        .slice(-2)
-        .padStart(2, '0') ||
-      '00';
+        .filter(Boolean);
+
+    const kc =
+      (districtParts[districtParts.length - 1] || '000')
+        .replace(/\D/g, '')
+        .slice(-3)
+        .padStart(3, '0');
 
     const prefix =
       `${pp}.${kk}.${kc}.`;
@@ -1704,6 +1730,7 @@ class StorageService {
               ''
           ).trim();
 
+        // Hanya nomor dengan format final yang dihitung.
         if (
           !nta.startsWith(
             prefix
@@ -1712,11 +1739,16 @@ class StorageService {
           return;
         }
 
+        const sequenceText =
+          nta.slice(prefix.length);
+
+        if (!/^\d{6}$/.test(sequenceText)) {
+          return;
+        }
+
         const sequence =
           parseInt(
-            nta
-              .slice(prefix.length)
-              .replace(/\D/g, ''),
+            sequenceText,
             10
           );
 
@@ -1921,11 +1953,12 @@ class StorageService {
           String(
             member.nationalMemberNumber ||
               ''
-          );
+          ).trim();
 
+        // Format final: PP.KK.KKK.NNNNNN
         const match =
           nta.match(
-            /^(\d{2}\.\d{2}\.\d{2})\.(\d{6})$/
+            /^(\d{2}\.\d{2}\.\d{3})\.(\d{6})$/
           );
 
         if (match) {
@@ -1946,8 +1979,19 @@ class StorageService {
 
     selected.forEach(
       member => {
+        const existingNta =
+          String(
+            member.nationalMemberNumber ||
+              ''
+          ).trim();
+
+        // Nomor final yang sudah benar tidak disentuh.
+        // Nomor lama (mis. 00.00.00.000001) atau kosong
+        // akan dibuat ulang sesuai wilayah anggota.
         if (
-          member.nationalMemberNumber
+          /^\d{2}\.\d{2}\.\d{3}\.\d{6}$/.test(
+            existingNta
+          )
         ) {
           skipped++;
           return;
@@ -1975,18 +2019,19 @@ class StorageService {
             .padStart(2, '0') ||
           '00';
 
-        const kc =
+        const kcParts =
           String(
             member.districtId ||
-              '00.00.00'
+              '00.00.000'
           )
             .split('.')
-            .filter(Boolean)
-            .pop()
-            ?.replace(/\D/g, '')
-            .slice(-2)
-            .padStart(2, '0') ||
-          '00';
+            .filter(Boolean);
+
+        const kc =
+          (kcParts[kcParts.length - 1] || '000')
+            .replace(/\D/g, '')
+            .slice(-3)
+            .padStart(3, '0');
 
         const prefix =
           `${pp}.${kk}.${kc}`;
@@ -2377,6 +2422,12 @@ class StorageService {
       ...DEFAULT_KTA_SETTINGS,
       ...(settings && typeof settings === 'object' ? settings : {})
     } as KtaCardSettings;
+
+    // Keep the signer/date defaults safe for older KTA configurations.
+    // Legacy barcode settings remain accepted for spreadsheet compatibility,
+    // but barcode elements are no longer rendered anywhere on the KTA.
+    if (Number((merged as any).signerY ?? 88) === 88) (merged as any).signerY = 82;
+    if (Number((merged as any).issueLocationDateY ?? 70) === 70) (merged as any).issueLocationDateY = 60;
 
     this.ktaSettings = {
       ...merged,
@@ -3100,3 +3151,4 @@ class StorageService {
 
 export const storage =
   new StorageService();
+
