@@ -103,6 +103,22 @@ function cssColorFunctionToRgb(cloneDocument: Document, token: string): string {
   const trimmed = token.trim();
   if (!trimmed) return token;
 
+  // Avoid creating a DOM probe repeatedly for the same CSS token. Tailwind's
+  // generated stylesheet can contain the same OKLCH value many times.
+  const cache = (cloneDocument as any).__ktaCssColorCache as Map<string, string> | undefined;
+  const colorCache = cache || new Map<string, string>();
+  (cloneDocument as any).__ktaCssColorCache = colorCache;
+
+  const cached = colorCache.get(trimmed);
+  if (cached) return cached;
+
+  // OKLCH is common in Tailwind v4. Convert it directly; this avoids DOM work.
+  if (/^oklch\(/i.test(trimmed)) {
+    const converted = oklchToRgbString(trimmed);
+    colorCache.set(trimmed, converted);
+    return converted;
+  }
+
   try {
     const win = cloneDocument.defaultView;
     if (!win || !cloneDocument.body) return token;
@@ -113,36 +129,36 @@ function cssColorFunctionToRgb(cloneDocument: Document, token: string): string {
     const computed = win.getComputedStyle(probe).color;
     probe.remove();
 
-    // Browser-computed colors are returned as rgb()/rgba(), which html2canvas
-    // can parse even when the original CSS used OKLab/OKLCH/Lab/LCH/color().
     if (computed && !/^(?:oklab|oklch|lab|lch|color)\(/i.test(computed)) {
+      colorCache.set(trimmed, computed);
       return computed;
     }
   } catch {
     // Keep the original token if the browser cannot normalize it.
   }
 
-  return token;
+  // A final safe fallback prevents html2canvas from aborting on a CSS Color 4
+  // function it cannot parse. This only affects the cloned export document.
+  const fallback = /^(?:oklab|oklch|lab|lch|color)\(/i.test(trimmed)
+    ? 'transparent'
+    : token;
+  colorCache.set(trimmed, fallback);
+  return fallback;
 }
 
 function replaceUnsupportedCssColors(value: string, cloneDocument: Document): string {
   if (!value) return value;
 
-  // html2canvas 1.4.x does not understand several CSS Color 4 functions.
-  // Let the browser convert each token to a legacy rgb()/rgba() value.
   const pattern = /(?:oklch|oklab|lch|lab|color)\([^)]*\)/gi;
-  return value.replace(pattern, token => {
-    const converted = cssColorFunctionToRgb(cloneDocument, token);
-    return /^(?:oklch|oklab|lch|lab|color)\(/i.test(converted.trim())
-      ? 'transparent'
-      : converted;
-  });
+  return value.replace(pattern, token => cssColorFunctionToRgb(cloneDocument, token));
 }
 
 function sanitizeHtml2CanvasClone(cloneDocument: Document): void {
-  // First sanitize inline <style> blocks. html2canvas parses stylesheet rules
-  // before/while computing element styles, so fixing only computed properties
-  // is not sufficient: the original Tailwind CSS can still contain oklab().
+  // Keep this callback deliberately lightweight. html2canvas already clones
+  // the entire application document; scanning every element and every computed
+  // CSS declaration here can freeze the browser on a large React/Tailwind app.
+  // We only sanitize stylesheet text plus the actual KTA capture subtree.
+
   const styleNodes = Array.from(cloneDocument.querySelectorAll('style'));
   for (const styleNode of styleNodes) {
     const css = styleNode.textContent || '';
@@ -150,70 +166,33 @@ function sanitizeHtml2CanvasClone(cloneDocument: Document): void {
     if (safeCss !== css) styleNode.textContent = safeCss;
   }
 
-  // Also sanitize same-origin linked stylesheets. Some Vite/Tailwind builds
-  // place generated CSS in <link> elements instead of inline <style> blocks.
-  const sanitizeRules = (rules: CSSRuleList) => {
-    for (let i = 0; i < rules.length; i += 1) {
-      const rule = rules.item(i) as CSSStyleRule & { cssRules?: CSSRuleList };
-      if (!rule) continue;
+  // Do not walk CSSStyleSheet.cssRules here. On a large Tailwind build that
+  // can force Chromium to materialize thousands of CSS rules and is one of the
+  // main causes of a "Page Unresponsive" dialog during export. Inline <style>
+  // blocks above plus the KTA subtree below are sufficient for the usual Vite
+  // build and keep the export responsive.
 
-      try {
-        if ((rule as CSSStyleRule).style) {
-          const cssText = (rule as CSSStyleRule).style.cssText || '';
-          const safeCssText = replaceUnsupportedCssColors(cssText, cloneDocument);
-          if (safeCssText !== cssText) {
-            (rule as CSSStyleRule).style.cssText = safeCssText;
-          }
+  const captureNodes = Array.from(
+    cloneDocument.querySelectorAll<HTMLElement>('[data-kta-render-side]')
+  );
+
+  for (const element of captureNodes) {
+    const descendants = Array.from(
+      element.querySelectorAll<HTMLElement>('*')
+    );
+    for (const node of [element, ...descendants]) {
+      const computed = cloneDocument.defaultView?.getComputedStyle(node);
+      if (!computed) continue;
+
+      for (let i = 0; i < computed.length; i += 1) {
+        const property = computed.item(i);
+        const value = computed.getPropertyValue(property);
+        if (!/(?:oklch|oklab|lch|lab|color)\(/i.test(value)) continue;
+
+        const safeValue = replaceUnsupportedCssColors(value, cloneDocument);
+        if (safeValue !== value) {
+          node.style.setProperty(property, safeValue, 'important');
         }
-      } catch {
-        // Ignore cross-origin or read-only stylesheet rules.
-      }
-
-      try {
-        if (rule.cssRules) sanitizeRules(rule.cssRules);
-      } catch {
-        // Ignore inaccessible nested rules.
-      }
-    }
-  };
-
-  for (const sheet of Array.from(cloneDocument.styleSheets)) {
-    try {
-      if (sheet.cssRules) sanitizeRules(sheet.cssRules);
-    } catch {
-      // Cross-origin stylesheets cannot be inspected; inline computed-style
-      // sanitization below still protects the cloned elements we can inspect.
-    }
-  }
-
-  const elements = Array.from(cloneDocument.querySelectorAll<HTMLElement>('*'));
-
-  for (const element of elements) {
-    const computed = cloneDocument.defaultView?.getComputedStyle(element);
-    if (!computed) continue;
-
-    // Copy only declarations that contain unsupported CSS Color 4 functions.
-    // This preserves the original layout while giving html2canvas parseable
-    // colors on the cloned DOM.
-    for (let i = 0; i < computed.length; i += 1) {
-      const property = computed.item(i);
-      const value = computed.getPropertyValue(property);
-      if (!/(?:oklch|oklab|lch|lab|color)\(/i.test(value)) continue;
-
-      const safeValue = replaceUnsupportedCssColors(value, cloneDocument);
-      if (safeValue !== value) {
-        element.style.setProperty(property, safeValue, 'important');
-      }
-    }
-
-    // CSS custom properties can contain unsupported colors and be consumed by
-    // another declaration during html2canvas parsing.
-    for (let i = 0; i < computed.length; i += 1) {
-      const property = computed.item(i);
-      if (!property.startsWith('--')) continue;
-      const value = computed.getPropertyValue(property);
-      if (/(?:oklch|oklab|lch|lab|color)\(/i.test(value)) {
-        element.style.setProperty(property, replaceUnsupportedCssColors(value, cloneDocument));
       }
     }
   }
@@ -985,14 +964,22 @@ export async function generateKtaPdf({
     const capture = async (element: HTMLElement): Promise<string> => {
       const canvas = await html2canvas(element, {
         backgroundColor: null,
-        scale: 1,
+        // Keep the DOM at the exact same 380px size used by the live preview.
+        // The previous 1012px DOM render made fixed-size text/icons appear
+        // disproportionately tiny. We upscale the preview during capture
+        // instead, preserving the 1:1 visual proportions while still
+        // producing the 1012px-wide export raster.
+        scale: CANVAS_WIDTH / PREVIEW_WIDTH_PX,
         useCORS: true,
         allowTaint: false,
         logging: false,
-        width: CANVAS_WIDTH,
-        height: CANVAS_HEIGHT,
-        windowWidth: CANVAS_WIDTH,
-        windowHeight: CANVAS_HEIGHT,
+        width: PREVIEW_WIDTH_PX,
+        windowWidth: PREVIEW_WIDTH_PX,
+        windowHeight: Math.round(
+          PREVIEW_WIDTH_PX /
+            (Number(design.widthMm || CR80_WIDTH_MM) /
+              Math.max(Number(design.heightMm || CR80_HEIGHT_MM), 1))
+        ),
         onclone: clonedDocument => {
           sanitizeHtml2CanvasClone(clonedDocument);
         }
@@ -1000,10 +987,11 @@ export async function generateKtaPdf({
       return canvas.toDataURL('image/png', 1);
     };
 
-    [frontImg, backImg] = await Promise.all([
-      capture(frontElement),
-      capture(backElement)
-    ]);
+    // Capture sequentially. Running two html2canvas jobs simultaneously clones
+    // the whole React document twice and can make Chromium report "Page
+    // Unresponsive" on heavier KTA pages.
+    frontImg = await capture(frontElement);
+    backImg = await capture(backElement);
   } else {
     onProgress?.('Preview tidak tersedia — menggunakan renderer Canvas sebagai fallback...');
 
