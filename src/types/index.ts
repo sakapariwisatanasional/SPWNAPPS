@@ -1,3 +1,4 @@
+================================================================================
 export type UserRole = 
   | 'SUPER_ADMIN'      // Pengendali sistem tertinggi / Kwartir Nasional
   | 'ADMIN_NATIONAL'   // Admin operasional Kwartir Nasional
@@ -149,7 +150,7 @@ export const getMemberKwartirHierarchy = (
 export interface Member {
   id: string;                  // UUID
   userId: string;
-  nationalMemberNumber?: string; // Format: PP.KK.KC.NNNNNN
+  nationalMemberNumber?: string; // Format: PP.KK.KKK.NNNNNN
   fullName: string;
   nikMasked: string;           // E.g. 320612******0004
   avatarUrl: string;
@@ -480,7 +481,7 @@ export interface KtaCardSettings {
   backHeaderTitle: string; backHeaderSubtitle: string; terms: string[]; issueLocationDate: string;
   barcodeType: KtaBarcodeType; barcodeCustomValue?: string; showBarcode?: boolean; issueLocationDateX?: number; issueLocationDateY?: number;
   barcodeX?: number; barcodeY?: number; barcodeWidth?: number; barcodeHeight?: number; barcodeShowText?: boolean;
-  signerMemberId?: string; showSignerQrCode?: boolean; showSignerVerified?: boolean; signerVerifiedX?: number; signerVerifiedY?: number; signerVerifiedWidth?: number; signerVerifiedFontSize?: number; signerVerifiedColor?: string;
+  signerMemberId?: string; showSignerQrCode?: boolean; showSignerName?: boolean; showSignerTitle?: boolean; showSignerVerified?: boolean; signerVerifiedX?: number; signerVerifiedY?: number; signerVerifiedWidth?: number; signerVerifiedFontSize?: number; signerVerifiedColor?: string;
   signerQrX?: number; signerQrY?: number; signerQrSize?: number; signerQrPadding?: number; signerQrBackgroundColor?: string; signerQrBorderWidth?: number; signerQrBorderColor?: string; signerQrBorderRadius?: number;
   barcodeCaption?: string;
   showBarcodeFront?: boolean; barcodeFrontCustomValue?: string; barcodeFrontX?: number; barcodeFrontY?: number; barcodeFrontWidth?: number; barcodeFrontHeight?: number; barcodeFrontShowText?: boolean; barcodeFrontCaption?: string; barcodeFrontCaptionX?: number; barcodeFrontCaptionY?: number; barcodeFrontCaptionWidth?: number; barcodeFrontCaptionFontSize?: number; barcodeFrontCaptionFontWeight?: 'normal'|'medium'|'bold'|'black'; barcodeFrontCaptionColor?: string; barcodeFrontCaptionAlign?: 'left'|'center'|'right'; barcodeFrontCaptionLineHeight?: number; barcodeFrontCaptionLetterSpacing?: number;
@@ -597,3 +598,4 @@ export interface KridaModuleItem {
   };
   specialSafetyNotes?: string;
 }
+
