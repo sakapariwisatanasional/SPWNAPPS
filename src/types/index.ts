@@ -1,4 +1,3 @@
-================================================================================
 export type UserRole = 
   | 'SUPER_ADMIN'      // Pengendali sistem tertinggi / Kwartir Nasional
   | 'ADMIN_NATIONAL'   // Admin operasional Kwartir Nasional
