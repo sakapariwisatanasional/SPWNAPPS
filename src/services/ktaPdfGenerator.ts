@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import QRCode from 'qrcode';
 import { Member, KtaCardSettings } from '../types';
 import { DEFAULT_KTA_SETTINGS } from './storage';
@@ -21,6 +22,123 @@ const CANVAS_HEIGHT = 638;
 const PREVIEW_WIDTH_PX = 380;
 const PX_SCALE = CANVAS_WIDTH / PREVIEW_WIDTH_PX;
 
+
+/**
+ * html2canvas 1.4.x tidak dapat mem-parse CSS color function oklch() yang
+ * dihasilkan Tailwind CSS v4. Browser sendiri dapat merendernya, tetapi
+ * parser html2canvas akan berhenti dengan error:
+ * "Attempting to parse an unsupported color function \"oklch\"".
+ *
+ * Sebelum capture, kita salin computed color yang sudah dipahami browser
+ * menjadi nilai RGB/RGBA pada clone DOM. Ini hanya dilakukan pada DOM clone
+ * html2canvas, sehingga tidak mengubah tampilan aplikasi.
+ */
+function oklchToRgbString(input: string): string {
+  const match = input.match(/oklch\(\s*([^\s]+)\s+([^\s]+)\s+([^\s\/]+)(?:\s*\/\s*([^\)]+))?\s*\)/i);
+  if (!match) return input;
+
+  const parseLightness = (value: string) => {
+    if (value.toLowerCase() === 'none') return 0;
+    return value.endsWith('%') ? parseFloat(value) / 100 : parseFloat(value);
+  };
+
+  const parseChroma = (value: string) => {
+    if (value.toLowerCase() === 'none') return 0;
+    // CSS Color 4: 100% chroma corresponds to 0.4 in the OKLCH model.
+    return value.endsWith('%') ? (parseFloat(value) / 100) * 0.4 : parseFloat(value);
+  };
+
+  const parseHue = (value: string) => {
+    if (value.toLowerCase() === 'none') return 0;
+    const n = parseFloat(value);
+    if (value.toLowerCase().endsWith('turn')) return n * Math.PI * 2;
+    if (value.toLowerCase().endsWith('rad')) return n;
+    if (value.toLowerCase().endsWith('grad')) return n * Math.PI / 200;
+    return n * Math.PI / 180;
+  };
+
+  const L = Math.max(0, Math.min(1, parseLightness(match[1])));
+  const C = Math.max(0, parseChroma(match[2]));
+  const H = parseHue(match[3]);
+  const alphaRaw = match[4];
+  const alpha = alphaRaw
+    ? (alphaRaw.trim().endsWith('%') ? parseFloat(alphaRaw) / 100 : parseFloat(alphaRaw))
+    : 1;
+
+  const a = C * Math.cos(H);
+  const b = C * Math.sin(H);
+
+  // OKLab -> LMS (Ottosson)
+  const l_ = L + 0.3963377774 * a - 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+
+  const l = l_ * l_ * l_;
+  const m = m_ * m_ * m_;
+  const ss = s_ * s_ * s_;
+
+  // LMS -> linear sRGB
+  const linearR = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * ss;
+  const linearG = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * ss;
+  const linearB = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * ss;
+
+  const gamma = (v: number) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    return clamped <= 0.0031308
+      ? 12.92 * clamped
+      : 1.055 * Math.pow(clamped, 1 / 2.4) - 0.055;
+  };
+
+  const r = Math.round(gamma(linearR) * 255);
+  const g = Math.round(gamma(linearG) * 255);
+  const blue = Math.round(gamma(linearB) * 255);
+  const aClamped = Math.max(0, Math.min(1, alpha));
+
+  return aClamped >= 0.999
+    ? `rgb(${r}, ${g}, ${blue})`
+    : `rgba(${r}, ${g}, ${blue}, ${aClamped})`;
+}
+
+function replaceUnsupportedCssColors(value: string): string {
+  if (!value || !/oklch\(/i.test(value)) return value;
+  // Match each oklch() token independently. The generated Tailwind values
+  // use the standard 3-channel form, with an optional alpha channel.
+  return value.replace(/oklch\(\s*[^\)]*\)/gi, token => oklchToRgbString(token));
+}
+
+function sanitizeHtml2CanvasClone(cloneDocument: Document): void {
+  const elements = Array.from(cloneDocument.querySelectorAll<HTMLElement>('*'));
+
+  for (const element of elements) {
+    const computed = cloneDocument.defaultView?.getComputedStyle(element);
+    if (!computed) continue;
+
+    // Only copy declarations that contain oklch(). We deliberately avoid
+    // copying every computed property so the clone keeps its original layout.
+    for (let i = 0; i < computed.length; i += 1) {
+      const property = computed.item(i);
+      const value = computed.getPropertyValue(property);
+      if (!/oklch\(/i.test(value)) continue;
+
+      const safeValue = replaceUnsupportedCssColors(value);
+      if (safeValue !== value) {
+        element.style.setProperty(property, safeValue, 'important');
+      }
+    }
+
+    // CSS custom properties can also contain oklch() and may be consumed by
+    // another declaration during html2canvas parsing.
+    for (let i = 0; i < computed.length; i += 1) {
+      const property = computed.item(i);
+      if (!property.startsWith('--')) continue;
+      const value = computed.getPropertyValue(property);
+      if (/oklch\\(/i.test(value)) {
+        element.style.setProperty(property, replaceUnsupportedCssColors(value));
+      }
+    }
+  }
+}
+
 export type KtaPdfFormat = 'CR80_STANDARD' | 'A4_PRINT_SHEET';
 
 type Side = 'FRONT' | 'BACK';
@@ -28,8 +146,8 @@ type Side = 'FRONT' | 'BACK';
 /**
  * KTA PDF renderer — single source of truth is KtaCardSettings.
  *
- * The renderer intentionally does NOT capture DigitalMemberCard DOM.
- * It renders the same designer model used by DigitalMemberCard:
+ * For UI PDF export, the preview DOM is captured so the printed KTA matches
+ * the visible preview. The Canvas renderer remains available as a fallback:
  * backgrounds, logos, configured text/data fields, photo, QR, validity,
  * terms and signer information are all read from KtaCardSettings.
  */
@@ -234,32 +352,7 @@ function memberFieldValue(member: Member, field: string): string {
     joinYear: member.joinYear,
     status: member.status
   };
-  const value = String(values[field] ?? '');
-
-  if (field === 'currentPosition') {
-    return value.toUpperCase();
-  }
-
-  if (field === 'provinceName') {
-    return value.replace(/Kwartir Nasional/gi, 'KWARTIR NASIONAL').toUpperCase();
-  }
-
-  if (field === 'regencyName') {
-    return value
-      .replace(/KWARTIR NASIONAL\s*\(PUSAT\)/gi, 'TINGKAT NASIONAL')
-      .replace(/^PUSAT NASIONAL$/i, 'TINGKAT NASIONAL')
-      .toUpperCase();
-  }
-
-  if (field === 'districtName' && /^(nasional|pusat nasional)$/i.test(value.trim())) {
-    return 'TINGKAT NASIONAL';
-  }
-
-  if (field === 'krida') {
-    return value.toUpperCase();
-  }
-
-  return value;
+  return String(values[field] ?? '');
 }
 
 function transformedText(text: string, cfg: any): string {
@@ -459,6 +552,7 @@ async function renderFront(
     backLogoImg: HTMLImageElement;
     avatar: HTMLImageElement;
     qrImg: HTMLImageElement;
+    signerQrImg: HTMLImageElement | null;
     logos: Array<{ cfg: any; img: HTMLImageElement }>;
   }
 ): Promise<HTMLCanvasElement> {
@@ -587,6 +681,7 @@ async function renderBack(
     frontLogoImg: HTMLImageElement;
     backLogoImg: HTMLImageElement;
     qrImg: HTMLImageElement;
+    signerQrImg: HTMLImageElement | null;
     logos: Array<{ cfg: any; img: HTMLImageElement }>;
   },
   signerMember: Member | null
@@ -682,16 +777,15 @@ async function renderBack(
     }, '#ffffff');
   }
 
-  if ((settings as any).showSignerQrCode !== false && signer) {
-    const signerQrDataUrl = await generateQrDataUrl(`${window.location.origin}/verify?verifyId=${encodeURIComponent(getVerificationValue(signer))}`);
-    const signerQrImg = await loadImage(signerQrDataUrl);
+  // QR belakang adalah QR verifikasi pejabat/penandatangan yang dipilih.
+  if (signer && (settings as any).showSignerQrCode !== false && assets.signerQrImg) {
     drawQr(
       ctx,
-      signerQrImg,
+      assets.signerQrImg,
       Math.max(0, Math.min(100 - Number((settings as any).signerQrSize ?? 18), Number((settings as any).signerQrX ?? 68))),
       Math.max(0, Math.min(100 - Number((settings as any).signerQrSize ?? 18), Number((settings as any).signerQrY ?? 68))),
-      Math.max(8, Math.min(35, Number((settings as any).signerQrSize ?? 18))),
-      Number((settings as any).signerQrPadding ?? 2),
+      Math.max(5, Math.min(40, Number((settings as any).signerQrSize ?? 18))),
+      Math.max(0, Number((settings as any).signerQrPadding ?? 2)),
       String((settings as any).signerQrBackgroundColor || '#ffffff'),
       String((settings as any).signerQrBorderColor || 'transparent'),
       Number((settings as any).signerQrBorderWidth ?? 0),
@@ -713,42 +807,34 @@ async function renderBack(
       whiteSpace: 'normal'
     };
 
-    if ((settings as any).showSignerName !== false) {
-      drawText(ctx, signer.fullName, {
-        ...base,
-        y: sy + ((settings as any).signerNameYOffset ?? 0),
-        fontSize: (settings as any).signerNameFontSize ?? 9,
-        fontWeight: 'bold'
-      }, '#ffffff');
-    }
+    drawText(ctx, signer.fullName, {
+      ...base,
+      y: sy + ((settings as any).signerNameYOffset ?? 0),
+      fontSize: (settings as any).signerNameFontSize ?? 9,
+      fontWeight: 'bold'
+    }, '#ffffff');
 
-    if ((settings as any).showSignerTitle === true) {
-      drawText(ctx, signer.currentPosition || '', {
-        ...base,
-        y: sy + 10,
-        fontSize: (settings as any).signerTitleFontSize ?? 7,
-        fontWeight: 'normal'
-      }, '#ffffff');
-    }
+    drawText(ctx, signer.currentPosition || '', {
+      ...base,
+      y: sy + 10,
+      fontSize: (settings as any).signerTitleFontSize ?? 7,
+      fontWeight: 'normal'
+    }, '#ffffff');
   } else if ((settings as any).signerName || (settings as any).signerTitle) {
     const sx = (settings as any).signerX ?? 5;
     const sy = (settings as any).signerY ?? 82;
-    if ((settings as any).showSignerName !== false) {
-      drawText(ctx, String((settings as any).signerName || ''), {
-        x: sx, y: sy, width: (settings as any).signerWidth ?? 55,
-        fontSize: (settings as any).signerNameFontSize ?? 9,
-        fontWeight: 'bold', color: (settings as any).signerColor ?? '#ffffff',
-        align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
-      }, '#ffffff');
-    }
-    if ((settings as any).showSignerTitle === true) {
-      drawText(ctx, String((settings as any).signerTitle || ''), {
-        x: sx, y: sy + 10, width: (settings as any).signerWidth ?? 55,
-        fontSize: (settings as any).signerTitleFontSize ?? 7,
-        fontWeight: 'normal', color: (settings as any).signerColor ?? '#ffffff',
-        align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
-      }, '#ffffff');
-    }
+    drawText(ctx, String((settings as any).signerName || ''), {
+      x: sx, y: sy, width: (settings as any).signerWidth ?? 55,
+      fontSize: (settings as any).signerNameFontSize ?? 9,
+      fontWeight: 'bold', color: (settings as any).signerColor ?? '#ffffff',
+      align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
+    }, '#ffffff');
+    drawText(ctx, String((settings as any).signerTitle || ''), {
+      x: sx, y: sy + 10, width: (settings as any).signerWidth ?? 55,
+      fontSize: (settings as any).signerTitleFontSize ?? 7,
+      fontWeight: 'normal', color: (settings as any).signerColor ?? '#ffffff',
+      align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
+    }, '#ffffff');
   }
 
   ctx.restore();
@@ -760,13 +846,18 @@ export interface GenerateKtaOptions {
   settings?: KtaCardSettings;
   format?: KtaPdfFormat;
   onProgress?: (step: string) => void;
+  /** Jika tersedia, PDF memakai DOM preview yang sama agar hasil 1:1 dengan tampilan aplikasi. */
+  frontElement?: HTMLElement | null;
+  backElement?: HTMLElement | null;
 }
 
 export async function generateKtaPdf({
   member,
   settings = DEFAULT_KTA_SETTINGS,
   format = 'CR80_STANDARD',
-  onProgress
+  onProgress,
+  frontElement,
+  backElement
 }: GenerateKtaOptions): Promise<jsPDF> {
   // Clone once. This is the immutable design snapshot for this PDF job.
   const design: KtaCardSettings = JSON.parse(JSON.stringify(settings || DEFAULT_KTA_SETTINGS));
@@ -795,6 +886,15 @@ export async function generateKtaPdf({
   ]);
 
   const qrImg = await loadImage(qrDataUrl);
+  const signerVerificationId = signerMember
+    ? String(signerMember.nationalMemberNumber || signerMember.id || signerMember.userId || '').trim()
+    : '';
+  const signerVerificationUrl = signerVerificationId
+    ? `${window.location.origin}/verify?verifyId=${encodeURIComponent(signerVerificationId)}`
+    : '';
+  const signerQrImg = signerVerificationUrl
+    ? await loadImage(await generateQrDataUrl(signerVerificationUrl))
+    : null;
 
   onProgress?.('Me-render sisi depan berdasarkan KtaCardSettings...');
   const frontCanvas = await renderFront(member, design, {
@@ -804,6 +904,7 @@ export async function generateKtaPdf({
     backLogoImg,
     avatar,
     qrImg,
+    signerQrImg,
     logos: configuredLogos
   });
 
@@ -814,11 +915,41 @@ export async function generateKtaPdf({
     frontLogoImg,
     backLogoImg,
     qrImg,
+    signerQrImg,
     logos: configuredLogos
   }, signerMember);
 
-  const frontImg = frontCanvas.toDataURL('image/png', 1);
-  const backImg = backCanvas.toDataURL('image/png', 1);
+  // Untuk export dari UI, gunakan DOM preview yang sama persis.
+  // Ini menghindari perbedaan font, wrapping, padding, logo, dan posisi
+  // antara renderer Canvas dan tampilan KTA di aplikasi. Renderer Canvas
+  // tetap dipertahankan sebagai fallback untuk pemanggilan non-UI.
+  let frontImg = frontCanvas.toDataURL('image/png', 1);
+  let backImg = backCanvas.toDataURL('image/png', 1);
+
+  if (frontElement && backElement) {
+    onProgress?.('Menyalin tampilan preview KTA secara 1:1 ke PDF...');
+    const capture = async (element: HTMLElement) => {
+      const canvas = await html2canvas(element, {
+        backgroundColor: null,
+        scale: 1,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        windowWidth: CANVAS_WIDTH,
+        windowHeight: CANVAS_HEIGHT,
+        onclone: (clonedDocument) => {
+          sanitizeHtml2CanvasClone(clonedDocument);
+        }
+      });
+      return canvas.toDataURL('image/png', 1);
+    };
+    [frontImg, backImg] = await Promise.all([
+      capture(frontElement),
+      capture(backElement)
+    ]);
+  }
 
   onProgress?.('Menyusun PDF dengan ukuran fisik KTA...');
 
@@ -947,9 +1078,10 @@ export async function downloadKtaPdfFile(
   member: Member,
   settings: KtaCardSettings = DEFAULT_KTA_SETTINGS,
   format: KtaPdfFormat = 'CR80_STANDARD',
-  onProgress?: (step: string) => void
+  onProgress?: (step: string) => void,
+  captureElements?: { frontElement?: HTMLElement | null; backElement?: HTMLElement | null }
 ): Promise<void> {
-  const doc = await generateKtaPdf({ member, settings, format, onProgress });
+  const doc = await generateKtaPdf({ member, settings, format, onProgress, ...captureElements });
   const cleanName = member.fullName.replace(/[^a-zA-Z0-9]/g, '_');
   const nta = member.nationalMemberNumber
     ? member.nationalMemberNumber.replace(/[^a-zA-Z0-9]/g, '-')
@@ -957,4 +1089,3 @@ export async function downloadKtaPdfFile(
   const fileName = `KTA-SakaPariwisata-${nta}-${cleanName}-${format === 'CR80_STANDARD' ? 'CR80' : 'A4'}.pdf`;
   doc.save(fileName);
 }
-
