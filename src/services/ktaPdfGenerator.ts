@@ -132,7 +132,7 @@ function sanitizeHtml2CanvasClone(cloneDocument: Document): void {
       const property = computed.item(i);
       if (!property.startsWith('--')) continue;
       const value = computed.getPropertyValue(property);
-      if (/oklch\\(/i.test(value)) {
+      if (/oklch\(/i.test(value)) {
         element.style.setProperty(property, replaceUnsupportedCssColors(value));
       }
     }
