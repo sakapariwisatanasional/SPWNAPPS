@@ -515,6 +515,20 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
     setSelectedSize(product.sizes?.[0]);
   };
 
+  const openCart = (event?: React.MouseEvent<HTMLButtonElement>) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.nativeEvent.stopImmediatePropagation();
+    }
+
+    setNotice('');
+    setSelectedProduct(null);
+    setCheckoutOpen(false);
+    setSuccessOrder(null);
+    setCartOpen(true);
+  };
+
   const addToCart = () => {
     if (!selectedProduct) return;
 
@@ -742,17 +756,7 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
             <button
               type="button"
-              onClick={event => {
-                // Keep the cart action isolated from any parent navigation/click handler.
-                event.preventDefault();
-                event.stopPropagation();
-
-                setNotice('');
-                setSelectedProduct(null);
-                setCheckoutOpen(false);
-                setSuccessOrder(null);
-                setCartOpen(true);
-              }}
+              onClick={openCart}
               className="relative inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-black text-white transition hover:bg-white/15"
             >
               <ShoppingBag className="h-4 w-4" />
@@ -1216,12 +1220,34 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
       )}
 
       {cartOpen && (
-        <ModalShell
-          title={`Keranjang ${
-            cartCount > 0 ? `(${cartCount})` : ''
-          }`}
-          onClose={() => setCartOpen(false)}
+        <div
+          className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Keranjang"
+          onPointerDown={event => event.stopPropagation()}
+          onClick={event => event.stopPropagation()}
         >
+          <div
+            className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[1.8rem] bg-white shadow-2xl sm:rounded-[1.8rem]"
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+              <h2 className="text-sm font-black text-slate-800">
+                Keranjang {cartCount > 0 ? `(${cartCount})` : ''}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setCartOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                aria-label="Tutup keranjang"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 overflow-y-auto">
           <div className="p-5 sm:p-6">
             {!cartRows.length ? (
               <div className="py-10 text-center">
@@ -1362,7 +1388,9 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               </>
             )}
           </div>
-        </ModalShell>
+            </div>
+          </div>
+        </div>
       )}
 
       {checkoutOpen && (
