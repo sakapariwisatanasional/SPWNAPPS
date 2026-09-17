@@ -50,6 +50,7 @@ interface CheckoutForm {
 interface DemoOrder {
   orderNumber: string;
   createdAt: string;
+  status: string;
   items: Array<{
     productId: string;
     name: string;
@@ -62,8 +63,6 @@ interface DemoOrder {
 }
 
 const CART_STORAGE_KEY = 'spwn-official-store-cart';
-const ORDERS_STORAGE_KEY = 'spwn-official-store-orders';
-
 const categoryLabels: Record<OfficialMerchandiseProduct['category'], string> = {
   APPAREL: 'Apparel',
   ACCESSORIES: 'Aksesori',
@@ -93,14 +92,6 @@ const isPurchasable = (product: OfficialMerchandiseProduct) =>
   product.active &&
   product.purchaseEnabled === true &&
   product.comingSoon === false;
-
-const createOrderNumber = () => {
-  const date = new Date();
-  const datePart = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
-  const randomPart = Math.random().toString(36).slice(2, 6).toUpperCase();
-
-  return `SPWN-${datePart}-${randomPart}`;
-};
 
 const readCart = (): CartItem[] => {
   try {
@@ -388,6 +379,8 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
   const [checkoutError, setCheckoutError] = useState<string>('');
 
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+
   const [form, setForm] = useState<CheckoutForm>({
     receiverName: '',
     whatsapp: '',
@@ -634,10 +627,10 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
     }
   };
 
-  const submitOrder = () => {
-    const requiredFields: Array<
-      [keyof CheckoutForm, string]
-    > = [
+  const submitOrder = async () => {
+    if (submittingOrder) return;
+
+    const requiredFields: Array<[keyof CheckoutForm, string]> = [
       ['receiverName', 'Nama penerima'],
       ['whatsapp', 'Nomor WhatsApp'],
       ['address', 'Alamat lengkap'],
@@ -646,21 +639,14 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
       ['district', 'Kecamatan']
     ];
 
-    const missing = requiredFields.find(
-      ([field]) => !form[field].trim()
-    );
+    const missing = requiredFields.find(([field]) => !form[field].trim());
 
     if (missing) {
-      setCheckoutError(
-        `${missing[1]} wajib diisi.`
-      );
+      setCheckoutError(`${missing[1]} wajib diisi.`);
       return;
     }
 
-    const normalizedPhone = form.whatsapp.replace(
-      /[^0-9]/g,
-      ''
-    );
+    const normalizedPhone = form.whatsapp.replace(/[^0-9]/g, '');
 
     if (normalizedPhone.length < 8) {
       setCheckoutError(
@@ -670,58 +656,71 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
     }
 
     if (!cartRows.length) {
-      setCheckoutError(
-        'Keranjang tidak memiliki produk yang dapat dibeli.'
-      );
+      setCheckoutError('Keranjang tidak memiliki produk yang dapat dibeli.');
       return;
     }
 
-    const order: DemoOrder = {
-      orderNumber: createOrderNumber(),
-      createdAt: new Date().toISOString(),
-      items: cartRows.map(row => ({
-        productId: row.product.id,
-        name: row.product.name,
-        price: row.product.price,
-        size: row.item.size,
-        quantity: row.item.quantity
-      })),
-      subtotal,
-      checkout: {
-        ...form,
-        whatsapp: form.whatsapp.trim()
-      }
-    };
+    setSubmittingOrder(true);
+    setCheckoutError('');
 
     try {
-      const existingRaw =
-        window.localStorage.getItem(
-          ORDERS_STORAGE_KEY
+      const token = window.localStorage.getItem('saka_auth_token');
+      const response = await fetch('/api/mutate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          type: 'ORDER',
+          action: 'CREATE',
+          payload: {
+            items: cartRows.map(row => ({
+              productId: row.product.id,
+              size: row.item.size,
+              quantity: row.item.quantity
+            })),
+            checkout: {
+              receiverName: form.receiverName.trim(),
+              whatsapp: normalizedPhone,
+              address: form.address.trim(),
+              province: form.province.trim(),
+              regency: form.regency.trim(),
+              district: form.district.trim(),
+              note: form.note.trim()
+            }
+          }
+        })
+      });
+
+      let result: any = null;
+      try {
+        result = await response.json();
+      } catch {
+        result = null;
+      }
+
+      if (!response.ok || !result?.success || !result?.order) {
+        throw new Error(
+          result?.message ||
+            `Pesanan belum tersimpan. Server mengembalikan HTTP ${response.status}.`
         );
+      }
 
-      const existingOrders = existingRaw
-        ? JSON.parse(existingRaw)
-        : [];
+      const order: DemoOrder = result.order;
 
-      const safeOrders = Array.isArray(existingOrders)
-        ? existingOrders
-        : [];
-
-      window.localStorage.setItem(
-        ORDERS_STORAGE_KEY,
-        JSON.stringify([
-          ...safeOrders,
-          order
-        ])
+      setCart([]);
+      setCheckoutOpen(false);
+      setSuccessOrder(order);
+    } catch (error: any) {
+      setCheckoutError(
+        error?.message ||
+          'Pesanan belum dapat disimpan. Silakan coba lagi.'
       );
-    } catch {
-      // Pesanan tetap dapat ditampilkan sebagai hasil demo
-      // walaupun localStorage tidak tersedia.
+    } finally {
+      setSubmittingOrder(false);
     }
-
-    setCart([]);
-    setCheckoutOpen(false);
-    setSuccessOrder(order);
   };
 
   return (
@@ -1373,9 +1372,9 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               </div>
 
               <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
-                Isi data pengiriman dengan benar. Tahap ini
-                masih berupa simulasi checkout dan belum
-                terhubung dengan payment gateway.
+                Isi data pengiriman dengan benar. Pesanan akan
+                disimpan ke backend Official Store. Pembayaran
+                belum terhubung pada tahap ini.
               </p>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -1536,10 +1535,11 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               <button
                 type="button"
                 onClick={submitOrder}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#34206b] px-4 py-3 text-[10px] font-black text-white transition hover:bg-[#45288b]"
+                disabled={submittingOrder}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#34206b] px-4 py-3 text-[10px] font-black text-white transition hover:bg-[#45288b] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <CreditCard className="h-4 w-4" />
-                Buat Pesanan
+                {submittingOrder ? 'Menyimpan Pesanan...' : 'Buat Pesanan'}
               </button>
             </div>
 
@@ -1603,9 +1603,8 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
                 <div className="mt-2 flex items-start gap-2 rounded-xl bg-white p-3 text-[9px] leading-relaxed text-slate-500">
                   <Truck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#7b2cbf]" />
-                  Ongkir belum dihitung pada tahap demo ini
-                  dan akan dikonfirmasi setelah pesanan
-                  diterima.
+                  Ongkir belum dihitung pada tahap ini dan akan
+                  dikonfirmasi setelah pesanan diterima.
                 </div>
               </div>
             </div>
@@ -1632,9 +1631,9 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
             </div>
 
             <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-slate-500">
-              Data pesanan tersimpan sebagai demo pada perangkat
-              ini. Tahap ini belum terhubung ke pembayaran atau
-              backend pemesanan.
+              Pesanan telah tersimpan di backend Official Store
+              dengan status awal <strong>Menunggu Pembayaran</strong>.
+              Pembayaran belum terhubung pada tahap ini.
             </p>
 
             <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left">
