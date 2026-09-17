@@ -1700,6 +1700,188 @@ app.post('/api/auth/change-password', async (req, res) => {
   }
 });
 
+// POST /api/auth/reset-password - Public forgot-password persistence
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { identifier, userId, email, memberId, newPassword } = req.body || {};
+  const password = String(newPassword || '');
+
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
+  }
+
+  const cleanIdentifier = String(identifier || '').trim();
+  const cleanUserId = String(userId || '').trim();
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanMemberId = String(memberId || '').trim();
+
+  if (!cleanIdentifier && !cleanUserId && !cleanEmail && !cleanMemberId) {
+    return res.status(400).json({ success: false, message: 'Identitas akun wajib diisi.' });
+  }
+
+  const matchedUser = db.users.find(u =>
+    (cleanUserId && String(u.id || '') === cleanUserId) ||
+    (cleanEmail && String(u.email || '').trim().toLowerCase() === cleanEmail) ||
+    (cleanMemberId && String(u.memberId || '') === cleanMemberId)
+  );
+  const matchedMember = db.members.find(m =>
+    (cleanMemberId && String(m.id || '') === cleanMemberId) ||
+    (cleanEmail && String(m.email || '').trim().toLowerCase() === cleanEmail)
+  );
+
+  if (!matchedUser && !matchedMember) {
+    return res.status(404).json({ success: false, message: 'Akun tidak ditemukan.' });
+  }
+
+  const normalizedIdentifier = cleanIdentifier.toLowerCase();
+  const identifierMatches =
+    (matchedUser && (String(matchedUser.id || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedUser.username || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedUser.email || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedUser.memberId || '').toLowerCase() === normalizedIdentifier)) ||
+    (matchedMember && (String(matchedMember.id || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedMember.nationalMemberNumber || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedMember.email || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedMember.phone || '').toLowerCase() === normalizedIdentifier));
+
+  if (!identifierMatches) {
+    return res.status(400).json({ success: false, message: 'Identitas akun tidak sesuai dengan data akun yang ditemukan.' });
+  }
+
+  try {
+    const passwordHash = hashPassword(password);
+    const gasResult = await forwardToGoogleAppsScript({
+      action: 'AUTH_RESET_PASSWORD',
+      identifier: cleanIdentifier,
+      userId: cleanUserId || String(matchedUser?.id || matchedMember?.userId || '').trim(),
+      email: cleanEmail || String(matchedUser?.email || matchedMember?.email || '').trim().toLowerCase(),
+      memberId: cleanMemberId || String(matchedUser?.memberId || matchedMember?.id || '').trim(),
+      passwordHash
+    }, DEFAULT_APPS_SCRIPT_URL);
+
+    if (!gasResult?.success) {
+      return res.status(400).json({
+        success: false,
+        message: gasResult?.message || 'Kata sandi gagal diperbarui di Google Spreadsheet.'
+      });
+    }
+
+    const matchingUsers = db.users
+      .map((user, index) => ({ user, index }))
+      .filter(({ user }) =>
+        (cleanUserId && String(user.id || '') === cleanUserId) ||
+        (cleanEmail && String(user.email || '').trim().toLowerCase() === cleanEmail) ||
+        (cleanMemberId && String(user.memberId || '') === cleanMemberId)
+      );
+
+    for (const { user, index } of matchingUsers) {
+      db.users[index] = { ...user, passwordHash };
+    }
+    if (matchingUsers.length > 0) saveDatabase();
+
+    return res.json({
+      success: true,
+      message: 'Kata sandi berhasil diperbarui dan disimpan di Google Spreadsheet.'
+    });
+  } catch (error: any) {
+    console.error('[Auth] Reset password ke Google Apps Script gagal:', error);
+    return res.status(502).json({
+      success: false,
+      message: error?.message || 'Gagal menyimpan kata sandi ke Google Spreadsheet.'
+    });
+  }
+});
+
+// POST /api/admin/reset-member-password - Super Admin membantu anggota yang lupa password
+app.post('/api/admin/reset-member-password', async (req, res) => {
+  const session = getSessionUser(req);
+  if (!session) {
+    return res.status(401).json({ success: false, message: 'Sesi administrator tidak ditemukan. Silakan masuk kembali.' });
+  }
+  if (session.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat mereset kata sandi anggota.' });
+  }
+
+  const { memberId, userId, email, newPassword } = req.body || {};
+  const password = String(newPassword || '');
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
+  }
+
+  const cleanMemberId = String(memberId || '').trim();
+  const cleanUserId = String(userId || '').trim();
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!cleanMemberId && !cleanUserId && !cleanEmail) {
+    return res.status(400).json({ success: false, message: 'Identitas anggota tidak lengkap.' });
+  }
+
+  const member = db.members.find(m =>
+    (cleanMemberId && String(m.id || '') === cleanMemberId) ||
+    (cleanEmail && String(m.email || '').trim().toLowerCase() === cleanEmail)
+  );
+  const user = db.users.find(u =>
+    (cleanUserId && String(u.id || '') === cleanUserId) ||
+    (cleanMemberId && String(u.memberId || '') === cleanMemberId) ||
+    (cleanEmail && String(u.email || '').trim().toLowerCase() === cleanEmail)
+  );
+
+  if (!member && !user) {
+    return res.status(404).json({ success: false, message: 'Akun anggota tidak ditemukan di database aplikasi.' });
+  }
+
+  const resolvedMemberId = cleanMemberId || String(member?.id || user?.memberId || '').trim();
+  const resolvedUserId = cleanUserId || String(user?.id || member?.userId || '').trim();
+  const resolvedEmail = cleanEmail || String(user?.email || member?.email || '').trim().toLowerCase();
+
+  try {
+    const passwordHash = hashPassword(password);
+    const gasResult = await forwardToGoogleAppsScript({
+      action: 'AUTH_RESET_PASSWORD',
+      userId: resolvedUserId,
+      memberId: resolvedMemberId,
+      email: resolvedEmail,
+      passwordHash,
+      resetByUserId: session.userId,
+      resetByUsername: session.username,
+      resetByName: session.name
+    }, DEFAULT_APPS_SCRIPT_URL);
+
+    if (!gasResult?.success) {
+      return res.status(400).json({
+        success: false,
+        message: gasResult?.message || 'Kata sandi gagal diperbarui di Google Spreadsheet.'
+      });
+    }
+
+    if (user) {
+      user.passwordHash = passwordHash;
+    }
+
+    db.auditLogs.unshift({
+      id: `audit-password-reset-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      userId: session.userId,
+      userName: session.name || session.username || 'Super Admin',
+      action: 'RESET_MEMBER_PASSWORD',
+      entityType: 'MEMBER',
+      entityId: resolvedMemberId || resolvedUserId,
+      description: `Super Admin mereset kata sandi anggota ${member?.fullName || resolvedEmail || resolvedMemberId}.`
+    });
+    if (db.auditLogs.length > 500) db.auditLogs.pop();
+    saveDatabase();
+
+    return res.json({
+      success: true,
+      message: 'Kata sandi anggota berhasil diperbarui dan disimpan di Google Spreadsheet.'
+    });
+  } catch (error: any) {
+    console.error('[Admin] Reset password anggota ke Google Apps Script gagal:', error);
+    return res.status(502).json({
+      success: false,
+      message: error?.message || 'Gagal menyimpan kata sandi anggota ke Google Spreadsheet.'
+    });
+  }
+});
+
 // POST /api/auth/register - Public new member registration
 app.post('/api/auth/register', async (req, res) => {
   const requestId = `REG-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
