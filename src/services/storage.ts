@@ -70,7 +70,6 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   heightMm: 53.98,
   cornerRadiusMm: 3.18,
   cardTheme: 'purple_saka',
-  // Template master nasional — artwork tidak lagi dapat diganti dari KTA Designer.
   bgImageUrl: '/assets/kta/KTA_MASTER_DEPAN.png',
   frontBackgroundUrl: '/assets/kta/KTA_MASTER_DEPAN.png',
   backBackgroundUrl: '/assets/kta/KTA_MASTER_BELAKANG.png',
@@ -82,7 +81,6 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   logos: [],
   dataFields: [],
   textElements: [],
-  // Deprecated: header organisasi sekarang sudah menjadi bagian dari master artwork.
   frontOrganizationTitle: '',
   frontOrganizationSubtitle: '',
   frontOrganizationTitleX: 15,
@@ -112,8 +110,8 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   qrBorderRadius: 10,
   qrPadding: 6,
   qrBackgroundColor: '#ffffff',
-  backHeaderTitle: 'KARTU TANDA ANGGOTA',
-  backHeaderSubtitle: 'SAKA PARIWISATA NASIONAL',
+  backHeaderTitle: '',
+  backHeaderSubtitle: '',
   terms: [],
   issueLocationDate: 'Jakarta, 14 Agustus 2026',
   issueLocationDateX: 5,
@@ -2422,23 +2420,18 @@ class StorageService {
   }
 
   private setKtaSettingsInMemory(settings: KtaCardSettings) {
-
     const merged = {
       ...DEFAULT_KTA_SETTINGS,
       ...(settings && typeof settings === 'object' ? settings : {})
     } as KtaCardSettings;
 
-    // KTA menggunakan dua artwork master yang fixed. Konfigurasi lama
-    // tetap dibaca agar migrasi aman, tetapi artwork aktif selalu master nasional.
-    (merged as any).frontBackgroundUrl = '/assets/kta/KTA_MASTER_DEPAN.png';
-    (merged as any).backBackgroundUrl = '/assets/kta/KTA_MASTER_BELAKANG.png';
+    // KTA SPWNAPP menggunakan artwork master tetap untuk kedua sisi.
+    const frontBg = String((merged as any).frontBackgroundUrl || '');
+    const backBg = String((merged as any).backBackgroundUrl || '');
+    if (!frontBg || frontBg.includes('KTA-MASTER.png')) (merged as any).frontBackgroundUrl = '/assets/kta/KTA_MASTER_DEPAN.png';
+    if (!backBg || backBg.includes('KTA-MASTER.png')) (merged as any).backBackgroundUrl = '/assets/kta/KTA_MASTER_BELAKANG.png';
     (merged as any).bgImageUrl = '/assets/kta/KTA_MASTER_DEPAN.png';
     (merged as any).bgOpacity = 0;
-    (merged as any).customBackgroundColorFront = '#32116f';
-    (merged as any).customBackgroundColorBack = '#32116f';
-    // Header organisasi lama dipertahankan hanya untuk kompatibilitas data lama.
-    (merged as any).frontOrganizationTitle = '';
-    (merged as any).frontOrganizationSubtitle = '';
 
     // Keep the signer/date defaults safe for older KTA configurations.
     // Legacy barcode settings remain accepted for spreadsheet compatibility,

@@ -15,9 +15,6 @@ export const CR80_WIDTH_MM = 85.60;
 export const CR80_HEIGHT_MM = 53.98;
 export const CR80_CORNER_RADIUS_MM = 3.18;
 
-export const KTA_MASTER_FRONT_URL = '/assets/kta/KTA_MASTER_DEPAN.png';
-export const KTA_MASTER_BACK_URL = '/assets/kta/KTA_MASTER_BELAKANG.png';
-
 // 300 DPI-equivalent render surface for the ISO/IEC 7810 ID-1 card.
 const CANVAS_WIDTH = 1012;
 const CANVAS_HEIGHT = 638;
@@ -335,6 +332,14 @@ function drawDataFields(
     });
 }
 
+const MASTER_FRONT_URL = '/assets/kta/KTA_MASTER_DEPAN.png';
+const MASTER_BACK_URL = '/assets/kta/KTA_MASTER_BELAKANG.png';
+
+function isMasterBackground(image: HTMLImageElement | null, side: Side, settings: KtaCardSettings): boolean {
+  const configured = side === 'FRONT' ? String((settings as any).frontBackgroundUrl || '') : String((settings as any).backBackgroundUrl || '');
+  return configured.includes(side === 'FRONT' ? 'KTA_MASTER_DEPAN.png' : 'KTA_MASTER_BELAKANG.png');
+}
+
 function drawBackground(
   ctx: CanvasRenderingContext2D,
   settings: KtaCardSettings,
@@ -348,10 +353,23 @@ function drawBackground(
   ctx.fillStyle = color;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+  const master = isMasterBackground(image, side, settings);
   if (image?.naturalWidth) {
     ctx.save();
     drawCoverImage(ctx, image, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.restore();
+  }
+
+  // Artwork master sudah memiliki seluruh elemen grafisnya sendiri.
+  // Jangan tambahkan dark overlay ketika menggunakan master.
+  if (!master) {
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    const opacity = Math.max(0, Math.min(1, Number(settings.bgOpacity ?? 0.1)));
+    if (opacity > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${0.1 * opacity})`;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
   }
 }
 
@@ -378,7 +396,7 @@ function drawQr(
   if (!qrImg || !qrImg.naturalWidth) return;
 
   // DigitalMemberCard sizes QR against the smaller card dimension.
-  const side = Math.max(36, Math.min(CANVAS_WIDTH, CANVAS_HEIGHT) * sizePercent / 100);
+  const side = Math.max(36, Math.min(CANVAS_WIDTH, CANVAS_WIDTH * sizePercent / 100));
   const x = pctX(xPercent);
   const y = pctY(yPercent);
   const padding = Math.max(0, Number(paddingPercent) * PX_SCALE);
@@ -444,14 +462,43 @@ async function renderFront(
 
   drawBackground(ctx, settings, 'FRONT', assets.background);
 
+  const frontMaster = isMasterBackground(assets.background, 'FRONT', settings);
   const frontLogos = assets.logos.filter(item => item.cfg.side === 'FRONT');
-  if (frontLogos.length) {
+  if (!frontMaster && frontLogos.length) {
     frontLogos.forEach(item => drawConfiguredImage(ctx, item.img, item.cfg));
-  } else if (settings.frontLogoUrl) {
+  } else if (!frontMaster && settings.frontLogoUrl) {
     drawConfiguredImage(ctx, assets.frontLogoImg?.naturalWidth ? assets.frontLogoImg : assets.officialLogo, {
       x: 4, y: 5, width: 10, height: 16, objectFit: 'contain', opacity: 1
     });
+  } else if (!frontMaster) {
+    drawConfiguredImage(ctx, assets.officialLogo, { x: 4, y: 5, width: 10, height: 16, objectFit: 'contain', opacity: 1 });
   }
+
+  if (!frontMaster) drawText(ctx, settings.frontOrganizationTitle || '', {
+    x: settings.frontOrganizationTitleX ?? 15,
+    y: settings.frontOrganizationTitleY ?? 6,
+    width: settings.frontOrganizationTitleWidth ?? 65,
+    fontSize: settings.frontOrganizationTitleFontSize ?? 11,
+    fontWeight: settings.frontOrganizationTitleFontWeight ?? 'bold',
+    color: settings.frontOrganizationTitleColor ?? '#ffffff',
+    align: settings.frontOrganizationTitleAlign ?? 'left',
+    lineHeight: settings.frontOrganizationTitleLineHeight ?? 1.15,
+    letterSpacing: settings.frontOrganizationTitleLetterSpacing ?? 0,
+    whiteSpace: 'normal'
+  }, '#ffffff', { uppercase: true });
+
+  if (!frontMaster) drawText(ctx, settings.frontOrganizationSubtitle || '', {
+    x: settings.frontOrganizationSubtitleX ?? 15,
+    y: settings.frontOrganizationSubtitleY ?? 12,
+    width: settings.frontOrganizationSubtitleWidth ?? 70,
+    fontSize: settings.frontOrganizationSubtitleFontSize ?? 8,
+    fontWeight: settings.frontOrganizationSubtitleFontWeight ?? 'normal',
+    color: settings.frontOrganizationSubtitleColor ?? '#e5e7eb',
+    align: settings.frontOrganizationSubtitleAlign ?? 'left',
+    lineHeight: settings.frontOrganizationSubtitleLineHeight ?? 1.2,
+    letterSpacing: settings.frontOrganizationSubtitleLetterSpacing ?? 0,
+    whiteSpace: 'normal'
+  }, '#e5e7eb');
 
   if (settings.showPhoto !== false && assets.avatar.naturalWidth) {
     const x = pctX(settings.photoX ?? 4);
@@ -546,12 +593,39 @@ async function renderBack(
 
   drawBackground(ctx, settings, 'BACK', assets.background);
 
+  const backMaster = isMasterBackground(assets.background, 'BACK', settings);
   const backLogos = assets.logos.filter(item => item.cfg.side === 'BACK');
-  if (backLogos.length) {
+  if (!backMaster && backLogos.length) {
     backLogos.forEach(item => drawConfiguredImage(ctx, item.img, item.cfg));
-  } else if (settings.backLogoUrl) {
+  } else if (!backMaster && settings.backLogoUrl) {
     drawConfiguredImage(ctx, assets.backLogoImg?.naturalWidth ? assets.backLogoImg : assets.officialLogo, { x: 4, y: 3, width: 10, height: 16, objectFit: 'contain', opacity: 1 });
   }
+
+  if (!backMaster) drawText(ctx, settings.backHeaderTitle || '', {
+    x: (settings as any).backHeaderTitleX ?? 5,
+    y: (settings as any).backHeaderTitleY ?? 6,
+    width: (settings as any).backHeaderTitleWidth ?? 90,
+    fontSize: (settings as any).backHeaderTitleFontSize ?? 11,
+    fontWeight: (settings as any).backHeaderTitleFontWeight ?? 'bold',
+    color: (settings as any).backHeaderTitleColor ?? '#ffffff',
+    align: (settings as any).backHeaderTitleAlign ?? 'left',
+    lineHeight: (settings as any).backHeaderTitleLineHeight ?? 1.15,
+    letterSpacing: (settings as any).backHeaderTitleLetterSpacing ?? 0,
+    whiteSpace: 'normal'
+  }, '#ffffff', { uppercase: true });
+
+  if (!backMaster) drawText(ctx, settings.backHeaderSubtitle || '', {
+    x: (settings as any).backHeaderSubtitleX ?? 5,
+    y: (settings as any).backHeaderSubtitleY ?? 14,
+    width: (settings as any).backHeaderSubtitleWidth ?? 90,
+    fontSize: (settings as any).backHeaderSubtitleFontSize ?? 8,
+    fontWeight: (settings as any).backHeaderSubtitleFontWeight ?? 'normal',
+    color: (settings as any).backHeaderSubtitleColor ?? '#e5e7eb',
+    align: (settings as any).backHeaderSubtitleAlign ?? 'left',
+    lineHeight: (settings as any).backHeaderSubtitleLineHeight ?? 1.2,
+    letterSpacing: (settings as any).backHeaderSubtitleLetterSpacing ?? 0,
+    whiteSpace: 'normal'
+  }, '#e5e7eb');
 
   const terms = (settings.terms || []).length
     ? settings.terms
@@ -636,12 +710,14 @@ async function renderBack(
       fontWeight: 'bold'
     }, '#ffffff');
 
-    drawText(ctx, signer.currentPosition || '', {
-      ...base,
-      y: sy + 10,
-      fontSize: (settings as any).signerTitleFontSize ?? 7,
-      fontWeight: 'normal'
-    }, '#ffffff');
+    if ((settings as any).showSignerTitle === true) {
+      drawText(ctx, signer.currentPosition || '', {
+        ...base,
+        y: sy + 10,
+        fontSize: (settings as any).signerTitleFontSize ?? 7,
+        fontWeight: 'normal'
+      }, '#ffffff');
+    }
   } else if ((settings as any).signerName || (settings as any).signerTitle) {
     const sx = (settings as any).signerX ?? 5;
     const sy = (settings as any).signerY ?? 82;
@@ -651,12 +727,14 @@ async function renderBack(
       fontWeight: 'bold', color: (settings as any).signerColor ?? '#ffffff',
       align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
     }, '#ffffff');
-    drawText(ctx, String((settings as any).signerTitle || ''), {
-      x: sx, y: sy + 10, width: (settings as any).signerWidth ?? 55,
-      fontSize: (settings as any).signerTitleFontSize ?? 7,
-      fontWeight: 'normal', color: (settings as any).signerColor ?? '#ffffff',
-      align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
-    }, '#ffffff');
+    if ((settings as any).showSignerTitle === true) {
+      drawText(ctx, String((settings as any).signerTitle || ''), {
+        x: sx, y: sy + 10, width: (settings as any).signerWidth ?? 55,
+        fontSize: (settings as any).signerTitleFontSize ?? 7,
+        fontWeight: 'normal', color: (settings as any).signerColor ?? '#ffffff',
+        align: (settings as any).signerAlign ?? 'left', whiteSpace: 'normal'
+      }, '#ffffff');
+    }
   }
 
   ctx.restore();
@@ -697,8 +775,8 @@ export async function generateKtaPdf({
   const [avatar, officialLogo, frontBackground, backBackground, frontLogoImg, backLogoImg, qrDataUrl, signerMember] = await Promise.all([
     loadImage(member.avatarUrl || ''),
     loadOfficialSakaLogo(),
-    loadCardBackground(KTA_MASTER_FRONT_URL),
-    loadCardBackground(KTA_MASTER_BACK_URL),
+    loadCardBackground(design.frontBackgroundUrl || design.bgImageUrl),
+    loadCardBackground(design.backBackgroundUrl || design.bgImageUrl),
     design.frontLogoUrl ? loadImage(design.frontLogoUrl) : Promise.resolve(new Image()),
     design.backLogoUrl ? loadImage(design.backLogoUrl) : Promise.resolve(new Image()),
     generateQrDataUrl(verificationUrl),
