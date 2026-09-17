@@ -1462,6 +1462,19 @@ app.post('/api/auth/login', async (req, res) => {
   const cleanUser = String(username).trim().toLowerCase();
   const rawPass = String(password);
 
+  // Login dapat memakai Username, Email, atau Nomor KTA.
+  // Google Apps Script Users mengenali Username/Email/Member ID, sehingga
+  // Nomor KTA perlu dipetakan ke akun member terlebih dahulu bila tersedia
+  // di cache server. Bila cache belum berisi anggota, GAS tetap menerima
+  // identifier asli sebagai fallback.
+  const matchedMemberByKta = db.members.find(m =>
+    m?.nationalMemberNumber &&
+    String(m.nationalMemberNumber).trim().toLowerCase() === cleanUser
+  );
+  const gasLoginIdentifier = matchedMemberByKta?.email
+    ? String(matchedMemberByKta.email).trim().toLowerCase()
+    : cleanUser;
+
   // Google Spreadsheet / Users adalah sumber autentikasi utama.
   // Cache Vercel tidak dipakai lebih dahulu agar login setelah logout/cold-start
   // selalu menggunakan kredensial yang tersimpan secara persisten.
@@ -1475,9 +1488,10 @@ app.post('/api/auth/login', async (req, res) => {
     // menyebabkan HTTP 404 sebelum autentikasi mencapai Users sheet.
     const gasResult = await forwardToGoogleAppsScript({
       action: 'AUTH_LOGIN',
-      username: cleanUser,
-      password: rawPass
-    }, DEFAULT_APPS_SCRIPT_URL);
+      username: gasLoginIdentifier,
+      password: rawPass,
+      memberId: matchedMemberByKta?.id || ''
+    }, scriptUrl || DEFAULT_APPS_SCRIPT_URL);
 
     if (gasResult?.success === true && gasResult?.user) {
       matchedUser = {
@@ -1522,7 +1536,8 @@ app.post('/api/auth/login', async (req, res) => {
   if (!matchedUser) {
     const cachedUser = db.users.find(u =>
       (u.username && String(u.username).toLowerCase() === cleanUser) ||
-      (u.email && String(u.email).toLowerCase() === cleanUser)
+      (u.email && String(u.email).toLowerCase() === cleanUser) ||
+      (u.memberId && String(u.memberId).toLowerCase() === String(matchedMemberByKta?.id || cleanUser).toLowerCase())
     );
 
     if (cachedUser?.passwordHash && verifyPassword(rawPass, String(cachedUser.passwordHash))) {
@@ -1628,6 +1643,62 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true, message: 'Berhasil keluar.' });
 });
 
+// POST /api/auth/reset-password
+// Digunakan oleh alur Lupa Password. Password baru hanya dianggap berhasil
+// setelah Google Apps Script mengonfirmasi penulisan ke sheet Users.
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { userId, username, email, memberId, identifier, newPassword, scriptUrl } = req.body || {};
+
+  if (!newPassword || String(newPassword).length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: 'Kata sandi baru minimal 6 karakter.'
+    });
+  }
+
+  const payload = {
+    action: 'AUTH_RESET_PASSWORD',
+    userId: String(userId || ''),
+    username: String(username || '').trim().toLowerCase(),
+    email: String(email || '').trim().toLowerCase(),
+    memberId: String(memberId || ''),
+    identifier: String(identifier || '').trim().toLowerCase(),
+    newPassword: String(newPassword)
+  };
+
+  if (!payload.userId && !payload.username && !payload.email && !payload.memberId && !payload.identifier) {
+    return res.status(400).json({ success: false, message: 'Identitas akun tidak diberikan.' });
+  }
+
+  try {
+    const gasResult = await forwardToGoogleAppsScript(
+      payload,
+      scriptUrl || DEFAULT_APPS_SCRIPT_URL
+    );
+
+    if (!gasResult?.success) {
+      return res.status(400).json({
+        success: false,
+        message: gasResult?.message || 'Kata sandi gagal diperbarui di Google Spreadsheet.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: gasResult.message || 'Kata sandi berhasil diperbarui di Google Spreadsheet.'
+    });
+  } catch (error: any) {
+    console.error('[Auth] Reset password gagal:', error);
+    const message = error?.message || 'Gagal menyimpan kata sandi ke Google Spreadsheet.';
+    const statusMatch = message.match(/HTTP (\d{3})/i);
+    const status = statusMatch ? Number(statusMatch[1]) : 502;
+    return res.status(status >= 400 && status < 600 ? status : 502).json({
+      success: false,
+      message
+    });
+  }
+});
+
 // POST /api/auth/change-password
 app.post('/api/auth/change-password', async (req, res) => {
   const session = getSessionUser(req);
@@ -1696,188 +1767,6 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(502).json({
       success: false,
       message: error?.message || 'Gagal menyimpan kata sandi ke Google Spreadsheet.'
-    });
-  }
-});
-
-// POST /api/auth/reset-password - Public forgot-password persistence
-app.post('/api/auth/reset-password', async (req, res) => {
-  const { identifier, userId, email, memberId, newPassword } = req.body || {};
-  const password = String(newPassword || '');
-
-  if (password.length < 6) {
-    return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
-  }
-
-  const cleanIdentifier = String(identifier || '').trim();
-  const cleanUserId = String(userId || '').trim();
-  const cleanEmail = String(email || '').trim().toLowerCase();
-  const cleanMemberId = String(memberId || '').trim();
-
-  if (!cleanIdentifier && !cleanUserId && !cleanEmail && !cleanMemberId) {
-    return res.status(400).json({ success: false, message: 'Identitas akun wajib diisi.' });
-  }
-
-  const matchedUser = db.users.find(u =>
-    (cleanUserId && String(u.id || '') === cleanUserId) ||
-    (cleanEmail && String(u.email || '').trim().toLowerCase() === cleanEmail) ||
-    (cleanMemberId && String(u.memberId || '') === cleanMemberId)
-  );
-  const matchedMember = db.members.find(m =>
-    (cleanMemberId && String(m.id || '') === cleanMemberId) ||
-    (cleanEmail && String(m.email || '').trim().toLowerCase() === cleanEmail)
-  );
-
-  if (!matchedUser && !matchedMember) {
-    return res.status(404).json({ success: false, message: 'Akun tidak ditemukan.' });
-  }
-
-  const normalizedIdentifier = cleanIdentifier.toLowerCase();
-  const identifierMatches =
-    (matchedUser && (String(matchedUser.id || '').toLowerCase() === normalizedIdentifier ||
-      String(matchedUser.username || '').toLowerCase() === normalizedIdentifier ||
-      String(matchedUser.email || '').toLowerCase() === normalizedIdentifier ||
-      String(matchedUser.memberId || '').toLowerCase() === normalizedIdentifier)) ||
-    (matchedMember && (String(matchedMember.id || '').toLowerCase() === normalizedIdentifier ||
-      String(matchedMember.nationalMemberNumber || '').toLowerCase() === normalizedIdentifier ||
-      String(matchedMember.email || '').toLowerCase() === normalizedIdentifier ||
-      String(matchedMember.phone || '').toLowerCase() === normalizedIdentifier));
-
-  if (!identifierMatches) {
-    return res.status(400).json({ success: false, message: 'Identitas akun tidak sesuai dengan data akun yang ditemukan.' });
-  }
-
-  try {
-    const passwordHash = hashPassword(password);
-    const gasResult = await forwardToGoogleAppsScript({
-      action: 'AUTH_RESET_PASSWORD',
-      identifier: cleanIdentifier,
-      userId: cleanUserId || String(matchedUser?.id || matchedMember?.userId || '').trim(),
-      email: cleanEmail || String(matchedUser?.email || matchedMember?.email || '').trim().toLowerCase(),
-      memberId: cleanMemberId || String(matchedUser?.memberId || matchedMember?.id || '').trim(),
-      passwordHash
-    }, DEFAULT_APPS_SCRIPT_URL);
-
-    if (!gasResult?.success) {
-      return res.status(400).json({
-        success: false,
-        message: gasResult?.message || 'Kata sandi gagal diperbarui di Google Spreadsheet.'
-      });
-    }
-
-    const matchingUsers = db.users
-      .map((user, index) => ({ user, index }))
-      .filter(({ user }) =>
-        (cleanUserId && String(user.id || '') === cleanUserId) ||
-        (cleanEmail && String(user.email || '').trim().toLowerCase() === cleanEmail) ||
-        (cleanMemberId && String(user.memberId || '') === cleanMemberId)
-      );
-
-    for (const { user, index } of matchingUsers) {
-      db.users[index] = { ...user, passwordHash };
-    }
-    if (matchingUsers.length > 0) saveDatabase();
-
-    return res.json({
-      success: true,
-      message: 'Kata sandi berhasil diperbarui dan disimpan di Google Spreadsheet.'
-    });
-  } catch (error: any) {
-    console.error('[Auth] Reset password ke Google Apps Script gagal:', error);
-    return res.status(502).json({
-      success: false,
-      message: error?.message || 'Gagal menyimpan kata sandi ke Google Spreadsheet.'
-    });
-  }
-});
-
-// POST /api/admin/reset-member-password - Super Admin membantu anggota yang lupa password
-app.post('/api/admin/reset-member-password', async (req, res) => {
-  const session = getSessionUser(req);
-  if (!session) {
-    return res.status(401).json({ success: false, message: 'Sesi administrator tidak ditemukan. Silakan masuk kembali.' });
-  }
-  if (session.role !== 'SUPER_ADMIN') {
-    return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat mereset kata sandi anggota.' });
-  }
-
-  const { memberId, userId, email, newPassword } = req.body || {};
-  const password = String(newPassword || '');
-  if (password.length < 6) {
-    return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
-  }
-
-  const cleanMemberId = String(memberId || '').trim();
-  const cleanUserId = String(userId || '').trim();
-  const cleanEmail = String(email || '').trim().toLowerCase();
-  if (!cleanMemberId && !cleanUserId && !cleanEmail) {
-    return res.status(400).json({ success: false, message: 'Identitas anggota tidak lengkap.' });
-  }
-
-  const member = db.members.find(m =>
-    (cleanMemberId && String(m.id || '') === cleanMemberId) ||
-    (cleanEmail && String(m.email || '').trim().toLowerCase() === cleanEmail)
-  );
-  const user = db.users.find(u =>
-    (cleanUserId && String(u.id || '') === cleanUserId) ||
-    (cleanMemberId && String(u.memberId || '') === cleanMemberId) ||
-    (cleanEmail && String(u.email || '').trim().toLowerCase() === cleanEmail)
-  );
-
-  if (!member && !user) {
-    return res.status(404).json({ success: false, message: 'Akun anggota tidak ditemukan di database aplikasi.' });
-  }
-
-  const resolvedMemberId = cleanMemberId || String(member?.id || user?.memberId || '').trim();
-  const resolvedUserId = cleanUserId || String(user?.id || member?.userId || '').trim();
-  const resolvedEmail = cleanEmail || String(user?.email || member?.email || '').trim().toLowerCase();
-
-  try {
-    const passwordHash = hashPassword(password);
-    const gasResult = await forwardToGoogleAppsScript({
-      action: 'AUTH_RESET_PASSWORD',
-      userId: resolvedUserId,
-      memberId: resolvedMemberId,
-      email: resolvedEmail,
-      passwordHash,
-      resetByUserId: session.userId,
-      resetByUsername: session.username,
-      resetByName: session.name
-    }, DEFAULT_APPS_SCRIPT_URL);
-
-    if (!gasResult?.success) {
-      return res.status(400).json({
-        success: false,
-        message: gasResult?.message || 'Kata sandi gagal diperbarui di Google Spreadsheet.'
-      });
-    }
-
-    if (user) {
-      user.passwordHash = passwordHash;
-    }
-
-    db.auditLogs.unshift({
-      id: `audit-password-reset-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      userId: session.userId,
-      userName: session.name || session.username || 'Super Admin',
-      action: 'RESET_MEMBER_PASSWORD',
-      entityType: 'MEMBER',
-      entityId: resolvedMemberId || resolvedUserId,
-      description: `Super Admin mereset kata sandi anggota ${member?.fullName || resolvedEmail || resolvedMemberId}.`
-    });
-    if (db.auditLogs.length > 500) db.auditLogs.pop();
-    saveDatabase();
-
-    return res.json({
-      success: true,
-      message: 'Kata sandi anggota berhasil diperbarui dan disimpan di Google Spreadsheet.'
-    });
-  } catch (error: any) {
-    console.error('[Admin] Reset password anggota ke Google Apps Script gagal:', error);
-    return res.status(502).json({
-      success: false,
-      message: error?.message || 'Gagal menyimpan kata sandi anggota ke Google Spreadsheet.'
     });
   }
 });
