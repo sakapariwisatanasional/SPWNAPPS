@@ -742,8 +742,15 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
             <button
               type="button"
-              onClick={() => {
+              onClick={event => {
+                // Keep the cart action isolated from any parent navigation/click handler.
+                event.preventDefault();
+                event.stopPropagation();
+
                 setNotice('');
+                setSelectedProduct(null);
+                setCheckoutOpen(false);
+                setSuccessOrder(null);
                 setCartOpen(true);
               }}
               className="relative inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-black text-white transition hover:bg-white/15"
