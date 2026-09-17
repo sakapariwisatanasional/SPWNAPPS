@@ -99,6 +99,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [forgotStep, setForgotStep] = useState<'request' | 'reset' | 'done'>('request');
   const [forgotError, setForgotError] = useState('');
   const [forgotUserFound, setForgotUserFound] = useState<CurrentUser | null>(null);
+  const [isForgotResetting, setIsForgotResetting] = useState(false);
 
   // ============================================================
   // RESET FORM
@@ -867,72 +868,97 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // ============================================================
   // RESET PASSWORD
   // ============================================================
-  const handleResetPassword = (
+  const handleResetPassword = async (
     e: React.FormEvent
   ) => {
     e.preventDefault();
 
+    if (isForgotResetting) return;
+
     setForgotError('');
 
-    if (
-      forgotNewPassword.length <
-      6
-    ) {
+    if (forgotNewPassword.length < 6) {
       setForgotError(
         'Kata sandi baru minimal 6 karakter.'
       );
       return;
     }
 
-    if (
-      forgotNewPassword !==
-      forgotConfirmPassword
-    ) {
+    if (forgotNewPassword !== forgotConfirmPassword) {
       setForgotError(
         'Konfirmasi kata sandi tidak cocok.'
       );
       return;
     }
 
-    if (forgotUserFound) {
-      const users =
-        storage.getUsers();
-
-      const updated =
-        users.map(u => {
-          if (
-            u.id ===
-              forgotUserFound.id ||
-            u.email ===
-              forgotUserFound.email
-          ) {
-            return {
-              ...u,
-              password:
-                forgotNewPassword
-            };
-          }
-
-          return u;
-        });
-
-      storage.setUsers(
-        updated as any
+    if (!forgotUserFound) {
+      setForgotError(
+        'Data akun belum ditemukan. Silakan ulangi pencarian akun.'
       );
+      return;
+    }
 
-      setForgotStep(
-        'done'
-      );
+    setIsForgotResetting(true);
+
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        cache: 'no-store',
+        body: JSON.stringify({
+          identifier: forgotIdentifier.trim(),
+          userId: forgotUserFound.id,
+          email: forgotUserFound.email,
+          memberId: forgotUserFound.memberId || '',
+          newPassword: forgotNewPassword
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success !== true) {
+        throw new Error(
+          data?.message ||
+          'Kata sandi gagal disimpan ke Google Spreadsheet.'
+        );
+      }
+
+      // Browser storage hanya cache. Perbarui setelah server mengonfirmasi
+      // transaksi persisten di Google Spreadsheet berhasil.
+      const users = storage.getUsers();
+      const updated = users.map(u => {
+        if (
+          (forgotUserFound.id && u.id === forgotUserFound.id) ||
+          (forgotUserFound.email && u.email?.toLowerCase() === forgotUserFound.email.toLowerCase())
+        ) {
+          return {
+            ...u,
+            password: forgotNewPassword
+          };
+        }
+        return u;
+      });
+      storage.setUsers(updated as any);
+
+      setForgotStep('done');
+      setForgotNewPassword('');
+      setForgotConfirmPassword('');
 
       setTimeout(() => {
         setTab('login');
-        setForgotStep(
-          'request'
-        );
-        setLoginIdentifier(
-          forgotIdentifier
-        );
+        setForgotStep('request');
+        setLoginIdentifier(forgotIdentifier);
       }, 1500);
+    } catch (err: any) {
+      console.error('[Auth Forgot Password] Reset gagal:', err);
+      setForgotError(
+        err?.message ||
+        'Kata sandi gagal disimpan. Silakan coba lagi.'
+      );
+    } finally {
+      setIsForgotResetting(false);
     }
   };
 
@@ -2005,9 +2031,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold"
+                    disabled={isForgotResetting}
+                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold"
                   >
-                    Simpan Kata Sandi Baru
+                    {isForgotResetting ? 'Menyimpan ke Google Spreadsheet...' : 'Simpan Kata Sandi Baru'}
                   </button>
 
                 </form>
