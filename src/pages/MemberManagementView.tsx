@@ -27,10 +27,13 @@ import {
   ShieldAlert,
   Trash2,
   AlertTriangle,
-  MoreHorizontal
+  MoreHorizontal,
+  RefreshCw
 } from 'lucide-react';
 import { Member, CurrentUser, Province, Regency } from '../types';
 import { DigitalMemberCard } from '../components/member/DigitalMemberCard';
+import { MemberFormModal } from '../components/member/MemberFormModal';
+import { storage } from '../services/storage';
 import { formatDriveImageUrl, getDriveDirectFallbackUrl, getValidAvatarUrl } from '../components/common/SakaLogo';
 
 interface MemberManagementViewProps {
@@ -77,6 +80,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
   const [previewCardMember, setPreviewCardMember] = useState<Member | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
   const [showClearAllModal, setShowClearAllModal] = useState(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(new Date().toISOString());
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   // Filter logic
   const safeMembers = Array.isArray(members) ? members : [];
@@ -84,25 +90,42 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
   const filteredMembers = useMemo(() => {
     return safeMembers.filter((m) => {
       // Role-based scoping
-      if (currentUser.role === 'ADMIN_PROVINCE' && currentUser.jurisdictionId && m.provinceId !== currentUser.jurisdictionId) {
+      if (
+        currentUser.role === 'ADMIN_PROVINCE' &&
+        currentUser.jurisdictionId &&
+        m.provinceId !== currentUser.jurisdictionId
+      ) {
         return false;
       }
-      if (currentUser.role === 'ADMIN_REGENCY' && currentUser.jurisdictionId && m.regencyId !== currentUser.jurisdictionId) {
+
+      if (
+        currentUser.role === 'ADMIN_REGENCY' &&
+        currentUser.jurisdictionId &&
+        m.regencyId !== currentUser.jurisdictionId
+      ) {
         return false;
       }
-      if (currentUser.role === 'ADMIN_BRANCH' && currentUser.jurisdictionId && m.districtId !== currentUser.jurisdictionId) {
+
+      if (
+        currentUser.role === 'ADMIN_BRANCH' &&
+        currentUser.jurisdictionId &&
+        m.districtId !== currentUser.jurisdictionId
+      ) {
         return false;
       }
 
       // Search Query
       const q = (searchQuery || '').toLowerCase();
-      const matchSearch = 
+
+      const matchSearch =
         (m.fullName || '').toLowerCase().includes(q) ||
-        (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase().includes(q)) ||
+        (m.nationalMemberNumber &&
+          m.nationalMemberNumber.toLowerCase().includes(q)) ||
         (m.districtName || '').toLowerCase().includes(q) ||
         (m.regencyName || '').toLowerCase().includes(q) ||
         (m.provinceName || '').toLowerCase().includes(q) ||
-        (m.operatorJurisdictionName && m.operatorJurisdictionName.toLowerCase().includes(q));
+        (m.operatorJurisdictionName &&
+          m.operatorJurisdictionName.toLowerCase().includes(q));
 
       if (!matchSearch) return false;
 
@@ -111,22 +134,52 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
         if (!m.isOperator) return false;
       } else if (selectedStatus === 'NON_OPERATOR') {
         if (m.isOperator) return false;
-      } else if (selectedStatus !== 'ALL' && m.status !== selectedStatus) {
+      } else if (
+        selectedStatus !== 'ALL' &&
+        m.status !== selectedStatus
+      ) {
         return false;
       }
 
       // Province
-      if (selectedProvinceId !== 'ALL' && m.provinceId !== selectedProvinceId) return false;
+      if (
+        selectedProvinceId !== 'ALL' &&
+        m.provinceId !== selectedProvinceId
+      ) {
+        return false;
+      }
 
       // Krida
-      if (selectedKrida !== 'ALL' && m.krida !== selectedKrida) return false;
+      if (
+        selectedKrida !== 'ALL' &&
+        m.krida !== selectedKrida
+      ) {
+        return false;
+      }
 
       return true;
     });
-  }, [members, searchQuery, selectedStatus, selectedProvinceId, selectedKrida, currentUser]);
+  }, [
+    members,
+    searchQuery,
+    selectedStatus,
+    selectedProvinceId,
+    selectedKrida,
+    currentUser
+  ]);
 
   const handleExportCSV = () => {
-    const headers = ['Nomor Anggota', 'Nama Lengkap', 'Provinsi', 'Kabupaten/Kota', 'Kecamatan', 'Krida', 'Status', 'Terdaftar'];
+    const headers = [
+      'Nomor Anggota',
+      'Nama Lengkap',
+      'Provinsi',
+      'Kabupaten/Kota',
+      'Kecamatan',
+      'Krida',
+      'Status',
+      'Terdaftar'
+    ];
+
     const rows = filteredMembers.map(m => [
       m.nationalMemberNumber || '-',
       `"${m.fullName}"`,
@@ -138,14 +191,142 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       new Date(m.registeredAt).toLocaleDateString('id-ID')
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [
+        headers.join(','),
+        ...rows.map(e => e.join(','))
+      ].join('\n');
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
+
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Daftar_Anggota_Saka_Pariwisata_${Date.now()}.csv`);
+    link.setAttribute(
+      'download',
+      `Daftar_Anggota_Saka_Pariwisata_${Date.now()}.csv`
+    );
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const isAreaAdmin = [
+    'ADMIN_NATIONAL',
+    'ADMIN_PROVINCE',
+    'ADMIN_REGENCY',
+    'ADMIN_BRANCH'
+  ].includes(currentUser.role);
+
+  const activeCount = safeMembers.filter(
+    m => m.status === 'ACTIVE'
+  ).length;
+
+  const pendingCount = safeMembers.filter(
+    m => m.status === 'PENDING'
+  ).length;
+
+  const inactiveCount = safeMembers.filter(
+    m =>
+      m.status === 'SUSPENDED' ||
+      (m.status !== 'ACTIVE' && m.status !== 'PENDING')
+  ).length;
+
+  const jurisdictionLabel =
+    currentUser.role === 'ADMIN_NATIONAL'
+      ? 'Kwartir Nasional'
+      : currentUser.jurisdictionName ||
+        'Wilayah kewenangan Anda';
+
+  // Saat halaman Admin dibuka, muat snapshot yang sudah disaring server.
+  // Ini tidak membaca spreadsheet mentah dan tidak membocorkan anggota di luar wilayah.
+  React.useEffect(() => {
+    if (!isAreaAdmin) return;
+
+    void storage.syncWithServer().then((success) => {
+      if (success) {
+        setLastRefreshAt(new Date().toISOString());
+      }
+    });
+  }, [
+    isAreaAdmin,
+    currentUser?.role,
+    currentUser?.jurisdictionId
+  ]);
+
+  const handleRefreshLatestData = async () => {
+    if (isRefreshingData) return;
+
+    const token = storage.getAuthToken();
+
+    if (!token) {
+      alert(
+        'Sesi administrator tidak ditemukan. Silakan login ulang.'
+      );
+      return;
+    }
+
+    setIsRefreshingData(true);
+
+    try {
+      const response = await fetch(
+        '/api/sync-spreadsheet',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Cache-Control':
+              'no-cache, no-store, max-age=0',
+            Pragma: 'no-cache'
+          },
+          credentials: 'include',
+          cache: 'no-store'
+        }
+      );
+
+      const result =
+        await response.json().catch(() => ({}));
+
+      if (
+        !response.ok ||
+        result?.success !== true
+      ) {
+        throw new Error(
+          result?.message ||
+            `Sinkronisasi gagal (HTTP ${response.status}).`
+        );
+      }
+
+      // Setelah server mengambil Spreadsheet terbaru,
+      // ambil snapshot /api/data yang sudah difilter sesuai
+      // jurisdiction Admin yang sedang login.
+      const hydrated =
+        await storage.syncWithServer();
+
+      if (!hydrated) {
+        throw new Error(
+          'Data terbaru sudah diambil server, tetapi belum dapat dimuat ke halaman Member. Silakan coba lagi.'
+        );
+      }
+
+      setLastRefreshAt(
+        result?.lastUpdated ||
+          new Date().toISOString()
+      );
+
+      alert(
+        result?.message ||
+          'Data anggota terbaru berhasil diambil dari Google Spreadsheet.'
+      );
+    } catch (error: any) {
+      alert(
+        error?.message ||
+          'Gagal mengambil data terbaru dari Google Spreadsheet.'
+      );
+    } finally {
+      setIsRefreshingData(false);
+    }
   };
 
   const kridaOptions = [
@@ -157,68 +338,236 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Page Header */}
+
+      {/* =======================================================
+          PAGE HEADER
+      ======================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-extrabold font-heading text-slate-900">
             Manajemen Keanggotaan Terpadu
           </h2>
+
           <p className="text-xs text-slate-500 mt-0.5">
             Pendataan, verifikasi berjenjang, dan penerbitan Nomor Anggota Nasional (PP.KK.KC.NNNNNN)
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+
+          {/* Ambil Data Terbaru */}
+          {isAreaAdmin && (
+            <button
+              type="button"
+              onClick={handleRefreshLatestData}
+              disabled={isRefreshingData}
+              className="px-3 py-2.5 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+              title="Ambil data terbaru dari Google Spreadsheet"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${
+                  isRefreshingData
+                    ? 'animate-spin'
+                    : ''
+                }`}
+              />
+
+              <span className="hidden sm:inline text-xs font-bold">
+                {isRefreshingData
+                  ? 'Mengambil...'
+                  : 'Ambil Data Terbaru'}
+              </span>
+            </button>
+          )}
+
+          {/* Edit desain KTA */}
           {onOpenEditCardModal && (
             <button
               onClick={onOpenEditCardModal}
               className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-2xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+              title="Edit Desain KTA"
             >
               <Sliders className="w-3.5 h-3.5 text-amber-700" />
-              <span className="sr-only">Edit Desain KTA</span>
+              <span className="sr-only">
+                Edit Desain KTA
+              </span>
             </button>
           )}
 
           {/* Tombol Hapus Dummy untuk Super Admin */}
-          {currentUser.role === 'SUPER_ADMIN' && onDeleteAllDummyMembers && (
-            <button
-              onClick={() => setShowClearAllModal(true)}
-              className="p-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-2xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
-              title="Hapus / Bersihkan semua data dummy dari aplikasi"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-red-600" />
-              <span className="sr-only">Hapus Dummy</span>
-            </button>
-          )}
+          {currentUser.role === 'SUPER_ADMIN' &&
+            onDeleteAllDummyMembers && (
+              <button
+                onClick={() =>
+                  setShowClearAllModal(true)
+                }
+                className="p-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-2xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+                title="Hapus / Bersihkan semua data dummy dari aplikasi"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                <span className="sr-only">
+                  Hapus Dummy
+                </span>
+              </button>
+            )}
 
+          {/* Export */}
           <button
             onClick={handleExportCSV}
             className="p-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+            title="Ekspor daftar anggota"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="sr-only">Ekspor CSV</span>
+            <span className="sr-only">
+              Ekspor CSV
+            </span>
           </button>
 
+          {/* Daftarkan Anggota */}
           <button
-            onClick={onOpenRegisterModal}
-            className="p-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
+            onClick={() =>
+              setIsRegisterModalOpen(true)
+            }
+            className="px-3 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
+            title="Daftarkan anggota baru"
           >
             <Plus className="w-4 h-4" />
-            <span className="sr-only">Tambah Anggota</span>
+
+            <span className="hidden sm:inline text-xs font-bold">
+              Daftarkan Anggota
+            </span>
+
+            <span className="sr-only">
+              Daftarkan Anggota
+            </span>
           </button>
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* =======================================================
+          ADMIN AREA SUMMARY
+      ======================================================== */}
+      {isAreaAdmin && (
+        <>
+          <div className="rounded-[1.5rem] border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-teal-50 p-4 sm:p-5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <MapPin className="w-5 h-5" />
+                </div>
+
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-700">
+                    Wilayah Kewenangan Admin
+                  </p>
+
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5">
+                    {jurisdictionLabel}
+                  </h3>
+
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Daftar anggota yang tampil dibatasi otomatis sesuai kewenangan akun Anda.
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-[10px] text-slate-500 sm:text-right">
+                <span className="font-semibold">
+                  Terakhir diperbarui
+                </span>
+                <br />
+
+                <span className="font-mono text-slate-700">
+                  {lastRefreshAt
+                    ? new Date(
+                        lastRefreshAt
+                      ).toLocaleString('id-ID')
+                    : 'Belum ada sinkronisasi'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Statistics */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+
+            <div className="bg-white border border-slate-200 rounded-[1.35rem] p-4 shadow-xs">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                Total Wilayah
+              </p>
+
+              <p className="text-2xl font-black text-slate-900 mt-1">
+                {safeMembers.length}
+              </p>
+
+              <p className="text-[10px] text-slate-500 mt-1">
+                anggota terdaftar
+              </p>
+            </div>
+
+            <div className="bg-white border border-emerald-200 rounded-[1.35rem] p-4 shadow-xs">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-600">
+                Aktif
+              </p>
+
+              <p className="text-2xl font-black text-emerald-700 mt-1">
+                {activeCount}
+              </p>
+
+              <p className="text-[10px] text-slate-500 mt-1">
+                KTA aktif
+              </p>
+            </div>
+
+            <div className="bg-white border border-amber-200 rounded-[1.35rem] p-4 shadow-xs">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-amber-600">
+                Menunggu
+              </p>
+
+              <p className="text-2xl font-black text-amber-700 mt-1">
+                {pendingCount}
+              </p>
+
+              <p className="text-[10px] text-slate-500 mt-1">
+                siap diaktivasi
+              </p>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-[1.35rem] p-4 shadow-xs">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                Nonaktif
+              </p>
+
+              <p className="text-2xl font-black text-slate-700 mt-1">
+                {inactiveCount}
+              </p>
+
+              <p className="text-[10px] text-slate-500 mt-1">
+                perlu tindak lanjut
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* =======================================================
+          FILTER BAR
+      ======================================================== */}
       <div className="bg-white p-4 rounded-[1.35rem] border border-slate-200 shadow-xs space-y-3">
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+
           {/* Search Box */}
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2">
             <Search className="w-4 h-4 text-slate-400" />
+
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) =>
+                setSearchQuery(e.target.value)
+              }
               placeholder="Cari nama, No KTA, wilayah..."
               className="bg-transparent outline-none w-full text-slate-800"
             />
@@ -228,15 +577,34 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           <div>
             <select
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              onChange={(e) =>
+                setSelectedStatus(e.target.value)
+              }
               className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 outline-none font-medium text-slate-700"
             >
-              <option value="ALL">Semua Status (Aktif, Pending, Operator)</option>
-              <option value="OPERATOR_ONLY">⭐ Hanya Operator Kwartir</option>
-              <option value="NON_OPERATOR">Anggota Reguler (Bukan Operator)</option>
-              <option value="ACTIVE">Status: AKTIF (KTA Terbit)</option>
-              <option value="PENDING">Status: PENDING (Perlu Verifikasi)</option>
-              <option value="SUSPENDED">Status: SUSPENDED / Non-aktif</option>
+              <option value="ALL">
+                Semua Status (Aktif, Pending, Operator)
+              </option>
+
+              <option value="OPERATOR_ONLY">
+                ⭐ Hanya Operator Kwartir
+              </option>
+
+              <option value="NON_OPERATOR">
+                Anggota Reguler (Bukan Operator)
+              </option>
+
+              <option value="ACTIVE">
+                Status: AKTIF (KTA Terbit)
+              </option>
+
+              <option value="PENDING">
+                Status: PENDING (Perlu Verifikasi)
+              </option>
+
+              <option value="SUSPENDED">
+                Status: SUSPENDED / Non-aktif
+              </option>
             </select>
           </div>
 
@@ -244,12 +612,22 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           <div>
             <select
               value={selectedProvinceId}
-              onChange={(e) => setSelectedProvinceId(e.target.value)}
+              onChange={(e) =>
+                setSelectedProvinceId(e.target.value)
+              }
               className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 outline-none font-medium text-slate-700"
             >
-              <option value="ALL">Semua Wilayah (Kwarnas / Kwarda)</option>
+              <option value="ALL">
+                Semua Wilayah (Kwarnas / Kwarda)
+              </option>
+
               {provinces.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option
+                  key={p.id}
+                  value={p.id}
+                >
+                  {p.name}
+                </option>
               ))}
             </select>
           </div>
@@ -258,12 +636,22 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           <div>
             <select
               value={selectedKrida}
-              onChange={(e) => setSelectedKrida(e.target.value)}
+              onChange={(e) =>
+                setSelectedKrida(e.target.value)
+              }
               className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 outline-none font-medium text-slate-700"
             >
-              <option value="ALL">Semua Krida Saka</option>
+              <option value="ALL">
+                Semua Krida Saka
+              </option>
+
               {kridaOptions.map((k) => (
-                <option key={k} value={k}>{k}</option>
+                <option
+                  key={k}
+                  value={k}
+                >
+                  {k}
+                </option>
               ))}
             </select>
           </div>
@@ -271,8 +659,23 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
         {/* Filter Summary Tags */}
         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-          <span>Menampilkan <strong className="text-slate-900">{filteredMembers.length}</strong> dari total <strong className="text-slate-900">{members.length}</strong> anggota terdaftar.</span>
-          {(searchQuery || selectedStatus !== 'ALL' || selectedProvinceId !== 'ALL' || selectedKrida !== 'ALL') && (
+
+          <span>
+            Menampilkan{' '}
+            <strong className="text-slate-900">
+              {filteredMembers.length}
+            </strong>{' '}
+            dari total{' '}
+            <strong className="text-slate-900">
+              {members.length}
+            </strong>{' '}
+            anggota terdaftar.
+          </span>
+
+          {(searchQuery ||
+            selectedStatus !== 'ALL' ||
+            selectedProvinceId !== 'ALL' ||
+            selectedKrida !== 'ALL') && (
             <button
               onClick={() => {
                 setSearchQuery('');
@@ -288,53 +691,115 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
         </div>
       </div>
 
-      {/* Main Members Table */}
+      {/* =======================================================
+          MAIN MEMBERS TABLE
+      ======================================================== */}
       <div className="bg-white rounded-[1.75rem] border border-slate-200 shadow-xs overflow-hidden">
+
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
+
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                <th className="py-3.5 px-4">Identitas Anggota</th>
-                <th className="py-3.5 px-4">No. Anggota Nasional</th>
-                <th className="py-3.5 px-4">Wilayah & Kwartir</th>
-                <th className="py-3.5 px-4">Krida</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4 text-right"><span className="sr-only">Aksi & Administrasi</span><MoreHorizontal className="w-4 h-4 ml-auto text-slate-400" /></th>
+
+                <th className="py-3.5 px-4">
+                  Identitas Anggota
+                </th>
+
+                <th className="py-3.5 px-4">
+                  No. Anggota Nasional
+                </th>
+
+                <th className="py-3.5 px-4">
+                  Wilayah & Kwartir
+                </th>
+
+                <th className="py-3.5 px-4">
+                  Krida
+                </th>
+
+                <th className="py-3.5 px-4">
+                  Status
+                </th>
+
+                <th className="py-3.5 px-4 text-right">
+                  <span className="sr-only">
+                    Aksi & Administrasi
+                  </span>
+
+                  <MoreHorizontal className="w-4 h-4 ml-auto text-slate-400" />
+                </th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-slate-100">
+
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td
+                    colSpan={6}
+                    className="py-12 text-center text-slate-400"
+                  >
                     Tidak ada data anggota yang sesuai dengan kriteria pencarian.
                   </td>
                 </tr>
               ) : (
                 filteredMembers.map((m) => (
-                  <tr key={m.id} className="hover:bg-slate-50/60 transition-colors">
+                  <tr
+                    key={m.id}
+                    className="hover:bg-slate-50/60 transition-colors"
+                  >
+
                     {/* Member Identity */}
                     <td className="py-3.5 px-4">
+
                       <div className="flex items-center gap-3">
+
                         <div className="relative group/avatar flex-shrink-0">
+
                           <img
-                            src={formatDriveImageUrl(m.avatarUrl) || m.avatarUrl || getValidAvatarUrl(m.avatarUrl, m.gender)}
+                            src={
+                              formatDriveImageUrl(m.avatarUrl) ||
+                              m.avatarUrl ||
+                              getValidAvatarUrl(
+                                m.avatarUrl,
+                                m.gender
+                              )
+                            }
                             alt={m.fullName}
                             referrerPolicy="no-referrer"
                             className="w-10 h-10 rounded-2xl object-cover border border-slate-200 shadow-xs bg-slate-800"
                             onError={(e) => {
-                              const img = e.target as HTMLImageElement;
-                              const directFallback = getDriveDirectFallbackUrl(m.avatarUrl);
-                              if (directFallback && img.src !== directFallback) {
-                                img.src = directFallback;
+                              const img =
+                                e.target as HTMLImageElement;
+
+                              const directFallback =
+                                getDriveDirectFallbackUrl(
+                                  m.avatarUrl
+                                );
+
+                              if (
+                                directFallback &&
+                                img.src !== directFallback
+                              ) {
+                                img.src =
+                                  directFallback;
                               } else {
-                                img.src = getValidAvatarUrl('', m.gender);
+                                img.src =
+                                  getValidAvatarUrl(
+                                    '',
+                                    m.gender
+                                  );
                               }
                             }}
                           />
+
                           {onOpenEditPhotoModal && (
                             <button
                               type="button"
-                              onClick={() => onOpenEditPhotoModal(m)}
+                              onClick={() =>
+                                onOpenEditPhotoModal(m)
+                              }
                               className="absolute inset-0 bg-purple-950/80 opacity-0 group-hover/avatar:opacity-100 rounded-2xl flex items-center justify-center text-white transition-opacity cursor-pointer shadow-xs"
                               title="Perbaiki Pas Foto Resmi KTA"
                             >
@@ -342,51 +807,96 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             </button>
                           )}
                         </div>
+
                         <div className="min-w-0">
+
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="font-bold text-slate-900 truncate text-xs font-heading">{m.fullName}</p>
+
+                            <p className="font-bold text-slate-900 truncate text-xs font-heading">
+                              {m.fullName}
+                            </p>
+
                             {m.isOperator && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300 font-extrabold text-[9px] shadow-xs">
+
                                 <ShieldCheck className="w-3 h-3 text-fuchsia-700" />
-                                <span>{m.operatorRole === 'ADMIN_NATIONAL' ? 'Admin Nasional' : m.operatorRole === 'ADMIN_REGENCY' ? 'Kwarcab' : m.operatorRole === 'ADMIN_PROVINCE' ? 'Kwarda' : 'Kecamatan'}</span>
+
+                                <span>
+                                  {m.operatorRole === 'ADMIN_NATIONAL'
+                                    ? 'Admin Nasional'
+                                    : m.operatorRole === 'ADMIN_REGENCY'
+                                      ? 'Kwarcab'
+                                      : m.operatorRole === 'ADMIN_PROVINCE'
+                                        ? 'Kwarda'
+                                        : 'Kecamatan'}
+                                </span>
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-500 truncate">{m.email}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">{m.phone}</p>
+
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {m.email}
+                          </p>
+
+                          <p className="text-[10px] text-slate-400 font-mono">
+                            {m.phone}
+                          </p>
                         </div>
                       </div>
                     </td>
 
                     {/* National Member Number */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
+
                       {m.nationalMemberNumber ? (
-                        <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-lg font-mono font-bold text-xs">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>{m.nationalMemberNumber}</span>
-                        </div>
+                        <span className="font-mono font-bold text-emerald-800">
+                          {m.nationalMemberNumber}
+                        </span>
                       ) : (
-                        <span className="text-[11px] font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                          Belum Diterbitkan
+                        <span className="text-amber-700 font-mono">
+                          Belum Ada
                         </span>
                       )}
                     </td>
 
-                    {/* Territory */}
+                    {/* Region */}
                     <td className="py-3.5 px-4">
-                      <p className="font-bold text-slate-800 truncate max-w-[160px]">{m.regencyName}</p>
-                      <p className="text-[10px] text-emerald-700 font-medium truncate">{m.districtName}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{m.provinceName}</p>
+
+                      <div className="flex items-start gap-2">
+
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800 truncate">
+                            {m.districtName || 'Kecamatan belum ditentukan'}
+                          </p>
+
+                          <p className="text-[10px] text-slate-500 truncate">
+                            {m.regencyName || '-'}
+                            {m.provinceName
+                              ? ` • ${m.provinceName}`
+                              : ''}
+                          </p>
+                        </div>
+                      </div>
                     </td>
 
                     {/* Krida */}
                     <td className="py-3.5 px-4">
-                      <p className="font-semibold text-slate-800 truncate">{m.krida || 'Pramuka Saka'}</p>
-                      <p className="text-[10px] text-slate-500 truncate"></p>
+
+                      <div className="flex items-center gap-1.5">
+
+                        <Award className="w-3.5 h-3.5 text-fuchsia-600" />
+
+                        <span className="font-semibold text-slate-700">
+                          {m.krida || 'Pramuka Saka'}
+                        </span>
+                      </div>
                     </td>
 
-                    {/* Status Badge */}
+                    {/* Status */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
+
                       {m.status === 'ACTIVE' ? (
                         <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                           AKTIF
@@ -404,10 +914,14 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
+
                       <div className="flex items-center justify-end gap-1.5">
+
                         {/* Primary action: preview KTA */}
                         <button
-                          onClick={() => setPreviewCardMember(m)}
+                          onClick={() =>
+                            setPreviewCardMember(m)
+                          }
                           className="p-2 bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 rounded-xl transition-colors border border-fuchsia-200 cursor-pointer"
                           title="Lihat KTA Digital"
                           aria-label={`Lihat KTA Digital ${m.fullName}`}
@@ -418,7 +932,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                         {/* Primary action: edit profile */}
                         {onOpenEditMemberModal && (
                           <button
-                            onClick={() => onOpenEditMemberModal(m)}
+                            onClick={() =>
+                              onOpenEditMemberModal(m)
+                            }
                             className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors border border-slate-200 cursor-pointer"
                             title="Koreksi Profil"
                             aria-label={`Koreksi profil ${m.fullName}`}
@@ -427,8 +943,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                           </button>
                         )}
 
-                        {/* Secondary actions grouped into one menu */}
+                        {/* Secondary actions */}
                         <details className="relative">
+
                           <summary
                             className="list-none p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors border border-slate-200 cursor-pointer flex items-center justify-center"
                             title="Aksi lainnya"
@@ -436,74 +953,107 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                           >
                             <MoreHorizontal className="w-4 h-4" />
                           </summary>
+
                           <div className="absolute right-0 top-full mt-2 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl text-left">
+
                             {onOpenPrintPdfModal && (
                               <button
-                                onClick={() => onOpenPrintPdfModal(m)}
+                                onClick={() =>
+                                  onOpenPrintPdfModal(m)
+                                }
                                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
                               >
                                 <FileDown className="w-4 h-4" />
                                 Cetak / Unduh KTA
                               </button>
                             )}
+
                             {onOpenQuickShareModal && (
                               <button
-                                onClick={() => onOpenQuickShareModal(m)}
+                                onClick={() =>
+                                  onOpenQuickShareModal(m)
+                                }
                                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800"
                               >
                                 <Share2 className="w-4 h-4" />
                                 Quick Share / Badge
                               </button>
                             )}
+
                             {onOpenEditPhotoModal && (
                               <button
-                                onClick={() => onOpenEditPhotoModal(m)}
+                                onClick={() =>
+                                  onOpenEditPhotoModal(m)
+                                }
                                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
                               >
                                 <Camera className="w-4 h-4" />
                                 Perbaiki Foto
                               </button>
                             )}
-                            {currentUser.role === 'SUPER_ADMIN' && onOpenOperatorModal && (
-                              <button
-                                type="button"
-                                onClick={() => onOpenOperatorModal(m)}
-                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
-                              >
-                                {m.isOperator ? <ShieldCheck className="w-4 h-4 text-fuchsia-700" /> : <Shield className="w-4 h-4" />}
-                                {m.isOperator ? 'Kelola Operator' : 'Tetapkan Operator'}
-                              </button>
-                            )}
+
+                            {currentUser.role === 'SUPER_ADMIN' &&
+                              onOpenOperatorModal && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onOpenOperatorModal(m)
+                                  }
+                                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
+                                >
+                                  {m.isOperator ? (
+                                    <ShieldCheck className="w-4 h-4 text-fuchsia-700" />
+                                  ) : (
+                                    <Shield className="w-4 h-4" />
+                                  )}
+
+                                  {m.isOperator
+                                    ? 'Kelola Operator'
+                                    : 'Tetapkan Operator'}
+                                </button>
+                              )}
+
                             <button
-                              onClick={() => onOpenVerifyModal(m)}
+                              onClick={() =>
+                                onOpenVerifyModal(m)
+                              }
                               className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100"
                             >
                               <Eye className="w-4 h-4" />
                               Verifikasi Anggota
                             </button>
+
                             <button
-                              onClick={() => onOpenTransferModal(m)}
+                              onClick={() =>
+                                onOpenTransferModal(m)
+                              }
                               className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800"
                             >
                               <ArrowRightLeft className="w-4 h-4" />
                               Mutasi / Transfer
                             </button>
-                            {currentUser.role === 'SUPER_ADMIN' && onDeleteMember && (
-                              <button
-                                onClick={() => setMemberToDelete(m)}
-                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                Hapus Anggota
-                              </button>
-                            )}
+
+                            {currentUser.role === 'SUPER_ADMIN' &&
+                              onDeleteMember && (
+                                <button
+                                  onClick={() =>
+                                    setMemberToDelete(m)
+                                  }
+                                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Hapus Anggota
+                                </button>
+                              )}
                           </div>
                         </details>
 
-                        {/* Pending approval remains visible as the highest-priority action */}
+                        {/* Pending approval */}
                         {m.status === 'PENDING' && (
                           <button
-                            onClick={() => onApproveMember(m.id)}
+                            onClick={() =>
+                              onApproveMember(m.id)
+                            }
                             className="px-3 py-2 bg-emerald-600 hover:bg-fuchsia-500 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                             title="Setujui dan terbitkan Nomor Anggota"
                           >
@@ -513,7 +1063,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                         )}
                       </div>
                     </td>
-
                   </tr>
                 ))
               )}
@@ -521,27 +1070,92 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           </table>
         </div>
 
-        {/* Mobile Responsive Cards View (Zero Horizontal Scroll!) */}
+        {/* =====================================================
+            MOBILE RESPONSIVE CARDS
+        ====================================================== */}
         <div className="md:hidden divide-y divide-slate-100">
+
           {filteredMembers.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs">
               Tidak ada data anggota yang sesuai dengan kriteria pencarian.
             </div>
           ) : (
             filteredMembers.map((m) => (
-              <div key={m.id} className="p-4 space-y-3 bg-white">
+              <div
+                key={m.id}
+                className="p-4 space-y-3 bg-white"
+              >
+
                 <div className="flex items-start justify-between gap-3">
+
                   <div className="flex items-center gap-3 min-w-0">
+
                     <img
-                      src={formatDriveImageUrl(m.avatarUrl) || m.avatarUrl || getValidAvatarUrl(m.avatarUrl, m.gender)}
+                      src={
+                        formatDriveImageUrl(m.avatarUrl) ||
+                        m.avatarUrl ||
+                        getValidAvatarUrl(
+                          m.avatarUrl,
+                          m.gender
+                        )
+                      }
                       alt={m.fullName}
                       referrerPolicy="no-referrer"
                       className="w-12 h-12 rounded-[1.35rem] object-cover border border-slate-200 shadow-xs bg-slate-800 flex-shrink-0"
+                      onError={(e) => {
+                        const img =
+                          e.target as HTMLImageElement;
+
+                        const directFallback =
+                          getDriveDirectFallbackUrl(
+                            m.avatarUrl
+                          );
+
+                        if (
+                          directFallback &&
+                          img.src !== directFallback
+                        ) {
+                          img.src =
+                            directFallback;
+                        } else {
+                          img.src =
+                            getValidAvatarUrl(
+                              '',
+                              m.gender
+                            );
+                        }
+                      }}
                     />
+
                     <div className="min-w-0">
-                      <p className="font-bold text-slate-900 text-sm font-heading leading-tight truncate">{m.fullName}</p>
-                      <p className="text-[11px] text-slate-500 truncate">{m.email}</p>
-                      {m.phone && <p className="text-[10px] text-slate-400 font-mono">{m.phone}</p>}
+
+                      <p className="font-bold text-slate-900 text-sm font-heading leading-tight truncate">
+                        {m.fullName}
+                      </p>
+
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {m.email}
+                      </p>
+
+                      {m.phone && (
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          {m.phone}
+                        </p>
+                      )}
+
+                      {m.isOperator && (
+                        <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300 font-extrabold text-[9px]">
+                          <ShieldCheck className="w-3 h-3 text-fuchsia-700" />
+
+                          {m.operatorRole === 'ADMIN_NATIONAL'
+                            ? 'Admin Nasional'
+                            : m.operatorRole === 'ADMIN_REGENCY'
+                              ? 'Kwarcab'
+                              : m.operatorRole === 'ADMIN_PROVINCE'
+                                ? 'Kwarda'
+                                : 'Kecamatan'}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -562,30 +1176,57 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                 {/* Details Grid */}
                 <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-3 rounded-[1.35rem] border border-slate-100">
+
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">No. KTA Nasional</span>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                      No. KTA Nasional
+                    </span>
+
                     {m.nationalMemberNumber ? (
-                      <span className="font-mono font-bold text-emerald-800 text-[11px]">{m.nationalMemberNumber}</span>
+                      <span className="font-mono font-bold text-emerald-800 text-[11px]">
+                        {m.nationalMemberNumber}
+                      </span>
                     ) : (
-                      <span className="text-amber-700 font-mono text-[10px]">Belum Ada</span>
+                      <span className="text-amber-700 font-mono text-[10px]">
+                        Belum Ada
+                      </span>
                     )}
                   </div>
 
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Krida / Peminatan</span>
-                    <span className="font-semibold text-slate-800 truncate block">{m.krida || 'Pramuka Saka'}</span>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                      Krida / Peminatan
+                    </span>
+
+                    <span className="font-semibold text-slate-800 truncate block">
+                      {m.krida || 'Pramuka Saka'}
+                    </span>
                   </div>
 
                   <div className="col-span-2 pt-1 border-t border-slate-200/60">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Wilayah Kwartir</span>
-                    <span className="text-slate-700 font-medium truncate block">{m.regencyName}, {m.provinceName}</span>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                      Wilayah Kwartir
+                    </span>
+
+                    <span className="text-slate-700 font-medium truncate block">
+                      {m.districtName
+                        ? `${m.districtName}, `
+                        : ''}
+                      {m.regencyName || '-'}
+                      {m.provinceName
+                        ? `, ${m.provinceName}`
+                        : ''}
+                    </span>
                   </div>
                 </div>
 
                 {/* Action Buttons Toolbar */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
+
                   <button
-                    onClick={() => setPreviewCardMember(m)}
+                    onClick={() =>
+                      setPreviewCardMember(m)
+                    }
                     className="py-2.5 px-3 bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-800 rounded-2xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-fuchsia-200 min-h-[42px]"
                   >
                     <CreditCard className="w-4 h-4" />
@@ -594,7 +1235,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                   {onOpenEditMemberModal && (
                     <button
-                      onClick={() => onOpenEditMemberModal(m)}
+                      onClick={() =>
+                        onOpenEditMemberModal(m)
+                      }
                       className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-colors border border-slate-200 min-h-[42px] flex items-center justify-center gap-1.5"
                     >
                       <Edit3 className="w-4 h-4" />
@@ -603,77 +1246,109 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                   )}
 
                   <details className="relative col-span-2">
+
                     <summary className="list-none w-full py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 rounded-2xl text-xs font-bold transition-colors border border-slate-200 min-h-[42px] flex items-center justify-center gap-1.5 cursor-pointer">
                       <MoreHorizontal className="w-4 h-4" />
                       <span>Aksi lainnya</span>
                     </summary>
+
                     <div className="mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+
                       {onOpenPrintPdfModal && (
                         <button
-                          onClick={() => onOpenPrintPdfModal(m)}
+                          onClick={() =>
+                            onOpenPrintPdfModal(m)
+                          }
                           className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                         >
                           <FileDown className="w-4 h-4 text-fuchsia-700" />
                           PDF KTA
                         </button>
                       )}
+
                       {onOpenQuickShareModal && (
                         <button
-                          onClick={() => onOpenQuickShareModal(m)}
+                          onClick={() =>
+                            onOpenQuickShareModal(m)
+                          }
                           className="py-2.5 px-2 bg-white hover:bg-amber-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                         >
                           <Share2 className="w-4 h-4 text-amber-700" />
                           Quick Share
                         </button>
                       )}
+
                       {onOpenEditPhotoModal && (
                         <button
-                          onClick={() => onOpenEditPhotoModal(m)}
+                          onClick={() =>
+                            onOpenEditPhotoModal(m)
+                          }
                           className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                         >
                           <Camera className="w-4 h-4" />
                           Foto
                         </button>
                       )}
+
                       <button
-                        onClick={() => onOpenVerifyModal(m)}
+                        onClick={() =>
+                          onOpenVerifyModal(m)
+                        }
                         className="py-2.5 px-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                       >
                         <Eye className="w-4 h-4" />
                         Verifikasi
                       </button>
+
                       <button
-                        onClick={() => onOpenTransferModal(m)}
+                        onClick={() =>
+                          onOpenTransferModal(m)
+                        }
                         className="py-2.5 px-2 bg-white hover:bg-amber-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                       >
                         <ArrowRightLeft className="w-4 h-4" />
                         Mutasi
                       </button>
-                      {currentUser.role === 'SUPER_ADMIN' && onOpenOperatorModal && (
-                        <button
-                          type="button"
-                          onClick={() => onOpenOperatorModal(m)}
-                          className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
-                        >
-                          {m.isOperator ? <ShieldCheck className="w-4 h-4 text-fuchsia-700" /> : <Shield className="w-4 h-4" />}
-                          Operator
-                        </button>
-                      )}
-                      {currentUser.role === 'SUPER_ADMIN' && onDeleteMember && (
-                        <button
-                          onClick={() => setMemberToDelete(m)}
-                          className="py-2.5 px-2 bg-white hover:bg-red-50 text-red-700 rounded-xl text-[11px] font-semibold border border-red-200 flex items-center justify-center gap-1.5"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Hapus
-                        </button>
-                      )}
+
+                      {currentUser.role === 'SUPER_ADMIN' &&
+                        onOpenOperatorModal && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onOpenOperatorModal(m)
+                            }
+                            className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
+                          >
+                            {m.isOperator ? (
+                              <ShieldCheck className="w-4 h-4 text-fuchsia-700" />
+                            ) : (
+                              <Shield className="w-4 h-4" />
+                            )}
+
+                            Operator
+                          </button>
+                        )}
+
+                      {currentUser.role === 'SUPER_ADMIN' &&
+                        onDeleteMember && (
+                          <button
+                            onClick={() =>
+                              setMemberToDelete(m)
+                            }
+                            className="py-2.5 px-2 bg-white hover:bg-red-50 text-red-700 rounded-xl text-[11px] font-semibold border border-red-200 flex items-center justify-center gap-1.5"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Hapus
+                          </button>
+                        )}
                     </div>
                   </details>
 
                   {m.status === 'PENDING' && (
                     <button
-                      onClick={() => onApproveMember(m.id)}
+                      onClick={() =>
+                        onApproveMember(m.id)
+                      }
                       className="col-span-2 py-2.5 bg-emerald-600 hover:bg-fuchsia-500 text-white font-bold rounded-2xl text-xs transition-colors min-h-[42px] flex items-center justify-center gap-1.5"
                     >
                       <CheckCircle2 className="w-4 h-4" />
@@ -687,19 +1362,54 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
         </div>
       </div>
 
-      {/* Digital KTA Preview Modal */}
+      {/* =======================================================
+          ADMIN MEMBER REGISTRATION MODAL
+      ======================================================== */}
+      <MemberFormModal
+        isOpen={isRegisterModalOpen}
+        currentUser={currentUser}
+        onClose={() =>
+          setIsRegisterModalOpen(false)
+        }
+        onSuccess={() => {
+          setIsRegisterModalOpen(false);
+
+          void storage
+            .syncWithServer()
+            .then((success) => {
+              if (success) {
+                setLastRefreshAt(
+                  new Date().toISOString()
+                );
+              }
+            });
+        }}
+      />
+
+      {/* =======================================================
+          DIGITAL KTA PREVIEW MODAL
+      ======================================================== */}
       {previewCardMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
+
           <div className="bg-white rounded-[1.75rem] p-6 shadow-xl border border-slate-200 max-w-lg w-full space-y-4">
+
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+
               <div>
                 <h3 className="font-bold text-base text-slate-900 font-heading">
                   Kartu Tanda Anggota (KTA) Digital
                 </h3>
-                <p className="text-xs text-slate-500">{previewCardMember.fullName}</p>
+
+                <p className="text-xs text-slate-500">
+                  {previewCardMember.fullName}
+                </p>
               </div>
+
               <button
-                onClick={() => setPreviewCardMember(null)}
+                onClick={() =>
+                  setPreviewCardMember(null)
+                }
                 className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm"
               >
                 ✕
@@ -710,19 +1420,36 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               member={previewCardMember}
               onVerifyClick={onOpenVerifyModal}
               onEditCard={onOpenEditCardModal}
-              onEditPhoto={onOpenEditPhotoModal ? (m) => onOpenEditPhotoModal(m) : undefined}
-              onEditMemberProfile={onOpenEditMemberModal ? (m) => {
-                setPreviewCardMember(null);
-                onOpenEditMemberModal(m);
-              } : undefined}
-              onPrintPdf={onOpenPrintPdfModal ? (m) => onOpenPrintPdfModal(m) : undefined}
+              onEditPhoto={
+                onOpenEditPhotoModal
+                  ? (m) =>
+                      onOpenEditPhotoModal(m)
+                  : undefined
+              }
+              onEditMemberProfile={
+                onOpenEditMemberModal
+                  ? (m) => {
+                      setPreviewCardMember(null);
+                      onOpenEditMemberModal(m);
+                    }
+                  : undefined
+              }
+              onPrintPdf={
+                onOpenPrintPdfModal
+                  ? (m) =>
+                      onOpenPrintPdfModal(m)
+                  : undefined
+              }
               showControls={true}
               allowAdminEdit={true}
             />
 
             <div className="pt-2 flex justify-end">
+
               <button
-                onClick={() => setPreviewCardMember(null)}
+                onClick={() =>
+                  setPreviewCardMember(null)
+                }
                 className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold"
               >
                 Tutup
@@ -732,91 +1459,154 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
         </div>
       )}
 
-      {/* Modal Konfirmasi Hapus 1 Anggota (Super Admin) */}
+      {/* =======================================================
+          DELETE ONE MEMBER CONFIRMATION
+      ======================================================== */}
       {memberToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in">
+
           <div className="bg-white rounded-[1.75rem] p-6 shadow-xl border border-red-200 max-w-md w-full space-y-4">
+
             <div className="flex items-center gap-3 text-red-600">
+
               <div className="w-10 h-10 rounded-[1.35rem] bg-red-100 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
+
               <div>
                 <h3 className="font-bold text-base text-slate-900 font-heading">
                   Konfirmasi Hapus Anggota
                 </h3>
-                <p className="text-xs text-red-600 font-medium">Tindakan ini tidak dapat dibatalkan</p>
+
+                <p className="text-xs text-red-600 font-medium">
+                  Tindakan ini tidak dapat dibatalkan
+                </p>
               </div>
             </div>
 
             <div className="p-4 bg-slate-50 rounded-[1.35rem] border border-slate-200 space-y-2 text-xs">
+
               <div className="flex items-center gap-3">
+
                 <img
-                  src={formatDriveImageUrl(memberToDelete.avatarUrl) || memberToDelete.avatarUrl || getValidAvatarUrl(memberToDelete.avatarUrl, memberToDelete.gender)}
+                  src={
+                    formatDriveImageUrl(
+                      memberToDelete.avatarUrl
+                    ) ||
+                    memberToDelete.avatarUrl ||
+                    getValidAvatarUrl(
+                      memberToDelete.avatarUrl,
+                      memberToDelete.gender
+                    )
+                  }
                   alt={memberToDelete.fullName}
                   referrerPolicy="no-referrer"
                   className="w-12 h-12 rounded-2xl object-cover border border-slate-300 bg-slate-800"
                   onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    const directFallback = getDriveDirectFallbackUrl(memberToDelete.avatarUrl);
-                    if (directFallback && img.src !== directFallback) {
-                      img.src = directFallback;
+                    const img =
+                      e.target as HTMLImageElement;
+
+                    const directFallback =
+                      getDriveDirectFallbackUrl(
+                        memberToDelete.avatarUrl
+                      );
+
+                    if (
+                      directFallback &&
+                      img.src !== directFallback
+                    ) {
+                      img.src =
+                        directFallback;
                     } else {
-                      img.src = getValidAvatarUrl('', memberToDelete.gender);
+                      img.src =
+                        getValidAvatarUrl(
+                          '',
+                          memberToDelete.gender
+                        );
                     }
                   }}
                 />
+
                 <div>
-                  <p className="font-bold text-slate-900 text-sm">{memberToDelete.fullName}</p>
-                  <p className="text-[11px] text-fuchsia-700 font-mono font-semibold">
-                    {memberToDelete.nationalMemberNumber || 'Belum ada NTA'}
+                  <p className="font-bold text-slate-900 text-sm">
+                    {memberToDelete.fullName}
                   </p>
-                  <p className="text-slate-500">{memberToDelete.districtName}, {memberToDelete.regencyName}</p>
+
+                  <p className="text-[11px] text-fuchsia-700 font-mono font-semibold">
+                    {memberToDelete.nationalMemberNumber ||
+                      'Belum ada NTA'}
+                  </p>
+
+                  <p className="text-slate-500">
+                    {memberToDelete.districtName},{' '}
+                    {memberToDelete.regencyName}
+                  </p>
                 </div>
               </div>
+
               <p className="text-slate-600 pt-1 border-t border-slate-200 text-[11px]">
                 Data keanggotaan, KTA Digital, serta riwayat akan dihapus secara permanen dari database.
               </p>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
+
               <button
                 type="button"
-                onClick={() => setMemberToDelete(null)}
+                onClick={() =>
+                  setMemberToDelete(null)
+                }
                 className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold cursor-pointer"
               >
                 Batal
               </button>
+
               <button
                 type="button"
                 onClick={() => {
                   if (onDeleteMember) {
-                    onDeleteMember(memberToDelete);
+                    onDeleteMember(
+                      memberToDelete
+                    );
                   }
+
                   setMemberToDelete(null);
                 }}
                 className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>Hapus Anggota Ini</span>
+
+                <span>
+                  Hapus Anggota Ini
+                </span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Konfirmasi Bersihkan Semua Data Dummy */}
+      {/* =======================================================
+          DELETE ALL DUMMY CONFIRMATION
+      ======================================================== */}
       {showClearAllModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in">
+
           <div className="bg-white rounded-[1.75rem] p-6 shadow-xl border border-red-200 max-w-md w-full space-y-4">
+
             <div className="flex items-center gap-3 text-red-600">
+
               <div className="w-10 h-10 rounded-[1.35rem] bg-red-100 flex items-center justify-center">
                 <Trash2 className="w-5 h-5 text-red-600" />
               </div>
+
               <div>
                 <h3 className="font-bold text-base text-slate-900 font-heading">
                   Bersihkan Seluruh Anggota Dummy?
                 </h3>
-                <p className="text-xs text-red-600 font-medium">Pengaturan Basis Data Bersih</p>
+
+                <p className="text-xs text-red-600 font-medium">
+                  Pengaturan Basis Data Bersih
+                </p>
               </div>
             </div>
 
@@ -825,25 +1615,35 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
+
               <button
                 type="button"
-                onClick={() => setShowClearAllModal(false)}
+                onClick={() =>
+                  setShowClearAllModal(false)
+                }
                 className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold cursor-pointer"
               >
                 Batal
               </button>
+
               <button
                 type="button"
                 onClick={() => {
-                  if (onDeleteAllDummyMembers) {
+                  if (
+                    onDeleteAllDummyMembers
+                  ) {
                     onDeleteAllDummyMembers();
                   }
+
                   setShowClearAllModal(false);
                 }}
                 className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>Ya, Hapus Seluruh Dummy</span>
+
+                <span>
+                  Ya, Hapus Seluruh Dummy
+                </span>
               </button>
             </div>
           </div>
