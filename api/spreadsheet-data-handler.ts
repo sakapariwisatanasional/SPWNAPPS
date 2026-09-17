@@ -1,0 +1,413 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import crypto from 'crypto';
+
+const DEFAULT_SPREADSHEET_ID =
+  '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
+
+const DEFAULT_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const SESSION_SECRET =
+  process.env.SESSION_SECRET ||
+  'dev-only-change-this-session-secret';
+
+interface ActiveSession {
+  token: string;
+  userId: string;
+  username: string;
+  role: string;
+  name: string;
+  jurisdictionName?: string;
+  jurisdictionId?: string;
+  avatarUrl?: string;
+  memberId?: string;
+  expiresAt: number;
+}
+
+function normalizeAppsScriptUrl(raw: unknown): string {
+  const value = String(raw || '')
+    .trim()
+    .replace(/\s+/g, '');
+
+  if (!value) return '';
+
+  if (
+    !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:[?#].*)?$/i.test(
+      value
+    )
+  ) {
+    return '';
+  }
+
+  return value;
+}
+
+function base64UrlDecode(value: string): string {
+  return Buffer.from(value, 'base64url').toString('utf8');
+}
+
+function signSessionPayload(payload: string): string {
+  return crypto
+    .createHmac('sha256', SESSION_SECRET)
+    .update(payload)
+    .digest('base64url');
+}
+
+function getSessionUser(req: VercelRequest): ActiveSession | null {
+  try {
+    const rawAuthorization = req.headers.authorization;
+    const authorization = Array.isArray(rawAuthorization)
+      ? rawAuthorization[0]
+      : rawAuthorization;
+
+    if (
+      typeof authorization !== 'string' ||
+      !authorization.startsWith('Bearer ')
+    ) {
+      return null;
+    }
+
+    const token = authorization.slice('Bearer '.length).trim();
+    if (!token) return null;
+
+    const parts = token.split('.');
+    if (parts.length !== 2) return null;
+
+    const encodedPayload = parts[0];
+    const providedSignature = parts[1];
+    if (!encodedPayload || !providedSignature) return null;
+
+    const expectedSignature = signSessionPayload(encodedPayload);
+    const providedBuffer = Buffer.from(providedSignature);
+    const expectedBuffer = Buffer.from(expectedSignature);
+
+    if (
+      providedBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(providedBuffer, expectedBuffer)
+    ) {
+      return null;
+    }
+
+    const payload = JSON.parse(base64UrlDecode(encodedPayload));
+
+    if (!payload || typeof payload.exp !== 'number') return null;
+    if (Date.now() > payload.exp) return null;
+
+    if (payload.exp > Date.now() + SESSION_TTL_MS + 60 * 1000) {
+      return null;
+    }
+
+    return {
+      token,
+      userId: String(payload.userId || ''),
+      username: String(payload.username || ''),
+      role: String(payload.role || ''),
+      name: String(payload.name || ''),
+      jurisdictionName: payload.jurisdictionName
+        ? String(payload.jurisdictionName)
+        : undefined,
+      jurisdictionId: payload.jurisdictionId
+        ? String(payload.jurisdictionId)
+        : undefined,
+      avatarUrl: payload.avatarUrl
+        ? String(payload.avatarUrl)
+        : undefined,
+      memberId: payload.memberId
+        ? String(payload.memberId)
+        : undefined,
+      expiresAt: payload.exp,
+    };
+  } catch (error) {
+    console.warn(
+      '[Spreadsheet Handler] Invalid session:',
+      error instanceof Error ? error.message : error
+    );
+    return null;
+  }
+}
+
+function getQueryValue(req: VercelRequest, key: string): string {
+  const value = req.query?.[key];
+  if (Array.isArray(value)) return String(value[0] || '').trim();
+  return String(value || '').trim();
+}
+
+function noCache(res: VercelResponse): void {
+  res.setHeader(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate'
+  );
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+}
+
+async function fetchAppsScript(
+  scriptUrl: string,
+  sheet: string
+): Promise<{ rows: Record<string, any>[]; rawData: any }> {
+  const separator = scriptUrl.includes('?') ? '&' : '?';
+  const url =
+    `${scriptUrl}${separator}` +
+    `sheet=${encodeURIComponent(sheet)}` +
+    `&action=GET_SHEET` +
+    `&_t=${Date.now()}` +
+    `&_r=${Math.floor(Math.random() * 1000000)}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, max-age=0',
+      Pragma: 'no-cache',
+    },
+    redirect: 'follow',
+  });
+
+  const text = await response.text();
+  let data: any = null;
+
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Google Apps Script HTTP ${response.status}${
+        data?.message ? `: ${data.message}` : ''
+      }`
+    );
+  }
+
+  if (data?.status === 'error' || data?.success === false) {
+    throw new Error(
+      data?.message ||
+        `Google Apps Script gagal membaca sheet ${sheet}.`
+    );
+  }
+
+  const rows = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.rows)
+      ? data.rows
+      : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.records)
+          ? data.records
+          : null;
+
+  if (!rows) {
+    throw new Error(
+      `Respons Google Apps Script untuk sheet ${sheet} tidak berisi array data yang valid.`
+    );
+  }
+
+  return { rows, rawData: data };
+}
+
+async function fetchGoogleSpreadsheetGViz(
+  spreadsheetId: string,
+  sheet: string
+): Promise<Record<string, any>[]> {
+  const gvizUrl =
+    `https://docs.google.com/spreadsheets/d/` +
+    `${encodeURIComponent(spreadsheetId)}` +
+    `/gviz/tq?tqx=out:json` +
+    `&sheet=${encodeURIComponent(sheet)}` +
+    `&_t=${Date.now()}` +
+    `&_r=${Math.floor(Math.random() * 1000000)}`;
+
+  const response = await fetch(gvizUrl, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, max-age=0',
+      Pragma: 'no-cache',
+    },
+    redirect: 'follow',
+  });
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`Google Spreadsheet GViz HTTP ${response.status}`);
+  }
+
+  const jsonStart = text.indexOf('{');
+  const jsonEnd = text.lastIndexOf('}');
+
+  if (jsonStart < 0 || jsonEnd <= jsonStart) {
+    throw new Error(`Respons GViz untuk sheet ${sheet} tidak valid.`);
+  }
+
+  const data = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
+
+  if (data?.status === 'error') {
+    const reason =
+      Array.isArray(data?.errors) && data.errors[0]?.detailed_message
+        ? data.errors[0].detailed_message
+        : `Google Spreadsheet gagal membaca sheet ${sheet}.`;
+    throw new Error(reason);
+  }
+
+  const columns = Array.isArray(data?.table?.cols)
+    ? data.table.cols
+    : [];
+  const rows = Array.isArray(data?.table?.rows)
+    ? data.table.rows
+    : [];
+
+  const headers = columns.map((column: any, index: number) =>
+    String(column?.label || column?.id || `col_${index}`).trim() ||
+    `col_${index}`
+  );
+
+  return rows.map((row: any) => {
+    const values = Array.isArray(row?.c) ? row.c : [];
+    const record: Record<string, any> = {};
+
+    headers.forEach((header: string, index: number) => {
+      const cell = values[index];
+      record[header] =
+        cell?.f !== undefined && cell?.f !== null
+          ? cell.f
+          : (cell?.v ?? '');
+    });
+
+    return record;
+  });
+}
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<void> {
+  noCache(res);
+
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    res.status(405).json({
+      success: false,
+      message: 'Method tidak diizinkan. Endpoint ini hanya menerima GET.',
+    });
+    return;
+  }
+
+  try {
+    const session = getSessionUser(req);
+
+    if (session?.role !== 'SUPER_ADMIN') {
+      res.status(403).json({
+        success: false,
+        message:
+          'Akses spreadsheet mentah hanya tersedia untuk Super Admin Nasional.',
+      });
+      return;
+    }
+
+    const sheet = getQueryValue(req, 'sheet') || 'Anggota';
+
+    const requestedScriptUrl = normalizeAppsScriptUrl(
+      getQueryValue(req, 'scriptUrl')
+    );
+
+    const envScriptUrl = normalizeAppsScriptUrl(
+      process.env.GOOGLE_APPS_SCRIPT_URL
+    );
+
+    const defaultScriptUrl = normalizeAppsScriptUrl(
+      DEFAULT_APPS_SCRIPT_URL
+    );
+
+    const scriptUrl =
+      requestedScriptUrl || envScriptUrl || defaultScriptUrl;
+
+    const spreadsheetId = String(
+      process.env.GOOGLE_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID
+    ).trim();
+
+    let gasError: any = null;
+
+    if (scriptUrl) {
+      try {
+        const result = await fetchAppsScript(scriptUrl, sheet);
+
+        res.setHeader('X-SPWAPP-Spreadsheet-Source', 'GOOGLE_APPS_SCRIPT');
+        res.status(200).json({
+          success: true,
+          sheet,
+          rows: result.rows,
+          count: result.rows.length,
+          source: 'GOOGLE_APPS_SCRIPT',
+          fetchedAt: new Date().toISOString(),
+        });
+        return;
+      } catch (error: any) {
+        gasError = error;
+        console.warn(
+          `[Spreadsheet Handler] GAS gagal untuk ${sheet}; mencoba GViz:`,
+          error
+        );
+      }
+    }
+
+    if (!spreadsheetId) {
+      res.status(502).json({
+        success: false,
+        message:
+          `Google Apps Script gagal dan Spreadsheet ID belum tersedia.` +
+          `${gasError?.message ? ` GAS: ${gasError.message}` : ''}`,
+      });
+      return;
+    }
+
+    try {
+      const rows = await fetchGoogleSpreadsheetGViz(spreadsheetId, sheet);
+
+      res.setHeader(
+        'X-SPWAPP-Spreadsheet-Source',
+        'GOOGLE_SPREADSHEET_GVIZ'
+      );
+
+      if (gasError) {
+        res.setHeader('X-SPWAPP-GAS-Fallback', 'true');
+      }
+
+      res.status(200).json({
+        success: true,
+        sheet,
+        rows,
+        count: rows.length,
+        source: 'GOOGLE_SPREADSHEET_GVIZ',
+        fetchedAt: new Date().toISOString(),
+      });
+      return;
+    } catch (gvizError: any) {
+      const gasMessage = gasError?.message
+        ? ` GAS: ${gasError.message}.`
+        : '';
+
+      res.status(502).json({
+        success: false,
+        message:
+          `Spreadsheet belum dapat dibaca.` +
+          gasMessage +
+          ` GViz: ${
+            gvizError?.message || 'akses Google Spreadsheet gagal.'
+          }`,
+      });
+      return;
+    }
+  } catch (error: any) {
+    console.error('[Spreadsheet Handler] Unexpected error:', error);
+    res.status(502).json({
+      success: false,
+      message:
+        error?.message ||
+        'Gagal menghubungkan aplikasi ke Google Spreadsheet.',
+    });
+  }
+}
