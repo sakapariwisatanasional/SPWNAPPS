@@ -105,6 +105,7 @@ import { MyCardView } from './pages/MyCardView';
 import { KridaModulesView } from './pages/KridaModulesView';
 import { KridaMaterialEditorModal } from './components/krida/KridaMaterialEditorModal';
 import { PublicPortalView } from './pages/PublicPortalView';
+import { PublicVerificationPage } from './pages/PublicVerificationPage';
 
 // Modals
 import { AuthModal } from './components/auth/AuthModal';
@@ -504,6 +505,20 @@ export default function App() {
   };
 
   const userRole = currentUser?.role || 'PUBLIC';
+  const hasPublicVerificationQuery = typeof window !== 'undefined' &&
+    window.location.pathname.toLowerCase().startsWith('/verify') &&
+    Boolean(new URLSearchParams(window.location.search).get('verifyId') ||
+      new URLSearchParams(window.location.search).get('nta') ||
+      new URLSearchParams(window.location.search).get('id') ||
+      new URLSearchParams(window.location.search).get('kta'));
+
+  // QR/tautan verifikasi publik menggunakan halaman khusus agar hasil verifikasi
+  // tampil langsung tanpa landing page, header aplikasi, atau scroll tambahan.
+  if (currentTab === 'verify-portal' && hasPublicVerificationQuery) {
+    return (
+      <PublicVerificationPage members={members} />
+    );
+  }
 
   // IF CURRENT TAB IS LANDING PAGE
   if (currentTab === 'landing') {
