@@ -70,16 +70,100 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   heightMm: 53.98,
   cornerRadiusMm: 3.18,
   cardTheme: 'purple_saka',
-  bgImageUrl: '',
-  frontBackgroundUrl: '',
-  backBackgroundUrl: '',
-  customBackgroundColorFront: '#24105b',
-  customBackgroundColorBack: '#111827',
-  bgOpacity: 0.10,
+  // KTA MASTER artwork supplied by the administrator.
+  // The same artwork is intentionally used as the visual base for both sides.
+  bgImageUrl: '/assets/kta/KTA-MASTER.png',
+  frontBackgroundUrl: '/assets/kta/KTA-MASTER.png',
+  backBackgroundUrl: '/assets/kta/KTA-MASTER.png',
+  customBackgroundColorFront: '#32116f',
+  customBackgroundColorBack: '#32116f',
+  // The master artwork already contains its own dark-purple treatment.
+  bgOpacity: 0,
   frontLogoUrl: '',
   backLogoUrl: '',
   logos: [],
-  dataFields: [],
+  dataFields: [
+    {
+      id: 'master-name',
+      field: 'fullName',
+      label: '',
+      showLabel: false,
+      side: 'FRONT',
+      visible: true,
+      x: 31,
+      y: 30,
+      width: 43,
+      fontSize: 11,
+      fontWeight: 'bold',
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      align: 'left'
+    },
+    {
+      id: 'master-nta',
+      field: 'nationalMemberNumber',
+      label: '',
+      showLabel: false,
+      side: 'FRONT',
+      visible: true,
+      x: 31,
+      y: 39,
+      width: 43,
+      fontSize: 8,
+      fontWeight: 'bold',
+      color: '#ffffff',
+      textTransform: 'none',
+      align: 'left'
+    },
+    {
+      id: 'master-status',
+      field: 'status',
+      label: '',
+      showLabel: false,
+      side: 'FRONT',
+      visible: true,
+      x: 31,
+      y: 47,
+      width: 43,
+      fontSize: 8,
+      fontWeight: 'bold',
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      align: 'left'
+    },
+    {
+      id: 'master-regency',
+      field: 'regencyName',
+      label: '',
+      showLabel: false,
+      side: 'FRONT',
+      visible: true,
+      x: 31,
+      y: 55,
+      width: 43,
+      fontSize: 8,
+      fontWeight: 'bold',
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      align: 'left'
+    },
+    {
+      id: 'master-province',
+      field: 'provinceName',
+      label: '',
+      showLabel: false,
+      side: 'FRONT',
+      visible: true,
+      x: 31,
+      y: 63,
+      width: 43,
+      fontSize: 8,
+      fontWeight: 'bold',
+      color: '#ffffff',
+      textTransform: 'uppercase',
+      align: 'left'
+    }
+  ],
   textElements: [],
   frontOrganizationTitle: 'SAKA PARIWISATA',
   frontOrganizationSubtitle: 'GERAKAN PRAMUKA INDONESIA',
@@ -2431,6 +2515,28 @@ class StorageService {
     if (Number((merged as any).signerY ?? 88) === 88) (merged as any).signerY = 82;
     if (Number((merged as any).issueLocationDateY ?? 70) === 70) (merged as any).issueLocationDateY = 60;
 
+    // KTA MASTER migration:
+    // older cloud configurations may have blank backgrounds. In that case,
+    // use the administrator-supplied master artwork without overwriting a
+    // deliberately configured non-empty background.
+    if (!String((merged as any).frontBackgroundUrl || '').trim()) {
+      (merged as any).frontBackgroundUrl = '/assets/kta/KTA-MASTER.png';
+    }
+    if (!String((merged as any).backBackgroundUrl || '').trim()) {
+      (merged as any).backBackgroundUrl = '/assets/kta/KTA-MASTER.png';
+    }
+    if (!String((merged as any).bgImageUrl || '').trim()) {
+      (merged as any).bgImageUrl = '/assets/kta/KTA-MASTER.png';
+    }
+    if (
+      String((merged as any).frontBackgroundUrl || '').includes('/assets/kta/KTA-MASTER.png') ||
+      String((merged as any).backBackgroundUrl || '').includes('/assets/kta/KTA-MASTER.png')
+    ) {
+      (merged as any).bgOpacity = 0;
+      (merged as any).customBackgroundColorFront = '#32116f';
+      (merged as any).customBackgroundColorBack = '#32116f';
+    }
+
     this.ktaSettings = {
       ...merged,
       logos: Array.isArray(merged.logos) ? merged.logos : [],
@@ -3153,3 +3259,4 @@ class StorageService {
 
 export const storage =
   new StorageService();
+
