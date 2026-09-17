@@ -99,7 +99,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [forgotStep, setForgotStep] = useState<'request' | 'reset' | 'done'>('request');
   const [forgotError, setForgotError] = useState('');
   const [forgotUserFound, setForgotUserFound] = useState<CurrentUser | null>(null);
-  const [isForgotResetting, setIsForgotResetting] = useState(false);
 
   // ============================================================
   // RESET FORM
@@ -873,32 +872,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   ) => {
     e.preventDefault();
 
-    if (isForgotResetting) return;
-
     setForgotError('');
 
     if (forgotNewPassword.length < 6) {
-      setForgotError(
-        'Kata sandi baru minimal 6 karakter.'
-      );
+      setForgotError('Kata sandi baru minimal 6 karakter.');
       return;
     }
 
     if (forgotNewPassword !== forgotConfirmPassword) {
-      setForgotError(
-        'Konfirmasi kata sandi tidak cocok.'
-      );
+      setForgotError('Konfirmasi kata sandi tidak cocok.');
       return;
     }
 
     if (!forgotUserFound) {
-      setForgotError(
-        'Data akun belum ditemukan. Silakan ulangi pencarian akun.'
-      );
+      setForgotError('Akun belum dipilih. Silakan ulangi proses lupa password.');
       return;
     }
 
-    setIsForgotResetting(true);
+    setIsLoading(true);
 
     try {
       const response = await fetch('/api/auth/reset-password', {
@@ -909,56 +900,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         credentials: 'include',
         cache: 'no-store',
         body: JSON.stringify({
+          userId: forgotUserFound.id || '',
+          username: forgotUserFound.username || '',
+          email: forgotUserFound.email || '',
+          memberId: '',
           identifier: forgotIdentifier.trim(),
-          userId: forgotUserFound.id,
-          email: forgotUserFound.email,
-          memberId: forgotUserFound.memberId || '',
           newPassword: forgotNewPassword
         })
       });
 
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data?.success !== true) {
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.success) {
         throw new Error(
-          data?.message ||
-          'Kata sandi gagal disimpan ke Google Spreadsheet.'
+          result?.message || `Reset password gagal (HTTP ${response.status}).`
         );
       }
 
-      // Browser storage hanya cache. Perbarui setelah server mengonfirmasi
-      // transaksi persisten di Google Spreadsheet berhasil.
-      const users = storage.getUsers();
-      const updated = users.map(u => {
-        if (
-          (forgotUserFound.id && u.id === forgotUserFound.id) ||
-          (forgotUserFound.email && u.email?.toLowerCase() === forgotUserFound.email.toLowerCase())
-        ) {
-          return {
-            ...u,
-            password: forgotNewPassword
-          };
-        }
-        return u;
-      });
-      storage.setUsers(updated as any);
-
       setForgotStep('done');
-      setForgotNewPassword('');
-      setForgotConfirmPassword('');
 
       setTimeout(() => {
         setTab('login');
         setForgotStep('request');
         setLoginIdentifier(forgotIdentifier);
+        setForgotNewPassword('');
+        setForgotConfirmPassword('');
+        setForgotUserFound(null);
       }, 1500);
-    } catch (err: any) {
-      console.error('[Auth Forgot Password] Reset gagal:', err);
+    } catch (error: any) {
       setForgotError(
-        err?.message ||
-        'Kata sandi gagal disimpan. Silakan coba lagi.'
+        error?.message || 'Password gagal diperbarui. Silakan coba lagi.'
       );
     } finally {
-      setIsForgotResetting(false);
+      setIsLoading(false);
     }
   };
 
@@ -2031,10 +2005,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                   <button
                     type="submit"
-                    disabled={isForgotResetting}
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold"
+                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold"
                   >
-                    {isForgotResetting ? 'Menyimpan ke Google Spreadsheet...' : 'Simpan Kata Sandi Baru'}
+                    Simpan Kata Sandi Baru
                   </button>
 
                 </form>
