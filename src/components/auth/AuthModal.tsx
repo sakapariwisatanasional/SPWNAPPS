@@ -94,11 +94,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // FORGOT PASSWORD
   // ============================================================
   const [forgotIdentifier, setForgotIdentifier] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
   const [forgotStep, setForgotStep] = useState<'request' | 'reset' | 'done'>('request');
   const [forgotError, setForgotError] = useState('');
-  const [forgotUserFound, setForgotUserFound] = useState<CurrentUser | null>(null);
 
   // ============================================================
   // RESET FORM
@@ -297,9 +297,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     try {
-      // Endpoint Google Apps Script sengaja tidak dikirim dari browser.
-      // Ini membuat login konsisten di desktop, HP, dan tablet meskipun
-      // localStorage perangkat masih menyimpan konfigurasi GAS lama.
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -757,19 +754,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // ============================================================
-  // FIND ACCOUNT
+  // PASSWORD RECOVERY
   // ============================================================
-  const handleFindAccount = (
+  // Recovery tidak lagi mencari akun dari localStorage.
+  // Identitas diverifikasi oleh Google Apps Script dan kode OTP
+  // dikirim ke email yang tersimpan pada akun.
+  const handleFindAccount = async (
     e: React.FormEvent
   ) => {
     e.preventDefault();
 
     setForgotError('');
 
-    const ident =
-      forgotIdentifier
-        .trim()
-        .toLowerCase();
+    const ident = forgotIdentifier.trim().toLowerCase();
 
     if (!ident) {
       setForgotError(
@@ -778,94 +775,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    const users =
-      storage.getUsers();
+    setIsLoading(true);
 
-    const members =
-      storage.getMembers();
-
-    const foundU =
-      users.find(
-        u =>
-          (
-            u.email &&
-            u.email
-              .toLowerCase() ===
-              ident
-          ) ||
-          (
-            u.username &&
-            u.username
-              .toLowerCase() ===
-              ident
-          )
+    try {
+      const response = await fetch(
+        '/api/auth/request-password-reset',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          cache: 'no-store',
+          body: JSON.stringify({
+            identifier: ident
+          })
+        }
       );
 
-    const foundM =
-      members.find(
-        m =>
-          (
-            m.email &&
-            m.email
-              .toLowerCase() ===
-              ident
-          ) ||
-          (
-            m.nationalMemberNumber &&
-            m.nationalMemberNumber
-              .toLowerCase() ===
-              ident
-          ) ||
-          (
-            m.phone &&
-            m.phone ===
-            ident
-          )
-      );
+      const result =
+        await response.json().catch(() => null);
 
-    if (foundU || foundM) {
-      const userRef:
-        CurrentUser =
-        foundU || {
-          id:
-            foundM!.userId ||
-            `user-${foundM!.id}`,
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.message ||
+          `Permintaan pemulihan gagal (HTTP ${response.status}).`
+        );
+      }
 
-          username:
-            foundM!.nationalMemberNumber ||
-            foundM!.email
-              .split('@')[0],
-
-          name:
-            foundM!.fullName,
-
-          fullName:
-            foundM!.fullName,
-
-          email:
-            foundM!.email,
-
-          role:
-            'MEMBER'
-        };
-
-      setForgotUserFound(
-        userRef
-      );
-
-      setForgotStep(
-        'reset'
-      );
-    } else {
+      setForgotOtp('');
+      setForgotNewPassword('');
+      setForgotConfirmPassword('');
+      setForgotStep('reset');
+    } catch (error: any) {
       setForgotError(
-        'Akun tidak ditemukan. Pastikan data yang dimasukkan sudah benar.'
+        error?.message ||
+        'Kode pemulihan gagal dikirim. Silakan coba lagi.'
       );
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // ============================================================
-  // RESET PASSWORD
-  // ============================================================
   const handleResetPassword = async (
     e: React.FormEvent
   ) => {
@@ -873,46 +824,59 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setForgotError('');
 
+    if (!forgotOtp.trim()) {
+      setForgotError(
+        'Masukkan kode pemulihan yang dikirim ke email.'
+      );
+      return;
+    }
+
     if (forgotNewPassword.length < 6) {
-      setForgotError('Kata sandi baru minimal 6 karakter.');
+      setForgotError(
+        'Kata sandi baru minimal 6 karakter.'
+      );
       return;
     }
 
-    if (forgotNewPassword !== forgotConfirmPassword) {
-      setForgotError('Konfirmasi kata sandi tidak cocok.');
-      return;
-    }
-
-    if (!forgotUserFound) {
-      setForgotError('Akun belum dipilih. Silakan ulangi proses lupa password.');
+    if (
+      forgotNewPassword !==
+      forgotConfirmPassword
+    ) {
+      setForgotError(
+        'Konfirmasi kata sandi tidak cocok.'
+      );
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        cache: 'no-store',
-        body: JSON.stringify({
-          userId: forgotUserFound.id || '',
-          username: forgotUserFound.username || '',
-          email: forgotUserFound.email || '',
-          memberId: '',
-          identifier: forgotIdentifier.trim(),
-          newPassword: forgotNewPassword
-        })
-      });
+      const response = await fetch(
+        '/api/auth/reset-password',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          cache: 'no-store',
+          body: JSON.stringify({
+            identifier:
+              forgotIdentifier.trim().toLowerCase(),
+            code: forgotOtp.trim(),
+            newPassword:
+              forgotNewPassword
+          })
+        }
+      );
 
-      const result = await response.json().catch(() => null);
+      const result =
+        await response.json().catch(() => null);
 
       if (!response.ok || !result?.success) {
         throw new Error(
-          result?.message || `Reset password gagal (HTTP ${response.status}).`
+          result?.message ||
+          `Reset password gagal (HTTP ${response.status}).`
         );
       }
 
@@ -921,14 +885,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setTimeout(() => {
         setTab('login');
         setForgotStep('request');
-        setLoginIdentifier(forgotIdentifier);
+        setLoginIdentifier(
+          forgotIdentifier.trim()
+        );
+        setForgotOtp('');
         setForgotNewPassword('');
         setForgotConfirmPassword('');
-        setForgotUserFound(null);
       }, 1500);
     } catch (error: any) {
       setForgotError(
-        error?.message || 'Password gagal diperbarui. Silakan coba lagi.'
+        error?.message ||
+        'Password gagal diperbarui. Silakan coba lagi.'
       );
     } finally {
       setIsLoading(false);
@@ -1874,31 +1841,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               {forgotError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
-
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-
-                  <span>
-                    {forgotError}
-                  </span>
-
+                  <span>{forgotError}</span>
                 </div>
               )}
 
-              {forgotStep ===
-                'request' && (
+              {forgotStep === 'request' && (
                 <form
-                  onSubmit={
-                    handleFindAccount
-                  }
+                  onSubmit={handleFindAccount}
                   className="space-y-4"
                 >
-
                   <p className="text-xs text-slate-600">
-                    Masukkan email, username, atau nomor KTA Anda untuk mencari akun dan mengatur ulang kata sandi.
+                    Masukkan email, username, atau nomor KTA.
+                    Jika akun memiliki email terdaftar, kode
+                    pemulihan akan dikirim ke email tersebut.
                   </p>
 
                   <div>
-
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Identitas Akun
                     </label>
@@ -1906,58 +1865,64 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <input
                       type="text"
                       required
-                      value={
-                        forgotIdentifier
-                      }
+                      autoComplete="username"
+                      value={forgotIdentifier}
                       onChange={e =>
-                        setForgotIdentifier(
-                          e.target.value
-                        )
+                        setForgotIdentifier(e.target.value)
                       }
-                      placeholder="Email atau No. KTA"
+                      placeholder="Email, Username, atau No. KTA"
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
                     />
-
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold"
+                    disabled={isLoading}
+                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold"
                   >
-                    Temukan Akun
+                    {isLoading
+                      ? 'Mengirim Kode...'
+                      : 'Kirim Kode Pemulihan'}
                   </button>
-
                 </form>
               )}
 
-              {forgotStep ===
-                'reset' && (
+              {forgotStep === 'reset' && (
                 <form
-                  onSubmit={
-                    handleResetPassword
-                  }
+                  onSubmit={handleResetPassword}
                   className="space-y-3.5"
                 >
-
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
-
-                    Akun ditemukan:{' '}
-
-                    <strong>
-                      {forgotUserFound?.fullName ||
-                        forgotUserFound?.name}
-                    </strong>{' '}
-
-                    (
-                    {
-                      forgotUserFound?.email
-                    }
-                    )
-
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
+                    Kode pemulihan telah diminta. Periksa
+                    email yang terdaftar pada akun Anda.
+                    Kode berlaku selama 10 menit.
                   </div>
 
                   <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Kode Pemulihan
+                    </label>
 
+                    <input
+                      type="text"
+                      required
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      value={forgotOtp}
+                      onChange={e =>
+                        setForgotOtp(
+                          e.target.value
+                            .replace(/\D/g, '')
+                            .slice(0, 6)
+                        )
+                      }
+                      placeholder="6 digit kode dari email"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm tracking-[0.35em] text-center focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Kata Sandi Baru
                     </label>
@@ -1965,22 +1930,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <input
                       type="password"
                       required
-                      value={
-                        forgotNewPassword
-                      }
+                      autoComplete="new-password"
+                      value={forgotNewPassword}
                       onChange={e =>
-                        setForgotNewPassword(
-                          e.target.value
-                        )
+                        setForgotNewPassword(e.target.value)
                       }
                       placeholder="Minimal 6 karakter"
                       className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
                     />
-
                   </div>
 
                   <div>
-
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Konfirmasi Kata Sandi
                     </label>
@@ -1988,34 +1948,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <input
                       type="password"
                       required
-                      value={
-                        forgotConfirmPassword
-                      }
+                      autoComplete="new-password"
+                      value={forgotConfirmPassword}
                       onChange={e =>
-                        setForgotConfirmPassword(
-                          e.target.value
-                        )
+                        setForgotConfirmPassword(e.target.value)
                       }
                       placeholder="Ketik ulang sandi"
                       className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
                     />
-
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold"
+                    disabled={isLoading}
+                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold"
                   >
-                    Simpan Kata Sandi Baru
+                    {isLoading
+                      ? 'Menyimpan...'
+                      : 'Verifikasi & Simpan Password'}
                   </button>
 
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => {
+                      setForgotStep('request');
+                      setForgotOtp('');
+                      setForgotError('');
+                    }}
+                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-emerald-700"
+                  >
+                    Kirim kode baru
+                  </button>
                 </form>
               )}
 
-              {forgotStep ===
-                'done' && (
+              {forgotStep === 'done' && (
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2">
-
                   <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto" />
 
                   <p className="text-xs font-semibold text-emerald-800">
@@ -2025,12 +1994,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <p className="text-[11px] text-emerald-600">
                     Mengalihkan ke halaman login...
                   </p>
-
                 </div>
               )}
 
             </div>
           )}
+
 
         </div>
       </div>
