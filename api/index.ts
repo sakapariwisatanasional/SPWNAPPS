@@ -4,6 +4,10 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { OFFICIAL_MERCHANDISE_PRODUCTS } from '../src/data/officialMerchandiseData';
 
+// URL default backend Google Apps Script. Didefinisikan di awal module agar aman digunakan oleh seluruh helper, termasuk saat cold-start/server sync.
+const DEFAULT_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
+
 const app = express();
 const PORT = 3000;
 export type UserRole = 
@@ -1239,8 +1243,7 @@ if (!IS_VERCEL) {
   }, 25000);
 }
 
-const DEFAULT_APPS_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
+
 
 // Proxy khusus autentikasi/recovery. URL dari browser tidak pernah dipakai
 // untuk aksi autentikasi. Kandidat server dicoba berurutan agar deployment
