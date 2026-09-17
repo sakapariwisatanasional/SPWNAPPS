@@ -1241,18 +1241,16 @@ const DEFAULT_APPS_SCRIPT_URL =
 
 // Proxy mutation to Google Apps Script Web App
 async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
-  // Browser mobile dapat membawa URL deployment lama dari localStorage.
-  // Jangan biarkan URL lama tersebut menjadi satu-satunya sumber endpoint.
-  // Server mencoba URL yang diminta terlebih dahulu, lalu URL konfigurasi,
-  // ENV Vercel, dan terakhir URL produksi yang ditanam sebagai fallback.
+  // Browser desktop/mobile/tablet dapat membawa URL deployment lama dari
+  // localStorage. URL dari browser TIDAK boleh menjadi endpoint utama karena
+  // setiap perangkat bisa memiliki cache konfigurasi yang berbeda.
+  // Server menggunakan endpoint produksi yang dikendalikan server terlebih
+  // dahulu, lalu hanya memakai konfigurasi lama sebagai fallback.
   const requested = normalizeManualAppsScriptUrl(requestedScriptUrl);
   const configured = normalizeManualAppsScriptUrl(db.config.scriptUrl);
   const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-  // Prioritas mutlak: URL yang dikirim halaman aktif (hasil Dashboard), lalu
-  // konfigurasi server. ENV hanya menjadi bootstrap opsional; tidak ada URL GAS
-  // tertentu yang ditanam permanen di source code.
   const defaultUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
-  const candidates = [requested, configured, envUrl, defaultUrl]
+  const candidates = [envUrl, defaultUrl, configured, requested]
     .filter(Boolean)
     .filter((url, index, arr) => arr.indexOf(url) === index);
 
@@ -1287,7 +1285,15 @@ async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unkn
       }
 
       if (data?.status === 'error' || data?.success === false) {
-        throw new Error(data.message || 'Google Apps Script menolak permintaan.');
+        const gasMessage = String(data?.message || 'Google Apps Script menolak permintaan.');
+        // Deployment lama kadang masih hidup dan mengembalikan HTTP 200,
+        // tetapi belum mengenal action terbaru. Jangan biarkan respons seperti
+        // ini menghentikan fallback ke deployment produksi yang benar.
+        if (/action.*(tidak dikenal|unknown|not found)|unknown.*action|tidak mengenal.*action/i.test(gasMessage)) {
+          lastError = gasMessage;
+          continue;
+        }
+        throw new Error(gasMessage);
       }
 
       console.log(`[GAS Forward] ${payload.action} berhasil melalui ${scriptUrl}`);
@@ -1454,7 +1460,10 @@ app.post('/api/upload-image', express.raw({ type: ['application/octet-stream', '
 
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
-  const { username, password, scriptUrl } = req.body || {};
+  // Jangan mengambil endpoint GAS dari browser. Perangkat mobile/tablet bisa
+  // menyimpan konfigurasi lama di localStorage sehingga login berakhir di
+  // deployment GAS yang sudah tidak aktif (HTTP 404). Endpoint dipilih server.
+  const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Nama pengguna dan kata sandi wajib diisi.' });
   }
@@ -1491,7 +1500,7 @@ app.post('/api/auth/login', async (req, res) => {
       username: gasLoginIdentifier,
       password: rawPass,
       memberId: matchedMemberByKta?.id || ''
-    }, scriptUrl || DEFAULT_APPS_SCRIPT_URL);
+    });
 
     if (gasResult?.success === true && gasResult?.user) {
       matchedUser = {
