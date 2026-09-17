@@ -622,4 +622,3 @@ export interface KridaModuleItem {
   };
   specialSafetyNotes?: string;
 }
-
