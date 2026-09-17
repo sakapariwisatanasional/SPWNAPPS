@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { OFFICIAL_MERCHANDISE_PRODUCTS } from '../src/data/officialMerchandiseData';
 
 const app = express();
 const PORT = 3000;
@@ -756,6 +757,7 @@ interface DatabaseSchema {
   kridaModules?: any[];
   users: any[];
   auditLogs: any[];
+  orders: any[];
   lastUpdated: string;
   version: number;
 }
@@ -778,6 +780,7 @@ let db: DatabaseSchema = {
   kridaModules: [],
   users: [],
   auditLogs: [],
+  orders: [],
   lastUpdated: new Date().toISOString(),
   version: 1
 };
@@ -3043,6 +3046,120 @@ app.post('/api/admin/revoke', async (req, res) => {
   return res.json({ success:true, status:'success', message:'Status Admin dicabut. Akun kembali menjadi Member.', user:{ id:targetUser?.id || userId || '', memberId:resolvedMemberId, role:'MEMBER', jurisdictionId:'', jurisdictionName:'' } });
 });
 
+// ==========================================
+// OFFICIAL STORE ORDERS
+// ==========================================
+const ORDER_STATUSES = [
+  'MENUNGGU_PEMBAYARAN',
+  'PEMBAYARAN_DIVERIFIKASI',
+  'DIPROSES',
+  'DIKIRIM',
+  'SELESAI',
+  'DIBATALKAN'
+] as const;
+
+const ORDER_ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
+
+const normalizeOrderPhone = (value: unknown) => String(value || '').replace(/[^0-9]/g, '');
+
+const createServerOrderNumber = () => {
+  const date = new Date();
+  const datePart = `${date.getFullYear()}${padServer(date.getMonth() + 1)}${padServer(date.getDate())}`;
+  const randomPart = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `SPWN-${datePart}-${randomPart}`;
+};
+
+function padServer(value: number): string {
+  return String(Math.max(0, value)).padStart(2, '0');
+}
+
+async function refreshOrdersFromSpreadsheet(): Promise<any[]> {
+  try {
+    const rows = await fetchSheetGViz('Store_Orders');
+    if (!Array.isArray(rows)) return Array.isArray(db.orders) ? db.orders : [];
+
+    const imported = rows.map((row: any, index: number) => {
+      const get = (aliases: string[]) => getColVal(row, aliases);
+      let items: any[] = [];
+      try {
+        const rawItems = get(['Items JSON', 'itemsJson', 'Items', 'col_14']);
+        const parsed = rawItems ? JSON.parse(rawItems) : [];
+        if (Array.isArray(parsed)) items = parsed;
+      } catch {
+        items = [];
+      }
+
+      return {
+        id: get(['ID', 'id', 'col_0']) || `order-sheet-${index + 1}`,
+        orderNumber: get(['Nomor Pesanan', 'Order Number', 'orderNumber', 'col_1']),
+        createdAt: get(['Tanggal Pesanan', 'Created At', 'createdAt', 'col_2']) || new Date().toISOString(),
+        status: get(['Status', 'status', 'col_3']) || 'MENUNGGU_PEMBAYARAN',
+        customerUserId: get(['User ID', 'customerUserId', 'col_4']) || null,
+        customerMemberId: get(['Member ID', 'customerMemberId', 'col_5']) || null,
+        checkout: {
+          receiverName: get(['Nama Penerima', 'receiverName', 'col_6']),
+          whatsapp: get(['WhatsApp', 'Nomor WhatsApp', 'whatsapp', 'col_7']),
+          address: get(['Alamat', 'address', 'col_8']),
+          province: get(['Provinsi', 'province', 'col_9']),
+          regency: get(['Kabupaten/Kota', 'regency', 'col_10']),
+          district: get(['Kecamatan', 'district', 'col_11']),
+          note: get(['Catatan', 'note', 'col_12'])
+        },
+        subtotal: Number(get(['Subtotal', 'subtotal', 'col_13'])) || 0,
+        items
+      };
+    }).filter((order: any) => order.orderNumber);
+
+    const local = Array.isArray(db.orders) ? db.orders : [];
+    const byNumber = new Map<string, any>();
+    [...imported, ...local].forEach(order => {
+      const key = String(order.orderNumber || '');
+      if (key) byNumber.set(key, order);
+    });
+    db.orders = Array.from(byNumber.values()).sort((a, b) =>
+      String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+    );
+    return db.orders;
+  } catch (error) {
+    console.warn('[Orders] Gagal memuat Store_Orders dari Spreadsheet:', error);
+    return Array.isArray(db.orders) ? db.orders : [];
+  }
+}
+
+function sanitizeOrderForResponse(order: any) {
+  return {
+    orderNumber: order.orderNumber,
+    createdAt: order.createdAt,
+    status: order.status,
+    items: Array.isArray(order.items) ? order.items : [],
+    subtotal: Number(order.subtotal) || 0,
+    checkout: order.checkout || {},
+    customerUserId: order.customerUserId || null
+  };
+}
+
+app.get('/api/orders', async (req, res) => {
+  const session = getSessionUser(req);
+  if (!session || !ORDER_ADMIN_ROLES.includes(session.role)) {
+    return res.status(403).json({ success: false, message: 'Wewenang administrator diperlukan untuk melihat seluruh pesanan.' });
+  }
+
+  const orders = await refreshOrdersFromSpreadsheet();
+  res.json({ success: true, orders: orders.map(sanitizeOrderForResponse) });
+});
+
+app.get('/api/orders/mine', async (req, res) => {
+  const session = getSessionUser(req);
+  if (!session || session.role !== 'MEMBER' || !session.memberId) {
+    return res.status(403).json({ success: false, message: 'Silakan login sebagai anggota untuk melihat pesanan Anda.' });
+  }
+
+  const allOrders = await refreshOrdersFromSpreadsheet();
+  const orders = allOrders
+    .filter((order: any) => String(order.customerMemberId || '') === String(session.memberId || ''));
+  res.json({ success: true, orders: orders.map(sanitizeOrderForResponse) });
+});
+
 // Central Mutation API - Receives any create/update/delete with Server Role Enforcement
 app.post('/api/mutate', async (req, res) => {
   const session = getSessionUser(req);
@@ -3127,7 +3244,7 @@ app.post('/api/mutate', async (req, res) => {
     }
   }
 
-  if (!requestScriptUrl) {
+  if (!requestScriptUrl && type !== 'ORDER') {
     return res.status(400).json({
       success: false,
       status: 'error',
@@ -3136,7 +3253,7 @@ app.post('/api/mutate', async (req, res) => {
   }
 
   const forwardMutation = (gasPayload: any) =>
-    forwardToGoogleAppsScript(gasPayload, requestScriptUrl);
+    forwardToGoogleAppsScript(gasPayload, requestScriptUrl || db.config.scriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL || '');
 
   // Validasi kewenangan wilayah dilakukan di server, bukan hanya di browser.
   const canEditMemberInJurisdiction = (target: any, incoming: any): boolean => {
@@ -3199,6 +3316,8 @@ app.post('/api/mutate', async (req, res) => {
   if (db.auditLogs.length > 500) db.auditLogs.pop();
 
   console.log(`[Mutation] [${session?.role || 'PUBLIC'}] Received ${type}:${action} from client.`);
+
+  let mutationResult: Record<string, any> = {};
 
   try {
     if (type === 'MEMBER') {
@@ -3490,6 +3609,111 @@ app.post('/api/mutate', async (req, res) => {
           id: payload.id
         });
       }
+    } else if (type === 'ORDER') {
+      if (action !== 'CREATE') {
+        return res.status(400).json({ success: false, message: 'Aksi Order yang tersedia pada tahap ini hanya CREATE.' });
+      }
+
+      const incoming = payload || {};
+      const rawItems = Array.isArray(incoming.items) ? incoming.items : [];
+      if (!rawItems.length) {
+        return res.status(400).json({ success: false, message: 'Pesanan tidak memiliki item.' });
+      }
+
+      const checkout = incoming.checkout || {};
+      const receiverName = String(checkout.receiverName || '').trim();
+      const whatsapp = normalizeOrderPhone(checkout.whatsapp);
+      const address = String(checkout.address || '').trim();
+      const province = String(checkout.province || '').trim();
+      const regency = String(checkout.regency || '').trim();
+      const district = String(checkout.district || '').trim();
+      const note = String(checkout.note || '').trim();
+
+      if (!receiverName || !whatsapp || whatsapp.length < 8 || !address || !province || !regency || !district) {
+        return res.status(400).json({ success: false, message: 'Data checkout belum lengkap atau nomor WhatsApp tidak valid.' });
+      }
+
+      const catalog = new Map(OFFICIAL_MERCHANDISE_PRODUCTS.map(product => [product.id, product]));
+      const normalizedItems: any[] = [];
+      let calculatedSubtotal = 0;
+
+      for (const rawItem of rawItems) {
+        const productId = String(rawItem?.productId || '').trim();
+        const product = catalog.get(productId);
+        const quantity = Number(rawItem?.quantity);
+        const size = rawItem?.size ? String(rawItem.size).trim() : undefined;
+
+        if (!product || !product.active || product.purchaseEnabled !== true || product.comingSoon === true) {
+          return res.status(409).json({ success: false, message: `Produk ${productId || 'tidak dikenal'} tidak tersedia untuk pembelian.` });
+        }
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+          return res.status(400).json({ success: false, message: `Jumlah produk ${product.name} tidak valid.` });
+        }
+        if (product.sizes?.length && (!size || !product.sizes.includes(size))) {
+          return res.status(400).json({ success: false, message: `Ukuran untuk ${product.name} tidak valid.` });
+        }
+
+        const lineTotal = product.price * quantity;
+        calculatedSubtotal += lineTotal;
+        normalizedItems.push({
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          size,
+          quantity,
+          lineTotal
+        });
+      }
+
+      const clientOrderNumber = String(incoming.orderNumber || '').trim();
+      const existingNumbers = new Set((Array.isArray(db.orders) ? db.orders : []).map((order: any) => String(order.orderNumber || '')));
+      let orderNumber = clientOrderNumber || createServerOrderNumber();
+      while (existingNumbers.has(orderNumber)) orderNumber = createServerOrderNumber();
+
+      const now = new Date().toISOString();
+      const order = {
+        id: `order-${crypto.randomBytes(12).toString('hex')}`,
+        orderNumber,
+        createdAt: now,
+        status: 'MENUNGGU_PEMBAYARAN',
+        customerUserId: session?.userId || null,
+        customerMemberId: session?.memberId || null,
+        items: normalizedItems,
+        subtotal: calculatedSubtotal,
+        checkout: { receiverName, whatsapp, address, province, regency, district, note }
+      };
+
+      const orderRow = [
+        order.id,
+        order.orderNumber,
+        order.createdAt,
+        order.status,
+        order.customerUserId || '',
+        order.customerMemberId || '',
+        receiverName,
+        whatsapp,
+        address,
+        province,
+        regency,
+        district,
+        note,
+        calculatedSubtotal,
+        JSON.stringify(normalizedItems)
+      ];
+
+      // The order is only reported as successfully created after the authoritative
+      // Google Apps Script write succeeds. This avoids claiming a durable order
+      // when the serverless instance itself cannot be relied on for persistence.
+      await forwardMutation({
+        action: 'UPSERT_ROW',
+        sheet: 'Store_Orders',
+        id: order.id,
+        rowData: orderRow
+      });
+
+      if (!Array.isArray(db.orders)) db.orders = [];
+      db.orders.unshift(order);
+      mutationResult = { order: sanitizeOrderForResponse(order) };
     } else if (type === 'KRIDA_MODULE') {
       const moduleItem = payload;
       if (!Array.isArray(db.kridaModules)) db.kridaModules = [];
@@ -3510,6 +3734,7 @@ app.post('/api/mutate', async (req, res) => {
     saveDatabase();
     res.json({
       success: true,
+      ...mutationResult,
       lastUpdated: db.lastUpdated,
       version: db.version
     });
