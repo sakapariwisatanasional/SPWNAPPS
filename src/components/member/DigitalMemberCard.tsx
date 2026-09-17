@@ -701,16 +701,25 @@ export const DigitalMemberCard: React.FC<Props> = ({
   const bgStyle = (
     url?: string,
     color?: string
-  ): React.CSSProperties => ({
-    backgroundColor:
-      color || '#24105b',
-    backgroundImage: url
-      ? `linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("${formatDriveImageUrl(url) || url}")`
-      : undefined,
-    backgroundSize: 'cover',
-    backgroundPosition:
-      'center'
-  });
+  ): React.CSSProperties => {
+    const resolvedUrl = formatDriveImageUrl(url || '') || url || '';
+    const isKtaMaster =
+      resolvedUrl.includes('/assets/kta/KTA-MASTER.png') ||
+      url?.includes('/assets/kta/KTA-MASTER.png');
+
+    return {
+      backgroundColor: color || '#24105b',
+      backgroundImage: resolvedUrl
+        ? (
+            isKtaMaster
+              ? `url("${resolvedUrl}")`
+              : `linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("${resolvedUrl}")`
+          )
+        : undefined,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center'
+    };
+  };
 
   return (
     <div className="flex flex-col items-center gap-3 select-none">
@@ -766,14 +775,16 @@ export const DigitalMemberCard: React.FC<Props> = ({
                 : {})
             }}
           >
-            <div
-              className="absolute inset-0 bg-black/10"
-              style={{
-                opacity:
-                  settings.bgOpacity ??
-                  0.1
-              }}
-            />
+            {!String(bgFront || '').includes('/assets/kta/KTA-MASTER.png') && (
+              <div
+                className="absolute inset-0 bg-black/10"
+                style={{
+                  opacity:
+                    settings.bgOpacity ??
+                    0.1
+                }}
+              />
+            )}
 
             {renderLogos(
               frontLogos
