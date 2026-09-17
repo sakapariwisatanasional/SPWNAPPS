@@ -59,9 +59,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const content = (
-    <div className="app-sidebar w-72 sm:w-80 lg:w-64 h-full bg-slate-950 text-white flex flex-col flex-shrink-0 border-r border-slate-800 select-none shadow-xl z-20 relative">
+    <div className="app-sidebar w-72 sm:w-80 lg:w-64 h-full bg-slate-950 text-white flex flex-col flex-shrink-0 border-r border-slate-800/80 select-none shadow-2xl z-20 relative">
       {/* Subtle Purple Glow Overlay */}
-      <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-purple-900/20 to-transparent pointer-events-none" />
+      <div className="absolute top-0 left-0 right-0 h-56 bg-gradient-to-b from-purple-900/25 via-fuchsia-900/10 to-transparent pointer-events-none" />
 
       {/* Brand Header with SakaLogo & Mobile Close Button */}
       <div className="p-4 sm:p-5 border-b border-slate-800/80 relative z-10 flex items-center justify-between">
@@ -81,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {onCloseMobile && (
           <button
             onClick={onCloseMobile}
-            className="lg:hidden w-8 h-8 rounded-2xl bg-slate-900 text-slate-400 hover:text-white flex items-center justify-center border border-slate-800 cursor-pointer"
+            className="lg:hidden w-10 h-10 rounded-2xl bg-slate-900/90 text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center border border-slate-800 cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-purple-400/60 focus:ring-offset-2 focus:ring-offset-slate-950"
             aria-label="Tutup Menu"
           >
             <X className="w-4 h-4" />
@@ -90,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation List */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar relative z-10">
+      <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto custom-scrollbar relative z-10">
         {/* Main Section */}
         <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest px-3 py-2 mb-1 flex items-center justify-between">
           <span>Menu Utama</span>
@@ -102,10 +102,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Landing Page */}
         <button
           onClick={() => handleItemClick('landing')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+          aria-current={currentTab === 'landing' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
             currentTab === 'landing'
-              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
           }`}
         >
           <Home className={`w-4 h-4 ${currentTab === 'landing' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -116,10 +117,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isAdmin && (
           <button
             onClick={() => handleItemClick('dashboard')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+            aria-current={currentTab === 'dashboard' ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               currentTab === 'dashboard'
-                ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+                : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
             }`}
           >
             <LayoutDashboard className={`w-4 h-4 ${currentTab === 'dashboard' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -137,10 +139,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isMember && (
           <button
             onClick={() => handleItemClick('my-card')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+            aria-current={currentTab === 'my-card' ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               currentTab === 'my-card'
-                ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+                : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
             }`}
           >
             <CreditCard className={`w-4 h-4 ${currentTab === 'my-card' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -153,10 +156,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isAdmin && (
           <button
             onClick={() => handleItemClick('members')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+            aria-current={currentTab === 'members' ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               currentTab === 'members'
-                ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+                : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
             }`}
           >
             <Users className={`w-4 h-4 ${currentTab === 'members' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -167,10 +171,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Tourism Directory */}
         <button
           onClick={() => handleItemClick('tours')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+          aria-current={currentTab === 'tours' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
             currentTab === 'tours'
-              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
           }`}
         >
           <Compass className={`w-4 h-4 ${currentTab === 'tours' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -180,10 +185,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Kuliner & Cinderamata Daerah */}
         <button
           onClick={() => handleItemClick('culinary-souvenirs')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+          aria-current={currentTab === 'culinary-souvenirs' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
             currentTab === 'culinary-souvenirs'
-              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
           }`}
         >
           <Utensils className={`w-4 h-4 ${currentTab === 'culinary-souvenirs' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -194,10 +200,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Official Store */}
         <button
           onClick={() => handleItemClick('official-store')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+          aria-current={currentTab === 'official-store' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
             currentTab === 'official-store'
-              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
           }`}
         >
           <ShoppingBag className={`w-4 h-4 ${currentTab === 'official-store' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -208,10 +215,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Skills & Certification */}
         <button
           onClick={() => handleItemClick('skills')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+          aria-current={currentTab === 'skills' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
             currentTab === 'skills'
-              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
           }`}
         >
           <Award className={`w-4 h-4 ${currentTab === 'skills' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -221,10 +229,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Modul SKK & Silabus 4 Krida */}
         <button
           onClick={() => handleItemClick('krida-modules')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+          aria-current={currentTab === 'krida-modules' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
             currentTab === 'krida-modules'
-              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
           }`}
         >
           <BookOpen className={`w-4 h-4 ${currentTab === 'krida-modules' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -235,10 +244,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Activities / Agenda */}
         <button
           onClick={() => handleItemClick('activities')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+          aria-current={currentTab === 'activities' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
             currentTab === 'activities'
-              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
           }`}
         >
           <CalendarDays className={`w-4 h-4 ${currentTab === 'activities' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -248,10 +258,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Public Portal (Wisata, Talenta, Verifikasi) */}
         <button
           onClick={() => handleItemClick('verify-portal')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+          aria-current={currentTab === 'verify-portal' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
             currentTab === 'verify-portal'
-              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
           }`}
         >
           <Compass className={`w-4 h-4 ${currentTab === 'verify-portal' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -269,10 +280,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {(isSuperAdmin || currentUser.role === 'ADMIN_NATIONAL' || currentUser.role === 'ADMIN_PROVINCE') && (
               <button
                 onClick={() => handleItemClick('territories')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+                aria-current={currentTab === 'territories' ? 'page' : undefined}
+                className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
                   currentTab === 'territories'
-                    ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-                    : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                    ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+                    : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
                 }`}
               >
                 <MapPin className={`w-4 h-4 ${currentTab === 'territories' ? 'text-purple-400' : 'text-slate-400'}`} />
@@ -284,7 +296,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isSuperAdmin && (
               <button
                 onClick={() => handleItemClick('audit-logs')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+                aria-current={currentTab === 'audit-logs' ? 'page' : undefined}
+                className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
                   currentTab === 'audit-logs'
                     ? 'bg-emerald-600/15 text-emerald-400 font-semibold border border-emerald-500/20 shadow-sm'
                     : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
@@ -302,7 +315,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onOpenSpreadsheetModal();
                   if (onCloseMobile) onCloseMobile();
                 }}
-                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-800/40 mt-1"
+                className="w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-800/40 mt-1"
                 title="Akses Database Google Spreadsheet (Super Admin Kwarnas)"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
@@ -317,7 +330,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onOpenDriveModal();
                   if (onCloseMobile) onCloseMobile();
                 }}
-                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer bg-purple-950/40 text-purple-300 hover:bg-purple-950/70 border border-purple-800/40 mt-1"
+                className="w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 bg-purple-950/40 text-purple-300 hover:bg-purple-950/70 border border-purple-800/40 mt-1"
                 title="Akses Media Google Drive Repository (Super Admin Kwarnas)"
               >
                 <FolderOpen className="w-4 h-4 text-purple-400" />
@@ -335,7 +348,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onOpenRegisterModal();
               if (onCloseMobile) onCloseMobile();
             }}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-semibold text-xs py-3 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-emerald-950 transition-all active:scale-95 cursor-pointer"
+            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-semibold text-xs min-h-11 py-3 px-3 rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-emerald-950/60 transition-all hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
             <Sparkles className="w-4 h-4" />
             <span>Daftar Anggota Baru</span>
@@ -344,8 +357,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* User Footer Profile */}
-      <div className="p-3 border-t border-slate-800">
-        <div className="bg-slate-800/70 rounded-2xl p-3 flex items-center gap-3 border border-slate-700/60">
+      <div className="p-3 border-t border-slate-800/80 bg-slate-950/60">
+        <div className="bg-gradient-to-r from-slate-800/80 to-slate-800/50 rounded-2xl p-3 flex items-center gap-3 border border-slate-700/70 shadow-sm">
           <img
             src={currentUser.avatarUrl}
             alt={currentUser.name}
@@ -374,12 +387,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="lg:hidden fixed inset-0 z-50 flex">
           {/* Dark Backdrop */}
           <div 
-            className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs transition-opacity animate-in fade-in"
+            className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm transition-opacity animate-in fade-in"
             onClick={onCloseMobile}
           />
 
           {/* Drawer Slide-in */}
-          <div className="relative z-10 flex h-full max-w-xs w-full animate-in slide-in-from-left duration-200 shadow-xl">
+          <div className="relative z-10 flex h-full max-w-xs w-full animate-in slide-in-from-left duration-200 shadow-2xl">
             {content}
           </div>
         </div>
