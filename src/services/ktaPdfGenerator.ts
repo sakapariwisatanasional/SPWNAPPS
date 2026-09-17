@@ -800,43 +800,12 @@ export async function generateKtaPdf({
     logos: configuredLogos
   }, signerMember);
 
-  // Untuk export dari UI, gunakan DOM preview yang sama persis.
-  // Ini menghindari perbedaan font, wrapping, padding, logo, dan posisi
-  // antara renderer Canvas dan tampilan KTA di aplikasi. Renderer Canvas
-  // tetap dipertahankan sebagai fallback untuk pemanggilan non-UI.
-  let frontImg = frontCanvas.toDataURL('image/png', 1);
-  let backImg = backCanvas.toDataURL('image/png', 1);
-
-  // PDF selalu dirender langsung dari KtaCardSettings menggunakan Canvas.
-  // captureElements/frontElement/backElement sengaja tidak digunakan agar
-  // html2canvas dan CSS Color 4 (oklab/oklch) tidak pernah masuk ke jalur PDF.
-  onProgress?.('Me-render sisi depan berdasarkan KtaCardSettings...');
-  const frontCanvas = await renderFront(member, design, {
-    background: frontBackground,
-    officialLogo,
-    frontLogoImg,
-    backLogoImg,
-    avatar,
-    qrImg,
-    signerQrImg,
-    logos: configuredLogos
-  });
-
-  onProgress?.('Me-render sisi belakang berdasarkan KtaCardSettings...');
-  const backCanvas = await renderBack(member, design, {
-    background: backBackground,
-    officialLogo,
-    frontLogoImg,
-    backLogoImg,
-    qrImg,
-    signerQrImg,
-    logos: configuredLogos
-  }, signerMember);
-
   const frontImg = frontCanvas.toDataURL('image/png', 1);
   const backImg = backCanvas.toDataURL('image/png', 1);
 
-
+  // PDF selalu dirender langsung dari KtaCardSettings menggunakan Canvas.
+  // Tidak ada html2canvas/DOM capture sehingga CSS Color 4 (oklab/oklch)
+  // dari aplikasi tidak pernah masuk ke jalur pembuatan PDF.
   onProgress?.('Menyusun PDF dengan ukuran fisik KTA...');
 
   const widthMm = Number(design.widthMm ?? CR80_WIDTH_MM);
