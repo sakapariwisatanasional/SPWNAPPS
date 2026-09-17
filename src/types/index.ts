@@ -147,11 +147,11 @@ export const getMemberKwartirHierarchy = (
 };
 
 export interface Member {
-  id: string;
+  id: string;                  // UUID
   userId: string;
-  nationalMemberNumber?: string;
+  nationalMemberNumber?: string; // Format: PP.KK.KKK.NNNNNN
   fullName: string;
-  nikMasked: string;
+  nikMasked: string;           // E.g. 320612******0004
   avatarUrl: string;
   gender: 'LAKI_LAKI' | 'PEREMPUAN';
   birthPlace: string;
@@ -176,7 +176,7 @@ export interface Member {
   
   joinYear: number;
   status: MemberStatus;
-  currentPosition: string;
+  currentPosition: string;     // e.g. Anggota Krida Pemandu
   krida?: KridaType;
   educationLevel: string;
   occupation: string;
@@ -190,7 +190,7 @@ export interface Member {
   verifiedAt?: string;
   verifiedBy?: string;
   rejectionReason?: string;
-  verificationToken: string;
+  verificationToken: string;   // Token untuk QR Code publik
 
   // Operator Privileges & Delegation
   isOperator?: boolean;
@@ -218,189 +218,76 @@ export type TourOwnerType = 'MEMBER' | 'BRANCH' | 'REGENCY' | 'PROVINCE' | 'PART
 
 export type TourStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED_PUBLISHED' | 'REJECTED';
 
-export interface TourItinerary {
-  day: number;
-  title: string;
-  description: string;
-  timeRange?: string;
-}
-
 export interface TourPackage {
   id: string;
   title: string;
-  slug: string;
-  description: string;
   category: TourCategory;
-  coverImage: string;
-  galleryImages: string[];
-  
-  ownerType: TourOwnerType;
-  ownerId: string;
-  ownerName: string;
-  
+  description: string;
+  pricePerPerson: number;
+  durationDays: number;
+  locationAddress: string;
   provinceId: string;
   provinceName: string;
   regencyId: string;
   regencyName: string;
-  districtName: string;
-  branchName?: string;
-  
-  locationAddress: string;
-  coordinates?: {
-    lat: number;
-    lng: number;
-  };
-  googleMapsUrl?: string;
-  
-  durationDays: number;
-  pricePerPerson: number;
-  minCapacity: number;
-  maxCapacity: number;
-  
-  facilities: string[];
-  lodgingType?: string;
-  transportationType?: string;
-  guideProvided: boolean;
+  ownerType: TourOwnerType;
+  ownerId: string;
+  ownerName: string;
   contactPhone: string;
-  contactEmail: string;
-  
-  itinerary: TourItinerary[];
-  
-  status: TourStatus;
-  submittedAt: string;
-  publishedAt?: string;
-  reviewedBy?: string;
-  rejectionReason?: string;
-  viewsCount: number;
-  featured?: boolean;
-}
-
-export interface Activity {
-  id: string;
-  title: string;
-  slug: string;
-  description: string;
-  bannerUrl: string;
   coverImage?: string;
-  category: string;
-  organizerLevel: 'INTERNASIONAL' | 'NASIONAL' | 'PROVINSI' | 'KABUPATEN' | 'RANTING';
-  organizerName: string;
-  
-  locationName: string;
-  locationAddress?: string;
-  provinceId?: string;
-  provinceName: string;
-  regencyId?: string;
-  regencyName: string;
-  scope?: string;
-  
-  startDate: string;
-  endDate: string;
-  timeString: string;
-  capacity: number;
-  maxParticipants?: number;
-  registeredCount: number;
-  isPublic: boolean;
-  status: 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED' | 'OPEN_REGISTRATION';
-  requirements: string[];
-  
-  contactPerson?: string;
-  contactPhone?: string;
-  contactEmail?: string;
-  feeType?: 'GRATIS' | 'BERBAYAR' | 'SUBSIDI';
-  feeAmount?: number;
-  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'ADMIN_BRANCH' | 'OPERATOR';
-  uploadedByName?: string;
-  uploadedAt?: string;
-  registrationLink?: string;
+  galleryImages?: string[];
+  itinerary?: string[];
+  facilities?: string[];
+  terms?: string;
+  status: TourStatus;
   featured?: boolean;
-}
-
-export interface ActivityRegistration {
-  id: string;
-  activityId: string;
-  activityTitle: string;
-  memberId: string;
-  memberName: string;
-  registeredAt: string;
-  status: 'REGISTERED' | 'CONFIRMED' | 'ATTENDED';
-  attendanceQrCode: string;
-}
-
-export interface NotificationItem {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ALERT';
   createdAt: string;
-  isRead: boolean;
-  actionUrl?: string;
+  updatedAt?: string;
 }
 
-export interface AuditLog {
-  id: string;
-  userId: string;
-  userName: string;
-  userRole: UserRole;
-  action: string;
-  entityType: 'MEMBER' | 'TOUR_PACKAGE' | 'ACTIVITY' | 'TERRITORY' | 'AUTH' | 'SKILL' | 'CULINARY_SOUVENIR';
-  entityId: string;
-  description: string;
-  timestamp: string;
-  ipAddress: string;
-}
-
-export type ProductKind = 'KULINER' | 'CINDERAMATA';
-
-export type KridaProductCategory = 
-  | 'Pemanduan & Paket Wisata'
-  | 'Fotografi & Media Wisata'
-  | 'MICE, Kemah & Atraksi'
-  | 'Kuliner & Minuman Daerah'
-  | 'Kriya & Cinderamata Khas'
-  | 'Jasa & Edukasi Wisata';
-
-export type ProductModerationStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+export type CulinaryKind = 'KULINER' | 'CINDERAMATA' | 'KRIYA';
 
 export interface CulinarySouvenirItem {
   id: string;
   name: string;
-  kind: ProductKind;
+  kind: CulinaryKind;
   krida: KridaType;
-  kridaCategory: KridaProductCategory;
-  categoryLabel: string;
   description: string;
-  storyOrigin?: string;
   priceEstimate: number;
-  priceUnit?: string;
+  authorName: string;
+  contactPhone: string;
+  provinceId: string;
+  provinceName: string;
+  regencyId: string;
+  regencyName: string;
   imageUrl?: string;
-  ownerMemberId: string;
-  ownerMemberName: string;
-  ownerKwartirName?: string;
-  ownerPhone?: string;
-  ownerEmail?: string;
-  address?: string;
-  tags: string[];
-  
-  // Alur Persetujuan Operator Wilayah
-  status: ProductModerationStatus;
-  submittedAt?: string;
-  approvedAt?: string;
-  approvedBy?: string;
-  approverRole?: UserRole;
-  rejectionReason?: string;
-  
+  categoryLabel?: string;
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   createdAt: string;
-  likesCount: number;
-  featured?: boolean;
+  updatedAt?: string;
 }
 
-export type OfficialMerchandiseCategory =
-  | 'APPAREL'
-  | 'ACCESSORIES'
-  | 'IDENTITY'
-  | 'OUTDOOR';
+export interface ActivityEvent {
+  id: string;
+  title: string;
+  description: string;
+  type: 'PELATIHAN' | 'KEGIATAN' | 'RAPAT' | 'KOMPETISI' | 'PAMERAN' | 'LAINNYA';
+  startDate: string;
+  endDate?: string;
+  location: string;
+  provinceId?: string;
+  provinceName?: string;
+  regencyId?: string;
+  regencyName?: string;
+  organizerName: string;
+  contactPhone?: string;
+  coverImage?: string;
+  registrationUrl?: string;
+  status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'COMPLETED';
+  featured?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export interface OfficialMerchandiseProduct {
   id: string;
@@ -416,10 +303,17 @@ export interface OfficialMerchandiseProduct {
   sizes?: string[];
   tags: string[];
   comingSoon: boolean;
+  purchaseEnabled?: boolean;
   launchAt?: string;
   featured?: boolean;
   active: boolean;
 }
+
+export type OfficialMerchandiseCategory =
+  | 'APPAREL'
+  | 'ACCESSORIES'
+  | 'IDENTITY'
+  | 'OUTDOOR';
 
 export interface CurrentUser {
   id: string;
@@ -429,328 +323,225 @@ export interface CurrentUser {
   role: UserRole;
   jurisdictionName?: string;
   jurisdictionId?: string;
-  avatarUrl: string;
+  avatarUrl?: string;
   memberId?: string;
 }
 
-export type KtaCardTheme = 'purple_saka' | 'emerald_pesona' | 'indigo_navy' | 'dark_slate' | 'gold_amber';
-export type KtaBarcodeType = 'CODE128' | 'STANDARD' | 'QR';
-export type KtaCardPreset = 'CR80_KTA' | 'KTP' | 'SIM' | 'CUSTOM';
-export type KtaCardSide = 'FRONT' | 'BACK';
-export type KtaMemberFieldKey =
-  | 'fullName' | 'id' | 'nationalMemberNumber' | 'currentPosition'
-  | 'provinceName' | 'regencyName' | 'districtName' | 'kwartirName' | 'kwartirHierarchy'
-  | 'krida' | 'phone' | 'email' | 'joinYear' | 'status';
-
-export interface KtaDataFieldConfig {
+export interface Notification {
   id: string;
-  field: KtaMemberFieldKey;
-  label?: string;
-  showLabel?: boolean;
-  side: KtaCardSide;
-  visible: boolean;
-  x: number;
-  y: number;
-  width: number;
-  fontSize: number;
-  fontWeight: 'normal' | 'medium' | 'bold' | 'black';
-  color: string;
-  textTransform?: 'none' | 'uppercase' | 'lowercase';
-  align?: 'left' | 'center' | 'right';
+  userId: string;
+  title: string;
+  message: string;
+  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+  read: boolean;
+  createdAt: string;
+  link?: string;
 }
 
-export interface KtaLogoElement {
+export interface VerificationRequest {
   id: string;
+  memberId: string;
+  memberName: string;
+  memberNumber?: string;
+  requestedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  notes?: string;
+}
+
+export interface DashboardStats {
+  totalMembers: number;
+  activeMembers: number;
+  pendingMembers: number;
+  totalTours: number;
+  publishedTours: number;
+  totalCulinary: number;
+  publishedCulinary: number;
+  totalActivities: number;
+  upcomingActivities: number;
+}
+
+export interface SearchResult {
+  type: 'MEMBER' | 'TOUR' | 'CULINARY' | 'ACTIVITY';
+  id: string;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+export interface SpreadsheetRow {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
+export interface SpreadsheetConfig {
+  spreadsheetId: string;
+  spreadsheetUrl: string;
+  scriptUrl: string;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'CHECKING';
+  lastSyncedAt?: string;
+  lastError?: string;
+  autoSync?: boolean;
+  autoRefreshIntervalSeconds?: number;
+  syncOnStartup?: boolean;
+  syncOnFocus?: boolean;
+  syncOnOnline?: boolean;
+}
+
+export interface SpreadsheetSyncState {
+  isSyncing: boolean;
+  isSaving: boolean;
+  lastSyncedTime?: string;
+  lastSavedTime?: string;
+  lastSavedAction?: string;
+  error?: string | null;
+  pollingIntervalSeconds?: number;
+}
+
+export interface AppSettings {
+  appName: string;
+  appVersion: string;
+  maintenanceMode: boolean;
+  allowRegistration: boolean;
+  allowPublicDirectory: boolean;
+  allowTourSubmission: boolean;
+  allowCulinarySubmission: boolean;
+  allowActivitySubmission: boolean;
+}
+
+export interface AuthSession {
+  user: CurrentUser;
+  expiresAt: string;
+  token?: string;
+}
+
+export interface MemberFilter {
+  search?: string;
+  status?: MemberStatus;
+  provinceId?: string;
+  regencyId?: string;
+  districtId?: string;
+  krida?: KridaType;
+}
+
+export interface TourFilter {
+  search?: string;
+  category?: TourCategory;
+  provinceId?: string;
+  regencyId?: string;
+  status?: TourStatus;
+}
+
+export interface ActivityFilter {
+  search?: string;
+  type?: ActivityEvent['type'];
+  provinceId?: string;
+  regencyId?: string;
+  status?: ActivityEvent['status'];
+}
+
+export interface OfficialMerchandiseFilter {
+  category?: OfficialMerchandiseCategory;
+  comingSoon?: boolean;
+  featured?: boolean;
+  active?: boolean;
+}
+
+export interface AuditLog {
+  id: string;
+  actorId: string;
+  actorName: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  details?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  pagination: Pagination;
+}
+
+export interface MemberStatsByRegion {
+  provinceId: string;
+  provinceName: string;
+  memberCount: number;
+  activeCount: number;
+  pendingCount: number;
+}
+
+export interface ActivityRegistration {
+  id: string;
+  activityId: string;
+  memberId?: string;
   name: string;
-  url: string;
-  side: KtaCardSide;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  opacity?: number;
-  objectFit?: 'contain' | 'cover' | 'fill';
+  phone: string;
+  email?: string;
+  registeredAt: string;
+  status: 'REGISTERED' | 'CONFIRMED' | 'CANCELLED';
 }
 
-export interface KtaTextElement {
+export interface TourBooking {
   id: string;
-  text: string;
-  side: KtaCardSide;
-  x: number;
-  y: number;
-  width: number;
-  fontSize: number;
-  fontWeight: 'normal' | 'medium' | 'bold' | 'black';
-  color: string;
-  align?: 'left' | 'center' | 'right';
-  textTransform?: 'none' | 'uppercase' | 'lowercase';
+  tourId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  participantCount: number;
+  travelDate?: string;
+  notes?: string;
+  createdAt: string;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
 }
 
-export interface KtaCardSettings {
-  preset?: KtaCardPreset;
-  widthMm: number;
-  heightMm: number;
-  cornerRadiusMm: number;
-  cardTheme: KtaCardTheme;
-  bgImageUrl?: string;
-  frontBackgroundUrl?: string;
-  backBackgroundUrl?: string;
-  customBackgroundColorFront?: string;
-  customBackgroundColorBack?: string;
-  bgOpacity?: number;
-  frontLogoUrl?: string;
-  backLogoUrl?: string;
-  logos: KtaLogoElement[];
-  dataFields: KtaDataFieldConfig[];
-  textElements: KtaTextElement[];
-  frontOrganizationTitle: string;
-  frontOrganizationSubtitle: string;
-  frontOrganizationTitleX?: number;
-  frontOrganizationTitleY?: number;
-  frontOrganizationTitleWidth?: number;
-  frontOrganizationTitleFontSize?: number;
-  frontOrganizationTitleFontWeight?: 'normal'|'medium'|'bold'|'black';
-  frontOrganizationTitleColor?: string;
-  frontOrganizationTitleAlign?: 'left'|'center'|'right';
-  frontOrganizationSubtitleX?: number;
-  frontOrganizationSubtitleY?: number;
-  frontOrganizationSubtitleWidth?: number;
-  frontOrganizationSubtitleFontSize?: number;
-  frontOrganizationSubtitleFontWeight?: 'normal'|'medium'|'bold'|'black';
-  frontOrganizationSubtitleColor?: string;
-  frontOrganizationSubtitleAlign?: 'left'|'center'|'right';
-  frontValidityText: string;
-  watermarkOpacity: number;
-  showKridaBadge: boolean;
-  showPhoto: boolean;
-  showQrCode: boolean;
-  qrX?: number;
-  qrY?: number;
-  qrSize?: number;
-  qrBorderWidth?: number;
-  qrBorderColor?: string;
-  qrBorderRadius?: number;
-  qrPadding?: number;
-  qrBackgroundColor?: string;
-  backHeaderTitle: string;
-  backHeaderSubtitle: string;
-  terms: string[];
-  issueLocationDate: string;
-  barcodeType: KtaBarcodeType;
-  barcodeCustomValue?: string;
-  showBarcode?: boolean;
-  issueLocationDateX?: number;
-  issueLocationDateY?: number;
-  barcodeX?: number;
-  barcodeY?: number;
-  barcodeWidth?: number;
-  barcodeHeight?: number;
-  barcodeShowText?: boolean;
-  signerMemberId?: string;
-  showSignerQrCode?: boolean;
-  showSignerName?: boolean;
-  showSignerTitle?: boolean;
-  showSignerVerified?: boolean;
-  signerVerifiedX?: number;
-  signerVerifiedY?: number;
-  signerVerifiedWidth?: number;
-  signerVerifiedFontSize?: number;
-  signerVerifiedColor?: string;
-  signerQrX?: number;
-  signerQrY?: number;
-  signerQrSize?: number;
-  signerQrPadding?: number;
-  signerQrBackgroundColor?: string;
-  signerQrBorderWidth?: number;
-  signerQrBorderColor?: string;
-  signerQrBorderRadius?: number;
-  barcodeCaption?: string;
-  showBarcodeFront?: boolean;
-  barcodeFrontCustomValue?: string;
-  barcodeFrontX?: number;
-  barcodeFrontY?: number;
-  barcodeFrontWidth?: number;
-  barcodeFrontHeight?: number;
-  barcodeFrontShowText?: boolean;
-  barcodeFrontCaption?: string;
-  barcodeFrontCaptionX?: number;
-  barcodeFrontCaptionY?: number;
-  barcodeFrontCaptionWidth?: number;
-  barcodeFrontCaptionFontSize?: number;
-  barcodeFrontCaptionFontWeight?: 'normal'|'medium'|'bold'|'black';
-  barcodeFrontCaptionColor?: string;
-  barcodeFrontCaptionAlign?: 'left'|'center'|'right';
-  barcodeFrontCaptionLineHeight?: number;
-  barcodeFrontCaptionLetterSpacing?: number;
-  photoX?: number;
-  photoY?: number;
-  photoWidth?: number;
-  photoHeight?: number;
-  photoRadius?: number;
-  photoBorderWidth?: number;
-  photoBorderColor?: string;
-  photoObjectFit?: 'contain'|'cover'|'fill';
-  frontValidityTextX?: number;
-  frontValidityTextY?: number;
-  frontValidityTextWidth?: number;
-  frontValidityTextFontSize?: number;
-  frontValidityTextFontWeight?: 'normal'|'medium'|'bold'|'black';
-  frontValidityTextColor?: string;
-  frontValidityTextAlign?: 'left'|'center'|'right';
-  frontValidityTextLineHeight?: number;
-  frontValidityTextLetterSpacing?: number;
-  frontOrganizationTitleLineHeight?: number;
-  frontOrganizationTitleLetterSpacing?: number;
-  frontOrganizationSubtitleLineHeight?: number;
-  frontOrganizationSubtitleLetterSpacing?: number;
-  backHeaderTitleX?: number;
-  backHeaderTitleY?: number;
-  backHeaderTitleWidth?: number;
-  backHeaderTitleFontSize?: number;
-  backHeaderTitleFontWeight?: 'normal'|'medium'|'bold'|'black';
-  backHeaderTitleColor?: string;
-  backHeaderTitleAlign?: 'left'|'center'|'right';
-  backHeaderTitleLineHeight?: number;
-  backHeaderTitleLetterSpacing?: number;
-  backHeaderSubtitleX?: number;
-  backHeaderSubtitleY?: number;
-  backHeaderSubtitleWidth?: number;
-  backHeaderSubtitleFontSize?: number;
-  backHeaderSubtitleFontWeight?: 'normal'|'medium'|'bold'|'black';
-  backHeaderSubtitleColor?: string;
-  backHeaderSubtitleAlign?: 'left'|'center'|'right';
-  backHeaderSubtitleLineHeight?: number;
-  backHeaderSubtitleLetterSpacing?: number;
-  termsX?: number;
-  termsY?: number;
-  termsWidth?: number;
-  termsFontSize?: number;
-  termsFontWeight?: 'normal'|'medium'|'bold'|'black';
-  termsColor?: string;
-  termsAlign?: 'left'|'center'|'right';
-  termsLineHeight?: number;
-  termsLetterSpacing?: number;
-  signerX?: number;
-  signerY?: number;
-  signerWidth?: number;
-  signerColor?: string;
-  signerAlign?: 'left'|'center'|'right';
-  signerLineHeight?: number;
-  signerLetterSpacing?: number;
-  signerNameXOffset?: number;
-  signerNameYOffset?: number;
-  issueLocationDateFontSize?: number;
-  signerNameFontSize?: number;
-  signerTitleFontSize?: number;
-  signerSubtitleFontSize?: number;
-  signerName: string;
-  signerTitle: string;
-  signerSubtitle?: string;
-  showStamp: boolean;
-  lastUpdated?: string;
-  updatedBy?: string;
-}
-
-// ==========================================
-// 4 KRIDA MODULES & CURRICULUM TYPES
-// ==========================================
-export type KridaId = 'pemandu' | 'penyuluh' | 'kuliner' | 'mice';
-
-export interface KridaCategoryInfo {
-  id: KridaId;
-  name: string;
-  shortTitle: string;
-  subtitle: string;
-  badge: string;
-  color: string;
-  borderGlow: string;
-  description: string;
-  desc?: string;
-  topicsCount: number;
-}
-
-export interface KridaCurriculumSession {
-  sessionNumber: number;
-  title: string;
-  duration: string;
-  competency: string;
-  method: string;
-}
-
-export interface KridaTestRequirements {
-  purwa: string[];
-  madya: string[];
-  utama: string[];
-}
-
-export interface KridaCompetencyRow {
-  code: string;
-  element: string;
-  indicator: string;
-  assessment: string;
-}
-
-export interface KridaImage {
+export interface CulinaryOrder {
   id: string;
-  url: string;
-  caption: string;
+  itemId: string;
+  customerName: string;
+  customerPhone: string;
+  quantity: number;
+  notes?: string;
+  createdAt: string;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
 }
 
-export interface KridaLink {
+export interface OfficialMerchandiseOrder {
   id: string;
-  title: string;
-  url: string;
-  type: 'VIDEO' | 'REFERENCE' | 'REGULATION';
-}
-
-export interface KridaDownloadFile {
-  id: string;
-  title: string;
-  fileUrl: string;
-  fileType: string;
-  fileSize: string;
-}
-
-// Aliases for editor and modal components
-export type CompetencyRow = KridaCompetencyRow;
-export type ModuleImage = KridaImage;
-export type ModuleLink = KridaLink;
-export type DownloadableResource = KridaDownloadFile;
-export type CurriculumSession = KridaCurriculumSession;
-
-export interface KridaModuleItem {
-  id: string;
-  kridaId: KridaId;
-  kridaName: string;
-  code: string;
-  title: string;
-  badge: string;
-  levelSKK: string;
-  description: string;
-  content: string;
-  curriculum: KridaCurriculumSession[];
-  testRequirements: KridaTestRequirements;
-  competencyTable: KridaCompetencyRow[];
-  images: KridaImage[];
-  links: KridaLink[];
-  downloads: KridaDownloadFile[];
-  updatedAt: string;
-  updatedBy: string;
-
-  // Standar Buku Panduan SKK Saka Pariwisata 2026:
-  skkniReference?: string;
-  practiceProduct?: {
-    purwa: string;
-    madya: string;
-    utama: string;
-  };
-  portfolioItems?: string[];
-  scoringWeights?: {
-    knowledge: number;
-    skill: number;
-    attitude: number;
-    product: number;
-    passingGrade: number;
-  };
-  specialSafetyNotes?: string;
+  orderNumber: string;
+  customerName: string;
+  whatsapp: string;
+  address: string;
+  province: string;
+  regency: string;
+  district: string;
+  note?: string;
+  items: Array<{
+    productId: string;
+    name: string;
+    price: number;
+    size?: string;
+    quantity: number;
+  }>;
+  subtotal: number;
+  shippingCost?: number;
+  total?: number;
+  status: 'DRAFT' | 'PENDING_PAYMENT' | 'PAID' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED';
+  createdAt: string;
+  updatedAt?: string;
 }
