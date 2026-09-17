@@ -755,7 +755,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
                 className="absolute inset-0 bg-black/10"
                 style={{ opacity: settings.bgOpacity ?? 0.1 }}
               />
-            )
+            )}
 
             {renderLogos(
               frontLogos
