@@ -840,15 +840,12 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         localMembers={members}
-        onScanSuccess={(scannedMember, result) => {
-          // Setelah barcode/QR tervalidasi dari database authoritative,
-          // langsung buka profil anggota terverifikasi.
-          setSearchedMember(scannedMember);
-          setVerificationMeta(result);
-          setVerifyInput(scannedMember.nationalMemberNumber || scannedMember.verificationToken || scannedMember.id);
-          setNotFound(false);
-          setIsScannerOpen(false);
-          onOpenVerifyModal(scannedMember);
+        onScanSuccess={(scannedMember) => {
+          // Setelah scan tervalidasi, pindahkan pengguna ke halaman verifikasi publik
+          // khusus. Halaman tersebut sengaja tidak memakai landing page atau modal.
+          const verificationId = scannedMember.nationalMemberNumber || scannedMember.id;
+          const targetUrl = `/verify?verifyId=${encodeURIComponent(String(verificationId || ''))}`;
+          window.location.href = targetUrl;
         }}
       />
     </div>
