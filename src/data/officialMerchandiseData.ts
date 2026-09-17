@@ -3,8 +3,10 @@ import { OfficialMerchandiseProduct } from '../types';
 /**
  * Sampel katalog Official Merchandise Saka Pariwisata.
  *
- * purchaseEnabled digunakan untuk menguji alur keranjang + checkout
- * sebelum sistem penjualan resmi dan payment gateway diaktifkan.
+ * Dua produk pertama sudah diaktifkan untuk simulasi alur:
+ * Detail Produk -> Keranjang -> Checkout -> Nomor Pesanan.
+ *
+ * Produk lainnya tetap Coming Soon.
  */
 export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
   {
@@ -20,10 +22,10 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     sizes: ['S', 'M', 'L', 'XL', '2XL'],
     tags: ['Official', 'Nasional', 'Apparel'],
     comingSoon: false,
+    purchaseEnabled: true,
     launchAt: '2026-09-01T09:00:00+07:00',
     featured: true,
-    active: true,
-    purchaseEnabled: true
+    active: true
   },
   {
     id: 'spw-merch-jaket-jelajah',
@@ -38,10 +40,10 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     sizes: ['M', 'L', 'XL', '2XL'],
     tags: ['Outdoor', 'Jelajah', 'Limited'],
     comingSoon: false,
+    purchaseEnabled: true,
     launchAt: '2026-09-01T09:00:00+07:00',
     featured: true,
-    active: true,
-    purchaseEnabled: true
+    active: true
   },
   {
     id: 'spw-merch-topi-petualang',
@@ -57,8 +59,7 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     comingSoon: true,
     launchAt: '2026-10-24T09:00:00+07:00',
     featured: true,
-    active: true,
-    purchaseEnabled: false
+    active: true
   },
   {
     id: 'spw-merch-tumbler-nusantara',
@@ -73,8 +74,7 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     tags: ['Eco', 'Travel', 'Aksesori'],
     comingSoon: true,
     launchAt: '2026-10-31T09:00:00+07:00',
-    active: true,
-    purchaseEnabled: false
+    active: true
   },
   {
     id: 'spw-merch-lanyard-kta',
@@ -89,8 +89,7 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     tags: ['KTA', 'Identity', 'Official'],
     comingSoon: true,
     launchAt: '2026-11-07T09:00:00+07:00',
-    active: true,
-    purchaseEnabled: false
+    active: true
   },
   {
     id: 'spw-merch-kit-pemandu',
@@ -105,7 +104,6 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     tags: ['Krida Pemandu', 'Explorer', 'Bundle'],
     comingSoon: true,
     launchAt: '2026-11-14T09:00:00+07:00',
-    active: true,
-    purchaseEnabled: false
+    active: true
   }
 ];
