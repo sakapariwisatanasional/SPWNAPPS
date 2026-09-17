@@ -884,18 +884,74 @@ initializeUsersAndSuperAdmin();
 
 // GViz API fetcher helper
 async function fetchSheetGViz(sheetName: string): Promise<Record<string, any>[]> {
-  // Google Apps Script adalah sumber data otoritatif aplikasi.
-  // Jangan membaca GViz/Spreadsheet secara langsung di server karena hasilnya
-  // dapat berbeda dari deployment GAS yang menjadi backend aplikasi.
+  // Primary source: Google Apps Script Web App.
+  // Fallback source: the configured Google Spreadsheet itself through GViz.
+  // This keeps read/sync working when the GAS deployment temporarily returns
+  // HTTP 500, while still preferring the application's authoritative backend.
   const configured = normalizeManualAppsScriptUrl(db.config.scriptUrl);
   const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-  const defaultUrl = DEFAULT_APPS_SCRIPT_URL;
+  const defaultUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
   const scriptUrl = configured || envUrl || defaultUrl;
 
+  const spreadsheetId = String(db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
+  const parseRows = (data: any): Record<string, any>[] | null => {
+    const rows = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.rows) ? data.rows
+      : Array.isArray(data?.data) ? data.data
+      : Array.isArray(data?.records) ? data.records
+      : null;
+    return rows || null;
+  };
+
+  let gasError: any = null;
+
+  if (scriptUrl) {
+    try {
+      const separator = scriptUrl.includes('?') ? '&' : '?';
+      const url = `${scriptUrl}${separator}sheet=${encodeURIComponent(sheetName)}&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache'
+        },
+        redirect: 'follow'
+      });
+
+      const text = await res.text();
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch {}
+
+      if (!res.ok) {
+        throw new Error(`Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`);
+      }
+      if (data?.status === 'error' || data?.success === false) {
+        throw new Error(data?.message || `GAS gagal membaca sheet ${sheetName}.`);
+      }
+
+      const rows = parseRows(data);
+      if (!rows) {
+        throw new Error(`Respons GAS untuk sheet ${sheetName} tidak berisi array data yang valid.`);
+      }
+
+      return rows;
+    } catch (err) {
+      gasError = err;
+      console.warn(`[Sync] GAS fetch error for ${sheetName}; mencoba Google Spreadsheet langsung:`, err);
+    }
+  }
+
+  // Direct Google Spreadsheet fallback. The spreadsheet must be accessible to
+  // the deployed application (for example, published/readable through Google).
+  if (!spreadsheetId) {
+    throw gasError || new Error(`Spreadsheet ID untuk sheet ${sheetName} belum dikonfigurasi.`);
+  }
+
   try {
-    const separator = scriptUrl.includes('?') ? '&' : '?';
-    const url = `${scriptUrl}${separator}sheet=${encodeURIComponent(sheetName)}&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
-    const res = await fetch(url, {
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+    const res = await fetch(gvizUrl, {
       method: 'GET',
       cache: 'no-store',
       headers: {
@@ -906,33 +962,46 @@ async function fetchSheetGViz(sheetName: string): Promise<Record<string, any>[]>
     });
 
     const text = await res.text();
-    let data: any = null;
-    try { data = text ? JSON.parse(text) : null; } catch {}
-
     if (!res.ok) {
-      throw new Error(`Google Apps Script HTTP ${res.status}${data?.message ? `: ${data.message}` : ''}`);
-    }
-    if (data?.status === 'error' || data?.success === false) {
-      throw new Error(data?.message || `GAS gagal membaca sheet ${sheetName}.`);
+      throw new Error(`Google Spreadsheet GViz HTTP ${res.status}`);
     }
 
-    const rows = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.rows) ? data.rows
-      : Array.isArray(data?.data) ? data.data
-      : Array.isArray(data?.records) ? data.records
-      : null;
-
-    if (!rows) {
-      throw new Error(`Respons GAS untuk sheet ${sheetName} tidak berisi array data yang valid.`);
+    // GViz returns JSONP-like text: google.visualization.Query.setResponse({...})
+    const jsonStart = text.indexOf('{');
+    const jsonEnd = text.lastIndexOf('}');
+    if (jsonStart < 0 || jsonEnd <= jsonStart) {
+      throw new Error(`Respons GViz untuk sheet ${sheetName} tidak valid.`);
     }
 
-    return rows;
-  } catch (err) {
-    console.warn(`[Sync] GAS fetch error for ${sheetName}:`, err);
-    // An empty sheet is valid; a failed request is not. Propagate the error so
-    // the API never replaces a good snapshot with an accidental empty cache.
-    throw err;
+    const data = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
+    if (data?.status === 'error') {
+      const reason = Array.isArray(data?.errors) && data.errors[0]?.detailed_message
+        ? data.errors[0].detailed_message
+        : `Google Spreadsheet gagal membaca sheet ${sheetName}.`;
+      throw new Error(reason);
+    }
+
+    const table = data?.table;
+    const columns = Array.isArray(table?.cols) ? table.cols : [];
+    const rows = Array.isArray(table?.rows) ? table.rows : [];
+
+    const headers = columns.map((col: any, index: number) => {
+      const label = String(col?.label || col?.id || '').trim();
+      return label || `col_${index}`;
+    });
+
+    return rows.map((row: any) => {
+      const values = Array.isArray(row?.c) ? row.c : [];
+      const record: Record<string, any> = {};
+      headers.forEach((header: string, index: number) => {
+        const cell = values[index];
+        record[header] = cell?.f !== undefined && cell?.f !== null ? cell.f : (cell?.v ?? '');
+      });
+      return record;
+    });
+  } catch (gvizError: any) {
+    const gasMessage = gasError?.message ? ` GAS: ${gasError.message}.` : '';
+    throw new Error(`Google Spreadsheet tidak dapat dibaca untuk sheet ${sheetName}.${gasMessage} GViz: ${gvizError?.message || 'akses gagal.'}`);
   }
 }
 
@@ -2429,81 +2498,139 @@ app.put('/api/kta-settings', async (req, res) => {
 // depends on Google Apps Script redirect/CORS behaviour. The active GAS URL is
 // supplied by the SuperAdmin-configured runtime setting.
 app.get('/api/spreadsheet-data', async (req, res) => {
-  const session = getSessionUser(req);
-  if (session?.role !== 'SUPER_ADMIN') {
-    return res.status(403).json({ success: false, message: 'Akses spreadsheet mentah hanya tersedia untuk Super Admin Nasional.' });
-  }
-
-  const sheet = String(req.query?.sheet || 'Anggota').trim() || 'Anggota';
-  // Prefer the URL supplied by the active Dashboard/browser configuration,
-  // then fall back to the server configuration and environment. Every value is
-  // strictly validated as a Google Apps Script /exec URL before it is used.
-  const requestedScriptUrl = normalizeManualAppsScriptUrl(req.query?.scriptUrl);
-  const configuredScriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
-  const envScriptUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-  const defaultScriptUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
-  const scriptUrl = requestedScriptUrl || configuredScriptUrl || envScriptUrl || defaultScriptUrl;
-
-  if (!scriptUrl) {
-    return res.status(400).json({
-      success: false,
-      message: 'Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.'
-    });
-  }
-
   try {
-    const separator = scriptUrl.includes('?') ? '&' : '?';
-    const url = `${scriptUrl}${separator}sheet=${encodeURIComponent(sheet)}&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
-    const upstream = await fetch(url, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, max-age=0',
-        'Pragma': 'no-cache'
-      },
-      redirect: 'follow'
-    });
-
-    const text = await upstream.text();
-    let data: any = null;
-    try { data = text ? JSON.parse(text) : null; } catch {}
-
-    if (!upstream.ok) {
-      return res.status(upstream.status).json({
-        success: false,
-        message: `Google Apps Script HTTP ${upstream.status}${data?.message ? `: ${data.message}` : ''}`
-      });
+    const session = getSessionUser(req);
+    if (session?.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Akses spreadsheet mentah hanya tersedia untuk Super Admin Nasional.' });
     }
 
-    if (data?.status === 'error' || data?.success === false) {
+    const sheet = String(req.query?.sheet || 'Anggota').trim() || 'Anggota';
+    const requestedScriptUrl = normalizeManualAppsScriptUrl(req.query?.scriptUrl);
+    const configuredScriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
+    const envScriptUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
+    const defaultScriptUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
+    const scriptUrl = requestedScriptUrl || configuredScriptUrl || envScriptUrl || defaultScriptUrl;
+
+    const spreadsheetId = String(db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
+    let gasError: any = null;
+
+    // 1. Try Google Apps Script first.
+    if (scriptUrl) {
+      try {
+        const separator = scriptUrl.includes('?') ? '&' : '?';
+        const url = `${scriptUrl}${separator}sheet=${encodeURIComponent(sheet)}&action=GET_SHEET&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+        const upstream = await fetch(url, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+            'Pragma': 'no-cache'
+          },
+          redirect: 'follow'
+        });
+
+        const text = await upstream.text();
+        let data: any = null;
+        try { data = text ? JSON.parse(text) : null; } catch {}
+
+        if (!upstream.ok) {
+          throw new Error(`Google Apps Script HTTP ${upstream.status}${data?.message ? `: ${data.message}` : ''}`);
+        }
+        if (data?.status === 'error' || data?.success === false) {
+          throw new Error(data?.message || `Google Apps Script gagal membaca sheet ${sheet}.`);
+        }
+
+        const rows = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.rows) ? data.rows
+          : Array.isArray(data?.data) ? data.data
+          : Array.isArray(data?.records) ? data.records
+          : null;
+
+        if (!rows) throw new Error(`Respons Google Apps Script untuk sheet ${sheet} tidak berisi array data yang valid.`);
+
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('X-SPWAPP-Spreadsheet-Source', 'GOOGLE_APPS_SCRIPT');
+        return res.json({ success: true, sheet, rows, count: rows.length, fetchedAt: new Date().toISOString() });
+      } catch (err: any) {
+        gasError = err;
+        console.warn(`[Spreadsheet Proxy] GAS gagal untuk ${sheet}; mencoba GViz:`, err);
+      }
+    }
+
+    // 2. Fallback directly to the Google Spreadsheet through GViz.
+    if (!spreadsheetId) {
       return res.status(502).json({
         success: false,
-        message: data?.message || `Google Apps Script gagal membaca sheet ${sheet}.`
+        message: `Google Apps Script gagal dan Spreadsheet ID belum tersedia.${gasError?.message ? ` ${gasError.message}` : ''}`
       });
     }
 
-    const rows = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.rows) ? data.rows
-      : Array.isArray(data?.data) ? data.data
-      : Array.isArray(data?.records) ? data.records
-      : null;
+    try {
+      const gvizUrl = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}&_t=${Date.now()}&_r=${Math.floor(Math.random() * 1000000)}`;
+      const upstream = await fetch(gvizUrl, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache'
+        },
+        redirect: 'follow'
+      });
 
-    if (!rows) {
+      const text = await upstream.text();
+      if (!upstream.ok) throw new Error(`Google Spreadsheet GViz HTTP ${upstream.status}`);
+
+      const jsonStart = text.indexOf('{');
+      const jsonEnd = text.lastIndexOf('}');
+      if (jsonStart < 0 || jsonEnd <= jsonStart) throw new Error(`Respons GViz untuk sheet ${sheet} tidak valid.`);
+
+      const data = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
+      if (data?.status === 'error') {
+        const reason = Array.isArray(data?.errors) && data.errors[0]?.detailed_message
+          ? data.errors[0].detailed_message
+          : `Google Spreadsheet gagal membaca sheet ${sheet}.`;
+        throw new Error(reason);
+      }
+
+      const columns = Array.isArray(data?.table?.cols) ? data.table.cols : [];
+      const rows = Array.isArray(data?.table?.rows) ? data.table.rows : [];
+      const headers = columns.map((col: any, index: number) => String(col?.label || col?.id || `col_${index}`).trim() || `col_${index}`);
+      const mappedRows = rows.map((row: any) => {
+        const values = Array.isArray(row?.c) ? row.c : [];
+        const record: Record<string, any> = {};
+        headers.forEach((header: string, index: number) => {
+          const cell = values[index];
+          record[header] = cell?.f !== undefined && cell?.f !== null ? cell.f : (cell?.v ?? '');
+        });
+        return record;
+      });
+
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('X-SPWAPP-Spreadsheet-Source', 'GOOGLE_SPREADSHEET_GVIZ');
+      if (gasError) res.setHeader('X-SPWAPP-GAS-Fallback', 'true');
+      return res.json({
+        success: true,
+        sheet,
+        rows: mappedRows,
+        count: mappedRows.length,
+        source: 'GOOGLE_SPREADSHEET_GVIZ',
+        fetchedAt: new Date().toISOString()
+      });
+    } catch (gvizError: any) {
+      const gasMessage = gasError?.message ? ` GAS: ${gasError.message}.` : '';
       return res.status(502).json({
         success: false,
-        message: `Respons Google Apps Script untuk sheet ${sheet} tidak berisi array data yang valid.`
+        message: `Spreadsheet belum dapat dibaca.${gasMessage} GViz: ${gvizError?.message || 'akses Google Spreadsheet gagal.'}`
       });
     }
-
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    return res.json({ success: true, sheet, rows, count: rows.length, fetchedAt: new Date().toISOString() });
   } catch (error: any) {
-    console.error(`[Spreadsheet Proxy] Gagal membaca ${sheet}:`, error);
+    console.error('[Spreadsheet Proxy] Unexpected error:', error);
     return res.status(502).json({
       success: false,
-      message: error?.message || `Gagal membaca sheet ${sheet} melalui Google Apps Script.`
+      message: error?.message || 'Gagal menghubungkan aplikasi ke Google Spreadsheet.'
     });
   }
 });
