@@ -198,8 +198,8 @@ export const MemberVerificationModal: React.FC<MemberVerificationModalProps> = (
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-          <span className="text-[10px] font-mono text-slate-400">
-            Token: {member.verificationToken}
+          <span className="text-[10px] text-slate-400">
+            Data publik terverifikasi
           </span>
           <div className="flex items-center gap-2">
             <button
