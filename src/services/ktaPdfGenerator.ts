@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import QRCode from 'qrcode';
 import { Member, KtaCardSettings } from '../types';
 import { DEFAULT_KTA_SETTINGS } from './storage';
@@ -22,6 +23,16 @@ const PREVIEW_WIDTH_PX = 380;
 const PX_SCALE = CANVAS_WIDTH / PREVIEW_WIDTH_PX;
 
 
+/**
+ * html2canvas 1.4.x tidak dapat mem-parse CSS color function oklch() yang
+ * dihasilkan Tailwind CSS v4. Browser sendiri dapat merendernya, tetapi
+ * parser html2canvas akan berhenti dengan error:
+ * "Attempting to parse an unsupported color function \"oklch\"".
+ *
+ * Sebelum capture, kita salin computed color yang sudah dipahami browser
+ * menjadi nilai RGB/RGBA pada clone DOM. Ini hanya dilakukan pada DOM clone
+ * html2canvas, sehingga tidak mengubah tampilan aplikasi.
+ */
 function oklchToRgbString(input: string): string {
   const match = input.match(/oklch\(\s*([^\s]+)\s+([^\s]+)\s+([^\s\/]+)(?:\s*\/\s*([^\)]+))?\s*\)/i);
   if (!match) return input;
@@ -86,6 +97,138 @@ function oklchToRgbString(input: string): string {
   return aClamped >= 0.999
     ? `rgb(${r}, ${g}, ${blue})`
     : `rgba(${r}, ${g}, ${blue}, ${aClamped})`;
+}
+
+function cssColorFunctionToRgb(cloneDocument: Document, token: string): string {
+  const trimmed = token.trim();
+  if (!trimmed) return token;
+
+  // Avoid creating a DOM probe repeatedly for the same CSS token. Tailwind's
+  // generated stylesheet can contain the same OKLCH value many times.
+  const cache = (cloneDocument as any).__ktaCssColorCache as Map<string, string> | undefined;
+  const colorCache = cache || new Map<string, string>();
+  (cloneDocument as any).__ktaCssColorCache = colorCache;
+
+  const cached = colorCache.get(trimmed);
+  if (cached) return cached;
+
+  // OKLCH is common in Tailwind v4. Convert it directly; this avoids DOM work.
+  if (/^oklch\(/i.test(trimmed)) {
+    const converted = oklchToRgbString(trimmed);
+    colorCache.set(trimmed, converted);
+    return converted;
+  }
+
+  try {
+    const win = cloneDocument.defaultView;
+    if (!win || !cloneDocument.body) return token;
+
+    const probe = cloneDocument.createElement('span');
+    probe.style.color = trimmed;
+    cloneDocument.body.appendChild(probe);
+    const computed = win.getComputedStyle(probe).color;
+    probe.remove();
+
+    if (computed && !/^(?:oklab|oklch|lab|lch|color)\(/i.test(computed)) {
+      colorCache.set(trimmed, computed);
+      return computed;
+    }
+  } catch {
+    // Keep the original token if the browser cannot normalize it.
+  }
+
+  // A final safe fallback prevents html2canvas from aborting on a CSS Color 4
+  // function it cannot parse. This only affects the cloned export document.
+  const fallback = /^(?:oklab|oklch|lab|lch|color)\(/i.test(trimmed)
+    ? 'transparent'
+    : token;
+  colorCache.set(trimmed, fallback);
+  return fallback;
+}
+
+function replaceUnsupportedCssColors(value: string, cloneDocument: Document): string {
+  if (!value) return value;
+
+  const pattern = /(?:oklch|oklab|lch|lab|color)\([^)]*\)/gi;
+  return value.replace(pattern, token => cssColorFunctionToRgb(cloneDocument, token));
+}
+
+function sanitizeHtml2CanvasClone(cloneDocument: Document): void {
+  /**
+   * html2canvas parses CSSStyleSheet rules itself. Tailwind v4 can leave
+   * oklch() in the generated stylesheet even when the visible KTA subtree
+   * does not directly use that color. Rewriting only matching CSS rules in
+   * the clone prevents html2canvas from ever seeing the unsupported token.
+   *
+   * IMPORTANT: do not call getComputedStyle() for every node here. On the
+   * full React application that is unnecessarily expensive and was the
+   * source of the previous "Page Unresponsive" behaviour.
+   */
+  const unsupported = /(?:oklch|oklab|lch|lab|color)\(/i;
+
+  const rewriteCssText = (cssText: string): string =>
+    replaceUnsupportedCssColors(cssText, cloneDocument);
+
+  const rewriteRuleContainer = (container: any): void => {
+    const rules: CSSRuleList | undefined = container?.cssRules;
+    if (!rules) return;
+
+    // Work backwards so deleting/reinserting a rule does not change the
+    // indexes of rules that have not been visited yet.
+    for (let i = rules.length - 1; i >= 0; i -= 1) {
+      const rule = rules.item(i);
+      if (!rule) continue;
+
+      const cssText = rule.cssText || '';
+      if (!unsupported.test(cssText)) continue;
+
+      const safeCssText = rewriteCssText(cssText);
+      if (safeCssText === cssText) continue;
+
+      try {
+        container.deleteRule(i);
+        container.insertRule(safeCssText, i);
+      } catch {
+        // Some browser-generated/imported rules are not mutable. The inline
+        // style pass below still handles styles attached directly to the KTA.
+      }
+    }
+  };
+
+  // First handle inline <style> blocks. This is cheap and catches Vite-injected
+  // styles as well as application-local CSS.
+  const styleNodes = Array.from(cloneDocument.querySelectorAll('style'));
+  for (const styleNode of styleNodes) {
+    const css = styleNode.textContent || '';
+    const safeCss = rewriteCssText(css);
+    if (safeCss !== css) styleNode.textContent = safeCss;
+  }
+
+  // Then handle external/same-origin stylesheets. html2canvas reads these
+  // through CSSOM, so changing only the DOM <style> text is not enough when
+  // Tailwind's generated CSS lives in a <link rel="stylesheet">.
+  for (const sheet of Array.from(cloneDocument.styleSheets)) {
+    try {
+      rewriteRuleContainer(sheet);
+    } catch {
+      // Cross-origin stylesheets expose no cssRules. Do not touch them; the
+      // KTA capture itself remains usable and no browser exception escapes.
+    }
+  }
+
+  // Finally sanitize explicit inline styles on the small KTA capture subtree.
+  // This does not walk the rest of the application.
+  const captureNodes = Array.from(
+    cloneDocument.querySelectorAll<HTMLElement>('[data-kta-render-side]')
+  );
+  for (const element of captureNodes) {
+    for (const node of [element, ...Array.from(element.querySelectorAll<HTMLElement>('*'))]) {
+      const inlineCss = node.getAttribute('style');
+      if (!inlineCss || !unsupported.test(inlineCss)) continue;
+      const safeInlineCss = rewriteCssText(inlineCss);
+      if (safeInlineCss !== inlineCss) node.setAttribute('style', safeInlineCss);
+    }
+  }
 }
 
 export type KtaPdfFormat = 'CR80_STANDARD' | 'A4_PRINT_SHEET';
@@ -414,27 +557,15 @@ function drawBackground(
   if (image?.naturalWidth) {
     ctx.save();
     drawCoverImage(ctx, image, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-    const isKtaMaster =
-      String(settings.frontBackgroundUrl || '').includes('/assets/kta/KTA-MASTER.png') ||
-      String(settings.backBackgroundUrl || '').includes('/assets/kta/KTA-MASTER.png') ||
-      String(settings.bgImageUrl || '').includes('/assets/kta/KTA-MASTER.png');
-
-    // KTA MASTER is already a finished artwork; do not darken it.
-    if (!isKtaMaster) {
-      ctx.fillStyle = 'rgba(0,0,0,0.12)';
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    }
+    // Same dark overlay used by DigitalMemberCard.bgStyle().
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.restore();
   }
 
+  // DigitalMemberCard has a second configurable black overlay.
   const opacity = Math.max(0, Math.min(1, Number(settings.bgOpacity ?? 0.1)));
-  const usesKtaMaster =
-    String(settings.frontBackgroundUrl || '').includes('/assets/kta/KTA-MASTER.png') ||
-    String(settings.backBackgroundUrl || '').includes('/assets/kta/KTA-MASTER.png') ||
-    String(settings.bgImageUrl || '').includes('/assets/kta/KTA-MASTER.png');
-
-  if (!usesKtaMaster && opacity > 0) {
+  if (opacity > 0) {
     ctx.fillStyle = `rgba(0,0,0,${0.1 * opacity})`;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
@@ -860,47 +991,74 @@ export async function generateKtaPdf({
   let frontImg: string;
   let backImg: string;
 
-  /*
-   * KTA MASTER export uses the dedicated Canvas renderer.
-   *
-   * We intentionally do not pass the React document to html2canvas.
-   * Tailwind/CSS Color 4 styles elsewhere in the application can contain
-   * oklab()/oklch(), which html2canvas may parse even when unrelated to KTA.
-   * That caused the browser error:
-   *   Attempting to parse an unsupported color function "oklab"
-   *
-   * Canvas uses the KtaCardSettings and the supplied KTA-MASTER artwork
-   * directly, so the PDF path is independent of the application's CSS.
-   * frontElement/backElement remain accepted for backwards compatibility
-   * with KtaPrintPdfModal but are intentionally not used here.
-   */
-  onProgress?.('Me-render KTA MASTER langsung dari template dan data anggota...');
+  if (frontElement && backElement) {
+    onProgress?.('Menyalin tampilan preview KTA secara 1:1 ke PDF...');
 
-  const frontCanvas = await renderFront(member, design, {
-    background: frontBackground,
-    officialLogo,
-    frontLogoImg,
-    backLogoImg,
-    avatar,
-    qrImg,
-    signerQrImg,
-    logos: configuredLogos
-  });
+    const capture = async (element: HTMLElement): Promise<string> => {
+      const canvas = await html2canvas(element, {
+        backgroundColor: null,
+        // Keep the DOM at the exact same 380px size used by the live preview.
+        // The previous 1012px DOM render made fixed-size text/icons appear
+        // disproportionately tiny. We upscale the preview during capture
+        // instead, preserving the 1:1 visual proportions while still
+        // producing the 1012px-wide export raster.
+        scale: CANVAS_WIDTH / PREVIEW_WIDTH_PX,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width: PREVIEW_WIDTH_PX,
+        windowWidth: PREVIEW_WIDTH_PX,
+        windowHeight: Math.round(
+          PREVIEW_WIDTH_PX /
+            (Number(design.widthMm || CR80_WIDTH_MM) /
+              Math.max(Number(design.heightMm || CR80_HEIGHT_MM), 1))
+        ),
+        onclone: clonedDocument => {
+          sanitizeHtml2CanvasClone(clonedDocument);
+        }
+      });
+      return canvas.toDataURL('image/png', 1);
+    };
 
-  onProgress?.('Me-render sisi belakang KTA MASTER...');
+    // Capture sequentially. Running two html2canvas jobs simultaneously clones
+    // the whole React document twice and can make Chromium report "Page
+    // Unresponsive" on heavier KTA pages.
+    frontImg = await capture(frontElement);
+    backImg = await capture(backElement);
+  } else {
+    onProgress?.('Preview tidak tersedia — menggunakan renderer Canvas sebagai fallback...');
 
-  const backCanvas = await renderBack(member, design, {
-    background: backBackground,
-    officialLogo,
-    frontLogoImg,
-    backLogoImg,
-    qrImg,
-    signerQrImg,
-    logos: configuredLogos
-  }, signerMember);
+    onProgress?.('Me-render sisi depan berdasarkan KtaCardSettings...');
+    const frontCanvas = await renderFront(member, design, {
+      background: frontBackground,
+      officialLogo,
+      frontLogoImg,
+      backLogoImg,
+      avatar,
+      qrImg,
+      signerQrImg,
+      logos: configuredLogos
+    });
 
-  frontImg = frontCanvas.toDataURL('image/png', 1);
-  backImg = backCanvas.toDataURL('image/png', 1);
+    onProgress?.('Me-render sisi belakang berdasarkan KtaCardSettings...');
+    const backCanvas = await renderBack(member, design, {
+      background: backBackground,
+      officialLogo,
+      frontLogoImg,
+      backLogoImg,
+      qrImg,
+      signerQrImg,
+      logos: configuredLogos
+    }, signerMember);
+
+    frontImg = frontCanvas.toDataURL('image/png', 1);
+    backImg = backCanvas.toDataURL('image/png', 1);
+  }
+
+  onProgress?.('Menyusun PDF dengan ukuran fisik KTA...');
+
+  const widthMm = Number(design.widthMm || CR80_WIDTH_MM);
+  const heightMm = Number(design.heightMm || CR80_HEIGHT_MM);
 
   if (format === 'CR80_STANDARD') {
     const doc = new jsPDF({
