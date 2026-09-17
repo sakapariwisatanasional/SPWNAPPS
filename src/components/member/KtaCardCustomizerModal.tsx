@@ -33,6 +33,9 @@ import {
 import { spreadsheetService } from '../../services/spreadsheetService';
 import { DigitalMemberCard } from './DigitalMemberCard';
 
+const KTA_MASTER_FRONT_URL = '/assets/kta/KTA_MASTER_DEPAN.png';
+const KTA_MASTER_BACK_URL = '/assets/kta/KTA_MASTER_BELAKANG.png';
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -145,6 +148,16 @@ const normalizeKtaSettings = (
       ? source.terms
       : [],
   };
+
+  // Artwork KTA master bersifat fixed; designer hanya mengatur data dinamis.
+  merged.frontBackgroundUrl = KTA_MASTER_FRONT_URL;
+  merged.backBackgroundUrl = KTA_MASTER_BACK_URL;
+  merged.bgImageUrl = KTA_MASTER_FRONT_URL;
+  merged.bgOpacity = 0;
+  merged.customBackgroundColorFront = '#32116f';
+  merged.customBackgroundColorBack = '#32116f';
+  merged.frontOrganizationTitle = '';
+  merged.frontOrganizationSubtitle = '';
 
   /**
    * Migrasi layout belakang lama.
@@ -577,7 +590,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
   const uploadAsset = async (
     file: File,
-    kind: 'logo' | 'background'
+    kind: 'logo'
   ) => {
     setMessage(
       'Mengunggah aset ke Google Drive...'
@@ -619,7 +632,7 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
 
   const handleAssetUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
-    kind: 'logo' | 'background',
+    kind: 'logo',
     id?: string
   ) => {
     const file =
@@ -641,21 +654,6 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
       updateLogo(id, {
         url,
       });
-    }
-
-    if (kind === 'background') {
-      setSettings((current) => ({
-        ...current,
-        ...(side === 'FRONT'
-          ? {
-              frontBackgroundUrl:
-                url,
-            }
-          : {
-              backBackgroundUrl:
-                url,
-            }),
-      }));
     }
 
     setMessage(
@@ -697,9 +695,17 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
        */
       const next: any = {
         ...settings,
+        frontBackgroundUrl: KTA_MASTER_FRONT_URL,
+        backBackgroundUrl: KTA_MASTER_BACK_URL,
+        bgImageUrl: KTA_MASTER_FRONT_URL,
+        bgOpacity: 0,
+        customBackgroundColorFront: '#32116f',
+        customBackgroundColorBack: '#32116f',
+        // Header organisasi merupakan artwork master, bukan data konfigurasi.
+        frontOrganizationTitle: '',
+        frontOrganizationSubtitle: '',
         showSignerVerified: false,
-        lastUpdated:
-          new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
       };
 
       const result =
@@ -985,134 +991,34 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
               </div>
             </section>
 
-            {/* 3. BACKGROUND */}
-            <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
+            {/* 3. TEMPLATE MASTER KTA */}
+            <section className="p-4 rounded-2xl border border-purple-200 bg-purple-50/50 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-bold">
+                <div className="flex items-center gap-2 font-bold text-purple-950">
                   <ImageIcon />
-                  <span>
-                    3. Latar Belakang{' '}
-                    {side === 'FRONT'
-                      ? 'Depan'
-                      : 'Belakang'}
-                  </span>
+                  <span>3. Template Master KTA</span>
                 </div>
-
-                <label className="px-3 py-2 rounded-lg bg-purple-900 text-white text-xs font-bold cursor-pointer">
-                  <Upload className="inline w-3.5 h-3.5 mr-1" />
-                  Upload Gambar
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) =>
-                      handleAssetUpload(
-                        event,
-                        'background'
-                      )
-                    }
-                  />
-                </label>
+                <span className="text-[9px] font-black uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                  Fixed / Nasional
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <label className="text-[10px] font-bold">
-                  URL Gambar
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className={`p-3 rounded-xl border ${side === 'FRONT' ? 'border-purple-600 bg-white shadow-sm' : 'border-purple-100 bg-purple-50/30'}`}>
+                  <div className="text-[10px] font-black text-purple-950 mb-2">KTA_MASTER_DEPAN</div>
+                  <img src={KTA_MASTER_FRONT_URL} alt="KTA Master Depan" className="w-full rounded-lg border border-purple-100" />
+                  <p className="text-[9px] text-slate-500 mt-2">Artwork depan digunakan otomatis dan tidak dapat diganti dari Designer.</p>
+                </div>
+                <div className={`p-3 rounded-xl border ${side === 'BACK' ? 'border-purple-600 bg-white shadow-sm' : 'border-purple-100 bg-purple-50/30'}`}>
+                  <div className="text-[10px] font-black text-purple-950 mb-2">KTA_MASTER_BELAKANG</div>
+                  <img src={KTA_MASTER_BACK_URL} alt="KTA Master Belakang" className="w-full rounded-lg border border-purple-100" />
+                  <p className="text-[9px] text-slate-500 mt-2">Artwork belakang digunakan otomatis dan tidak dapat diganti dari Designer.</p>
+                </div>
+              </div>
 
-                  <input
-                    value={
-                      side === 'FRONT'
-                        ? settings.frontBackgroundUrl ||
-                          ''
-                        : settings.backBackgroundUrl ||
-                          ''
-                    }
-                    onChange={(event) =>
-                      setSettings(
-                        (current) => ({
-                          ...current,
-                          ...(side ===
-                          'FRONT'
-                            ? {
-                                frontBackgroundUrl:
-                                  event.target
-                                    .value,
-                              }
-                            : {
-                                backBackgroundUrl:
-                                  event.target
-                                    .value,
-                              }),
-                        })
-                      )
-                    }
-                    className={input}
-                  />
-                </label>
-
-                <label className="text-[10px] font-bold">
-                  Warna
-
-                  <input
-                    type="text"
-                    value={
-                      side === 'FRONT'
-                        ? settings.customBackgroundColorFront ||
-                          '#24105b'
-                        : settings.customBackgroundColorBack ||
-                          '#111827'
-                    }
-                    onChange={(event) =>
-                      setSettings(
-                        (current) => ({
-                          ...current,
-                          ...(side ===
-                          'FRONT'
-                            ? {
-                                customBackgroundColorFront:
-                                  event.target
-                                    .value,
-                              }
-                            : {
-                                customBackgroundColorBack:
-                                  event.target
-                                    .value,
-                              }),
-                        })
-                      )
-                    }
-                    className={input}
-                  />
-                </label>
-
-                <label className="text-[10px] font-bold">
-                  Opasitas gambar
-
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={
-                      settings.bgOpacity ??
-                      0.1
-                    }
-                    onChange={(event) =>
-                      setSettings(
-                        (current) => ({
-                          ...current,
-                          bgOpacity:
-                            Number(
-                              event.target
-                                .value
-                            ),
-                        })
-                      )
-                    }
-                    className="w-full"
-                  />
-                </label>
+              <div className="p-3 rounded-xl bg-white border border-purple-100 text-[10px] text-slate-600 leading-5">
+                <strong>Catatan:</strong> Header organisasi, logo bawaan, warna latar, dan artwork merupakan bagian dari template master.
+                Pengaturan di bawah hanya digunakan untuk elemen data anggota, foto, QR, dan penandatangan yang bersifat dinamis.
               </div>
             </section>
 
@@ -1282,362 +1188,6 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
                 </div>
               ))}
             </section>
-
-            {/* FRONT HEADER */}
-            {side === 'FRONT' && (
-              <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
-                <div className="flex items-center gap-2 font-bold">
-                  <Type />
-                  <span>
-                    5. Header Organisasi
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-                  <div className="p-3 rounded-xl bg-slate-50 border space-y-2">
-                    <div className="text-[10px] font-black uppercase">
-                      SAKA PARIWISATA
-                    </div>
-
-                    <input
-                      value={
-                        settings.frontOrganizationTitle
-                      }
-                      onChange={(event) =>
-                        setSettings(
-                          (current) => ({
-                            ...current,
-                            frontOrganizationTitle:
-                              event.target
-                                .value,
-                          })
-                        )
-                      }
-                      className={input}
-                      placeholder="Judul"
-                    />
-
-                    <div className="grid grid-cols-4 gap-2">
-                      <label className="text-[9px] font-bold">
-                        X
-                        {numberInput(
-                          settings.frontOrganizationTitleX ??
-                            15,
-                          (value) =>
-                            setSettings(
-                              (current) => ({
-                                ...current,
-                                frontOrganizationTitleX:
-                                  value,
-                              })
-                            )
-                        )}
-                      </label>
-
-                      <label className="text-[9px] font-bold">
-                        Y
-                        {numberInput(
-                          settings.frontOrganizationTitleY ??
-                            6,
-                          (value) =>
-                            setSettings(
-                              (current) => ({
-                                ...current,
-                                frontOrganizationTitleY:
-                                  value,
-                              })
-                            )
-                        )}
-                      </label>
-
-                      <label className="text-[9px] font-bold">
-                        Lebar
-                        {numberInput(
-                          settings.frontOrganizationTitleWidth ??
-                            65,
-                          (value) =>
-                            setSettings(
-                              (current) => ({
-                                ...current,
-                                frontOrganizationTitleWidth:
-                                  value,
-                              })
-                            )
-                        )}
-                      </label>
-
-                      <label className="text-[9px] font-bold">
-                        Font
-                        {numberInput(
-                          settings.frontOrganizationTitleFontSize ??
-                            11,
-                          (value) =>
-                            setSettings(
-                              (current) => ({
-                                ...current,
-                                frontOrganizationTitleFontSize:
-                                  value,
-                              })
-                            )
-                        )}
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <select
-                        value={
-                          settings.frontOrganizationTitleFontWeight ??
-                          'bold'
-                        }
-                        onChange={(event) =>
-                          setSettings(
-                            (current) => ({
-                              ...current,
-                              frontOrganizationTitleFontWeight:
-                                event.target
-                                  .value as any,
-                            })
-                          )
-                        }
-                        className={input}
-                      >
-                        <option value="normal">
-                          Normal
-                        </option>
-                        <option value="medium">
-                          Medium
-                        </option>
-                        <option value="bold">
-                          Bold
-                        </option>
-                        <option value="black">
-                          Black
-                        </option>
-                      </select>
-
-                      <select
-                        value={
-                          settings.frontOrganizationTitleAlign ??
-                          'left'
-                        }
-                        onChange={(event) =>
-                          setSettings(
-                            (current) => ({
-                              ...current,
-                              frontOrganizationTitleAlign:
-                                event.target
-                                  .value as any,
-                            })
-                          )
-                        }
-                        className={input}
-                      >
-                        <option value="left">
-                          Kiri
-                        </option>
-                        <option value="center">
-                          Tengah
-                        </option>
-                        <option value="right">
-                          Kanan
-                        </option>
-                      </select>
-
-                      <input
-                        type="color"
-                        value={
-                          settings.frontOrganizationTitleColor ??
-                          '#ffffff'
-                        }
-                        onChange={(event) =>
-                          setSettings(
-                            (current) => ({
-                              ...current,
-                              frontOrganizationTitleColor:
-                                event.target
-                                  .value,
-                            })
-                          )
-                        }
-                        className="h-9 w-full rounded"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-50 border space-y-2">
-                    <div className="text-[10px] font-black uppercase">
-                      GERAKAN PRAMUKA INDONESIA
-                    </div>
-
-                    <input
-                      value={
-                        settings.frontOrganizationSubtitle
-                      }
-                      onChange={(event) =>
-                        setSettings(
-                          (current) => ({
-                            ...current,
-                            frontOrganizationSubtitle:
-                              event.target
-                                .value,
-                          })
-                        )
-                      }
-                      className={input}
-                      placeholder="Subjudul"
-                    />
-
-                    <div className="grid grid-cols-4 gap-2">
-                      <label className="text-[9px] font-bold">
-                        X
-                        {numberInput(
-                          settings.frontOrganizationSubtitleX ??
-                            15,
-                          (value) =>
-                            setSettings(
-                              (current) => ({
-                                ...current,
-                                frontOrganizationSubtitleX:
-                                  value,
-                              })
-                            )
-                        )}
-                      </label>
-
-                      <label className="text-[9px] font-bold">
-                        Y
-                        {numberInput(
-                          settings.frontOrganizationSubtitleY ??
-                            12,
-                          (value) =>
-                            setSettings(
-                              (current) => ({
-                                ...current,
-                                frontOrganizationSubtitleY:
-                                  value,
-                              })
-                            )
-                        )}
-                      </label>
-
-                      <label className="text-[9px] font-bold">
-                        Lebar
-                        {numberInput(
-                          settings.frontOrganizationSubtitleWidth ??
-                            70,
-                          (value) =>
-                            setSettings(
-                              (current) => ({
-                                ...current,
-                                frontOrganizationSubtitleWidth:
-                                  value,
-                              })
-                            )
-                        )}
-                      </label>
-
-                      <label className="text-[9px] font-bold">
-                        Font
-                        {numberInput(
-                          settings.frontOrganizationSubtitleFontSize ??
-                            8,
-                          (value) =>
-                            setSettings(
-                              (current) => ({
-                                ...current,
-                                frontOrganizationSubtitleFontSize:
-                                  value,
-                              })
-                            )
-                        )}
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <select
-                        value={
-                          settings.frontOrganizationSubtitleFontWeight ??
-                          'normal'
-                        }
-                        onChange={(event) =>
-                          setSettings(
-                            (current) => ({
-                              ...current,
-                              frontOrganizationSubtitleFontWeight:
-                                event.target
-                                  .value as any,
-                            })
-                          )
-                        }
-                        className={input}
-                      >
-                        <option value="normal">
-                          Normal
-                        </option>
-                        <option value="medium">
-                          Medium
-                        </option>
-                        <option value="bold">
-                          Bold
-                        </option>
-                        <option value="black">
-                          Black
-                        </option>
-                      </select>
-
-                      <select
-                        value={
-                          settings.frontOrganizationSubtitleAlign ??
-                          'left'
-                        }
-                        onChange={(event) =>
-                          setSettings(
-                            (current) => ({
-                              ...current,
-                              frontOrganizationSubtitleAlign:
-                                event.target
-                                  .value as any,
-                            })
-                          )
-                        }
-                        className={input}
-                      >
-                        <option value="left">
-                          Kiri
-                        </option>
-                        <option value="center">
-                          Tengah
-                        </option>
-                        <option value="right">
-                          Kanan
-                        </option>
-                      </select>
-
-                      <input
-                        type="color"
-                        value={
-                          settings.frontOrganizationSubtitleColor ??
-                          '#e5e7eb'
-                        }
-                        onChange={(event) =>
-                          setSettings(
-                            (current) => ({
-                              ...current,
-                              frontOrganizationSubtitleColor:
-                                event.target
-                                  .value,
-                            })
-                          )
-                        }
-                        className="h-9 w-full rounded"
-                      />
-                    </div>
-                  </div>
-
-                </div>
-              </section>
-            )}
 
             {/* FRONT QR */}
             {side === 'FRONT' && (
@@ -2589,129 +2139,34 @@ export const KtaCardCustomizerModal: React.FC<Props> = ({
             <section className="p-4 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex items-center gap-2 font-bold">
                 <Type />
-                <span>
-                  9. Teks Sistem Kartu
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <label className="text-[10px] font-bold">
-                  Judul Organisasi
-
-                  <input
-                    value={
-                      settings.frontOrganizationTitle
-                    }
-                    onChange={(event) =>
-                      setSettings(
-                        (current) => ({
-                          ...current,
-                          frontOrganizationTitle:
-                            event.target
-                              .value,
-                        })
-                      )
-                    }
-                    className={input}
-                  />
-                </label>
-
-                <label className="text-[10px] font-bold">
-                  Subjudul
-
-                  <input
-                    value={
-                      settings.frontOrganizationSubtitle
-                    }
-                    onChange={(event) =>
-                      setSettings(
-                        (current) => ({
-                          ...current,
-                          frontOrganizationSubtitle:
-                            event.target
-                              .value,
-                        })
-                      )
-                    }
-                    className={input}
-                  />
-                </label>
-
-                <label className="text-[10px] font-bold">
-                  Masa Berlaku
-
-                  <input
-                    value={
-                      settings.frontValidityText
-                    }
-                    onChange={(event) =>
-                      setSettings(
-                        (current) => ({
-                          ...current,
-                          frontValidityText:
-                            event.target
-                              .value,
-                        })
-                      )
-                    }
-                    className={input}
-                  />
-                </label>
-
-                <label className="text-[10px] font-bold">
-                  Header Belakang
-
-                  <input
-                    value={
-                      settings.backHeaderTitle
-                    }
-                    onChange={(event) =>
-                      setSettings(
-                        (current) => ({
-                          ...current,
-                          backHeaderTitle:
-                            event.target
-                              .value,
-                        })
-                      )
-                    }
-                    className={input}
-                  />
-                </label>
-
-                <div className="md:col-span-2 p-3 rounded-xl bg-slate-50 border text-[10px] text-slate-600">
-                  Nama dan jabatan penandatangan
-                  mengikuti anggota yang dipilih
-                  pada QR Penandatangan Digital.
-                  Data wilayah penandatangan tidak
-                  ditampilkan pada KTA.
-                </div>
+                <span>8. Teks Sistem & Ketentuan</span>
               </div>
 
               <label className="text-[10px] font-bold">
-                Ketentuan Belakang
-
-                <textarea
-                  value={
-                    settings.terms.join(
-                      '\n'
-                    )
-                  }
+                Masa Berlaku
+                <input
+                  value={settings.frontValidityText}
                   onChange={(event) =>
-                    setSettings(
-                      (current) => ({
-                        ...current,
-                        terms:
-                          event.target
-                            .value
-                            .split('\n'),
-                      })
-                    )
+                    setSettings((current) => ({
+                      ...current,
+                      frontValidityText: event.target.value,
+                    }))
                   }
-                  className={
-                    input +
-                    ' min-h-24'
+                  className={input}
+                />
+              </label>
+
+              <label className="text-[10px] font-bold">
+                Ketentuan Belakang
+                <textarea
+                  value={settings.terms.join('\n')}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+                      terms: event.target.value.split('\n'),
+                    }))
                   }
+                  className={input + ' min-h-24'}
                 />
               </label>
             </section>

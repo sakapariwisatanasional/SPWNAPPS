@@ -6,7 +6,6 @@ import {
   KtaDataFieldConfig
 } from '../../types';
 import {
-  SakaLogo,
   formatDriveImageUrl
 } from '../common/SakaLogo';
 import {
@@ -17,6 +16,9 @@ import {
   KtaQrCode,
   getMemberVerificationUrl
 } from './KtaQrCode';
+
+const KTA_MASTER_FRONT_URL = '/assets/kta/KTA_MASTER_DEPAN.png';
+const KTA_MASTER_BACK_URL = '/assets/kta/KTA_MASTER_BELAKANG.png';
 
 interface Props {
   member: Member;
@@ -31,9 +33,6 @@ interface Props {
   onPreviewSettingsChange?: (
     settings: KtaCardSettings
   ) => void;
-  renderWidthPx?: number;
-  initialSide?: 'front' | 'back';
-  printCapture?: boolean;
 }
 
 const valueOf = (
@@ -103,10 +102,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
   showControls = true,
   allowAdminEdit = false,
   previewSettings,
-  onPreviewSettingsChange,
-  renderWidthPx,
-  initialSide = 'front',
-  printCapture = false
+  onPreviewSettingsChange
 }) => {
   const normalizeSettings = (
     value?: Partial<KtaCardSettings> | null
@@ -149,11 +145,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
     );
 
   const [flipped, setFlipped] =
-    useState(initialSide === 'back');
-
-  useEffect(() => {
-    setFlipped(initialSide === 'back');
-  }, [initialSide]);
+    useState(false);
 
   useEffect(() => {
     if (previewSettings) {
@@ -343,7 +335,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
       )
   );
 
-  const widthPx = renderWidthPx ?? 380;
+  const widthPx = 380;
   const heightPx = widthPx / ratio;
 
   const photo =
@@ -390,13 +382,9 @@ export const DigitalMemberCard: React.FC<Props> = ({
         l.url
     );
 
-  const bgFront =
-    settings.frontBackgroundUrl ||
-    settings.bgImageUrl;
+  const bgFront = KTA_MASTER_FRONT_URL;
 
-  const bgBack =
-    settings.backBackgroundUrl ||
-    settings.bgImageUrl;
+  const bgBack = KTA_MASTER_BACK_URL;
 
   const radius = Math.max(
     8,
@@ -701,25 +689,16 @@ export const DigitalMemberCard: React.FC<Props> = ({
   const bgStyle = (
     url?: string,
     color?: string
-  ): React.CSSProperties => {
-    const resolvedUrl = formatDriveImageUrl(url || '') || url || '';
-    const isKtaMaster =
-      resolvedUrl.includes('/assets/kta/KTA-MASTER.png') ||
-      url?.includes('/assets/kta/KTA-MASTER.png');
-
-    return {
-      backgroundColor: color || '#24105b',
-      backgroundImage: resolvedUrl
-        ? (
-            isKtaMaster
-              ? `url("${resolvedUrl}")`
-              : `linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("${resolvedUrl}")`
-          )
-        : undefined,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center'
-    };
-  };
+  ): React.CSSProperties => ({
+    backgroundColor:
+      color || '#24105b',
+    backgroundImage: url
+      ? `url("${formatDriveImageUrl(url) || url}")`
+      : undefined,
+    backgroundSize: 'cover',
+    backgroundPosition:
+      'center'
+  });
 
   return (
     <div className="flex flex-col items-center gap-3 select-none">
@@ -735,16 +714,13 @@ export const DigitalMemberCard: React.FC<Props> = ({
         }
       >
         <div
-          className={`relative w-full h-full ${
-            printCapture ? '' : 'transition-transform duration-500'
-          }`}
+          className="relative w-full h-full transition-transform duration-500"
           style={{
-            transformStyle: printCapture ? 'flat' : 'preserve-3d',
-            transform: printCapture
-              ? 'none'
-              : flipped
-                ? 'rotateY(180deg)'
-                : 'none'
+            transformStyle:
+              'preserve-3d',
+            transform: flipped
+              ? 'rotateY(180deg)'
+              : 'none'
           }}
         >
 
@@ -763,158 +739,14 @@ export const DigitalMemberCard: React.FC<Props> = ({
               ),
               borderRadius: radius,
               backfaceVisibility:
-                'hidden',
-              ...(printCapture
-                ? {
-                    transform: 'none',
-                    visibility:
-                      initialSide === 'front'
-                        ? 'visible'
-                        : 'hidden'
-                  }
-                : {})
+                'hidden'
             }}
           >
-            {!String(bgFront || '').includes('/assets/kta/KTA-MASTER.png') && (
-              <div
-                className="absolute inset-0 bg-black/10"
-                style={{
-                  opacity:
-                    settings.bgOpacity ??
-                    0.1
-                }}
-              />
-            )}
 
             {renderLogos(
               frontLogos
             )}
 
-            {!frontLogos.length && (
-              <div className="absolute left-[4%] top-[5%]">
-                <SakaLogo size={38} />
-              </div>
-            )}
-
-            {/* =================================================
-                HEADER ORGANISASI
-            ================================================== */}
-
-            <div
-              className="absolute overflow-hidden"
-              style={{
-                left: `${
-                  (settings as any)
-                    .frontOrganizationTitleX ??
-                  15
-                }%`,
-                top: `${
-                  (settings as any)
-                    .frontOrganizationTitleY ??
-                  6
-                }%`,
-                width: `${
-                  (settings as any)
-                    .frontOrganizationTitleWidth ??
-                  65
-                }%`,
-                fontSize: `${
-                  (settings as any)
-                    .frontOrganizationTitleFontSize ??
-                  11
-                }px`,
-                fontWeight: weight(
-                  (settings as any)
-                    .frontOrganizationTitleFontWeight ??
-                    'bold'
-                ),
-                color:
-                  (settings as any)
-                    .frontOrganizationTitleColor ??
-                  '#ffffff',
-                textAlign:
-                  (settings as any)
-                    .frontOrganizationTitleAlign ??
-                  'left',
-                lineHeight: Number(
-                  (settings as any)
-                    .frontOrganizationTitleLineHeight ??
-                    1.15
-                ),
-                letterSpacing: `${
-                  (settings as any)
-                    .frontOrganizationTitleLetterSpacing ??
-                  0
-                }px`,
-                whiteSpace:
-                  'normal',
-                textTransform:
-                  'uppercase',
-                wordBreak:
-                  'break-word'
-              }}
-            >
-              {
-                settings.frontOrganizationTitle
-              }
-            </div>
-
-            <div
-              className="absolute overflow-hidden"
-              style={{
-                left: `${
-                  (settings as any)
-                    .frontOrganizationSubtitleX ??
-                  15
-                }%`,
-                top: `${
-                  (settings as any)
-                    .frontOrganizationSubtitleY ??
-                  12
-                }%`,
-                width: `${
-                  (settings as any)
-                    .frontOrganizationSubtitleWidth ??
-                  70
-                }%`,
-                fontSize: `${
-                  (settings as any)
-                    .frontOrganizationSubtitleFontSize ??
-                  8
-                }px`,
-                fontWeight: weight(
-                  (settings as any)
-                    .frontOrganizationSubtitleFontWeight ??
-                    'normal'
-                ),
-                color:
-                  (settings as any)
-                    .frontOrganizationSubtitleColor ??
-                  '#e5e7eb',
-                textAlign:
-                  (settings as any)
-                    .frontOrganizationSubtitleAlign ??
-                  'left',
-                lineHeight: Number(
-                  (settings as any)
-                    .frontOrganizationSubtitleLineHeight ??
-                    1.2
-                ),
-                letterSpacing: `${
-                  (settings as any)
-                    .frontOrganizationSubtitleLetterSpacing ??
-                  0
-                }px`,
-                whiteSpace:
-                  'normal',
-                wordBreak:
-                  'break-word'
-              }}
-            >
-              {
-                settings.frontOrganizationSubtitle
-              }
-            </div>
 
             {/* =================================================
                 FOTO ANGGOTA
@@ -1199,17 +1031,8 @@ export const DigitalMemberCard: React.FC<Props> = ({
               borderRadius: radius,
               backfaceVisibility:
                 'hidden',
-              ...(printCapture
-                ? {
-                    transform: 'none',
-                    visibility:
-                      initialSide === 'back'
-                        ? 'visible'
-                        : 'hidden'
-                  }
-                : {
-                    transform: 'rotateY(180deg)'
-                  })
+              transform:
+                'rotateY(180deg)'
             }}
           >
             {renderLogos(
@@ -1217,124 +1040,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
             )}
 
             {/* =================================================
-                HEADER BELAKANG
-            ================================================== */}
-
-            <div
-              className="absolute overflow-hidden"
-              style={{
-                left: `${
-                  (settings as any)
-                    .backHeaderTitleX ??
-                  5
-                }%`,
-                top: `${
-                  (settings as any)
-                    .backHeaderTitleY ??
-                  6
-                }%`,
-                width: `${
-                  (settings as any)
-                    .backHeaderTitleWidth ??
-                  90
-                }%`,
-                fontSize: `${
-                  (settings as any)
-                    .backHeaderTitleFontSize ??
-                  11
-                }px`,
-                fontWeight: weight(
-                  (settings as any)
-                    .backHeaderTitleFontWeight ??
-                    'bold'
-                ),
-                color:
-                  (settings as any)
-                    .backHeaderTitleColor ??
-                  '#ffffff',
-                textAlign:
-                  (settings as any)
-                    .backHeaderTitleAlign ??
-                  'left',
-                lineHeight: Number(
-                  (settings as any)
-                    .backHeaderTitleLineHeight ??
-                    1.15
-                ),
-                letterSpacing: `${
-                  (settings as any)
-                    .backHeaderTitleLetterSpacing ??
-                  0
-                }px`,
-                whiteSpace:
-                  'normal',
-                wordBreak:
-                  'break-word',
-                textTransform:
-                  'uppercase'
-              }}
-            >
-              {
-                settings.backHeaderTitle
-              }
-            </div>
-
-            <div
-              className="absolute overflow-hidden"
-              style={{
-                left: `${
-                  (settings as any)
-                    .backHeaderSubtitleX ??
-                  5
-                }%`,
-                top: `${
-                  (settings as any)
-                    .backHeaderSubtitleY ??
-                  14
-                }%`,
-                width: `${
-                  (settings as any)
-                    .backHeaderSubtitleWidth ??
-                  90
-                }%`,
-                fontSize: `${
-                  (settings as any)
-                    .backHeaderSubtitleFontSize ??
-                  8
-                }px`,
-                fontWeight: weight(
-                  (settings as any)
-                    .backHeaderSubtitleFontWeight ??
-                    'normal'
-                ),
-                color:
-                  (settings as any)
-                    .backHeaderSubtitleColor ??
-                  '#e5e7eb',
-                textAlign:
-                  (settings as any)
-                    .backHeaderSubtitleAlign ??
-                  'left',
-                lineHeight: Number(
-                  (settings as any)
-                    .backHeaderSubtitleLineHeight ??
-                    1.2
-                ),
-                letterSpacing: `${
-                  (settings as any)
-                    .backHeaderSubtitleLetterSpacing ??
-                  0
-                }px`,
-                whiteSpace:
-                  'normal',
-                wordBreak:
-                  'break-word'
-              }}
-            >
-              {
-                settings.backHeaderSubtitle
-              }
-            </div>
+                KETENTUAN
 
             {/* =================================================
                 KETENTUAN
