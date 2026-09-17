@@ -2401,6 +2401,82 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+
+function resetPasswordInUsersSheet_(body) {
+  var ss = getActiveOrConfiguredSpreadsheet();
+  if (!ss) throw new Error('Spreadsheet tidak dapat dibuka.');
+
+  var sheet = ss.getSheetByName('Users');
+  if (!sheet) throw new Error('Sheet Users tidak ditemukan.');
+
+  var values = sheet.getDataRange().getValues();
+  if (!values || values.length === 0) throw new Error('Sheet Users belum memiliki header.');
+
+  var headers = values[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
+  function findColumn_(aliases) {
+    for (var i = 0; i < aliases.length; i++) {
+      var idx = headers.indexOf(String(aliases[i]).toLowerCase());
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+
+  var idCol = findColumn_(['id', 'user id', 'userid', 'user_id']);
+  var usernameCol = findColumn_(['username', 'user name', 'nama pengguna', 'nama user']);
+  var emailCol = findColumn_(['email', 'alamat email']);
+  var memberIdCol = findColumn_(['member id', 'memberid', 'member_id', 'id anggota']);
+  var passwordCol = findColumn_(['password hash', 'passwordhash', 'password_hash', 'password', 'kata sandi', 'kata sandi hash']);
+
+  if (passwordCol < 0) {
+    passwordCol = headers.length;
+    sheet.getRange(1, passwordCol + 1).setValue('Password Hash');
+  }
+
+  var targetUserId = String(body.userId || '').trim();
+  var targetUsername = String(body.username || '').trim().toLowerCase();
+  var targetEmail = String(body.email || '').trim().toLowerCase();
+  var targetMemberId = String(body.memberId || '').trim();
+  var targetIdentifier = String(body.identifier || '').trim().toLowerCase();
+  var targetRow = -1;
+
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var rowId = idCol >= 0 ? String(row[idCol] || '').trim() : '';
+    var rowUsername = usernameCol >= 0 ? String(row[usernameCol] || '').trim().toLowerCase() : '';
+    var rowEmail = emailCol >= 0 ? String(row[emailCol] || '').trim().toLowerCase() : '';
+    var rowMemberId = memberIdCol >= 0 ? String(row[memberIdCol] || '').trim() : '';
+
+    var matched =
+      (targetUserId && rowId === targetUserId) ||
+      (targetUsername && rowUsername === targetUsername) ||
+      (targetEmail && rowEmail === targetEmail) ||
+      (targetMemberId && rowMemberId === targetMemberId) ||
+      (targetIdentifier && (rowId.toLowerCase() === targetIdentifier || rowUsername === targetIdentifier || rowEmail === targetIdentifier || rowMemberId.toLowerCase() === targetIdentifier));
+
+    if (matched) {
+      targetRow = r + 1;
+      break;
+    }
+  }
+
+  if (targetRow < 0) throw new Error('Akun pada sheet Users tidak ditemukan.');
+
+  var passwordHash = String(body.passwordHash || '').trim();
+  if (!passwordHash) throw new Error('Password hash kosong.');
+
+  sheet.getRange(targetRow, passwordCol + 1).setValue(passwordHash);
+  SpreadsheetApp.flush();
+
+  return {
+    status: 'success',
+    success: true,
+    action: 'AUTH_RESET_PASSWORD',
+    userId: targetUserId,
+    memberId: targetMemberId,
+    message: 'Kata sandi berhasil diperbarui pada sheet Users.'
+  };
+}
+
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -2429,6 +2505,13 @@ function doPost(e) {
 
     var ss = getActiveOrConfiguredSpreadsheet();
     var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
+
+    // 0. RESET PASSWORD — update Users sheet with the server-generated hash.
+    if (body.action === "AUTH_RESET_PASSWORD") {
+      var resetResult = resetPasswordInUsersSheet_(body);
+      return ContentService.createTextOutput(JSON.stringify(resetResult))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
 
     // 1. AKSI INISIALISASI STRUKTUR SUBFOLDER DI GOOGLE DRIVE (TANPA DUPLIKASI)
     if (body.action === "SETUP_DRIVE_FOLDERS" || (e.parameter && e.parameter.action === "SETUP_DRIVE_FOLDERS")) {
