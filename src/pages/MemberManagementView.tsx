@@ -354,24 +354,12 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           PAGE HEADER
       ======================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
-              <Users className="w-4.5 h-4.5" />
-            </div>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-extrabold font-heading text-slate-900">
+            Manajemen Keanggotaan Terpadu
+          </h2>
 
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.16em] font-extrabold text-purple-600">
-                Keanggotaan
-              </p>
-
-              <h2 className="text-xl sm:text-2xl font-extrabold font-heading text-slate-900 leading-tight">
-                Manajemen Keanggotaan Terpadu
-              </h2>
-            </div>
-          </div>
-
-          <p className="text-xs text-slate-500 mt-2 max-w-3xl">
+          <p className="text-xs text-slate-500 mt-0.5">
             Pendataan, verifikasi berjenjang, dan penerbitan Nomor Anggota Nasional (PP.KK.KC.NNNNNN)
           </p>
         </div>
@@ -384,7 +372,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               type="button"
               onClick={handleRefreshLatestData}
               disabled={isRefreshingData}
-              className="px-3 py-2.5 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait min-h-[40px]"
+              className="px-3 py-2.5 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait"
               title="Ambil data terbaru dari Google Spreadsheet"
             >
               <RefreshCw
@@ -411,17 +399,14 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               aria-label="Aksi tambahan"
             >
               <MoreHorizontal className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                Aksi
-              </span>
+              <span className="hidden sm:inline">Aksi</span>
             </summary>
 
             <div className="absolute right-0 top-full mt-2 z-40 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
-
               <button
                 type="button"
                 onClick={handleExportCSV}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-left cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-left"
               >
                 <Download className="w-4 h-4" />
                 Ekspor daftar anggota
@@ -431,7 +416,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 <button
                   type="button"
                   onClick={onOpenEditCardModal}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 text-left cursor-pointer"
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 text-left"
                 >
                   <Sliders className="w-4 h-4 text-amber-700" />
                   Edit desain KTA
@@ -445,7 +430,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                     onClick={() =>
                       setShowClearAllModal(true)
                     }
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-red-700 hover:bg-red-50 text-left cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-red-700 hover:bg-red-50 text-left"
                   >
                     <Trash2 className="w-4 h-4" />
                     Bersihkan data dummy
@@ -459,7 +444,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             onClick={() =>
               setIsRegisterModalOpen(true)
             }
-            className="px-3 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-emerald-950/20 transition-all cursor-pointer min-h-[40px]"
+            className="px-3 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
             title="Daftarkan anggota baru"
           >
             <Plus className="w-4 h-4" />
@@ -484,7 +469,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
                   <MapPin className="w-5 h-5" />
                 </div>
 
@@ -503,7 +488,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 </div>
               </div>
 
-              <div className="text-[10px] text-slate-500 sm:text-right bg-white/70 rounded-xl px-3 py-2 border border-emerald-100">
+              <div className="text-[10px] text-slate-500 sm:text-right">
                 <span className="font-semibold">
                   Terakhir diperbarui
                 </span>
@@ -524,12 +509,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
 
             <div className="bg-white border border-slate-200 rounded-[1.35rem] p-4 shadow-xs">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                  Total Anggota
-                </p>
-                <Users className="w-4 h-4 text-slate-300" />
-              </div>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                Total Wilayah
+              </p>
 
               <p className="text-2xl font-black text-slate-900 mt-1">
                 {safeMembers.length}
@@ -541,12 +523,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             </div>
 
             <div className="bg-white border border-emerald-200 rounded-[1.35rem] p-4 shadow-xs">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-600">
-                  Aktif
-                </p>
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-              </div>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-600">
+                Aktif
+              </p>
 
               <p className="text-2xl font-black text-emerald-700 mt-1">
                 {activeCount}
@@ -558,12 +537,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             </div>
 
             <div className="bg-white border border-amber-200 rounded-[1.35rem] p-4 shadow-xs">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] uppercase tracking-wider font-bold text-amber-600">
-                  Menunggu
-                </p>
-                <Clock className="w-4 h-4 text-amber-300" />
-              </div>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-amber-600">
+                Menunggu
+              </p>
 
               <p className="text-2xl font-black text-amber-700 mt-1">
                 {pendingCount}
@@ -575,12 +551,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             </div>
 
             <div className="bg-white border border-slate-200 rounded-[1.35rem] p-4 shadow-xs">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
-                  Nonaktif
-                </p>
-                <AlertCircle className="w-4 h-4 text-slate-300" />
-              </div>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                Nonaktif
+              </p>
 
               <p className="text-2xl font-black text-slate-700 mt-1">
                 {inactiveCount}
@@ -600,8 +573,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       <div className="bg-white p-4 rounded-[1.35rem] border border-slate-200 shadow-xs space-y-3">
 
         <div className="flex flex-col sm:flex-row gap-2">
-
-          {/* Search Box */}
+          {/* Search stays immediately visible because it is the most-used action. */}
           <div className="flex-1 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 min-h-[42px]">
             <Search className="w-4 h-4 text-slate-400 shrink-0" />
 
@@ -616,7 +588,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             />
           </div>
 
-          {/* Advanced filter toggle */}
           <button
             type="button"
             onClick={() =>
@@ -631,11 +602,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             aria-controls="member-advanced-filters"
           >
             <Filter className="w-4 h-4" />
-
-            <span>
-              Filter
-            </span>
-
+            <span>Filter</span>
             {activeFilterCount > 0 && (
               <span className="min-w-5 h-5 px-1 rounded-full bg-purple-600 text-white text-[10px] flex items-center justify-center">
                 {activeFilterCount}
@@ -647,15 +614,13 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
         {showAdvancedFilters && (
           <div
             id="member-advanced-filters"
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-slate-100"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1 border-t border-slate-100"
           >
-
             {/* Status Filter */}
             <div>
               <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1.5">
                 Status & Peran
               </label>
-
               <select
                 value={selectedStatus}
                 onChange={(e) =>
@@ -666,23 +631,18 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 <option value="ALL">
                   Semua Status / Peran
                 </option>
-
                 <option value="OPERATOR_ONLY">
                   ⭐ Hanya Operator Kwartir
                 </option>
-
                 <option value="NON_OPERATOR">
                   Anggota Reguler (Bukan Operator)
                 </option>
-
                 <option value="ACTIVE">
                   Status: AKTIF (KTA Terbit)
                 </option>
-
                 <option value="PENDING">
                   Status: PENDING (Perlu Verifikasi)
                 </option>
-
                 <option value="SUSPENDED">
                   Status: SUSPENDED / Non-aktif
                 </option>
@@ -694,7 +654,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1.5">
                 Wilayah
               </label>
-
               <select
                 value={selectedProvinceId}
                 onChange={(e) =>
@@ -705,12 +664,8 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 <option value="ALL">
                   Semua Wilayah (Kwarnas / Kwarda)
                 </option>
-
                 {provinces.map((p) => (
-                  <option
-                    key={p.id}
-                    value={p.id}
-                  >
+                  <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
                 ))}
@@ -722,7 +677,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1.5">
                 Krida
               </label>
-
               <select
                 value={selectedKrida}
                 onChange={(e) =>
@@ -733,12 +687,8 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 <option value="ALL">
                   Semua Krida Saka
                 </option>
-
                 {kridaOptions.map((k) => (
-                  <option
-                    key={k}
-                    value={k}
-                  >
+                  <option key={k} value={k}>
                     {k}
                   </option>
                 ))}
@@ -747,7 +697,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           </div>
         )}
 
-        {/* Filter Summary */}
+        {/* Filter Summary Tags */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[11px] text-slate-500 pt-1">
 
           <span>
@@ -764,7 +714,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
           {hasAnyFilter && (
             <button
-              type="button"
               onClick={() => {
                 setSearchQuery('');
                 setSelectedStatus('ALL');
@@ -891,7 +840,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                               }
                               className="absolute inset-0 bg-purple-950/80 opacity-0 group-hover/avatar:opacity-100 rounded-2xl flex items-center justify-center text-white transition-opacity cursor-pointer shadow-xs"
                               title="Perbaiki Pas Foto Resmi KTA"
-                              aria-label={`Perbaiki foto ${m.fullName}`}
                             >
                               <Camera className="w-4 h-4 text-fuchsia-200" />
                             </button>
@@ -1009,7 +957,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                         {/* Primary action: preview KTA */}
                         <button
-                          type="button"
                           onClick={() =>
                             setPreviewCardMember(m)
                           }
@@ -1023,7 +970,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                         {/* Primary action: edit profile */}
                         {onOpenEditMemberModal && (
                           <button
-                            type="button"
                             onClick={() =>
                               onOpenEditMemberModal(m)
                             }
@@ -1050,11 +996,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                             {onOpenPrintPdfModal && (
                               <button
-                                type="button"
                                 onClick={() =>
                                   onOpenPrintPdfModal(m)
                                 }
-                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700 cursor-pointer"
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
                               >
                                 <FileDown className="w-4 h-4" />
                                 Cetak / Unduh KTA
@@ -1063,11 +1008,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                             {onOpenQuickShareModal && (
                               <button
-                                type="button"
                                 onClick={() =>
                                   onOpenQuickShareModal(m)
                                 }
-                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 cursor-pointer"
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800"
                               >
                                 <Share2 className="w-4 h-4" />
                                 Quick Share / Badge
@@ -1076,11 +1020,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                             {onOpenEditPhotoModal && (
                               <button
-                                type="button"
                                 onClick={() =>
                                   onOpenEditPhotoModal(m)
                                 }
-                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700 cursor-pointer"
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
                               >
                                 <Camera className="w-4 h-4" />
                                 Perbaiki Foto
@@ -1094,7 +1037,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                                   onClick={() =>
                                     onOpenOperatorModal(m)
                                   }
-                                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700 cursor-pointer"
+                                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700"
                                 >
                                   {m.isOperator ? (
                                     <ShieldCheck className="w-4 h-4 text-fuchsia-700" />
@@ -1109,22 +1052,20 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                               )}
 
                             <button
-                              type="button"
                               onClick={() =>
                                 onOpenVerifyModal(m)
                               }
-                              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100"
                             >
                               <Eye className="w-4 h-4" />
                               Verifikasi Anggota
                             </button>
 
                             <button
-                              type="button"
                               onClick={() =>
                                 onOpenTransferModal(m)
                               }
-                              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 cursor-pointer"
+                              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800"
                             >
                               <ArrowRightLeft className="w-4 h-4" />
                               Mutasi / Transfer
@@ -1133,11 +1074,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             {currentUser.role === 'SUPER_ADMIN' &&
                               onDeleteMember && (
                                 <button
-                                  type="button"
                                   onClick={() =>
                                     setMemberToDelete(m)
                                   }
-                                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-red-700 hover:bg-red-50 cursor-pointer"
+                                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-red-700 hover:bg-red-50"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                   Hapus Anggota
@@ -1149,17 +1089,14 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                         {/* Pending approval */}
                         {m.status === 'PENDING' && (
                           <button
-                            type="button"
                             onClick={() =>
                               onApproveMember(m.id)
                             }
-                            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                            className="px-3 py-2 bg-emerald-600 hover:bg-fuchsia-500 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                             title="Setujui dan terbitkan Nomor Anggota"
                           >
                             <CheckCircle2 className="w-4 h-4" />
-                            <span className="hidden xl:inline">
-                              Setujui
-                            </span>
+                            Setujui
                           </button>
                         )}
                       </div>
@@ -1325,7 +1262,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 <div className="grid grid-cols-2 gap-2 pt-1">
 
                   <button
-                    type="button"
                     onClick={() =>
                       setPreviewCardMember(m)
                     }
@@ -1337,7 +1273,6 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                   {onOpenEditMemberModal && (
                     <button
-                      type="button"
                       onClick={() =>
                         onOpenEditMemberModal(m)
                       }
@@ -1359,11 +1294,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                       {onOpenPrintPdfModal && (
                         <button
-                          type="button"
                           onClick={() =>
                             onOpenPrintPdfModal(m)
                           }
-                          className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                         >
                           <FileDown className="w-4 h-4 text-fuchsia-700" />
                           PDF KTA
@@ -1372,11 +1306,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                       {onOpenQuickShareModal && (
                         <button
-                          type="button"
                           onClick={() =>
                             onOpenQuickShareModal(m)
                           }
-                          className="py-2.5 px-2 bg-white hover:bg-amber-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="py-2.5 px-2 bg-white hover:bg-amber-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                         >
                           <Share2 className="w-4 h-4 text-amber-700" />
                           Quick Share
@@ -1385,11 +1318,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                       {onOpenEditPhotoModal && (
                         <button
-                          type="button"
                           onClick={() =>
                             onOpenEditPhotoModal(m)
                           }
-                          className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                         >
                           <Camera className="w-4 h-4" />
                           Foto
@@ -1397,22 +1329,20 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                       )}
 
                       <button
-                        type="button"
                         onClick={() =>
                           onOpenVerifyModal(m)
                         }
-                        className="py-2.5 px-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="py-2.5 px-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                       >
                         <Eye className="w-4 h-4" />
                         Verifikasi
                       </button>
 
                       <button
-                        type="button"
                         onClick={() =>
                           onOpenTransferModal(m)
                         }
-                        className="py-2.5 px-2 bg-white hover:bg-amber-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="py-2.5 px-2 bg-white hover:bg-amber-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                       >
                         <ArrowRightLeft className="w-4 h-4" />
                         Mutasi
@@ -1425,7 +1355,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             onClick={() =>
                               onOpenOperatorModal(m)
                             }
-                            className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="py-2.5 px-2 bg-white hover:bg-fuchsia-50 text-slate-700 rounded-xl text-[11px] font-semibold border border-slate-200 flex items-center justify-center gap-1.5"
                           >
                             {m.isOperator ? (
                               <ShieldCheck className="w-4 h-4 text-fuchsia-700" />
@@ -1440,11 +1370,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                       {currentUser.role === 'SUPER_ADMIN' &&
                         onDeleteMember && (
                           <button
-                            type="button"
                             onClick={() =>
                               setMemberToDelete(m)
                             }
-                            className="py-2.5 px-2 bg-white hover:bg-red-50 text-red-700 rounded-xl text-[11px] font-semibold border border-red-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="py-2.5 px-2 bg-white hover:bg-red-50 text-red-700 rounded-xl text-[11px] font-semibold border border-red-200 flex items-center justify-center gap-1.5"
                           >
                             <Trash2 className="w-4 h-4" />
                             Hapus
@@ -1455,11 +1384,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
 
                   {m.status === 'PENDING' && (
                     <button
-                      type="button"
                       onClick={() =>
                         onApproveMember(m.id)
                       }
-                      className="col-span-2 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-xs transition-colors min-h-[42px] flex items-center justify-center gap-1.5"
+                      className="col-span-2 py-2.5 bg-emerald-600 hover:bg-fuchsia-500 text-white font-bold rounded-2xl text-xs transition-colors min-h-[42px] flex items-center justify-center gap-1.5"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Setujui Anggota</span>
@@ -1517,13 +1445,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               </div>
 
               <button
-                type="button"
                 onClick={() =>
                   setPreviewCardMember(null)
                 }
-                className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm cursor-pointer"
-                title="Tutup preview KTA"
-                aria-label="Tutup preview KTA"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm"
               >
                 ✕
               </button>
@@ -1560,11 +1485,10 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             <div className="pt-2 flex justify-end">
 
               <button
-                type="button"
                 onClick={() =>
                   setPreviewCardMember(null)
                 }
-                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold cursor-pointer"
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold"
               >
                 Tutup
               </button>
@@ -1678,16 +1602,21 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  if (onDeleteMember && memberToDelete) {
-                    onDeleteMember(memberToDelete);
+                  if (onDeleteMember) {
+                    onDeleteMember(
+                      memberToDelete
+                    );
                   }
 
                   setMemberToDelete(null);
                 }}
-                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-bold cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
-                Hapus Permanen
+
+                <span>
+                  Hapus Anggota Ini
+                </span>
               </button>
             </div>
           </div>
@@ -1705,23 +1634,23 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             <div className="flex items-center gap-3 text-red-600">
 
               <div className="w-10 h-10 rounded-[1.35rem] bg-red-100 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <Trash2 className="w-5 h-5 text-red-600" />
               </div>
 
               <div>
                 <h3 className="font-bold text-base text-slate-900 font-heading">
-                  Bersihkan Data Dummy
+                  Bersihkan Seluruh Anggota Dummy?
                 </h3>
 
                 <p className="text-xs text-red-600 font-medium">
-                  Hanya gunakan untuk membersihkan data pengujian.
+                  Pengaturan Basis Data Bersih
                 </p>
               </div>
             </div>
 
-            <div className="p-4 bg-red-50 rounded-[1.35rem] border border-red-100 text-xs text-slate-700">
-              Tindakan ini akan menghapus seluruh data dummy anggota dari aplikasi. Pastikan data tersebut memang bukan data anggota sebenarnya.
-            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Anda akan mengosongkan seluruh data anggota contoh/dummy dari database aplikasi untuk memulai pendataan resmi yang baru atau menyinkronkan dari Google Spreadsheet.
+            </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
 
@@ -1738,16 +1667,21 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  if (onDeleteAllDummyMembers) {
+                  if (
+                    onDeleteAllDummyMembers
+                  ) {
                     onDeleteAllDummyMembers();
                   }
 
                   setShowClearAllModal(false);
                 }}
-                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-bold cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
-                Bersihkan Data
+
+                <span>
+                  Ya, Hapus Seluruh Dummy
+                </span>
               </button>
             </div>
           </div>
