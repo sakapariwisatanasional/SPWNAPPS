@@ -91,7 +91,7 @@ class SpreadsheetService {
         const serverConfig = data.config as Partial<SpreadsheetConfig>;
         const currentLocalUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
         const serverUrl = this.normalizeAppsScriptUrl(serverConfig.scriptUrl);
-        const activeScriptUrl = DEFAULT_GAS_WEB_APP_URL; 
+        const activeScriptUrl = serverUrl || currentLocalUrl || DEFAULT_GAS_WEB_APP_URL;
         this.config = {
           ...this.config,
           ...serverConfig,
@@ -262,8 +262,8 @@ class SpreadsheetService {
     const previousConfig = this.config;
     this.config = { ...this.config, ...updates };
     if (updates.scriptUrl !== undefined) {
-      // URL GAS adalah konfigurasi bawaan aplikasi; setting manual tidak diperlukan.
-      this.config.scriptUrl = DEFAULT_GAS_WEB_APP_URL;
+      const normalizedScriptUrl = this.normalizeAppsScriptUrl(updates.scriptUrl);
+      this.config.scriptUrl = normalizedScriptUrl || this.config.scriptUrl || DEFAULT_GAS_WEB_APP_URL;
     }
     localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
     this.notifySyncState();
@@ -352,7 +352,7 @@ class SpreadsheetService {
   }
 
   private async handleAutoSyncMutation(event: any) {
-    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
+    const scriptUrl = this.getEffectiveAppsScriptUrl();
     if (!scriptUrl) return;
 
     this.syncState.isSaving = true;
@@ -461,7 +461,7 @@ class SpreadsheetService {
    * Hapus baris dari Google Spreadsheet berdasarkan ID atau Nomor KTA
    */
   public async deleteRowFromSpreadsheet(sheet: string, id: string, secondaryId?: string): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
+    const scriptUrl = this.getEffectiveAppsScriptUrl();
     if (!scriptUrl) return { success: true, message: 'Tersimpan lokal.' };
 
     try {
@@ -589,6 +589,7 @@ class SpreadsheetService {
         const response = await fetch(`/api/spreadsheet-data?${params.toString()}`, {
           method: 'GET',
           cache: 'no-store',
+          credentials: 'same-origin',
           headers: {
             'Cache-Control': 'no-cache, no-store, max-age=0',
             'Pragma': 'no-cache',
@@ -601,7 +602,8 @@ class SpreadsheetService {
         try { data = text ? JSON.parse(text) : null; } catch {}
 
         if (!response.ok) {
-          throw new Error(data?.message || `HTTP ${response.status}`);
+          const detail = data?.message || data?.error || text?.trim();
+          throw new Error(detail ? `HTTP ${response.status}: ${detail}` : `HTTP ${response.status}`);
         }
 
         if (data?.success === false) {
@@ -1345,7 +1347,8 @@ class SpreadsheetService {
   }
 
   public getEffectiveAppsScriptUrl(): string {
-    return DEFAULT_GAS_WEB_APP_URL;
+    const configured = this.normalizeAppsScriptUrl(this.config.scriptUrl);
+    return configured || DEFAULT_GAS_WEB_APP_URL;
   }
 
   /**
@@ -1668,7 +1671,7 @@ class SpreadsheetService {
    * Kirim data paket wisata ke Google Spreadsheet
    */
   public async appendTourToSpreadsheet(tour: TourPackage): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
+    const scriptUrl = this.getEffectiveAppsScriptUrl();
     if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
 
     try {
@@ -1709,7 +1712,7 @@ class SpreadsheetService {
    * Kirim data produk kuliner & cinderamata ke Google Spreadsheet
    */
   public async appendCulinaryToSpreadsheet(item: CulinarySouvenirItem): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
+    const scriptUrl = this.getEffectiveAppsScriptUrl();
     if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
 
     try {
@@ -1750,7 +1753,7 @@ class SpreadsheetService {
    * Kirim agenda kegiatan / event ke Google Spreadsheet
    */
   public async appendActivityToSpreadsheet(activity: any): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
+    const scriptUrl = this.getEffectiveAppsScriptUrl();
     if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
 
     try {
@@ -1793,7 +1796,7 @@ class SpreadsheetService {
    * Unggah seluruh data lokal ke Google Spreadsheet secara menyeluruh (Batch Sync)
    */
   public async pushAllDataToSpreadsheet(): Promise<{ success: boolean; message: string; counts: { members: number; tours: number; culinary: number; activities: number } }> {
-    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
+    const scriptUrl = this.getEffectiveAppsScriptUrl();
     const members = storage.getMembers();
     const tours = storage.getTourPackages();
     const culinary = storage.getCulinarySouvenirs();
@@ -2138,7 +2141,7 @@ class SpreadsheetService {
    * Inisialisasi struktur subfolder di Google Drive folder 16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh
    */
   public async setupDriveFolders(): Promise<{ success: boolean; directActionUrl?: string; message: string }> {
-    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
+    const scriptUrl = this.getEffectiveAppsScriptUrl();
     if (!scriptUrl) {
       return {
         success: false,
