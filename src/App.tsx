@@ -28,7 +28,8 @@ const TAB_ROUTES: Record<string, string> = {
   activities: '/activities',
   'verify-portal': '/verify',
   territories: '/territories',
-  'audit-logs': '/audit'
+  'audit-logs': '/audit',
+  'official-store': '/store'
 };
 
 const PUBLIC_TABS = new Set([
@@ -38,7 +39,8 @@ const PUBLIC_TABS = new Set([
   'skills',
   'krida-modules',
   'activities',
-  'verify-portal'
+  'verify-portal',
+  'official-store'
 ]);
 
 const ADMIN_ROLES = new Set([
@@ -84,7 +86,9 @@ const ROUTE_TO_TAB: Record<string, string> = {
   '/verify-portal': 'verify-portal',
   '/territories': 'territories',
   '/audit': 'audit-logs',
-  '/audit-logs': 'audit-logs'
+  '/audit-logs': 'audit-logs',
+  '/store': 'official-store',
+  '/official-store': 'official-store'
 };
 
 // Layout Components
@@ -106,6 +110,8 @@ import { KridaModulesView } from './pages/KridaModulesView';
 import { KridaMaterialEditorModal } from './components/krida/KridaMaterialEditorModal';
 import { PublicPortalView } from './pages/PublicPortalView';
 import { PublicVerificationPage } from './pages/PublicVerificationPage';
+import { OfficialStoreView } from './pages/OfficialStoreView';
+import { OFFICIAL_MERCHANDISE_PRODUCTS } from './data/officialMerchandiseData';
 
 // Modals
 import { AuthModal } from './components/auth/AuthModal';
@@ -668,6 +674,13 @@ export default function App() {
                   onOpenKridaEditor={() => handleNavigateTab('krida-modules')}
                 />
               </AppErrorBoundary>
+            )}
+
+            {currentTab === 'official-store' && (
+              <OfficialStoreView
+                products={OFFICIAL_MERCHANDISE_PRODUCTS}
+                onBackHome={() => handleNavigateTab('landing')}
+              />
             )}
 
             {currentTab === 'culinary-souvenirs' && (
