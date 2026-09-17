@@ -14,7 +14,10 @@ import {
   FileText,
   Check,
   BookOpen,
-  Edit3
+  Edit3,
+  MoreHorizontal,
+  FileCheck,
+  ChevronDown
 } from 'lucide-react';
 
 import { NationalMapVisual } from '../components/dashboard/NationalMapVisual';
@@ -68,24 +71,28 @@ const MetricCard: React.FC<MetricCardProps> = ({
 }) => {
   const colorMap = {
     emerald: {
-      iconBg: 'bg-emerald-50',
+      iconBg: 'bg-emerald-50 border border-emerald-100',
       value: 'text-emerald-700',
-      border: 'hover:border-emerald-200'
+      border: 'hover:border-emerald-300',
+      ring: 'group-hover:bg-emerald-100'
     },
     teal: {
-      iconBg: 'bg-teal-50',
+      iconBg: 'bg-teal-50 border border-teal-100',
       value: 'text-teal-700',
-      border: 'hover:border-teal-200'
+      border: 'hover:border-teal-300',
+      ring: 'group-hover:bg-teal-100'
     },
     amber: {
-      iconBg: 'bg-amber-50',
+      iconBg: 'bg-amber-50 border border-amber-100',
       value: 'text-amber-700',
-      border: 'hover:border-amber-200'
+      border: 'hover:border-amber-300',
+      ring: 'group-hover:bg-amber-100'
     },
     indigo: {
-      iconBg: 'bg-indigo-50',
-      value: 'text-indigo-700',
-      border: 'hover:border-indigo-200'
+      iconBg: 'bg-sky-50 border border-sky-100',
+      value: 'text-sky-700',
+      border: 'hover:border-sky-300',
+      ring: 'group-hover:bg-sky-100'
     }
   }[color];
 
@@ -93,7 +100,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
     <button
       type="button"
       onClick={onClick}
-      className={`relative text-left w-full bg-white rounded-[1.35rem] p-5 border border-slate-200 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${colorMap.border}`}
+      className={`group relative text-left w-full bg-white rounded-[1.5rem] p-5 border border-slate-200 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 ${colorMap.border}`}
     >
       {badge && (
         <span className="absolute top-4 right-4 px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-bold">
@@ -103,14 +110,19 @@ const MetricCard: React.FC<MetricCardProps> = ({
 
       <div className="flex items-start justify-between gap-3">
         <div
-          className={`w-11 h-11 rounded-2xl ${colorMap.iconBg} flex items-center justify-center shrink-0`}
+          className={`w-11 h-11 rounded-2xl ${colorMap.iconBg} ${colorMap.ring} flex items-center justify-center shrink-0 transition-colors`}
         >
           {icon}
         </div>
       </div>
 
       <div className="mt-4">
-        <p className="text-xs font-semibold text-slate-500">{title}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-slate-500">{title}</p>
+          {onClick && (
+            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-purple-500 transition-colors" />
+          )}
+        </div>
         <p
           className={`mt-1 text-2xl font-extrabold tracking-tight ${colorMap.value}`}
         >
@@ -456,7 +468,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleNavigate('audit-logs')}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition backdrop-blur-sm border border-white/10"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold transition backdrop-blur-sm border border-white/15 min-h-[42px]"
+                title="Buka riwayat audit sistem"
               >
                 <FileText className="w-4 h-4" />
                 Log Audit
@@ -466,7 +479,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('members')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition shadow-lg shadow-emerald-500/20"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs sm:text-sm font-extrabold transition shadow-lg shadow-emerald-500/20 min-h-[42px]"
+              title="Buka manajemen anggota"
             >
               <Users className="w-4 h-4" />
               Kelola Anggota
@@ -618,14 +632,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onChange={(event) =>
                   setSearchPending(event.target.value)
                 }
-                className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-52 sm:w-64"
+                className="pl-9 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-full sm:w-64 min-h-[40px]"
               />
             </div>
 
             <button
               type="button"
               onClick={() => handleNavigate('members')}
-              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-xs font-extrabold text-slate-700 hover:text-emerald-700 transition cursor-pointer min-h-[38px]"
+              title="Buka seluruh daftar anggota"
             >
               Lihat Semua
               <ChevronRight className="w-3.5 h-3.5" />
@@ -703,10 +718,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               onClick={() =>
                                 handleVerify(member)
                               }
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold transition"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-extrabold transition min-h-[38px]"
                               title="Periksa data anggota"
                             >
-                              <Check className="w-3.5 h-3.5" />
+                              <FileCheck className="w-3.5 h-3.5" />
                               Periksa
                             </button>
                           )}
@@ -718,7 +733,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               onClick={() =>
                                 handleActivate(member)
                               }
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition shadow-sm"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition shadow-sm min-h-[38px]"
                               title="Aktifkan anggota"
                             >
                               <UserCheck className="w-3.5 h-3.5" />
@@ -726,15 +741,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             </button>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleNavigate('members')
-                            }
-                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs transition"
-                          >
-                            Detail
-                          </button>
+                          <details className="relative">
+                            <summary
+                              className="list-none inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-extrabold transition cursor-pointer min-h-[38px]"
+                              title="Aksi lainnya"
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                              <span className="hidden xl:inline">Aksi</span>
+                              <ChevronDown className="w-3 h-3" />
+                            </summary>
+
+                            <div className="absolute right-0 top-full mt-2 z-30 w-44 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl text-left">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleNavigate('members')
+                                }
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                              >
+                                <Users className="w-4 h-4 text-purple-600" />
+                                Detail Anggota
+                              </button>
+                            </div>
+                          </details>
                         </div>
                       </td>
                     </tr>
