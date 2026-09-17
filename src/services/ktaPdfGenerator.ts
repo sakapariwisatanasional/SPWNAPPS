@@ -15,6 +15,9 @@ export const CR80_WIDTH_MM = 85.60;
 export const CR80_HEIGHT_MM = 53.98;
 export const CR80_CORNER_RADIUS_MM = 3.18;
 
+export const KTA_MASTER_FRONT_URL = '/assets/kta/KTA_MASTER_DEPAN.png';
+export const KTA_MASTER_BACK_URL = '/assets/kta/KTA_MASTER_BELAKANG.png';
+
 // 300 DPI-equivalent render surface for the ISO/IEC 7810 ID-1 card.
 const CANVAS_WIDTH = 1012;
 const CANVAS_HEIGHT = 638;
@@ -348,17 +351,7 @@ function drawBackground(
   if (image?.naturalWidth) {
     ctx.save();
     drawCoverImage(ctx, image, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    // Same dark overlay used by DigitalMemberCard.bgStyle().
-    ctx.fillStyle = 'rgba(0,0,0,0.12)';
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.restore();
-  }
-
-  // DigitalMemberCard has a second configurable black overlay.
-  const opacity = Math.max(0, Math.min(1, Number(settings.bgOpacity ?? 0.1)));
-  if (opacity > 0) {
-    ctx.fillStyle = `rgba(0,0,0,${0.1 * opacity})`;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
 }
 
@@ -458,35 +451,7 @@ async function renderFront(
     drawConfiguredImage(ctx, assets.frontLogoImg?.naturalWidth ? assets.frontLogoImg : assets.officialLogo, {
       x: 4, y: 5, width: 10, height: 16, objectFit: 'contain', opacity: 1
     });
-  } else {
-    drawConfiguredImage(ctx, assets.officialLogo, { x: 4, y: 5, width: 10, height: 16, objectFit: 'contain', opacity: 1 });
   }
-
-  drawText(ctx, settings.frontOrganizationTitle || '', {
-    x: settings.frontOrganizationTitleX ?? 15,
-    y: settings.frontOrganizationTitleY ?? 6,
-    width: settings.frontOrganizationTitleWidth ?? 65,
-    fontSize: settings.frontOrganizationTitleFontSize ?? 11,
-    fontWeight: settings.frontOrganizationTitleFontWeight ?? 'bold',
-    color: settings.frontOrganizationTitleColor ?? '#ffffff',
-    align: settings.frontOrganizationTitleAlign ?? 'left',
-    lineHeight: settings.frontOrganizationTitleLineHeight ?? 1.15,
-    letterSpacing: settings.frontOrganizationTitleLetterSpacing ?? 0,
-    whiteSpace: 'normal'
-  }, '#ffffff', { uppercase: true });
-
-  drawText(ctx, settings.frontOrganizationSubtitle || '', {
-    x: settings.frontOrganizationSubtitleX ?? 15,
-    y: settings.frontOrganizationSubtitleY ?? 12,
-    width: settings.frontOrganizationSubtitleWidth ?? 70,
-    fontSize: settings.frontOrganizationSubtitleFontSize ?? 8,
-    fontWeight: settings.frontOrganizationSubtitleFontWeight ?? 'normal',
-    color: settings.frontOrganizationSubtitleColor ?? '#e5e7eb',
-    align: settings.frontOrganizationSubtitleAlign ?? 'left',
-    lineHeight: settings.frontOrganizationSubtitleLineHeight ?? 1.2,
-    letterSpacing: settings.frontOrganizationSubtitleLetterSpacing ?? 0,
-    whiteSpace: 'normal'
-  }, '#e5e7eb');
 
   if (settings.showPhoto !== false && assets.avatar.naturalWidth) {
     const x = pctX(settings.photoX ?? 4);
@@ -587,32 +552,6 @@ async function renderBack(
   } else if (settings.backLogoUrl) {
     drawConfiguredImage(ctx, assets.backLogoImg?.naturalWidth ? assets.backLogoImg : assets.officialLogo, { x: 4, y: 3, width: 10, height: 16, objectFit: 'contain', opacity: 1 });
   }
-
-  drawText(ctx, settings.backHeaderTitle || '', {
-    x: (settings as any).backHeaderTitleX ?? 5,
-    y: (settings as any).backHeaderTitleY ?? 6,
-    width: (settings as any).backHeaderTitleWidth ?? 90,
-    fontSize: (settings as any).backHeaderTitleFontSize ?? 11,
-    fontWeight: (settings as any).backHeaderTitleFontWeight ?? 'bold',
-    color: (settings as any).backHeaderTitleColor ?? '#ffffff',
-    align: (settings as any).backHeaderTitleAlign ?? 'left',
-    lineHeight: (settings as any).backHeaderTitleLineHeight ?? 1.15,
-    letterSpacing: (settings as any).backHeaderTitleLetterSpacing ?? 0,
-    whiteSpace: 'normal'
-  }, '#ffffff', { uppercase: true });
-
-  drawText(ctx, settings.backHeaderSubtitle || '', {
-    x: (settings as any).backHeaderSubtitleX ?? 5,
-    y: (settings as any).backHeaderSubtitleY ?? 14,
-    width: (settings as any).backHeaderSubtitleWidth ?? 90,
-    fontSize: (settings as any).backHeaderSubtitleFontSize ?? 8,
-    fontWeight: (settings as any).backHeaderSubtitleFontWeight ?? 'normal',
-    color: (settings as any).backHeaderSubtitleColor ?? '#e5e7eb',
-    align: (settings as any).backHeaderSubtitleAlign ?? 'left',
-    lineHeight: (settings as any).backHeaderSubtitleLineHeight ?? 1.2,
-    letterSpacing: (settings as any).backHeaderSubtitleLetterSpacing ?? 0,
-    whiteSpace: 'normal'
-  }, '#e5e7eb');
 
   const terms = (settings.terms || []).length
     ? settings.terms
@@ -758,8 +697,8 @@ export async function generateKtaPdf({
   const [avatar, officialLogo, frontBackground, backBackground, frontLogoImg, backLogoImg, qrDataUrl, signerMember] = await Promise.all([
     loadImage(member.avatarUrl || ''),
     loadOfficialSakaLogo(),
-    loadCardBackground(design.frontBackgroundUrl || design.bgImageUrl),
-    loadCardBackground(design.backBackgroundUrl || design.bgImageUrl),
+    loadCardBackground(KTA_MASTER_FRONT_URL),
+    loadCardBackground(KTA_MASTER_BACK_URL),
     design.frontLogoUrl ? loadImage(design.frontLogoUrl) : Promise.resolve(new Image()),
     design.backLogoUrl ? loadImage(design.backLogoUrl) : Promise.resolve(new Image()),
     generateQrDataUrl(verificationUrl),
