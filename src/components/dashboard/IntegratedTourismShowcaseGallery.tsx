@@ -297,7 +297,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
       {/* ========================================================================= */}
       {/* 1. MASTER HEADER & SMART LOCATION BAR */}
       {/* ========================================================================= */}
-      <div className="bg-gradient-to-br from-slate-900 via-purple-950 to-slate-950 rounded-2xl sm:rounded-3xl p-5 sm:p-7 text-white border border-purple-800/40 shadow-xl relative overflow-hidden space-y-5">
+      <div className="bg-gradient-to-br from-slate-900 via-purple-950 to-slate-950 rounded-2xl sm:rounded-3xl p-5 sm:p-7 text-white border border-purple-800/40 shadow-2xl relative overflow-hidden space-y-5">
         {/* Glow Visuals */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
@@ -305,7 +305,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
         {/* Top Header Row */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10 border-b border-purple-800/30 pb-4">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-teal-500/20 to-purple-500/20 border border-teal-400/40 rounded-full text-teal-200 text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-teal-500/20 to-purple-500/20 border border-teal-400/40 rounded-full text-teal-200 text-xs font-semibold">
               <Sparkles className="w-3.5 h-3.5 text-teal-300 animate-pulse" />
               <span>Pusat Eksplorasi & Direktori Cerdas Saka Pariwisata</span>
             </div>
@@ -336,7 +336,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
               onClick={handleTriggerIpDetect}
               disabled={isDetectingIp}
               title="Perbarui Deteksi Lokasi Otomatis via IP Publik"
-              className="ml-2 p-2 bg-purple-600/30 hover:bg-purple-600/60 text-purple-200 hover:text-white rounded-xl border border-purple-400/30 transition-all cursor-pointer disabled:opacity-50 text-xs font-semibold flex items-center gap-1 min-h-[38px]"
+              className="ml-2 p-2.5 bg-purple-600/30 hover:bg-purple-600/60 text-purple-200 hover:text-white rounded-xl border border-purple-400/30 transition-all cursor-pointer disabled:opacity-50 text-xs font-semibold flex items-center gap-1 min-h-[38px]"
             >
               <Globe className={`w-4 h-4 ${isDetectingIp ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">{isDetectingIp ? 'Mendeteksi...' : 'IP Saya'}</span>
@@ -375,7 +375,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                 onClick={handleTriggerIpDetect}
                 disabled={isDetectingIp}
                 title="Perbarui lokasi otomatis"
-                className="p-1.5 rounded-lg text-purple-200 hover:text-white hover:bg-white/10 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+                className="p-2 rounded-lg text-purple-200 hover:text-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
               >
                 <Globe className={`w-3.5 h-3.5 ${isDetectingIp ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">{isDetectingIp ? 'Mendeteksi...' : 'Perbarui lokasi'}</span>
@@ -389,7 +389,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
           {/* Tab 1: Destinasi */}
           <button
             onClick={() => setActiveMainTab('DESTINATIONS')}
-            className={`p-3.5 rounded-2xl text-left transition-all cursor-pointer flex items-center gap-3 border ${
+            className={`p-4 rounded-2xl text-left transition-all duration-200 cursor-pointer flex items-center gap-3 border focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               activeMainTab === 'DESTINATIONS'
                 ? 'bg-gradient-to-r from-purple-700/80 to-indigo-700/80 border-teal-400 text-white shadow-lg shadow-purple-950/50 ring-2 ring-teal-400/30'
                 : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
@@ -414,7 +414,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
           {/* Tab 2: Etalase Karya & Produk 4 Krida */}
           <button
             onClick={() => setActiveMainTab('KRIDA_PRODUCTS')}
-            className={`p-3.5 rounded-2xl text-left transition-all cursor-pointer flex items-center gap-3 border ${
+            className={`p-4 rounded-2xl text-left transition-all duration-200 cursor-pointer flex items-center gap-3 border focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               activeMainTab === 'KRIDA_PRODUCTS'
                 ? 'bg-gradient-to-r from-purple-700/80 to-indigo-700/80 border-teal-400 text-white shadow-lg shadow-purple-950/50 ring-2 ring-teal-400/30'
                 : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
@@ -439,7 +439,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
           {/* Tab 3: Agenda Kegiatan Saka Pariwisata (BARU) */}
           <button
             onClick={() => setActiveMainTab('AGENDA_ACTIVITIES')}
-            className={`p-3.5 rounded-2xl text-left transition-all cursor-pointer flex items-center gap-3 border ${
+            className={`p-4 rounded-2xl text-left transition-all duration-200 cursor-pointer flex items-center gap-3 border focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               activeMainTab === 'AGENDA_ACTIVITIES'
                 ? 'bg-gradient-to-r from-purple-700/80 to-indigo-700/80 border-teal-400 text-white shadow-lg shadow-purple-950/50 ring-2 ring-teal-400/30'
                 : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
@@ -464,7 +464,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
           {/* Tab 4: Rekomendasi Pemandu & Kader */}
           <button
             onClick={() => setActiveMainTab('RECOMMENDED_MEMBERS')}
-            className={`p-3.5 rounded-2xl text-left transition-all cursor-pointer flex items-center gap-3 border ${
+            className={`p-4 rounded-2xl text-left transition-all duration-200 cursor-pointer flex items-center gap-3 border focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               activeMainTab === 'RECOMMENDED_MEMBERS'
                 ? 'bg-gradient-to-r from-teal-600/80 to-emerald-700/80 border-teal-300 text-white shadow-lg shadow-emerald-950/50 ring-2 ring-teal-300/40'
                 : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
@@ -496,7 +496,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
       {activeMainTab === 'DESTINATIONS' && (
         <div className="space-y-5 animate-in fade-in duration-200">
           {/* Filter & Search Bar */}
-          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base sm:text-lg font-extrabold font-heading text-slate-900 flex items-center gap-2">
@@ -519,7 +519,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                   className="bg-transparent outline-none text-xs w-full text-slate-800 placeholder:text-slate-400"
                 />
                 {tourSearchQuery && (
-                  <button onClick={() => setTourSearchQuery('')} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+                  <button onClick={() => setTourSearchQuery('')} className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50">✕</button>
                 )}
               </div>
             </div>
@@ -528,7 +528,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 onClick={() => setTourCategoryFilter('ALL')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer min-h-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 flex-shrink-0 ${
                   tourCategoryFilter === 'ALL'
                     ? 'bg-purple-900 text-white shadow-xs'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -540,7 +540,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                 <button
                   key={cat}
                   onClick={() => setTourCategoryFilter(cat)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer min-h-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 flex-shrink-0 ${
                     tourCategoryFilter === cat
                       ? 'bg-purple-900 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -566,7 +566,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                 return (
                   <div
                     key={tour.id}
-                    className={`bg-white rounded-2xl sm:rounded-3xl border transition-all flex flex-col justify-between overflow-hidden group hover:shadow-lg ${
+                    className={`bg-white rounded-2xl sm:rounded-3xl border transition-all duration-200 flex flex-col justify-between overflow-hidden group hover:shadow-xl hover:-translate-y-0.5 ${
                       isSelected ? 'border-teal-500 ring-2 ring-teal-400/40 shadow-md' : 'border-slate-200 shadow-xs'
                     }`}
                   >
@@ -653,7 +653,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                       {/* Main Dynamic Recommendation Trigger */}
                       <button
                         onClick={() => handleSelectTourForRecommendation(tour)}
-                        className={`w-full py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[40px] ${
+                        className={`w-full py-3 rounded-xl sm:rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer min-h-11 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/70 focus-visible:ring-offset-2 flex items-center justify-center gap-2 min-h-[40px] ${
                           isSelected
                             ? 'bg-teal-600 text-white shadow-md'
                             : 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-extrabold shadow-xs active:scale-98'
@@ -670,7 +670,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                           if (onViewTourDetail) onViewTourDetail(tour);
                           else setModalTour(tour);
                         }}
-                        className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1"
+                        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1 min-h-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60"
                       >
                         <span>Lihat Rincian Itinerary & Reservasi</span>
                       </button>
@@ -689,7 +689,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
       {activeMainTab === 'KRIDA_PRODUCTS' && (
         <div className="space-y-5 animate-in fade-in duration-200">
           {/* Header Bar & 4 Krida Selectors */}
-          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-4">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base sm:text-lg font-extrabold font-heading text-slate-900 flex items-center gap-2">
@@ -706,7 +706,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                   <button
                     type="button"
                     onClick={() => onOpenCulinaryFormModal(undefined, 'KULINER')}
-                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                    className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all min-h-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
                   >
                     <Utensils className="w-3.5 h-3.5" />
                     Ajukan Kuliner
@@ -714,7 +714,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                   <button
                     type="button"
                     onClick={() => onOpenCulinaryFormModal(undefined, 'CINDERAMATA')}
-                    className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                    className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all min-h-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70"
                   >
                     <Gift className="w-3.5 h-3.5" />
                     Ajukan Kriya
@@ -733,7 +733,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                   className="bg-transparent outline-none text-xs w-full text-slate-800 placeholder:text-slate-400"
                 />
                 {productSearchQuery && (
-                  <button onClick={() => setProductSearchQuery('')} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+                  <button onClick={() => setProductSearchQuery('')} className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50">✕</button>
                 )}
               </div>
             </div>
@@ -816,7 +816,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                 return (
                   <div
                     key={prod.id}
-                    className={`bg-white rounded-2xl sm:rounded-3xl border transition-all flex flex-col justify-between overflow-hidden group hover:shadow-lg ${
+                    className={`bg-white rounded-2xl sm:rounded-3xl border transition-all duration-200 flex flex-col justify-between overflow-hidden group hover:shadow-xl hover:-translate-y-0.5 ${
                       isLocationMatch ? 'border-purple-300 ring-1 ring-purple-300/50 shadow-xs' : 'border-slate-200 shadow-xs'
                     }`}
                   >
@@ -971,7 +971,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
           </div>
 
           {/* Filters Bar */}
-          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               {/* Category Filter Pills */}
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
@@ -1006,7 +1006,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                   aria-label="Filter Tingkat Penyelenggara"
                   value={activityLevelFilter}
                   onChange={(e) => setActivityLevelFilter(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 font-medium outline-none focus:border-purple-600 cursor-pointer"
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 font-medium outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-400/20 cursor-pointer min-h-10"
                 >
                   <option value="ALL">Semua Tingkat Penyelenggara</option>
                   <option value="Nasional">Tingkat Nasional (Kwarnas)</option>
@@ -1030,7 +1030,7 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
               {activitySearchQuery && (
                 <button
                   onClick={() => setActivitySearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700 cursor-pointer px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50"
                 >
                   Reset
                 </button>
