@@ -443,3 +443,9 @@
   .spwn-krida-card { min-height:220px; border-radius:20px; padding:1rem; }
   .spwn-verify-panel { padding:1rem; border-radius:20px; }
 }
+
+/* Official Store + Hero Carousel */
+.spwn-store-coming-soon { letter-spacing: .08em; }
+.spwn-hero-panel { min-height: 450px; }
+@media (max-width: 1023px) { .spwn-hero-panel { min-height: 500px; } }
+@media (max-width: 639px) { .spwn-hero-panel { min-height: 540px; } }
