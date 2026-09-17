@@ -701,19 +701,24 @@ function createSession(user: any): string {
 }
 
 function getSessionUser(req: express.Request): ActiveSession | null {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-
-  const token = authHeader.slice('Bearer '.length).trim();
-  if (!token) return null;
-
-  const parts = token.split('.');
-  if (parts.length !== 2) return null;
-
-  const [encodedPayload, providedSignature] = parts;
-  const expectedSignature = signSessionPayload(encodedPayload);
-
+  // Authentication must never be able to crash an API request.
+  // Node can expose authorization as string | string[] | undefined; only a
+  // single string Bearer token is valid for this application.
   try {
+    const rawAuthHeader = req.headers.authorization;
+    const authHeader = Array.isArray(rawAuthHeader) ? rawAuthHeader[0] : rawAuthHeader;
+    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) return null;
+
+    const token = authHeader.slice('Bearer '.length).trim();
+    if (!token) return null;
+
+    const parts = token.split('.');
+    if (parts.length !== 2) return null;
+
+    const [encodedPayload, providedSignature] = parts;
+    if (!encodedPayload || !providedSignature) return null;
+
+    const expectedSignature = signSessionPayload(encodedPayload);
     const a = Buffer.from(providedSignature);
     const b = Buffer.from(expectedSignature);
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
@@ -733,7 +738,8 @@ function getSessionUser(req: express.Request): ActiveSession | null {
       memberId: payload.memberId,
       expiresAt: payload.exp
     };
-  } catch {
+  } catch (error) {
+    console.warn('[Auth] Invalid session header ignored:', error instanceof Error ? error.message : error);
     return null;
   }
 }
