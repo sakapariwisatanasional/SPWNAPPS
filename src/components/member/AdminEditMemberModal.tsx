@@ -147,6 +147,13 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const [updateReason, setUpdateReason] = useState('Koreksi penulisan nama, gelar, dan penyesuaian domisili');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Password reset khusus Super Admin. Password baru hanya dianggap berhasil
+  // setelah server mengonfirmasi penyimpanan ke Google Spreadsheet.
+  const [newMemberPassword, setNewMemberPassword] = useState('');
+  const [confirmMemberPassword, setConfirmMemberPassword] = useState('');
+  const [isResettingMemberPassword, setIsResettingMemberPassword] = useState(false);
+  const [memberPasswordResetMessage, setMemberPasswordResetMessage] = useState('');
+
   // Active Tab
   const [activeTab, setActiveTab] = useState<'IDENTITY' | 'PHOTO' | 'DOMICILE' | 'SAKA' | 'SKILLS' | 'REASON'>('IDENTITY');
 
@@ -253,6 +260,10 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       setAutoRegenerateNta(false);
       setUpdateReason('Koreksi data profil dan domisili anggota oleh Operator');
       setMemberSkills(member.skills ? [...member.skills] : []);
+      setNewMemberPassword('');
+      setConfirmMemberPassword('');
+      setIsResettingMemberPassword(false);
+      setMemberPasswordResetMessage('');
       setMasterSkills(storage.getSkills());
       setIsAddingSkillInline(false);
       setActiveTab('IDENTITY');
@@ -405,6 +416,66 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
   const handleDeleteSkillInline = (skillId: string) => {
     setMemberSkills(prev => prev.filter(s => s.id !== skillId));
+  };
+
+  const handleResetMemberPassword = async () => {
+    if (!member || currentUser.role !== 'SUPER_ADMIN') return;
+    if (isResettingMemberPassword) return;
+
+    setMemberPasswordResetMessage('');
+
+    if (newMemberPassword.length < 6) {
+      setMemberPasswordResetMessage('Kata sandi baru minimal 6 karakter.');
+      return;
+    }
+
+    if (newMemberPassword !== confirmMemberPassword) {
+      setMemberPasswordResetMessage('Konfirmasi kata sandi tidak cocok.');
+      return;
+    }
+
+    setIsResettingMemberPassword(true);
+
+    try {
+      const token = storage.getAuthToken();
+      const response = await fetch('/api/admin/reset-member-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        credentials: 'include',
+        cache: 'no-store',
+        body: JSON.stringify({
+          memberId: member.id,
+          userId: member.userId,
+          email: member.email,
+          newPassword: newMemberPassword
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success !== true) {
+        throw new Error(
+          data?.message ||
+          'Kata sandi gagal disimpan ke Google Spreadsheet.'
+        );
+      }
+
+      setNewMemberPassword('');
+      setConfirmMemberPassword('');
+      setMemberPasswordResetMessage(
+        'Kata sandi baru berhasil disimpan di Google Spreadsheet.'
+      );
+    } catch (err: any) {
+      console.error('[Admin Reset Password] Gagal:', err);
+      setMemberPasswordResetMessage(
+        err?.message ||
+        'Kata sandi gagal diperbarui. Silakan coba lagi.'
+      );
+    } finally {
+      setIsResettingMemberPassword(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1641,6 +1712,67 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                   Catatan ini akan tersimpan permanen pada sistem <strong>Audit Trail Kwartir</strong> dan disampaikan melalui notifikasi aplikasi kepada anggota yang bersangkutan.
                 </p>
               </div>
+
+              {currentUser.role === 'SUPER_ADMIN' && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <Lock className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
+                    <div>
+                      <h5 className="font-bold text-amber-950 text-xs">Bantuan Reset Kata Sandi Anggota</h5>
+                      <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+                        Fitur ini khusus Super Admin untuk membantu anggota yang lupa kata sandi. Kata sandi baru dikirim ke server dan baru dianggap berhasil setelah Google Spreadsheet mengonfirmasi penyimpanan.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Kata Sandi Baru</label>
+                      <input
+                        type="password"
+                        value={newMemberPassword}
+                        onChange={(e) => setNewMemberPassword(e.target.value)}
+                        placeholder="Minimal 6 karakter"
+                        disabled={isResettingMemberPassword}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-500 outline-none text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Konfirmasi Kata Sandi</label>
+                      <input
+                        type="password"
+                        value={confirmMemberPassword}
+                        onChange={(e) => setConfirmMemberPassword(e.target.value)}
+                        placeholder="Ketik ulang sandi"
+                        disabled={isResettingMemberPassword}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-500 outline-none text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {memberPasswordResetMessage && (
+                    <div className={`p-2.5 rounded-xl text-[11px] font-semibold ${
+                      memberPasswordResetMessage.toLowerCase().includes('berhasil')
+                        ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                        : 'bg-rose-50 border border-rose-200 text-rose-700'
+                    }`}>
+                      {memberPasswordResetMessage}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleResetMemberPassword}
+                      disabled={isResettingMemberPassword}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition-colors"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      {isResettingMemberPassword ? 'Menyimpan...' : 'Reset Kata Sandi Anggota'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Summary of What Will Be Saved */}
               <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-2">
