@@ -1,12 +1,8 @@
-import { OfficialMerchandiseProduct } from '../types';
+import type { OfficialMerchandiseProduct } from '../types';
 
 /**
  * Sampel katalog Official Merchandise Saka Pariwisata.
- *
- * Dua produk pertama sudah diaktifkan untuk simulasi alur:
- * Detail Produk -> Keranjang -> Checkout -> Nomor Pesanan.
- *
- * Produk lainnya tetap Coming Soon.
+ * Produk masih coming soon; launchAt dapat diubah saat tanggal peluncuran resmi ditetapkan.
  */
 export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
   {
@@ -14,16 +10,14 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     name: 'Polo Official Saka Pariwisata Nasional',
     shortName: 'Polo Official',
     category: 'APPAREL',
-    description:
-      'Polo berkarakter smart-outdoor dengan identitas Saka Pariwisata Nasional untuk kegiatan resmi maupun lapangan.',
+    description: 'Polo berkarakter smart-outdoor dengan identitas Saka Pariwisata Nasional untuk kegiatan resmi maupun lapangan.',
     price: 189000,
     accentClass: 'from-emerald-950 via-emerald-700 to-teal-400',
     iconName: 'shirt',
     sizes: ['S', 'M', 'L', 'XL', '2XL'],
     tags: ['Official', 'Nasional', 'Apparel'],
-    comingSoon: false,
-    purchaseEnabled: true,
-    launchAt: '2026-09-01T09:00:00+07:00',
+    comingSoon: true,
+    launchAt: '2026-10-10T09:00:00+07:00',
     featured: true,
     active: true
   },
@@ -32,16 +26,14 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     name: 'Jaket Jelajah Nusantara',
     shortName: 'Jaket Jelajah',
     category: 'OUTDOOR',
-    description:
-      'Jaket ringan untuk eksplorasi destinasi, kegiatan Krida, perjalanan, dan agenda Saka Pariwisata.',
+    description: 'Jaket ringan untuk eksplorasi destinasi, kegiatan Krida, perjalanan, dan agenda Saka Pariwisata.',
     price: 329000,
     accentClass: 'from-violet-950 via-purple-800 to-fuchsia-500',
     iconName: 'jacket',
     sizes: ['M', 'L', 'XL', '2XL'],
     tags: ['Outdoor', 'Jelajah', 'Limited'],
-    comingSoon: false,
-    purchaseEnabled: true,
-    launchAt: '2026-09-01T09:00:00+07:00',
+    comingSoon: true,
+    launchAt: '2026-10-17T09:00:00+07:00',
     featured: true,
     active: true
   },
@@ -50,8 +42,7 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     name: 'Topi Petualang Saka Pariwisata',
     shortName: 'Topi Petualang',
     category: 'ACCESSORIES',
-    description:
-      'Topi lapangan bergaya kasual dengan aksen identitas Saka Pariwisata untuk aktivitas luar ruang.',
+    description: 'Topi lapangan bergaya kasual dengan aksen identitas Saka Pariwisata untuk aktivitas luar ruang.',
     price: 99000,
     accentClass: 'from-amber-950 via-orange-700 to-yellow-400',
     iconName: 'cap',
@@ -66,8 +57,7 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     name: 'Tumbler Jelajah Nusantara',
     shortName: 'Tumbler Nusantara',
     category: 'ACCESSORIES',
-    description:
-      'Tumbler reusable untuk mendukung gaya hidup perjalanan yang lebih bertanggung jawab terhadap lingkungan.',
+    description: 'Tumbler reusable untuk mendukung gaya hidup perjalanan yang lebih bertanggung jawab terhadap lingkungan.',
     price: 139000,
     accentClass: 'from-sky-950 via-cyan-700 to-emerald-400',
     iconName: 'bottle',
@@ -81,8 +71,7 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     name: 'Lanyard KTA Official',
     shortName: 'Lanyard KTA',
     category: 'IDENTITY',
-    description:
-      'Lanyard identitas resmi untuk KTA, kegiatan, pelatihan, dan pertemuan Saka Pariwisata.',
+    description: 'Lanyard identitas resmi untuk KTA, kegiatan, pelatihan, dan pertemuan Saka Pariwisata.',
     price: 59000,
     accentClass: 'from-pink-950 via-rose-700 to-orange-400',
     iconName: 'lanyard',
@@ -96,8 +85,7 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     name: 'Explorer Kit Krida Pemandu',
     shortName: 'Explorer Kit',
     category: 'OUTDOOR',
-    description:
-      'Paket identitas perjalanan untuk anggota Krida Pemandu yang berisi aksesori pilihan untuk kegiatan lapangan.',
+    description: 'Paket identitas perjalanan untuk anggota Krida Pemandu yang berisi aksesori pilihan untuk kegiatan lapangan.',
     price: 279000,
     accentClass: 'from-slate-950 via-slate-700 to-emerald-500',
     iconName: 'compass',
