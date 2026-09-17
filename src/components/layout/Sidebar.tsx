@@ -18,7 +18,8 @@ import {
   Home,
   FileSpreadsheet,
   FolderOpen,
-  BookOpen
+  BookOpen,
+  ShoppingBag
 } from 'lucide-react';
 import { CurrentUser } from '../../types';
 import { SakaLogo } from '../common/SakaLogo';
@@ -188,6 +189,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Utensils className={`w-4 h-4 ${currentTab === 'culinary-souvenirs' ? 'text-purple-400' : 'text-slate-400'}`} />
           <span className="flex-1">Kuliner & Cinderamata</span>
           <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded-md font-bold">4 Krida</span>
+        </button>
+
+        {/* Official Store */}
+        <button
+          onClick={() => handleItemClick('official-store')}
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer ${
+            currentTab === 'official-store'
+              ? 'bg-fuchsia-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <ShoppingBag className={`w-4 h-4 ${currentTab === 'official-store' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Official Merchandise</span>
+          <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded-md font-bold">Soon</span>
         </button>
 
         {/* Skills & Certification */}
