@@ -6,6 +6,7 @@ import {
   KtaDataFieldConfig
 } from '../../types';
 import {
+  SakaLogo,
   formatDriveImageUrl
 } from '../common/SakaLogo';
 import {
@@ -16,9 +17,6 @@ import {
   KtaQrCode,
   getMemberVerificationUrl
 } from './KtaQrCode';
-
-const KTA_MASTER_FRONT_URL = '/assets/kta/KTA_MASTER_DEPAN.png';
-const KTA_MASTER_BACK_URL = '/assets/kta/KTA_MASTER_BELAKANG.png';
 
 interface Props {
   member: Member;
@@ -382,9 +380,13 @@ export const DigitalMemberCard: React.FC<Props> = ({
         l.url
     );
 
-  const bgFront = KTA_MASTER_FRONT_URL;
+  const bgFront =
+    settings.frontBackgroundUrl ||
+    settings.bgImageUrl;
 
-  const bgBack = KTA_MASTER_BACK_URL;
+  const bgBack =
+    settings.backBackgroundUrl ||
+    settings.bgImageUrl;
 
   const radius = Math.max(
     8,
@@ -686,6 +688,10 @@ export const DigitalMemberCard: React.FC<Props> = ({
    * =========================================================
    */
 
+  const isMasterArtwork =
+    String((settings as any)?.frontBackgroundUrl || '').includes('KTA_MASTER_DEPAN.png') ||
+    String((settings as any)?.backBackgroundUrl || '').includes('KTA_MASTER_BELAKANG.png');
+
   const bgStyle = (
     url?: string,
     color?: string
@@ -693,7 +699,9 @@ export const DigitalMemberCard: React.FC<Props> = ({
     backgroundColor:
       color || '#24105b',
     backgroundImage: url
-      ? `url("${formatDriveImageUrl(url) || url}")`
+      ? (String(url).includes('KTA_MASTER_DEPAN.png') || String(url).includes('KTA_MASTER_BELAKANG.png')
+          ? `url("${formatDriveImageUrl(url) || url}")`
+          : `linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("${formatDriveImageUrl(url) || url}")`)
       : undefined,
     backgroundSize: 'cover',
     backgroundPosition:
@@ -742,12 +750,24 @@ export const DigitalMemberCard: React.FC<Props> = ({
                 'hidden'
             }}
           >
+            {!String(bgFront || '').includes('KTA_MASTER_DEPAN.png') && (
+              <div
+                className="absolute inset-0 bg-black/10"
+                style={{ opacity: settings.bgOpacity ?? 0.1 }}
+              />
+            )
 
             {renderLogos(
               frontLogos
             )}
 
+            {!frontLogos.length && !String((settings as any)?.frontBackgroundUrl || '').includes('KTA_MASTER_DEPAN.png') && (
+              <div className="absolute left-[4%] top-[5%]">
+                <SakaLogo size={38} />
+              </div>
+            )}
 
+            {/* HEADER ORGANISASI DISABLED: artwork master already contains it. */}
             {/* =================================================
                 FOTO ANGGOTA
 
@@ -859,12 +879,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
                   Math.max(
                     36,
                     Math.round(
-                      Math.min(
-                        widthPx,
-                        heightPx
-                      ) *
-                        (qrPercent /
-                          100)
+                      widthPx * (qrPercent / 100)
                     )
                   );
 
@@ -1040,7 +1055,124 @@ export const DigitalMemberCard: React.FC<Props> = ({
             )}
 
             {/* =================================================
-                KETENTUAN
+                HEADER BELAKANG
+            ================================================== */}
+
+            <div
+              className="absolute overflow-hidden"
+              style={{
+                left: `${
+                  (settings as any)
+                    .backHeaderTitleX ??
+                  5
+                }%`,
+                top: `${
+                  (settings as any)
+                    .backHeaderTitleY ??
+                  6
+                }%`,
+                width: `${
+                  (settings as any)
+                    .backHeaderTitleWidth ??
+                  90
+                }%`,
+                fontSize: `${
+                  (settings as any)
+                    .backHeaderTitleFontSize ??
+                  11
+                }px`,
+                fontWeight: weight(
+                  (settings as any)
+                    .backHeaderTitleFontWeight ??
+                    'bold'
+                ),
+                color:
+                  (settings as any)
+                    .backHeaderTitleColor ??
+                  '#ffffff',
+                textAlign:
+                  (settings as any)
+                    .backHeaderTitleAlign ??
+                  'left',
+                lineHeight: Number(
+                  (settings as any)
+                    .backHeaderTitleLineHeight ??
+                    1.15
+                ),
+                letterSpacing: `${
+                  (settings as any)
+                    .backHeaderTitleLetterSpacing ??
+                  0
+                }px`,
+                whiteSpace:
+                  'normal',
+                wordBreak:
+                  'break-word',
+                textTransform:
+                  'uppercase'
+              }}
+            >
+              {
+                settings.backHeaderTitle
+              }
+            </div>
+
+            <div
+              className="absolute overflow-hidden"
+              style={{
+                left: `${
+                  (settings as any)
+                    .backHeaderSubtitleX ??
+                  5
+                }%`,
+                top: `${
+                  (settings as any)
+                    .backHeaderSubtitleY ??
+                  14
+                }%`,
+                width: `${
+                  (settings as any)
+                    .backHeaderSubtitleWidth ??
+                  90
+                }%`,
+                fontSize: `${
+                  (settings as any)
+                    .backHeaderSubtitleFontSize ??
+                  8
+                }px`,
+                fontWeight: weight(
+                  (settings as any)
+                    .backHeaderSubtitleFontWeight ??
+                    'normal'
+                ),
+                color:
+                  (settings as any)
+                    .backHeaderSubtitleColor ??
+                  '#e5e7eb',
+                textAlign:
+                  (settings as any)
+                    .backHeaderSubtitleAlign ??
+                  'left',
+                lineHeight: Number(
+                  (settings as any)
+                    .backHeaderSubtitleLineHeight ??
+                    1.2
+                ),
+                letterSpacing: `${
+                  (settings as any)
+                    .backHeaderSubtitleLetterSpacing ??
+                  0
+                }px`,
+                whiteSpace:
+                  'normal',
+                wordBreak:
+                  'break-word'
+              }}
+            >
+              {
+                settings.backHeaderSubtitle
+              }
+            </div>
 
             {/* =================================================
                 KETENTUAN
@@ -1248,12 +1380,7 @@ export const DigitalMemberCard: React.FC<Props> = ({
                   Math.max(
                     36,
                     Math.round(
-                      Math.min(
-                        widthPx,
-                        heightPx
-                      ) *
-                        (qrPercent /
-                          100)
+                      widthPx * (qrPercent / 100)
                     )
                   );
 
