@@ -660,8 +660,9 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-this-session-secret';
 const IS_VERCEL = process.env.VERCEL === '1' || !!process.env.VERCEL;
 
-// URL Google Apps Script TIDAK boleh ditentukan oleh source code.
-// Super Admin mengisinya melalui Dashboard > Pengaturan API.
+// URL Google Apps Script dapat berasal dari konfigurasi Super Admin atau ENV.
+// Fallback deployment bawaan dipertahankan agar aplikasi tetap dapat membaca
+// Spreadsheet ketika konfigurasi serverless belum tersimpan pada instance baru.
 
 function normalizeManualAppsScriptUrl(raw: unknown): string {
   const value = String(raw || '').trim().replace(/\s+/g, '');
@@ -670,6 +671,21 @@ function normalizeManualAppsScriptUrl(raw: unknown): string {
     return '';
   }
   return value;
+}
+
+function getAppsScriptCandidates(requested?: unknown): string[] {
+  const candidates = [
+    normalizeManualAppsScriptUrl(requested),
+    normalizeManualAppsScriptUrl(db.config.scriptUrl),
+    normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL),
+    normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL)
+  ];
+
+  return candidates.filter(Boolean).filter((url, index, arr) => arr.indexOf(url) === index);
+}
+
+function getActiveAppsScriptUrl(requested?: unknown): string {
+  return getAppsScriptCandidates(requested)[0] || '';
 }
 
 function base64UrlEncode(value: string): string {
@@ -888,10 +904,7 @@ async function fetchSheetGViz(sheetName: string): Promise<Record<string, any>[]>
   // Fallback source: the configured Google Spreadsheet itself through GViz.
   // This keeps read/sync working when the GAS deployment temporarily returns
   // HTTP 500, while still preferring the application's authoritative backend.
-  const configured = normalizeManualAppsScriptUrl(db.config.scriptUrl);
-  const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-  const defaultUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
-  const scriptUrl = configured || envUrl || defaultUrl;
+  const scriptUrl = getActiveAppsScriptUrl();
 
   const spreadsheetId = String(db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
   const parseRows = (data: any): Record<string, any>[] | null => {
@@ -1405,16 +1418,12 @@ async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unkn
   // Jangan biarkan URL lama tersebut menjadi satu-satunya sumber endpoint.
   // Server mencoba URL yang diminta terlebih dahulu, lalu URL konfigurasi,
   // ENV Vercel, dan terakhir URL produksi yang ditanam sebagai fallback.
-  const requested = normalizeManualAppsScriptUrl(requestedScriptUrl);
-  const configured = normalizeManualAppsScriptUrl(db.config.scriptUrl);
-  const envUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-  // Prioritas mutlak: URL yang dikirim halaman aktif (hasil Dashboard), lalu
-  // konfigurasi server. ENV hanya menjadi bootstrap opsional; tidak ada URL GAS
-  // tertentu yang ditanam permanen di source code.
-  const defaultUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
-  const candidates = [requested, configured, envUrl, defaultUrl]
-    .filter(Boolean)
-    .filter((url, index, arr) => arr.indexOf(url) === index);
+  // Gunakan konfigurasi server sebagai sumber utama. Requested URL hanya
+  // menjadi fallback terakhir untuk kompatibilitas dengan deployment lama.
+  const candidates = [
+    ...getAppsScriptCandidates(),
+    normalizeManualAppsScriptUrl(requestedScriptUrl)
+  ].filter(Boolean).filter((url, index, arr) => arr.indexOf(url) === index);
 
   if (candidates.length === 0) {
     throw new Error('Google Apps Script Web App URL belum dikonfigurasi melalui Dashboard > Pengaturan API.');
@@ -2500,16 +2509,16 @@ app.put('/api/kta-settings', async (req, res) => {
 app.get('/api/spreadsheet-data', async (req, res) => {
   try {
     const session = getSessionUser(req);
-    if (session?.role !== 'SUPER_ADMIN') {
-      return res.status(403).json({ success: false, message: 'Akses spreadsheet mentah hanya tersedia untuk Super Admin Nasional.' });
+    const allowedRoles = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'];
+    if (!session || !allowedRoles.includes(session.role)) {
+      return res.status(403).json({ success: false, message: 'Autentikasi administrator diperlukan untuk membaca Spreadsheet.' });
     }
 
     const sheet = String(req.query?.sheet || 'Anggota').trim() || 'Anggota';
-    const requestedScriptUrl = normalizeManualAppsScriptUrl(req.query?.scriptUrl);
-    const configuredScriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
-    const envScriptUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-    const defaultScriptUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
-    const scriptUrl = requestedScriptUrl || configuredScriptUrl || envScriptUrl || defaultScriptUrl;
+    // Endpoint server-side adalah sumber endpoint yang sebenarnya. URL dari
+    // browser tidak dijadikan prioritas agar localStorage perangkat lama tidak
+    // dapat mengarahkan sinkronisasi ke deployment GAS yang sudah usang.
+    const scriptUrl = getActiveAppsScriptUrl();
 
     const spreadsheetId = String(db.config.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
     let gasError: any = null;
@@ -2950,7 +2959,13 @@ app.get('/api/sync-spreadsheet', async (req, res) => {
     return res.status(403).json({ success: false, message: 'Autentikasi administrator diperlukan untuk sinkronisasi database.' });
   }
   res.set({ 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate', Pragma: 'no-cache', Expires: '0' });
-  const result = await syncFromGoogleSpreadsheet();
+  let result: any;
+  try {
+    result = await syncFromGoogleSpreadsheet();
+  } catch (error: any) {
+    console.error('[Sync API] GET /api/sync-spreadsheet failed:', error);
+    result = { success: false, message: error?.message || 'Sinkronisasi Spreadsheet gagal.' };
+  }
   return res.status(result.success ? 200 : 502).json({
     ...result, membersCount: db.members.length, toursCount: db.tours.length,
     activitiesCount: db.activities.length, culinaryCount: db.culinaryItems.length,
@@ -2966,7 +2981,13 @@ app.post('/api/sync-spreadsheet', async (req, res) => {
   }
 
   res.set({ 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate', Pragma: 'no-cache', Expires: '0' });
-  const result = await syncFromGoogleSpreadsheet();
+  let result: any;
+  try {
+    result = await syncFromGoogleSpreadsheet();
+  } catch (error: any) {
+    console.error('[Sync API] POST /api/sync-spreadsheet failed:', error);
+    result = { success: false, message: error?.message || 'Sinkronisasi Spreadsheet gagal.' };
+  }
   res.status(result.success ? 200 : 502).json({
     ...result,
     membersCount: db.members.length,
