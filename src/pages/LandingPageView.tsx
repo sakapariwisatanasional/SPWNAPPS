@@ -16,6 +16,9 @@ import {
   ShieldCheck,
   Sparkles,
   Store,
+  ShoppingBag,
+  Pause,
+  Play,
   UserPlus,
   Users,
   X,
@@ -30,6 +33,7 @@ import { storage } from '../services/storage';
 import { KridaExplorerModal } from '../components/krida/KridaExplorerModal';
 import { KridaMaterialEditorModal } from '../components/krida/KridaMaterialEditorModal';
 import { KridaFullScreenReaderModal } from '../components/krida/KridaFullScreenReaderModal';
+import { OFFICIAL_MERCHANDISE_PRODUCTS } from '../data/officialMerchandiseData';
 
 interface LandingPageViewProps {
   currentUser: CurrentUser;
@@ -47,7 +51,7 @@ interface LandingPageViewProps {
   onEnterDashboard: (tab?: string) => void;
 }
 
-type HomeTool = 'verify' | 'krida' | 'tour' | 'agenda' | 'kuliner' | 'anggota';
+type HomeTool = 'verify' | 'krida' | 'tour' | 'agenda' | 'kuliner' | 'anggota' | 'store';
 
 const HOME_TOOLS: Array<{
   id: HomeTool;
@@ -98,11 +102,24 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   const [editingKridaModule, setEditingKridaModule] = useState<KridaModuleItem | null>(null);
   const [isFullScreenReaderOpen, setIsFullScreenReaderOpen] = useState(false);
   const [readerModuleId, setReaderModuleId] = useState<string | undefined>();
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [heroPaused, setHeroPaused] = useState(false);
 
   const activeMembersCount = useMemo(() => members.filter(m => m.status === 'ACTIVE').length, [members]);
   const publishedTours = useMemo(() => tours.filter(t => t.status === 'APPROVED_PUBLISHED'), [tours]);
   const approvedProducts = useMemo(() => culinaryItems.filter(c => (c.status || 'APPROVED') === 'APPROVED'), [culinaryItems]);
   const upcomingActivities = useMemo(() => activities.slice(0, 3), [activities]);
+  const heroSlides = useMemo(() => [
+    { eyebrow: 'Saka Pariwisata Nasional', title: <>Jelajahi.<br /><span className="text-[#ffd166]">Berkarya.</span><br /><span className="text-white">Berdaya.</span></>, description: 'Satu ruang digital untuk belajar Krida, mengenal destinasi, mengembangkan kompetensi, dan terhubung bersama Saka Pariwisata Indonesia.', image: '/hero-gatara-borobudur.png', cta: 'Mulai Eksplorasi', action: () => scrollTo('landing-krida'), icon: Compass, chips: ['Jelajah Indonesia', 'Belajar & Berkarya', 'Kolaborasi'] },
+    { eyebrow: 'Official Merchandise', title: <>Kenakan.<br /><span className="text-[#ffd166]">Bangga.</span><br /><span className="text-white">Bergerak.</span></>, description: 'Koleksi identitas resmi Saka Pariwisata sedang disiapkan. Pantau countdown peluncuran produk perdana.', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=1400&auto=format&fit=crop&q=85', cta: 'Lihat Official Store', action: () => onEnterDashboard('official-store'), icon: ShoppingBag, chips: ['Official', 'Coming Soon', 'Edisi Nasional'] },
+    { eyebrow: 'Komunitas & Kegiatan', title: <>Satu Saka.<br /><span className="text-[#ffd166]">Banyak Cerita.</span></>, description: 'Temukan agenda, kompetensi, dan karya anggota dari berbagai wilayah Indonesia dalam satu ekosistem.', image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1400&auto=format&fit=crop&q=85', cta: 'Lihat Agenda', action: () => scrollTo('landing-agenda'), icon: CalendarDays, chips: ['Komunitas', 'Agenda', 'Kompetensi'] }
+  ], [onEnterDashboard]);
+
+  useEffect(() => {
+    if (heroPaused) return;
+    const timer = window.setInterval(() => setHeroIndex(prev => (prev + 1) % heroSlides.length), 5500);
+    return () => window.clearInterval(timer);
+  }, [heroPaused, heroSlides.length]);
 
   useEffect(() => {
     const unsub = storage.subscribe(() => setKridaModules(storage.getKridaModules()));
@@ -122,6 +139,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
     if (tool === 'agenda') scrollTo('landing-agenda');
     if (tool === 'kuliner') scrollTo('landing-discover');
     if (tool === 'anggota') scrollTo('landing-members');
+    if (tool === 'store') onEnterDashboard('official-store');
   };
 
   const handleQuickVerify = (e: React.FormEvent) => {
@@ -191,6 +209,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <button type="button" onClick={() => scrollTo('landing-krida')} className="spwn-nav-link">Krida</button>
             <button type="button" onClick={() => scrollTo('landing-discover')} className="spwn-nav-link">Destinasi</button>
             <button type="button" onClick={() => scrollTo('landing-agenda')} className="spwn-nav-link">Agenda</button>
+            <button type="button" onClick={() => onEnterDashboard('official-store')} className="spwn-nav-link">Official Store</button>
             <button type="button" onClick={() => scrollTo('landing-members')} className="spwn-nav-link">Komunitas</button>
           </nav>
 
@@ -216,6 +235,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               const Icon = item.icon;
               return <button key={item.id} type="button" onClick={() => scrollTo(item.id)} className="spwn-mobile-menu-item"><Icon className="w-5 h-5 mx-auto mb-1 text-[#7b2cbf]" /><span>{item.label}</span></button>;
             })}
+            <button type="button" onClick={() => { setMobileMenuOpen(false); onEnterDashboard('official-store'); }} className="spwn-mobile-menu-item"><ShoppingBag className="w-5 h-5 mx-auto mb-1 text-[#7b2cbf]" /><span>Official Store</span></button>
             <button type="button" onClick={() => openTool('verify')} className="spwn-mobile-menu-item"><ShieldCheck className="w-5 h-5 mx-auto mb-1 text-[#159f6b]" /><span>Verifikasi</span></button>
             {currentUser?.role === 'PUBLIC' ? <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenLoginModal(); }} className="spwn-mobile-menu-item"><LockKeyhole className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Masuk</span></button> : <button type="button" onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')} className="spwn-mobile-menu-item"><LayoutDashboard className="w-5 h-5 mx-auto mb-1 text-[#3b5bdb]" /><span>Panel</span></button>}
             {currentUser?.role === 'PUBLIC' && <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenRegisterModal(); }} className="spwn-mobile-menu-item"><UserPlus className="w-5 h-5 mx-auto mb-1 text-[#f59e0b]" /><span>Daftar</span></button>}
@@ -227,39 +247,45 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         <section className="spwn-hero relative px-4 sm:px-6 pt-5 sm:pt-8 pb-8 sm:pb-10">
           <div className="spwn-hero-art spwn-hero-art-a" />
           <div className="spwn-hero-art spwn-hero-art-b" />
-          <div className="relative max-w-7xl mx-auto">
+          <div className="relative max-w-7xl mx-auto" onMouseEnter={() => setHeroPaused(true)} onMouseLeave={() => setHeroPaused(false)}>
             <div className="spwn-hero-panel overflow-hidden">
-              {/* Decorative destination artwork: intentionally subtle so the hero copy remains dominant. */}
-              <div className="spwn-hero-photo" aria-hidden="true">
-                <img src="/hero-gatara-borobudur.png" alt="" />
-              </div>
-              <div className="spwn-hero-gradient" />
-              <div className="spwn-hero-photo-wash" aria-hidden="true" />
-              <div className="absolute inset-0 pointer-events-none opacity-90" style={{ backgroundImage: 'radial-gradient(circle at 73% 35%, rgba(255,255,255,.25) 0 2px, transparent 3px), radial-gradient(circle at 85% 68%, rgba(255,255,255,.18) 0 1.5px, transparent 2px)' }} />
-              <div className="spwn-hero-content relative grid lg:grid-cols-[1.02fr_.98fr] min-h-[390px] sm:min-h-[450px]">
-                <div className="p-7 sm:p-10 lg:p-12 flex flex-col justify-center text-white">
-                  <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-[.13em] backdrop-blur-md"><Sparkles className="w-3.5 h-3.5 text-[#ffd166]" /> Saka Pariwisata Nasional</div>
-                  <h1 className="mt-5 text-[2.6rem] sm:text-5xl lg:text-[4.35rem] font-black tracking-[-.045em] leading-[.95]">Jelajahi.<br /><span className="text-[#ffd166]">Berkarya.</span><br /><span className="text-white">Berdaya.</span></h1>
-                  <p className="mt-5 max-w-xl text-sm sm:text-base text-white/85 leading-relaxed">Satu ruang digital untuk belajar Krida, mengenal destinasi, mengembangkan kompetensi, dan terhubung bersama Saka Pariwisata Indonesia.</p>
-                  <div className="mt-7 flex flex-col sm:flex-row gap-2.5">
-                    <button type="button" onClick={() => scrollTo('landing-krida')} className="spwn-hero-primary"><Compass className="w-4 h-4" /> Mulai Eksplorasi <ArrowRight className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => openTool('verify')} className="spwn-hero-secondary"><ShieldCheck className="w-4 h-4" /> Verifikasi KTA</button>
+              {heroSlides.map((slide, index) => {
+                const Icon = slide.icon;
+                const active = index === heroIndex;
+                return (
+                  <div key={index} className={`absolute inset-0 transition-opacity duration-700 ${active ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`} aria-hidden={!active}>
+                    <div className="spwn-hero-photo" aria-hidden="true"><img src={slide.image} alt="" /></div>
+                    <div className="spwn-hero-gradient" />
+                    <div className="spwn-hero-photo-wash" aria-hidden="true" />
+                    <div className="absolute inset-0 pointer-events-none opacity-90" style={{ backgroundImage: 'radial-gradient(circle at 73% 35%, rgba(255,255,255,.25) 0 2px, transparent 3px), radial-gradient(circle at 85% 68%, rgba(255,255,255,.18) 0 1.5px, transparent 2px)' }} />
+                    <div className="spwn-hero-content relative grid lg:grid-cols-[1.02fr_.98fr] min-h-[390px] sm:min-h-[450px]">
+                      <div className="p-7 sm:p-10 lg:p-12 flex flex-col justify-center text-white">
+                        <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-[.13em] backdrop-blur-md"><Sparkles className="w-3.5 h-3.5 text-[#ffd166]" /> {slide.eyebrow}</div>
+                        <h1 className="mt-5 text-[2.6rem] sm:text-5xl lg:text-[4.35rem] font-black tracking-[-.045em] leading-[.95]">{slide.title}</h1>
+                        <p className="mt-5 max-w-xl text-sm sm:text-base text-white/85 leading-relaxed">{slide.description}</p>
+                        <div className="mt-7 flex flex-col sm:flex-row gap-2.5">
+                          <button type="button" onClick={slide.action} className="spwn-hero-primary"><Icon className="w-4 h-4" /> {slide.cta} <ArrowRight className="w-4 h-4" /></button>
+                          <button type="button" onClick={() => openTool('verify')} className="spwn-hero-secondary"><ShieldCheck className="w-4 h-4" /> Verifikasi KTA</button>
+                        </div>
+                        <div className="mt-7 flex flex-wrap gap-2 text-[9px] font-bold text-white/85">{slide.chips.map(chip => <span key={chip} className="spwn-hero-chip">{chip}</span>)}</div>
+                      </div>
+                      <div className="relative hidden lg:flex items-end justify-center overflow-hidden">
+                        <div className="spwn-hero-ribbon spwn-ribbon-one" />
+                        <div className="spwn-hero-ribbon spwn-ribbon-two" />
+                        <div className="spwn-hero-orb"><Icon className="w-16 h-16 text-white/90" /></div>
+                        <div className="absolute right-10 bottom-8 w-64 rounded-[1.8rem] bg-white/90 backdrop-blur-xl p-4 shadow-2xl rotate-2">
+                          <div className="text-[9px] uppercase tracking-[.15em] font-black text-[#7b2cbf]">{slide.eyebrow}</div>
+                          <div className="mt-1 text-xl font-black text-[#29233d] leading-tight">{index === 0 ? 'Pesona Indonesia dalam setiap langkah.' : index === 1 ? 'Identitas resmi yang hadir untuk menemani perjalanan.' : 'Tumbuh bersama komunitas Saka Pariwisata.'}</div>
+                          <div className="mt-3 flex gap-1.5"><i className="spwn-dot spwn-dot-green" /><i className="spwn-dot spwn-dot-purple" /><i className="spwn-dot spwn-dot-orange" /><i className="spwn-dot spwn-dot-blue" /><i className="spwn-dot spwn-dot-magenta" /></div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-7 flex flex-wrap gap-2 text-[9px] font-bold text-white/85">
-                    <span className="spwn-hero-chip">Jelajah Indonesia</span><span className="spwn-hero-chip">Belajar & Berkarya</span><span className="spwn-hero-chip">Kolaborasi</span>
-                  </div>
-                </div>
-
-                <div className="relative hidden lg:flex items-end justify-center overflow-hidden">
-                  <div className="spwn-hero-ribbon spwn-ribbon-one" />
-                  <div className="spwn-hero-ribbon spwn-ribbon-two" />
-                  <div className="spwn-hero-orb"><Compass className="w-16 h-16 text-white/90" /></div>
-                  <div className="absolute right-10 bottom-8 w-64 rounded-[1.8rem] bg-white/90 backdrop-blur-xl p-4 shadow-2xl rotate-2">
-                    <div className="text-[9px] uppercase tracking-[.15em] font-black text-[#7b2cbf]">Wonderful Indonesia spirit</div>
-                    <div className="mt-1 text-xl font-black text-[#29233d] leading-tight">Pesona Indonesia dalam setiap langkah.</div>
-                    <div className="mt-3 flex gap-1.5"><i className="spwn-dot spwn-dot-green" /><i className="spwn-dot spwn-dot-purple" /><i className="spwn-dot spwn-dot-orange" /><i className="spwn-dot spwn-dot-blue" /><i className="spwn-dot spwn-dot-magenta" /></div>
-                  </div>
-                </div>
+                );
+              })}
+              <div className="absolute left-1/2 bottom-5 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-black/15 px-2.5 py-2 backdrop-blur-md">
+                {heroSlides.map((_, index) => <button key={index} type="button" aria-label={`Slide ${index + 1}`} onClick={() => setHeroIndex(index)} className={`h-1.5 rounded-full transition-all ${index === heroIndex ? 'w-7 bg-white' : 'w-1.5 bg-white/45'}`} />)}
+                <button type="button" aria-label={heroPaused ? 'Putar carousel' : 'Jeda carousel'} onClick={() => setHeroPaused(prev => !prev)} className="ml-1 flex h-5 w-5 items-center justify-center text-white/80">{heroPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}</button>
               </div>
               <div className="spwn-wave spwn-wave-green" /><div className="spwn-wave spwn-wave-magenta" /><div className="spwn-wave spwn-wave-orange" />
             </div>
@@ -267,12 +293,13 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </section>
 
         <section className="px-4 sm:px-6 pb-7">
-          <div className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             {[
               { id: 'krida', title: 'Krida & SKK', hint: 'Belajar kompetensi', icon: Award, cls: 'spwn-color-card-purple' },
               { id: 'agenda', title: 'Event & Kegiatan', hint: 'Ikuti agenda terbaru', icon: CalendarDays, cls: 'spwn-color-card-orange' },
               { id: 'anggota', title: 'Direktori Anggota', hint: 'Temukan komunitas', icon: Users, cls: 'spwn-color-card-blue' },
               { id: 'tour', title: 'Destinasi Wisata', hint: 'Jelajahi Indonesia', icon: Compass, cls: 'spwn-color-card-green' },
+              { id: 'store' as HomeTool, title: 'Official Store', hint: 'Merchandise resmi', icon: ShoppingBag, cls: 'spwn-color-card-purple' },
             ].map(tool => {
               const Icon = tool.icon;
               return <button key={tool.id} type="button" onClick={() => openTool(tool.id as HomeTool)} className={`spwn-color-card ${tool.cls}`}><span className="spwn-color-card-icon"><Icon className="w-5 h-5" /></span><span className="text-sm font-black text-[#28243a]">{tool.title}</span><span className="text-[10px] text-slate-500 mt-1">{tool.hint}</span></button>;
@@ -310,6 +337,26 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <div className="flex items-end justify-between gap-4 mb-6"><div><div className="spwn-eyebrow text-[#f59e0b]">Discover Indonesia</div><h2 className="mt-1 text-2xl sm:text-4xl font-black tracking-tight text-[#28243a]">Destinasi & karya</h2><p className="mt-2 text-xs sm:text-sm text-slate-500">Lihat paket wisata dan karya kuliner/cinderamata dari ekosistem Saka Pariwisata.</p></div><button type="button" onClick={() => onEnterDashboard('culinary-souvenirs')} className="text-xs font-bold text-[#d97706] hover:text-[#92400e] cursor-pointer whitespace-nowrap">Lihat semua <ArrowRight className="inline w-3.5 h-3.5" /></button></div>
             {publishedTours.length > 0 ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-7">{publishedTours.slice(0, 3).map(tour => <button key={tour.id} type="button" onClick={() => onViewTourDetail(tour)} className="spwn-photo-card"><div className="h-44 sm:h-48 bg-slate-100 overflow-hidden relative"><img src={formatDriveImageUrl(tour.imageUrl) || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1000&auto=format&fit=crop&q=80'} alt={tour.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" referrerPolicy="no-referrer" /><div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" /><div className="absolute left-3 bottom-3 inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md border border-white/20 px-2.5 py-1 text-[9px] text-white"><MapPin className="w-3 h-3" /> {tour.regencyName}, {tour.provinceName}</div></div><div className="p-4"><h3 className="text-sm font-black text-[#28243a] line-clamp-2">{tour.title}</h3><div className="mt-2 text-[9px] font-bold text-[#d97706]">Jelajahi paket →</div></div></button>)}</div> : <div className="spwn-empty-card mb-6">Belum ada paket wisata yang dipublikasikan.</div>}
             {approvedProducts.length > 0 && <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{approvedProducts.slice(0, 4).map(item => <button key={item.id} type="button" onClick={() => onSelectCulinaryDetail(item)} className="spwn-product-card"><div className="h-32 sm:h-40 bg-slate-100 overflow-hidden"><img src={formatDriveImageUrl(item.imageUrl) || 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80'} alt={item.name} className="w-full h-full object-cover" loading="lazy" referrerPolicy="no-referrer" /></div><div className="p-3.5"><div className="text-[8px] uppercase tracking-[.12em] text-[#d946a0] font-black">{item.kind === 'KULINER' ? 'Kuliner' : 'Cinderamata'}</div><h3 className="mt-1 text-xs font-bold text-[#28243a] line-clamp-2">{item.name}</h3></div></button>)}</div>}
+          </div>
+        </section>
+
+        <section id="landing-store" className="scroll-mt-20 px-4 sm:px-6 py-10 sm:py-12 bg-[#f6f4fb]">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div><div className="spwn-eyebrow text-[#7b2cbf]">Official Merchandise</div><h2 className="mt-1 text-2xl sm:text-4xl font-black tracking-tight text-[#28243a]">Identitas yang ikut menjelajah.</h2><p className="mt-2 max-w-2xl text-xs sm:text-sm text-slate-500">Koleksi perdana Saka Pariwisata sedang dipersiapkan. Setiap produk dilengkapi countdown menuju jadwal peluncuran.</p></div>
+              <button type="button" onClick={() => onEnterDashboard('official-store')} className="inline-flex items-center gap-1.5 text-xs font-black text-[#7b2cbf] hover:text-[#4c1d95]">Buka Official Store <ArrowRight className="h-3.5 w-3.5" /></button>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {OFFICIAL_MERCHANDISE_PRODUCTS.filter(p => p.active).slice(0, 4).map(product => (
+                <button key={product.id} type="button" onClick={() => onEnterDashboard('official-store')} className="group overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+                  <div className={`relative h-32 sm:h-40 overflow-hidden bg-gradient-to-br ${product.accentClass}`}>
+                    <div className="absolute inset-0 flex items-center justify-center"><ShoppingBag className="h-12 w-12 text-white/85 transition-transform group-hover:scale-110" /></div>
+                    <span className="absolute left-2.5 top-2.5 rounded-full bg-white/90 px-2 py-1 text-[8px] font-black text-amber-700">COMING SOON</span>
+                  </div>
+                  <div className="p-3"><div className="text-[8px] uppercase tracking-[.12em] font-black text-[#7b2cbf]">{product.tags[0]}</div><div className="mt-1 text-xs font-black leading-snug text-[#28243a] line-clamp-2">{product.shortName || product.name}</div><div className="mt-2 text-[9px] font-bold text-slate-400">Peluncuran bertahap • Lihat countdown</div></div>
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 
