@@ -931,7 +931,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                 <button
                   type="button"
                   onClick={() => setTimeRange('6M')}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] ${
+                  className={`px-3 py-2 rounded-lg transition-all cursor-pointer text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50 ${
                     timeRange === '6M' ? 'bg-emerald-700 text-white font-bold' : 'hover:text-slate-900'
                   }`}
                 >
@@ -940,7 +940,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                 <button
                   type="button"
                   onClick={() => setTimeRange('12M')}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] ${
+                  className={`px-3 py-2 rounded-lg transition-all cursor-pointer text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50 ${
                     timeRange === '12M' ? 'bg-emerald-700 text-white font-bold' : 'hover:text-slate-900'
                   }`}
                 >
@@ -949,7 +949,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                 <button
                   type="button"
                   onClick={() => setTimeRange('YEARS')}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] ${
+                  className={`px-3 py-2 rounded-lg transition-all cursor-pointer text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50 ${
                     timeRange === 'YEARS' ? 'bg-emerald-700 text-white font-bold' : 'hover:text-slate-900'
                   }`}
                 >
@@ -958,7 +958,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                 <button
                   type="button"
                   onClick={() => setTimeRange('ALL')}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] ${
+                  className={`px-3 py-2 rounded-lg transition-all cursor-pointer text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50 ${
                     timeRange === 'ALL' ? 'bg-emerald-700 text-white font-bold' : 'hover:text-slate-900'
                   }`}
                 >
@@ -973,7 +973,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
               <select
                 value={selectedKrida}
                 onChange={(e) => setSelectedKrida(e.target.value)}
-                className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-2xs"
+                className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-300 cursor-pointer shadow-2xs"
               >
                 <option value="ALL">Semua Krida (4 Krida)</option>
                 <option value="Krida Pemandu">Krida Pemandu</option>
@@ -1126,7 +1126,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                   id="btn-prov-chart-total"
                   type="button"
                   onClick={() => setProvinceChartType('BAR_TOTAL')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50 ${
                     provinceChartType === 'BAR_TOTAL'
                       ? 'bg-emerald-700 text-white shadow-2xs font-bold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1140,7 +1140,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                   id="btn-prov-chart-krida"
                   type="button"
                   onClick={() => setProvinceChartType('BAR_KRIDA')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50 ${
                     provinceChartType === 'BAR_KRIDA'
                       ? 'bg-emerald-700 text-white shadow-2xs font-bold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1154,7 +1154,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                   id="btn-prov-chart-island"
                   type="button"
                   onClick={() => setProvinceChartType('ISLAND_SUMMARY')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50 ${
                     provinceChartType === 'ISLAND_SUMMARY'
                       ? 'bg-emerald-700 text-white shadow-2xs font-bold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1168,7 +1168,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                   id="btn-prov-chart-table"
                   type="button"
                   onClick={() => setProvinceChartType('RANKED_TABLE')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50 ${
                     provinceChartType === 'RANKED_TABLE'
                       ? 'bg-emerald-700 text-white shadow-2xs font-bold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1189,7 +1189,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                         key={scope}
                         type="button"
                         onClick={() => setProvinceScope(scope)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                        className={`px-3 py-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/50 ${
                           provinceScope === scope
                             ? 'bg-emerald-700 text-white font-bold shadow-2xs'
                             : 'text-slate-600 hover:text-slate-900'
@@ -1215,7 +1215,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                   <select
                     value={selectedIsland}
                     onChange={(e) => setSelectedIsland(e.target.value)}
-                    className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-2xs"
+                    className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-300 cursor-pointer shadow-2xs"
                   >
                     {islandOptions.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1230,7 +1230,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as any)}
-                      className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-2xs"
+                      className="text-xs font-semibold bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-300 cursor-pointer shadow-2xs"
                     >
                       <option value="total">Total Terbanyak</option>
                       <option value="active">Aktif Terbanyak</option>
@@ -1249,7 +1249,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({
                   placeholder="Cari provinsi / pulau..."
                   value={provinceSearchQuery}
                   onChange={(e) => setProvinceSearchQuery(e.target.value)}
-                  className="w-full text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-800 shadow-2xs placeholder:text-slate-400"
+                  className="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-300 text-slate-800 shadow-2xs placeholder:text-slate-400"
                 />
               </div>
             </div>
