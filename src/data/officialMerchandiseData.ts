@@ -16,8 +16,8 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     iconName: 'shirt',
     sizes: ['S', 'M', 'L', 'XL', '2XL'],
     tags: ['Official', 'Nasional', 'Apparel'],
-    comingSoon: true,
-    launchAt: '2026-10-10T09:00:00+07:00',
+    comingSoon: false,
+    purchaseEnabled: true,
     featured: true,
     active: true
   },
@@ -32,8 +32,8 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     iconName: 'jacket',
     sizes: ['M', 'L', 'XL', '2XL'],
     tags: ['Outdoor', 'Jelajah', 'Limited'],
-    comingSoon: true,
-    launchAt: '2026-10-17T09:00:00+07:00',
+    comingSoon: false,
+    purchaseEnabled: true,
     featured: true,
     active: true
   },
@@ -47,8 +47,8 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     accentClass: 'from-amber-950 via-orange-700 to-yellow-400',
     iconName: 'cap',
     tags: ['Outdoor', 'Aksesori'],
-    comingSoon: true,
-    launchAt: '2026-10-24T09:00:00+07:00',
+    comingSoon: false,
+    purchaseEnabled: true,
     featured: true,
     active: true
   },
@@ -62,8 +62,8 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     accentClass: 'from-sky-950 via-cyan-700 to-emerald-400',
     iconName: 'bottle',
     tags: ['Eco', 'Travel', 'Aksesori'],
-    comingSoon: true,
-    launchAt: '2026-10-31T09:00:00+07:00',
+    comingSoon: false,
+    purchaseEnabled: true,
     active: true
   },
   {
@@ -76,8 +76,8 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     accentClass: 'from-pink-950 via-rose-700 to-orange-400',
     iconName: 'lanyard',
     tags: ['KTA', 'Identity', 'Official'],
-    comingSoon: true,
-    launchAt: '2026-11-07T09:00:00+07:00',
+    comingSoon: false,
+    purchaseEnabled: true,
     active: true
   },
   {
@@ -90,8 +90,8 @@ export const OFFICIAL_MERCHANDISE_PRODUCTS: OfficialMerchandiseProduct[] = [
     accentClass: 'from-slate-950 via-slate-700 to-emerald-500',
     iconName: 'compass',
     tags: ['Krida Pemandu', 'Explorer', 'Bundle'],
-    comingSoon: true,
-    launchAt: '2026-11-14T09:00:00+07:00',
+    comingSoon: false,
+    purchaseEnabled: true,
     active: true
   }
 ];
