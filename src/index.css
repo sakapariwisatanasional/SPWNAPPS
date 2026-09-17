@@ -1,451 +1,625 @@
-@import "tailwindcss";
+export type UserRole = 
+  | 'SUPER_ADMIN'      // Pengendali sistem tertinggi / Kwartir Nasional
+  | 'ADMIN_NATIONAL'   // Admin operasional Kwartir Nasional
+  | 'ADMIN_PROVINCE'   // Kwartir Daerah (Provinsi)
+  | 'ADMIN_REGENCY'    // Kwartir Cabang (Kabupaten/Kota)
+  | 'ADMIN_BRANCH'     // Kwartir Ranting (Kecamatan/Ranting)
+  | 'MEMBER'           // Anggota Saka Pariwisata
+  | 'PUBLIC';          // Pengunjung Umum
 
-@layer base {
-  html { background: #f7f5fb; }
-  body {
-    margin: 0;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: #f7f5fb;
-    color: #1f2430;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-  }
-  h1, h2, h3, h4, h5, h6, .font-heading {
-    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
-  }
-  button, input, select, textarea { font: inherit; }
-  button, a { -webkit-tap-highlight-color: transparent; }
-  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-    outline: 3px solid rgba(124, 58, 237, .22);
-    outline-offset: 2px;
-  }
-}
+export type MemberStatus = 
+  | 'PENDING'
+  | 'ACTIVE'
+  | 'REVISION_REQUIRED'
+  | 'INACTIVE'
+  | 'SUSPENDED'
+  | 'RESIGNED';
 
-:root {
-  --spwn-primary: #7c3aed;
-  --spwn-primary-strong: #6d28d9;
-  --spwn-primary-soft: #f3efff;
-  --spwn-lilac: #b8a1df;
-  --spwn-bg: #f7f5fb;
-  --spwn-surface: #ffffff;
-  --spwn-surface-soft: #fbfaff;
-  --spwn-ink: #202433;
-  --spwn-muted: #707789;
-  --spwn-border: #e8e4ef;
-  --spwn-success: #059669;
-  --spwn-warning: #d97706;
-  --spwn-danger: #dc2626;
-  --spwn-radius-card: 1.25rem;
-  --spwn-radius-control: .85rem;
+export interface Province {
+  id: string;          // Kode 2 digit (e.g. '32')
+  code: string;
+  name: string;
+  island: string;
+  memberCount?: number;
 }
 
-/* Digital card / print helpers */
-.perspective-1000 { perspective: 1000px; }
-.transform-style-3d { transform-style: preserve-3d; }
-.backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-.rotate-y-180 { transform: rotateY(180deg); }
-
-@media print {
-  .no-print { display: none !important; }
-  .print-only { display: block !important; }
+export interface Regency {
+  id: string;          // Kode e.g. '32.06'
+  provinceId: string;
+  code: string;
+  name: string;
+  type: 'KABUPATEN' | 'KOTA' | 'PUSAT' | 'NASIONAL';
+  memberCount?: number;
 }
 
-/* =========================================================
-   SPWNAPPS UI SYSTEM v3 — CLEAN / AIRY / MOBILE FIRST
-   Presentation-only CSS. No route, state, API or data logic.
-   ========================================================= */
-
-.app-shell { background: var(--spwn-bg) !important; }
-.app-main {
-  background: var(--spwn-bg) !important;
-  color: var(--spwn-ink);
+export interface District {
+  id: string;          // Kode resmi e.g. '32.06.010'
+  regencyId: string;
+  code: string;
+  name: string;
 }
 
-/* ---------- Admin sidebar ---------- */
-.app-sidebar {
-  background: #171522 !important;
-  border-right: 1px solid rgba(255,255,255,.07) !important;
-  box-shadow: 10px 0 32px rgba(20,16,35,.07) !important;
-}
-.app-sidebar nav {
-  padding: .65rem !important;
-}
-.app-sidebar nav button {
-  min-height: 44px !important;
-  margin-bottom: .18rem !important;
-  padding: .65rem .8rem !important;
-  border: 1px solid transparent !important;
-  border-radius: .85rem !important;
-  box-shadow: none !important;
-  color: #aaa7b7 !important;
-}
-.app-sidebar nav button:hover {
-  background: rgba(255,255,255,.055) !important;
-  color: #f5f3fa !important;
-}
-.app-sidebar nav button[class*="bg-purple-600/20"],
-.app-sidebar nav button[class*="bg-emerald-600/15"] {
-  background: rgba(139,92,246,.14) !important;
-  border-color: rgba(167,139,250,.16) !important;
-  border-left: 2px solid #a78bfa !important;
-  color: #eee9ff !important;
-  box-shadow: none !important;
-}
-.app-sidebar nav button[class*="bg-purple-600/20"] svg,
-.app-sidebar nav button[class*="bg-emerald-600/15"] svg {
-  color: #c4b5fd !important;
+export interface MemberLocationHistory {
+  id: string;
+  memberId: string;
+  prevDistrictName: string;
+  newDistrictName: string;
+  prevMemberNumber: string;
+  newMemberNumber: string;
+  transferDate: string;
+  reason: string;
+  authorizedByName: string;
 }
 
-/* ---------- Header ---------- */
-.app-header {
-  background: rgba(255,255,255,.92) !important;
-  border-bottom: 1px solid var(--spwn-border) !important;
-  box-shadow: 0 1px 12px rgba(31,36,48,.035) !important;
-  backdrop-filter: blur(16px);
+export type SkillProficiency = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT';
+
+export interface Skill {
+  id: string;
+  name: string;
+  category: 
+    | 'Pemanduan & Tour Guide'
+    | 'Fotografi & Media'
+    | 'Ekowisata & Alam'
+    | 'Hospitality & Kuliner'
+    | 'Digital Marketing & UMKM'
+    | 'Budaya & Storytelling'
+    | 'MICE & Event';
+  description: string;
+  iconName?: string;
 }
 
-/* ---------- Surfaces ---------- */
-.app-main .bg-white {
-  box-shadow: 0 1px 2px rgba(31,36,48,.025), 0 8px 26px rgba(31,36,48,.035) !important;
-}
-.app-main .rounded-3xl,
-.app-main .rounded-2xl {
-  border-color: var(--spwn-border);
-}
-.app-main table thead { background: #faf9fc !important; }
-.app-main table th {
-  color: #7a7f90 !important;
-  font-size: .68rem !important;
-  letter-spacing: .045em;
-  text-transform: uppercase;
-  font-weight: 800;
-}
-
-/* ---------- Form controls: calmer and larger touch targets ---------- */
-.app-main input:not([type="checkbox"]):not([type="radio"]),
-.app-main select,
-.app-main textarea {
-  border-color: #e2deea !important;
-  background: #fff !important;
-  border-radius: .82rem !important;
-  min-height: 42px;
-  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
-}
-.app-main input:not([type="checkbox"]):not([type="radio"]):focus,
-.app-main select:focus,
-.app-main textarea:focus {
-  border-color: #9b7be8 !important;
-  box-shadow: 0 0 0 3px rgba(124,58,237,.10) !important;
-  background: #fff !important;
+export interface MemberSkill {
+  id: string;
+  skillId: string;
+  skillName: string;
+  category: string;
+  proficiency: SkillProficiency;
+  yearsOfExperience: number;
+  portfolioUrl?: string;
+  isVerified: boolean;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  notes?: string;
+  certificateNumber?: string;
+  certificateIssuer?: string;
+  certificateFileUrl?: string;
 }
 
-/* Keep buttons readable without making every button visually heavy. */
-.app-main button {
-  border-radius: .82rem;
-}
-.app-main button[class*="bg-purple-600"],
-.app-main button[class*="bg-purple-700"],
-.app-main button[class*="from-purple-700"] {
-  box-shadow: 0 5px 14px rgba(109,40,217,.10) !important;
-}
-.app-main button[class*="bg-purple-600"]:hover,
-.app-main button[class*="bg-purple-700"]:hover {
-  box-shadow: 0 7px 18px rgba(109,40,217,.15) !important;
-}
-.app-main button:active { transform: translateY(0) scale(.985); }
-
-/* ---------- Landing / public UI ---------- */
-.spwn-home-header-btn {
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 13px;
-  border: 1px solid rgba(255,255,255,.09);
-  background: rgba(255,255,255,.045);
-  color: rgba(241,238,250,.78);
-  cursor: pointer;
-  transition: transform .18s ease, background .18s ease, border-color .18s ease, color .18s ease;
-}
-.spwn-home-header-btn:hover {
-  color: #fff;
-  background: rgba(139,92,246,.18);
-  border-color: rgba(196,181,253,.30);
-  transform: translateY(-1px);
-}
-.spwn-home-header-btn:active { transform: scale(.96); }
-
-/* Landing home tool grid: less visual noise, more breathing room. */
-#landing-top .grid.grid-cols-3.sm\:grid-cols-6 {
-  gap: .75rem !important;
-}
-#landing-top .grid.grid-cols-3.sm\:grid-cols-6 > button {
-  min-height: 92px;
-  padding: 1rem .7rem !important;
-  border-radius: 1.15rem !important;
-  background: rgba(255,255,255,.035) !important;
-  border-color: rgba(255,255,255,.085) !important;
-}
-#landing-top .grid.grid-cols-3.sm\:grid-cols-6 > button:hover {
-  background: rgba(255,255,255,.065) !important;
-  transform: translateY(-2px);
+export interface Certification {
+  id: string;
+  memberId: string;
+  name: string;
+  certNumber: string;
+  issuer: string;
+  issueDate: string;
+  expiryDate?: string;
+  fileUrl?: string;
+  isVerified: boolean;
 }
 
-/* Landing mobile menu */
-@media (max-width: 639px) {
-  .app-main { padding-left: .85rem !important; padding-right: .85rem !important; padding-bottom: 5.75rem !important; }
-  #landing-top .grid.grid-cols-3.sm\:grid-cols-6 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: .75rem !important;
-  }
-  #landing-top .grid.grid-cols-3.sm\:grid-cols-6 > button {
-    min-height: 88px;
-    padding: .9rem .65rem !important;
-  }
+export type KridaType = 
+  | 'Krida Pemandu'
+  | 'Krida Penyuluh'
+  | 'Krida Mice & Event'
+  | 'Krida Kuliner & Cinderamata';
+
+export type KtaInterestType = KridaType | 'Majelis Pembimbing' | 'Pimpinan Saka' | 'Pamong Saka';
+
+export type KwartirLevel = 'NASIONAL' | 'DAERAH' | 'CABANG' | 'RANTING';
+
+export const getMemberKwartirLevel = (
+  provinceId?: string,
+  regencyId?: string,
+  districtId?: string
+): KwartirLevel => {
+  if (String(provinceId || '') === '00') return 'NASIONAL';
+  if (String(districtId || '').trim()) return 'RANTING';
+  if (String(regencyId || '').trim()) return 'CABANG';
+  return 'DAERAH';
+};
+
+export const getMemberKwartirName = (
+  provinceId?: string,
+  provinceName?: string,
+  regencyId?: string,
+  regencyName?: string,
+  districtName?: string
+): string => {
+  const level = getMemberKwartirLevel(provinceId, regencyId, districtName);
+  if (level === 'NASIONAL') return 'Kwartir Nasional';
+  if (level === 'RANTING') return `Kwartir Ranting ${districtName || ''}`.trim();
+  if (level === 'CABANG') return `Kwartir Cabang ${regencyName || ''}`.trim();
+  return `Kwartir Daerah ${provinceName || ''}`.trim();
+};
+
+export const getMemberKwartirHierarchy = (
+  provinceId?: string,
+  provinceName?: string,
+  regencyName?: string,
+  districtName?: string
+): string => {
+  if (String(provinceId || '') === '00') return 'Kwartir Nasional';
+  return [
+    provinceName ? `Kwarda ${provinceName}` : '',
+    regencyName ? `Kwarcab ${regencyName}` : '',
+    districtName ? `Kwarran ${districtName}` : ''
+  ].filter(Boolean).join(' • ');
+};
+
+export interface Member {
+  id: string;                  // UUID
+  userId: string;
+  nationalMemberNumber?: string; // Format: PP.KK.KKK.NNNNNN
+  fullName: string;
+  nikMasked: string;           // E.g. 320612******0004
+  avatarUrl: string;
+  gender: 'LAKI_LAKI' | 'PEREMPUAN';
+  birthPlace: string;
+  birthDate: string;
+  phone: string;
+  email: string;
+  address: string;
+  
+  // Hierarchy Links
+  provinceId: string;
+  provinceName: string;
+  regencyId: string;
+  regencyName: string;
+  districtId: string;
+  districtName: string;
+  branchName?: string;
+  gugusDepan?: string;
+  kwartirLevel?: KwartirLevel;
+  kwartirName?: string;
+  kwartirHierarchy?: string;
+  ktaInterest?: KtaInterestType;
+  
+  joinYear: number;
+  status: MemberStatus;
+  currentPosition: string;     // e.g. Anggota Krida Pemandu
+  krida?: KridaType;
+  educationLevel: string;
+  occupation: string;
+  bio: string;
+  
+  skills: MemberSkill[];
+  certifications: Certification[];
+  locationHistory: MemberLocationHistory[];
+  
+  registeredAt: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  rejectionReason?: string;
+  verificationToken: string;   // Token untuk QR Code publik
+
+  // Operator Privileges & Delegation
+  isOperator?: boolean;
+  operatorRole?: UserRole;
+  operatorJurisdictionId?: string;
+  operatorJurisdictionName?: string;
+  operatorAssignedAt?: string;
+  operatorAssignedBy?: string;
+  operatorNotes?: string;
 }
 
-/* ---------- Mobile bottom navigation ---------- */
-.app-mobile-nav {
-  background: rgba(255,255,255,.96) !important;
-  border-top: 1px solid var(--spwn-border) !important;
-  box-shadow: 0 -8px 26px rgba(31,36,48,.08) !important;
-  backdrop-filter: blur(18px);
-}
-.app-mobile-nav button {
-  min-height: 52px !important;
-  border-radius: .9rem !important;
-}
-.app-mobile-nav button[class*="text-purple-700"] {
-  background: var(--spwn-primary-soft) !important;
-  color: var(--spwn-primary-strong) !important;
+export type TourCategory = 
+  | 'Wisata Alam'
+  | 'Wisata Budaya'
+  | 'Wisata Kuliner'
+  | 'Desa Wisata'
+  | 'Ekowisata'
+  | 'Adventure'
+  | 'Eduwisata'
+  | 'Bahari'
+  | 'Heritage & Sejarah'
+  | 'MICE & Event';
+
+export type TourOwnerType = 'MEMBER' | 'BRANCH' | 'REGENCY' | 'PROVINCE' | 'PARTNER';
+
+export type TourStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED_PUBLISHED' | 'REJECTED';
+
+export interface TourItinerary {
+  day: number;
+  title: string;
+  description: string;
+  timeRange?: string;
 }
 
-/* ---------- Generic cards: remove excessive visual weight ---------- */
-.spwn-soft-card {
-  background: rgba(255,255,255,.88);
-  border: 1px solid var(--spwn-border);
-  border-radius: var(--spwn-radius-card);
-  box-shadow: 0 8px 24px rgba(31,36,48,.035);
+export interface TourPackage {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  category: TourCategory;
+  coverImage: string;
+  galleryImages: string[];
+  
+  ownerType: TourOwnerType;
+  ownerId: string;
+  ownerName: string;
+  
+  provinceId: string;
+  provinceName: string;
+  regencyId: string;
+  regencyName: string;
+  districtName: string;
+  branchName?: string;
+  
+  locationAddress: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  googleMapsUrl?: string;
+  
+  durationDays: number;
+  pricePerPerson: number;
+  minCapacity: number;
+  maxCapacity: number;
+  
+  facilities: string[];
+  lodgingType?: string;
+  transportationType?: string;
+  guideProvided: boolean;
+  contactPhone: string;
+  contactEmail: string;
+  
+  itinerary: TourItinerary[];
+  
+  status: TourStatus;
+  submittedAt: string;
+  publishedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
+  viewsCount: number;
+  featured?: boolean;
 }
 
-/* ---------- Consistent interaction ---------- */
-.app-main button,
-.app-main a,
-.app-sidebar button,
-.app-mobile-nav button {
-  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
-  transition-duration: 160ms;
-  transition-timing-function: ease-out;
+export interface Activity {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  bannerUrl: string;
+  coverImage?: string;
+  category: string;
+  organizerLevel: 'INTERNASIONAL' | 'NASIONAL' | 'PROVINSI' | 'KABUPATEN' | 'RANTING';
+  organizerName: string;
+  
+  locationName: string;
+  locationAddress?: string;
+  provinceId?: string;
+  provinceName: string;
+  regencyId?: string;
+  regencyName: string;
+  scope?: string;
+  
+  startDate: string;
+  endDate: string;
+  timeString: string;
+  capacity: number;
+  maxParticipants?: number;
+  registeredCount: number;
+  isPublic: boolean;
+  status: 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED' | 'OPEN_REGISTRATION';
+  requirements: string[];
+  
+  contactPerson?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  feeType?: 'GRATIS' | 'BERBAYAR' | 'SUBSIDI';
+  feeAmount?: number;
+  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'ADMIN_BRANCH' | 'OPERATOR';
+  uploadedByName?: string;
+  uploadedAt?: string;
+  registrationLink?: string;
+  featured?: boolean;
 }
 
-/* ---------- Scrollbars ---------- */
-.custom-scrollbar { scrollbar-width: thin; scrollbar-color: #cfc9dc transparent; }
-.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #cfc9dc; border-radius: 999px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-
-/* ---------- Mobile spacing / touch comfort ---------- */
-@media (max-width: 1023px) {
-  .app-main { padding-bottom: 5.5rem !important; }
-  .app-main .rounded-3xl { border-radius: 1.2rem !important; }
-  .app-main .rounded-2xl { border-radius: 1rem !important; }
+export interface ActivityRegistration {
+  id: string;
+  activityId: string;
+  activityTitle: string;
+  memberId: string;
+  memberName: string;
+  registeredAt: string;
+  status: 'REGISTERED' | 'CONFIRMED' | 'ATTENDED';
+  attendanceQrCode: string;
 }
 
-@media (max-width: 640px) {
-  .app-main .px-8 { padding-left: 1rem !important; padding-right: 1rem !important; }
-  .app-main .p-8 { padding: 1rem !important; }
-  .app-main .p-10 { padding: 1.15rem !important; }
-  .app-main .p-12 { padding: 1.25rem !important; }
-  .app-main .gap-6 { gap: 1rem !important; }
-  .app-main .gap-8 { gap: 1.15rem !important; }
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ALERT';
+  createdAt: string;
+  isRead: boolean;
+  actionUrl?: string;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: .01ms !important;
-  }
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  action: string;
+  entityType: 'MEMBER' | 'TOUR_PACKAGE' | 'ACTIVITY' | 'TERRITORY' | 'AUTH' | 'SKILL' | 'CULINARY_SOUVENIR';
+  entityId: string;
+  description: string;
+  timestamp: string;
+  ipAddress: string;
 }
 
+export type ProductKind = 'KULINER' | 'CINDERAMATA';
 
-/* =========================================================
-   PUBLIC KTA VERIFICATION — MOBILE INPUT FIX
-   ---------------------------------------------------------
-   The generic .app-main form-control rule above intentionally
-   makes inputs white. The public KTA verification field is a
-   dark/gradient hero control, so it must be explicitly scoped
-   here and override that generic rule.
-   ========================================================= */
-.app-main #verifikasi-kta .kta-verification-input {
-  background: rgba(255, 255, 255, 0.10) !important;
-  background-color: rgba(255, 255, 255, 0.10) !important;
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff !important;
-  caret-color: #e9d5ff !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  min-height: 42px;
-  width: 100%;
-  min-width: 0;
-  opacity: 1 !important;
-  appearance: none;
-  -webkit-appearance: none;
-  pointer-events: auto !important;
-  position: relative;
-  z-index: 2;
-  box-shadow: none !important;
-}
+export type KridaProductCategory = 
+  | 'Pemanduan & Paket Wisata'    // Krida Pemandu (Walking Tour, Local Guide, Ekowisata)
+  | 'Fotografi & Media Wisata'     // Krida Penyuluh (Foto Wisata, Video Promosi, Cetak Karya)
+  | 'MICE, Kemah & Atraksi'       // Krida Atraksi & MICE (Scout Camp, Pertunjukan, Outbound)
+  | 'Kuliner & Minuman Daerah'    // Krida Kuliner & Cinderamata (Makanan Tradisional, Minuman Herbal)
+  | 'Kriya & Cinderamata Khas'    // Krida Kuliner & Cinderamata (Batik, Anyaman, Kerajinan, Suvenir)
+  | 'Jasa & Edukasi Wisata';      // Pelatihan, Storytelling, Workshop
 
-.app-main #verifikasi-kta .kta-verification-input::placeholder {
-  color: rgba(233, 213, 255, 0.55) !important;
-  -webkit-text-fill-color: rgba(233, 213, 255, 0.55) !important;
-  opacity: 1 !important;
-}
+export type ProductModerationStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 
-.app-main #verifikasi-kta .kta-verification-input:focus {
-  background: rgba(255, 255, 255, 0.14) !important;
-  background-color: rgba(255, 255, 255, 0.14) !important;
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff !important;
-  outline: none !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-@media (max-width: 640px) {
-  .app-main #verifikasi-kta .kta-verification-input {
-    font-size: 16px !important;
-    line-height: 1.4 !important;
-    min-height: 44px;
-    padding: 0 !important;
-    touch-action: manipulation;
-  }
-
-  .app-main #verifikasi-kta form > div:first-child {
-    min-height: 56px;
-  }
-}
-
-/* =========================================================
-   SPWNAPPS LANDING v4 — WONDERFUL INDONESIA INSPIRED
-   Presentation layer only. Existing app logic/routes untouched.
-   ========================================================= */
-.spwn-landing {
-  --wi-purple: #7b2cbf;
-  --wi-green: #64c51d;
-  --wi-orange: #ff9f1c;
-  --wi-blue: #159fe0;
-  --wi-magenta: #d926a9;
-  --spwn-ink: #28243a;
-  --spwn-muted: #687084;
-  background: #fbfbfe;
-  color: var(--spwn-ink);
-}
-.spwn-landing button { cursor: pointer; }
-.spwn-landing-header {
-  background: rgba(255,255,255,.92);
-  border-bottom: 1px solid #eceaf3;
-  box-shadow: 0 4px 24px rgba(53,39,89,.06);
-  backdrop-filter: blur(18px);
-}
-.spwn-landing-nav { position: relative; }
-.spwn-logo-frame {
-  width: 48px; height: 48px; display:grid; place-items:center;
-  border-radius: 16px; padding: 4px;
-  background: linear-gradient(135deg,var(--wi-purple),var(--wi-magenta),var(--wi-orange),var(--wi-green));
-  box-shadow: 0 8px 18px rgba(123,44,191,.16);
-}
-.spwn-logo-frame > * { border-radius: 12px; }
-.spwn-nav-link { padding:.6rem .85rem; border-radius:12px; transition:.18s ease; }
-.spwn-nav-link:hover { color:var(--wi-purple); background:#f5f0ff; }
-.spwn-primary-btn,.spwn-outline-btn,.spwn-hero-primary,.spwn-hero-secondary,.spwn-green-btn {
-  display:inline-flex; align-items:center; justify-content:center; gap:.45rem;
-  font-size:11px; font-weight:900; border-radius:13px; transition:.18s ease;
-}
-.spwn-primary-btn { padding:.65rem .9rem; color:white; background:linear-gradient(135deg,#6d28d9,#d926a9); box-shadow:0 8px 18px rgba(123,44,191,.18); }
-.spwn-primary-btn:hover { transform:translateY(-1px); box-shadow:0 11px 22px rgba(123,44,191,.23); }
-.spwn-outline-btn { padding:.65rem .9rem; color:#514b63; border:1px solid #e4e0ec; background:#fff; }
-.spwn-outline-btn:hover { border-color:#cfc4e9; color:var(--wi-purple); background:#faf8ff; }
-.spwn-mobile-menu { border-top:1px solid #eceaf3; background:rgba(255,255,255,.98); box-shadow:0 12px 30px rgba(53,39,89,.08); }
-.spwn-mobile-menu-item { min-height:70px; border:1px solid #eceaf3; border-radius:16px; background:#fff; color:#39344a; font-size:10px; font-weight:800; padding:.65rem; }
-.spwn-mobile-menu-item:hover { background:#faf8ff; border-color:#d8cbed; }
-.spwn-hero { background:linear-gradient(180deg,#fbfbfe 0,#f7f5fc 100%); }
-.spwn-hero-panel { position:relative; min-height:390px; border-radius:30px; box-shadow:0 24px 55px rgba(67,45,103,.18); isolation:isolate; }
-/* Background destination photo: kept behind the gradient/content and deliberately low-contrast. */
-.spwn-hero-photo { position:absolute; z-index:1; top:0; right:0; bottom:0; width:58%; overflow:hidden; pointer-events:none; }
-.spwn-hero-photo img { width:100%; height:100%; object-fit:cover; object-position:center 42%; opacity:.24; filter:saturate(.78) contrast(.88) brightness(.92); mix-blend-mode:screen; }
-.spwn-hero-photo-wash { position:absolute; z-index:4; inset:0; pointer-events:none; background:linear-gradient(90deg, rgba(70,34,169,.98) 0%, rgba(123,44,191,.92) 27%, rgba(217,38,169,.68) 53%, rgba(255,140,36,.28) 77%, rgba(21,159,224,.14) 100%); }
-.spwn-hero-gradient { position:absolute; z-index:5; inset:0; background:linear-gradient(115deg,rgba(70,34,169,.96) 0%,rgba(123,44,191,.88) 27%,rgba(217,38,169,.72) 53%,rgba(255,140,36,.58) 74%,rgba(21,159,224,.48) 100%); }
-.spwn-hero-content { position:relative; z-index:10; }
-.spwn-hero-art { position:absolute; z-index:0; border-radius:999px; filter:blur(40px); pointer-events:none; }
-.spwn-hero-art-a { width:260px;height:260px;left:-90px;top:30px;background:rgba(100,197,29,.20); }
-.spwn-hero-art-b { width:280px;height:280px;right:-100px;bottom:0;background:rgba(21,159,224,.16); }
-.spwn-hero-primary { padding:.85rem 1.05rem; color:#38220a; background:#ffd166; box-shadow:0 10px 22px rgba(255,159,28,.28); }
-.spwn-hero-primary:hover { transform:translateY(-1px); background:#ffe08a; }
-.spwn-hero-secondary { padding:.85rem 1.05rem; color:#fff; border:1px solid rgba(255,255,255,.28); background:rgba(255,255,255,.12); backdrop-filter:blur(10px); }
-.spwn-hero-secondary:hover { background:rgba(255,255,255,.2); }
-.spwn-hero-chip { padding:.4rem .65rem; border:1px solid rgba(255,255,255,.2); border-radius:999px; background:rgba(255,255,255,.1); }
-.spwn-hero-ribbon { position:absolute; border-radius:999px; transform:rotate(-12deg); opacity:.9; }
-.spwn-ribbon-one { width:360px;height:55px;right:-45px;top:95px;background:linear-gradient(90deg,#64c51d,#ffd166,#ff7b00,#d926a9); }
-.spwn-ribbon-two { width:430px;height:30px;right:-90px;top:170px;background:linear-gradient(90deg,#159fe0,#7b2cbf,#d926a9); transform:rotate(11deg); }
-.spwn-hero-orb { position:absolute; right:175px; top:105px; width:112px;height:112px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);box-shadow:0 18px 40px rgba(0,0,0,.12); }
-.spwn-wave { position:absolute; bottom:-12px; height:26px; border-radius:50%; filter:blur(.2px); transform:rotate(-3deg); z-index:2; }
-.spwn-wave-green { left:-5%; width:35%; background:#64c51d; }
-.spwn-wave-magenta { left:22%; width:35%; background:#d926a9; transform:rotate(5deg); }
-.spwn-wave-orange { right:-5%; width:38%; background:#ff9f1c; transform:rotate(-5deg); }
-.spwn-color-card { min-height:140px; padding:1.15rem 1rem; border:1px solid #ebe8f1; border-radius:22px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; box-shadow:0 8px 24px rgba(39,30,61,.045); transition:.2s ease; }
-.spwn-color-card:hover { transform:translateY(-4px); box-shadow:0 15px 32px rgba(39,30,61,.09); }
-.spwn-color-card-icon { width:54px;height:54px;border-radius:50%;display:grid;place-items:center;color:#fff;margin-bottom:.7rem;box-shadow:0 8px 16px rgba(0,0,0,.10); }
-.spwn-color-card-purple { background:linear-gradient(135deg,#f6efff,#fff); }.spwn-color-card-purple .spwn-color-card-icon{background:linear-gradient(135deg,#7b2cbf,#b13bd8)}
-.spwn-color-card-orange { background:linear-gradient(135deg,#fff8e9,#fff); }.spwn-color-card-orange .spwn-color-card-icon{background:linear-gradient(135deg,#f59e0b,#ff7b00)}
-.spwn-color-card-blue { background:linear-gradient(135deg,#eef8ff,#fff); }.spwn-color-card-blue .spwn-color-card-icon{background:linear-gradient(135deg,#159fe0,#3b82f6)}
-.spwn-color-card-green { background:linear-gradient(135deg,#f2fbea,#fff); }.spwn-color-card-green .spwn-color-card-icon{background:linear-gradient(135deg,#54b91b,#159f6b)}
-.spwn-verify-panel { padding:1.25rem; border:1px solid #dfeee7; border-radius:25px; background:linear-gradient(135deg,#effbf5,#fff 55%,#f6f0ff); box-shadow:0 10px 28px rgba(37,99,74,.06); }
-.spwn-eyebrow { font-size:9px; text-transform:uppercase; letter-spacing:.18em; font-weight:900; }
-.spwn-light-input { border:1px solid #e1deea !important; background:#fff !important; color:#28243a !important; box-shadow:0 2px 7px rgba(31,36,48,.03); }
-.spwn-light-input:focus { border-color:#9b7be8 !important; box-shadow:0 0 0 4px rgba(123,44,191,.08) !important; }
-.spwn-green-btn { color:#fff; background:#159f6b; box-shadow:0 8px 16px rgba(21,159,107,.16); }
-.spwn-green-btn:hover { background:#12885c; transform:translateY(-1px); }
-.spwn-krida-card { text-align:left; padding:1.15rem; min-height:240px; border:1px solid #e9e5f0; border-radius:25px; background:#fff; box-shadow:0 8px 25px rgba(39,30,61,.045); transition:.2s ease; }
-.spwn-krida-card:hover { transform:translateY(-4px); box-shadow:0 15px 34px rgba(39,30,61,.09); }
-.spwn-krida-icon { width:52px;height:52px;border-radius:17px;display:grid;place-items:center;color:#fff; }
-.spwn-krida-purple { background:linear-gradient(145deg,#faf4ff,#fff); }.spwn-krida-purple .spwn-krida-icon{background:linear-gradient(135deg,#7b2cbf,#b33bd6)}
-.spwn-krida-blue { background:linear-gradient(145deg,#f1faff,#fff); }.spwn-krida-blue .spwn-krida-icon{background:linear-gradient(135deg,#159fe0,#2563eb)}
-.spwn-krida-orange { background:linear-gradient(145deg,#fff9ec,#fff); }.spwn-krida-orange .spwn-krida-icon{background:linear-gradient(135deg,#ff9f1c,#f97316)}
-.spwn-krida-magenta { background:linear-gradient(145deg,#fff2fa,#fff); }.spwn-krida-magenta .spwn-krida-icon{background:linear-gradient(135deg,#d926a9,#e11d75)}
-.spwn-section-tint { background:#fffaf1; border-top:1px solid #f5ead5; border-bottom:1px solid #f5ead5; }
-.spwn-section-soft-green { background:linear-gradient(180deg,#f7fcf1,#fbfbfe); border-top:1px solid #e8f2de; }
-.spwn-photo-card,.spwn-product-card { overflow:hidden; text-align:left; border:1px solid #ebe8f1; border-radius:23px; background:#fff; box-shadow:0 8px 24px rgba(39,30,61,.045); transition:.2s ease; }
-.spwn-photo-card:hover,.spwn-product-card:hover { transform:translateY(-3px); box-shadow:0 14px 32px rgba(39,30,61,.09); }
-.spwn-photo-card img,.spwn-product-card img { transition:transform .5s ease; }.spwn-photo-card:hover img,.spwn-product-card:hover img{transform:scale(1.05)}
-.spwn-empty-card { padding:1.3rem; border:1px dashed #ded9e8; border-radius:18px; background:#fff; color:#7a8190; font-size:12px; }
-.spwn-content-card { border:1px solid #e9e6ef; border-radius:24px; background:#fff; box-shadow:0 8px 24px rgba(39,30,61,.045); }
-.spwn-landing-footer { border-top:1px solid #e9e6ef; background:#fff; }
-.spwn-footer-icon { width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:#6d667c;border:1px solid #e2deea;background:#fff; }
-.spwn-footer-icon:hover { color:#7b2cbf; background:#faf7ff; border-color:#d6caea; }
-.spwn-dot { display:block;width:9px;height:9px;border-radius:50%; }.spwn-dot-green{background:#64c51d}.spwn-dot-purple{background:#7b2cbf}.spwn-dot-orange{background:#ff9f1c}.spwn-dot-blue{background:#159fe0}.spwn-dot-magenta{background:#d926a9}
-@media (max-width: 1023px) {
-  .spwn-hero-panel { border-radius:25px; }
-}
-@media (max-width: 640px) {
-  .spwn-logo-frame { width:42px;height:42px;border-radius:14px; }
-  .spwn-hero-panel { min-height:0; border-radius:22px; }
-  .spwn-hero-panel > .spwn-hero-content { min-height:0; z-index:10; }
-  .spwn-hero-photo { width:100%; opacity:.58; }
-  .spwn-hero-photo img { opacity:.14; object-position:62% 42%; }
-  .spwn-hero-photo-wash { background:linear-gradient(90deg, rgba(70,34,169,.90) 0%, rgba(123,44,191,.78) 52%, rgba(217,38,169,.58) 100%); }
-  .spwn-hero-gradient { background:linear-gradient(115deg, rgba(70,34,169,.88) 0%, rgba(123,44,191,.68) 48%, rgba(217,38,169,.42) 100%); }
-  .spwn-color-card { min-height:125px; padding:.9rem .7rem; border-radius:18px; }
-  .spwn-color-card-icon { width:46px;height:46px; margin-bottom:.55rem; }
-  .spwn-krida-card { min-height:220px; border-radius:20px; padding:1rem; }
-  .spwn-verify-panel { padding:1rem; border-radius:20px; }
+export interface CulinarySouvenirItem {
+  id: string;
+  name: string;
+  kind: ProductKind; // 'KULINER' | 'CINDERAMATA'
+  krida: KridaType;  // 'Krida Pemandu' | 'Krida Penyuluh' | 'Krida Mice & Event' | 'Krida Kuliner & Cinderamata'
+  kridaCategory: KridaProductCategory;
+  categoryLabel: string; // e.g. "Makanan Khas", "Minuman Tradisional", "Kriya Anyaman", "Batik Daerah", "Jasa Pemanduan", "Paket Kemah"
+  description: string;
+  storyOrigin?: string; // Cerita/Filosofi/Sejarah Khas Daerah atau Nilai Tambah
+  priceEstimate: number;
+  priceUnit?: string; // e.g. "per porsi", "per buah", "per pax", "per paket", "per hari", "per lembar"
+  imageUrl: string;
+  galleryImages?: string[];
+  
+  // Wilayah asal (Kwarran / Kwarcab / Kwarda)
+  provinceId: string;
+  provinceName: string;
+  regencyId: string;
+  regencyName: string;
+  districtId: string; // Kwarran ID
+  districtName: string; // Kwarran / Kecamatan Name
+  
+  // Penginput (Anggota Saka)
+  authorMemberId: string;
+  authorName: string;
+  authorNta?: string;
+  authorAvatarUrl?: string;
+  authorRole?: string;
+  
+  // Kontak & Sentra UMKM / Pangkalan
+  umkmName?: string;
+  contactPhone: string; // WhatsApp untuk pemesanan / info
+  contactEmail?: string;
+  address?: string;
+  tags: string[];
+  
+  // Alur Persetujuan Operator Wilayah
+  status: ProductModerationStatus; // 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
+  submittedAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  approverRole?: UserRole;
+  rejectionReason?: string;
+  
+  createdAt: string;
+  likesCount: number;
+  featured?: boolean;
 }
 
-/* Official Store + Hero Carousel */
-.spwn-store-coming-soon { letter-spacing: .08em; }
-.spwn-hero-panel { min-height: 450px; }
-@media (max-width: 1023px) { .spwn-hero-panel { min-height: 500px; } }
-@media (max-width: 639px) { .spwn-hero-panel { min-height: 540px; } }
+export type OfficialMerchandiseCategory =
+  | 'APPAREL'
+  | 'ACCESSORIES'
+  | 'IDENTITY'
+  | 'OUTDOOR';
+
+export interface OfficialMerchandiseProduct {
+  id: string;
+  name: string;
+  shortName?: string;
+  category: OfficialMerchandiseCategory;
+  description: string;
+  price: number;
+  currency?: string;
+  imageUrl?: string;
+  accentClass?: string;
+  iconName?: string;
+  sizes?: string[];
+  tags: string[];
+  comingSoon: boolean;
+  launchAt?: string;
+  featured?: boolean;
+  active: boolean;
+}
+
+export interface CurrentUser {
+  id: string;
+  username?: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  jurisdictionName?: string;
+  jurisdictionId?: string;
+  avatarUrl: string;
+  memberId?: string;
+}
+
+export type KtaCardTheme = 'purple_saka' | 'emerald_pesona' | 'indigo_navy' | 'dark_slate' | 'gold_amber';
+export type KtaBarcodeType = 'CODE128' | 'STANDARD' | 'QR';
+export type KtaCardPreset = 'CR80_KTA' | 'KTP' | 'SIM' | 'CUSTOM';
+export type KtaCardSide = 'FRONT' | 'BACK';
+export type KtaMemberFieldKey =
+  | 'fullName' | 'id' | 'nationalMemberNumber' | 'currentPosition'
+  | 'provinceName' | 'regencyName' | 'districtName' | 'kwartirName' | 'kwartirHierarchy'
+  | 'krida' | 'phone' | 'email' | 'joinYear' | 'status';
+
+export interface KtaDataFieldConfig {
+  id: string;
+  field: KtaMemberFieldKey;
+  label?: string;
+  showLabel?: boolean;
+  side: KtaCardSide;
+  visible: boolean;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  fontWeight: 'normal' | 'medium' | 'bold' | 'black';
+  color: string;
+  textTransform?: 'none' | 'uppercase' | 'lowercase';
+  align?: 'left' | 'center' | 'right';
+}
+
+export interface KtaLogoElement {
+  id: string; name: string; url: string; side: KtaCardSide;
+  x: number; y: number; width: number; height: number; opacity?: number;
+  objectFit?: 'contain' | 'cover' | 'fill';
+}
+
+export interface KtaTextElement {
+  id: string; text: string; side: KtaCardSide; x: number; y: number; width: number;
+  fontSize: number; fontWeight: 'normal' | 'medium' | 'bold' | 'black'; color: string;
+  align?: 'left' | 'center' | 'right'; textTransform?: 'none' | 'uppercase' | 'lowercase';
+}
+
+export interface KtaCardSettings {
+  preset?: KtaCardPreset; widthMm: number; heightMm: number; cornerRadiusMm: number;
+  cardTheme: KtaCardTheme; bgImageUrl?: string; frontBackgroundUrl?: string; backBackgroundUrl?: string;
+  customBackgroundColorFront?: string; customBackgroundColorBack?: string; bgOpacity?: number;
+  frontLogoUrl?: string; backLogoUrl?: string; logos: KtaLogoElement[];
+  dataFields: KtaDataFieldConfig[]; textElements: KtaTextElement[];
+  frontOrganizationTitle: string; frontOrganizationSubtitle: string;
+  frontOrganizationTitleX?: number; frontOrganizationTitleY?: number; frontOrganizationTitleWidth?: number;
+  frontOrganizationTitleFontSize?: number; frontOrganizationTitleFontWeight?: 'normal'|'medium'|'bold'|'black';
+  frontOrganizationTitleColor?: string; frontOrganizationTitleAlign?: 'left'|'center'|'right';
+  frontOrganizationSubtitleX?: number; frontOrganizationSubtitleY?: number; frontOrganizationSubtitleWidth?: number;
+  frontOrganizationSubtitleFontSize?: number; frontOrganizationSubtitleFontWeight?: 'normal'|'medium'|'bold'|'black';
+  frontOrganizationSubtitleColor?: string; frontOrganizationSubtitleAlign?: 'left'|'center'|'right';
+  frontValidityText: string; watermarkOpacity: number; showKridaBadge: boolean;
+  showPhoto: boolean; showQrCode: boolean; qrX?: number; qrY?: number; qrSize?: number; qrBorderWidth?: number; qrBorderColor?: string; qrBorderRadius?: number; qrPadding?: number; qrBackgroundColor?: string;
+  backHeaderTitle: string; backHeaderSubtitle: string; terms: string[]; issueLocationDate: string;
+  barcodeType: KtaBarcodeType; barcodeCustomValue?: string; showBarcode?: boolean; issueLocationDateX?: number; issueLocationDateY?: number;
+  barcodeX?: number; barcodeY?: number; barcodeWidth?: number; barcodeHeight?: number; barcodeShowText?: boolean;
+  signerMemberId?: string; showSignerQrCode?: boolean; showSignerName?: boolean; showSignerTitle?: boolean; showSignerVerified?: boolean; signerVerifiedX?: number; signerVerifiedY?: number; signerVerifiedWidth?: number; signerVerifiedFontSize?: number; signerVerifiedColor?: string;
+  signerQrX?: number; signerQrY?: number; signerQrSize?: number; signerQrPadding?: number; signerQrBackgroundColor?: string; signerQrBorderWidth?: number; signerQrBorderColor?: string; signerQrBorderRadius?: number;
+  barcodeCaption?: string;
+  showBarcodeFront?: boolean; barcodeFrontCustomValue?: string; barcodeFrontX?: number; barcodeFrontY?: number; barcodeFrontWidth?: number; barcodeFrontHeight?: number; barcodeFrontShowText?: boolean; barcodeFrontCaption?: string; barcodeFrontCaptionX?: number; barcodeFrontCaptionY?: number; barcodeFrontCaptionWidth?: number; barcodeFrontCaptionFontSize?: number; barcodeFrontCaptionFontWeight?: 'normal'|'medium'|'bold'|'black'; barcodeFrontCaptionColor?: string; barcodeFrontCaptionAlign?: 'left'|'center'|'right'; barcodeFrontCaptionLineHeight?: number; barcodeFrontCaptionLetterSpacing?: number;
+  photoX?: number; photoY?: number; photoWidth?: number; photoHeight?: number; photoRadius?: number; photoBorderWidth?: number; photoBorderColor?: string; photoObjectFit?: 'contain'|'cover'|'fill';
+  frontValidityTextX?: number; frontValidityTextY?: number; frontValidityTextWidth?: number; frontValidityTextFontSize?: number; frontValidityTextFontWeight?: 'normal'|'medium'|'bold'|'black'; frontValidityTextColor?: string; frontValidityTextAlign?: 'left'|'center'|'right'; frontValidityTextLineHeight?: number; frontValidityTextLetterSpacing?: number;
+  frontOrganizationTitleLineHeight?: number; frontOrganizationTitleLetterSpacing?: number; frontOrganizationSubtitleLineHeight?: number; frontOrganizationSubtitleLetterSpacing?: number;
+  backHeaderTitleX?: number; backHeaderTitleY?: number; backHeaderTitleWidth?: number; backHeaderTitleFontSize?: number; backHeaderTitleFontWeight?: 'normal'|'medium'|'bold'|'black'; backHeaderTitleColor?: string; backHeaderTitleAlign?: 'left'|'center'|'right'; backHeaderTitleLineHeight?: number; backHeaderTitleLetterSpacing?: number;
+  backHeaderSubtitleX?: number; backHeaderSubtitleY?: number; backHeaderSubtitleWidth?: number; backHeaderSubtitleFontSize?: number; backHeaderSubtitleFontWeight?: 'normal'|'medium'|'bold'|'black'; backHeaderSubtitleColor?: string; backHeaderSubtitleAlign?: 'left'|'center'|'right'; backHeaderSubtitleLineHeight?: number; backHeaderSubtitleLetterSpacing?: number;
+  termsX?: number; termsY?: number; termsWidth?: number; termsFontSize?: number; termsFontWeight?: 'normal'|'medium'|'bold'|'black'; termsColor?: string; termsAlign?: 'left'|'center'|'right'; termsLineHeight?: number; termsLetterSpacing?: number;
+  signerX?: number; signerY?: number; signerWidth?: number; signerColor?: string; signerAlign?: 'left'|'center'|'right'; signerLineHeight?: number; signerLetterSpacing?: number; signerNameXOffset?: number; signerNameYOffset?: number; issueLocationDateFontSize?: number; signerNameFontSize?: number; signerTitleFontSize?: number; signerSubtitleFontSize?: number;
+  signerName: string; signerTitle: string; signerSubtitle?: string; showStamp: boolean;
+  lastUpdated?: string; updatedBy?: string;
+}
+
+// ==========================================
+// 4 KRIDA MODULES & CURRICULUM TYPES
+// ==========================================
+export type KridaId = 'pemandu' | 'penyuluh' | 'kuliner' | 'mice';
+
+export interface KridaCategoryInfo {
+  id: KridaId;
+  name: string;
+  shortTitle: string;
+  subtitle: string;
+  badge: string;
+  color: string;
+  borderGlow: string;
+  description: string;
+  desc?: string;
+  topicsCount: number;
+}
+
+export interface KridaCurriculumSession {
+  sessionNumber: number;
+  title: string;
+  duration: string;
+  competency: string;
+  method: string;
+}
+
+export interface KridaTestRequirements {
+  purwa: string[];
+  madya: string[];
+  utama: string[];
+}
+
+export interface KridaCompetencyRow {
+  code: string;
+  element: string;
+  indicator: string;
+  assessment: string;
+}
+
+export interface KridaImage {
+  id: string;
+  url: string;
+  caption: string;
+}
+
+export interface KridaLink {
+  id: string;
+  title: string;
+  url: string;
+  type: 'VIDEO' | 'REFERENCE' | 'REGULATION';
+}
+
+export interface KridaDownloadFile {
+  id: string;
+  title: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: string;
+}
+
+// Aliases for editor and modal components
+export type CompetencyRow = KridaCompetencyRow;
+export type ModuleImage = KridaImage;
+export type ModuleLink = KridaLink;
+export type DownloadableResource = KridaDownloadFile;
+export type CurriculumSession = KridaCurriculumSession;
+
+export interface KridaModuleItem {
+  id: string;
+  kridaId: KridaId;
+  kridaName: string;
+  code: string; // e.g. 'PM-01', 'PY-01', 'ME-01', 'KC-01'
+  title: string;
+  badge: string;
+  levelSKK: string;
+  description: string;
+  content: string; // Rich formatted text/markdown
+  curriculum: KridaCurriculumSession[];
+  testRequirements: KridaTestRequirements;
+  competencyTable: KridaCompetencyRow[];
+  images: KridaImage[];
+  links: KridaLink[];
+  downloads: KridaDownloadFile[];
+  updatedAt: string;
+  updatedBy: string;
+  // Standar Buku Panduan SKK Saka Pariwisata 2026:
+  skkniReference?: string;
+  practiceProduct?: {
+    purwa: string;
+    madya: string;
+    utama: string;
+  };
+  portfolioItems?: string[];
+  scoringWeights?: {
+    knowledge: number; // 20%
+    skill: number;     // 40%
+    attitude: number;  // 20%
+    product: number;   // 20%
+    passingGrade: number; // 80 (Memenuhi)
+  };
+  specialSafetyNotes?: string;
+}
+
