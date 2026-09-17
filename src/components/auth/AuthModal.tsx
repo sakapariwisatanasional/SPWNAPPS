@@ -297,9 +297,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     try {
-      const scriptUrl =
-        spreadsheetService.getConfig().scriptUrl || '';
-
+      // Endpoint Google Apps Script sengaja tidak dikirim dari browser.
+      // Ini membuat login konsisten di desktop, HP, dan tablet meskipun
+      // localStorage perangkat masih menyimpan konfigurasi GAS lama.
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -308,8 +308,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         credentials: 'include',
         body: JSON.stringify({
           username: ident,
-          password: pass,
-          scriptUrl
+          password: pass
         })
       });
 
