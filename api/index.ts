@@ -1239,12 +1239,14 @@ if (!IS_VERCEL) {
 const DEFAULT_APPS_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
 
-// Proxy mutation to Google Apps Script Web App
+// Proxy khusus autentikasi/recovery. URL dari browser tidak pernah dipakai
+// untuk aksi autentikasi. Kandidat server dicoba berurutan agar deployment
+// GAS lama yang masih hidup tidak memblokir login/reset dengan HTTP 200 error.
 async function forwardAuthToGoogleAppsScript(payload: any): Promise<any> {
   const candidates = [
     normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL),
-    normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL),
-    normalizeManualAppsScriptUrl(db.config.scriptUrl)
+    normalizeManualAppsScriptUrl(db.config.scriptUrl),
+    normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL)
   ]
     .filter(Boolean)
     .filter((url, index, arr) => arr.indexOf(url) === index);
@@ -1253,26 +1255,20 @@ async function forwardAuthToGoogleAppsScript(payload: any): Promise<any> {
     throw new Error('Google Apps Script Web App URL belum dikonfigurasi.');
   }
 
-  const gasPayload = { ...payload };
-  delete gasPayload.scriptUrl;
-
   let lastError = '';
-
   for (const scriptUrl of candidates) {
     try {
       const response = await fetch(scriptUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(gasPayload),
+        body: JSON.stringify(payload),
         redirect: 'follow',
         cache: 'no-store'
       });
 
       const text = await response.text();
       let data: any = null;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch {}
+      try { data = text ? JSON.parse(text) : null; } catch {}
 
       if (!response.ok) {
         lastError = `Google Apps Script HTTP ${response.status}${data?.message ? `: ${data.message}` : ''}`;
@@ -1280,30 +1276,49 @@ async function forwardAuthToGoogleAppsScript(payload: any): Promise<any> {
         throw new Error(lastError);
       }
 
-      // Deployment lama dapat mengembalikan HTTP 200 tetapi belum mengenal
-      // action autentikasi baru. Coba deployment berikutnya dalam kondisi ini.
       const message = String(data?.message || '');
+      const action = String(payload?.action || '');
+
+      // Deployment lama dapat menjawab HTTP 200 tetapi belum mengenal action baru.
       if (
         data?.status === 'error' &&
-        /action.*(tidak dikenal|unknown)|unknown.*action|AUTH_(LOGIN|REQUEST_PASSWORD_RESET|RESET_PASSWORD)/i.test(message)
+        /action.*(tidak dikenal|unknown)|unknown.*action/i.test(message)
       ) {
-        lastError = message || 'Deployment Google Apps Script belum mendukung autentikasi terbaru.';
+        lastError = message || 'Deployment Google Apps Script belum mendukung action autentikasi.';
         continue;
       }
 
-      return data || { success: false, status: 'error', message: 'Respons Google Apps Script kosong.' };
+      // Untuk login, jika deployment pertama menolak credential, coba deployment
+      // berikutnya. Ini penting ketika ada deployment GAS lama yang masih aktif.
+      if (
+        data?.status === 'error' &&
+        action === 'AUTH_LOGIN' &&
+        /username|email|password|kata sandi|credential|tidak valid|salah|akun/i.test(message)
+      ) {
+        lastError = message || 'Login ditolak oleh deployment Google Apps Script.';
+        continue;
+      }
+
+      return data || {
+        success: false,
+        status: 'error',
+        message: 'Respons Google Apps Script kosong.'
+      };
     } catch (error: any) {
       lastError = error?.message || String(error);
       if (/HTTP (404|410)/i.test(lastError)) continue;
-      // Error jaringan/endpoint kandidat tidak boleh membuat perangkat mencoba
-      // URL dari browser. Lanjutkan hanya ke kandidat server berikutnya.
-      continue;
+      // Untuk error autentikasi/recovery, lanjutkan ke kandidat server berikutnya.
+      if (/AUTH_(LOGIN|REQUEST_PASSWORD_RESET|RESET_PASSWORD)/i.test(String(payload?.action || ''))) {
+        continue;
+      }
+      throw error;
     }
   }
 
   throw new Error(lastError || 'Google Apps Script Web App tidak dapat dihubungi.');
 }
 
+// Proxy mutation to Google Apps Script Web App
 async function forwardToGoogleAppsScript(payload: any, requestedScriptUrl?: unknown): Promise<any> {
   // Browser mobile dapat membawa URL deployment lama dari localStorage.
   // Jangan biarkan URL lama tersebut menjadi satu-satunya sumber endpoint.
@@ -1519,38 +1534,28 @@ app.post('/api/upload-image', express.raw({ type: ['application/octet-stream', '
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body || {};
-
   if (!username || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Nama pengguna dan kata sandi wajib diisi.'
-    });
+    return res.status(400).json({ success: false, message: 'Nama pengguna dan kata sandi wajib diisi.' });
   }
 
   const cleanUser = String(username).trim().toLowerCase();
   const rawPass = String(password);
 
-  // Pemetaan Nomor KTA dilakukan dari cache bila tersedia.
-  // Endpoint GAS tetap menjadi sumber autentikasi utama.
-  const matchedMemberByKta = db.members.find(m =>
-    m?.nationalMemberNumber &&
-    String(m.nationalMemberNumber).trim().toLowerCase() === cleanUser
-  );
-
-  const gasLoginIdentifier = matchedMemberByKta?.email
-    ? String(matchedMemberByKta.email).trim().toLowerCase()
-    : cleanUser;
-
+  // Google Spreadsheet / Users adalah sumber autentikasi utama.
+  // Cache Vercel tidak dipakai lebih dahulu agar login setelah logout/cold-start
+  // selalu menggunakan kredensial yang tersimpan secara persisten.
   let matchedUser: any = null;
   let persistentAuthSucceeded = false;
   let persistentAuthMessage = '';
 
   try {
+    // Login harus menggunakan deployment GAS produksi terbaru.
+    // Ini mencegah URL lama yang tersimpan di localStorage perangkat
+    // menyebabkan HTTP 404 sebelum autentikasi mencapai Users sheet.
     const gasResult = await forwardAuthToGoogleAppsScript({
       action: 'AUTH_LOGIN',
-      username: gasLoginIdentifier,
-      password: rawPass,
-      memberId: matchedMemberByKta?.id || ''
+      username: cleanUser,
+      password: rawPass
     });
 
     if (gasResult?.success === true && gasResult?.user) {
@@ -1561,131 +1566,64 @@ app.post('/api/auth/login', async (req, res) => {
       };
       persistentAuthSucceeded = true;
 
+      // Cache hanya setelah Google Apps Script berhasil mengautentikasi.
       const existingIndex = db.users.findIndex(u =>
         String(u.id || '') === String(matchedUser.id || '')
       );
-
       if (existingIndex >= 0) {
-        db.users[existingIndex] = {
-          ...db.users[existingIndex],
-          ...matchedUser
-        };
+        db.users[existingIndex] = { ...db.users[existingIndex], ...matchedUser };
       } else {
         db.users.push(matchedUser);
       }
-
       saveDatabase();
     } else {
       persistentAuthMessage = String(
-        gasResult?.message ||
-        'Kombinasi nama pengguna atau kata sandi tidak valid.'
+        gasResult?.message || 'Kombinasi nama pengguna atau kata sandi tidak valid.'
       );
     }
   } catch (gasError: any) {
-    persistentAuthMessage =
-      gasError?.message ||
-      String(gasError);
-
-    console.warn(
-      '[Auth] AUTH_LOGIN Google Apps Script gagal:',
-      persistentAuthMessage
-    );
+    persistentAuthMessage = gasError?.message || String(gasError);
+    console.warn('[Auth] AUTH_LOGIN Google Apps Script gagal:', persistentAuthMessage);
   }
 
-  const explicitCredentialFailure =
-    /username|nama pengguna|email|password|kata sandi|tidak valid|salah|credential|akun.*(tidak|belum)|belum disetujui|pending|ditolak/i.test(
-      persistentAuthMessage
-    );
-
-  if (
-    !persistentAuthSucceeded &&
-    explicitCredentialFailure
-  ) {
-    const isPending =
-      /belum disetujui|pending|menunggu.*persetujuan/i.test(
-        persistentAuthMessage
-      );
-
-    return res.status(
-      isPending ? 403 : 401
-    ).json({
+  // Jangan gunakan password cache jika Google secara eksplisit menolak login.
+  // Ini mencegah kredensial lama mengalahkan Users sheet.
+  const explicitCredentialFailure = /username|nama pengguna|email|password|kata sandi|tidak valid|salah|credential|akun.*(tidak|belum)|belum disetujui|pending|ditolak/i.test(persistentAuthMessage);
+  if (!persistentAuthSucceeded && explicitCredentialFailure) {
+    const isPending = /belum disetujui|pending|menunggu.*persetujuan/i.test(persistentAuthMessage);
+    return res.status(isPending ? 403 : 401).json({
       success: false,
-      message: isPending
-        ? 'Akun belum disetujui administrator.'
-        : persistentAuthMessage
+      message: isPending ? 'Akun belum disetujui administrator.' : persistentAuthMessage
     });
   }
 
-  // Fallback legacy hanya jika GAS benar-benar tidak tersedia.
-  // Fallback ini tidak boleh mengalahkan penolakan kredensial dari GAS.
+  // Fallback legacy hanya ketika Google Apps Script benar-benar tidak tersedia.
   if (!matchedUser) {
     const cachedUser = db.users.find(u =>
-      (u.username &&
-        String(u.username).toLowerCase() === cleanUser) ||
-      (u.email &&
-        String(u.email).toLowerCase() === cleanUser) ||
-      (u.memberId &&
-        String(u.memberId).toLowerCase() ===
-          String(
-            matchedMemberByKta?.id || cleanUser
-          ).toLowerCase())
+      (u.username && String(u.username).toLowerCase() === cleanUser) ||
+      (u.email && String(u.email).toLowerCase() === cleanUser)
     );
 
-    if (
-      cachedUser?.passwordHash &&
-      verifyPassword(
-        rawPass,
-        String(cachedUser.passwordHash)
-      )
-    ) {
+    if (cachedUser?.passwordHash && verifyPassword(rawPass, String(cachedUser.passwordHash))) {
       matchedUser = cachedUser;
     }
   }
 
+  // Kompatibilitas akun legacy yang hanya tersimpan bersama member cache.
   if (!matchedUser) {
     const member = db.members.find(m =>
-      (m.email &&
-        String(m.email).toLowerCase() === cleanUser) ||
-      (m.nationalMemberNumber &&
-        String(m.nationalMemberNumber).toLowerCase() === cleanUser)
+      (m.email && String(m.email).toLowerCase() === cleanUser) ||
+      (m.nationalMemberNumber && String(m.nationalMemberNumber).toLowerCase() === cleanUser)
     );
-
-    if (
-      member?.passwordHash &&
-      verifyPassword(
-        rawPass,
-        String(member.passwordHash)
-      )
-    ) {
+    if (member?.passwordHash && verifyPassword(rawPass, String(member.passwordHash))) {
       matchedUser = {
-        id:
-          member.userId ||
-          `USER-${String(member.id || '').replace(/^SPW-/, '')}`,
-        username:
-          member.email?.split('@')[0] ||
-          cleanUser,
+        id: member.userId || `USER-${String(member.id || '').replace(/^SPW-/, '')}`,
+        username: member.email.split('@')[0],
         email: member.email,
         name: member.fullName,
-        role:
-          member.isOperator
-            ? (member.operatorRole || 'ADMIN_REGENCY')
-            : 'MEMBER',
-        jurisdictionName:
-          member.provinceId === '00'
-            ? 'KWARTIR NASIONAL'
-            : (
-                member.districtName
-                  ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '')
-                  : (
-                      member.regencyName ||
-                      member.provinceName ||
-                      'Indonesia'
-                    )
-              ),
-        jurisdictionId:
-          member.provinceId === '00'
-            ? '00'
-            : member.regencyId,
+        role: member.isOperator ? (member.operatorRole || 'ADMIN_REGENCY') : 'MEMBER',
+        jurisdictionName: member.provinceId === '00' ? 'KWARTIR NASIONAL' : (member.districtName ? `${member.districtName}, ${member.regencyName || ''}`.replace(/,\s*$/, '') : (member.regencyName || member.provinceName || 'Indonesia')),
+        jurisdictionId: member.provinceId === '00' ? '00' : member.regencyId,
         avatarUrl: member.avatarUrl,
         memberId: member.id,
         passwordHash: member.passwordHash
@@ -1694,33 +1632,16 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   if (!matchedUser) {
-    console.warn(
-      `[Auth] Failed login attempt for user: ${cleanUser}`
-    );
-
+    console.warn(`[Auth] Failed login attempt for user: ${cleanUser}`);
     return res.status(401).json({
       success: false,
-      message:
-        persistentAuthMessage ||
-        'Kombinasi nama pengguna atau kata sandi tidak valid.'
+      message: persistentAuthMessage || 'Kombinasi nama pengguna atau kata sandi tidak valid.'
     });
   }
 
-  if (
-    !persistentAuthSucceeded &&
-    (
-      !matchedUser.passwordHash ||
-      !verifyPassword(
-        rawPass,
-        String(matchedUser.passwordHash)
-      )
-    )
-  ) {
-    return res.status(401).json({
-      success: false,
-      message:
-        'Kombinasi nama pengguna atau kata sandi tidak valid.'
-    });
+  // Bila memakai fallback legacy, password tetap harus diverifikasi lokal.
+  if (!persistentAuthSucceeded && (!matchedUser.passwordHash || !verifyPassword(rawPass, String(matchedUser.passwordHash)))) {
+    return res.status(401).json({ success: false, message: 'Kombinasi nama pengguna atau kata sandi tidak valid.' });
   }
 
   const token = createSession(matchedUser);
@@ -1733,15 +1654,10 @@ app.post('/api/auth/login', async (req, res) => {
     action: 'LOGIN',
     targetType: 'AUTH',
     targetId: matchedUser.id,
-    description:
-      `Login berhasil sebagai ${matchedUser.role} (${matchedUser.jurisdictionName || 'Nasional'})`,
+    description: `Login berhasil sebagai ${matchedUser.role} (${matchedUser.jurisdictionName || 'Nasional'})`,
     timestamp: new Date().toISOString()
   });
-
-  if (db.auditLogs.length > 500) {
-    db.auditLogs.pop();
-  }
-
+  if (db.auditLogs.length > 500) db.auditLogs.pop();
   saveDatabase();
 
   const sanitizedUser = {
@@ -1756,11 +1672,7 @@ app.post('/api/auth/login', async (req, res) => {
     memberId: matchedUser.memberId
   };
 
-  return res.json({
-    success: true,
-    token,
-    user: sanitizedUser
-  });
+  res.json({ success: true, token, user: sanitizedUser });
 });
 
 // GET /api/auth/me - Verify current session token
@@ -1793,136 +1705,6 @@ app.post('/api/auth/logout', (req, res) => {
     // logout action; persistent revocation would require a shared session store.
   }
   res.json({ success: true, message: 'Berhasil keluar.' });
-});
-
-// POST /api/auth/reset-password
-// Digunakan oleh alur Lupa Password. Password baru hanya dianggap berhasil
-// setelah Google Apps Script mengonfirmasi penulisan ke sheet Users.
-app.post('/api/auth/request-password-reset', async (req, res) => {
-  const { identifier } = req.body || {};
-
-  if (!identifier || !String(identifier).trim()) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email, username, atau nomor KTA wajib diisi.'
-    });
-  }
-
-  try {
-    const gasResult = await forwardAuthToGoogleAppsScript({
-      action: 'AUTH_REQUEST_PASSWORD_RESET',
-      identifier: String(identifier).trim().toLowerCase()
-    });
-
-    if (!gasResult?.success) {
-      return res.status(400).json({
-        success: false,
-        message:
-          gasResult?.message ||
-          'Permintaan pemulihan password gagal.'
-      });
-    }
-
-    return res.json({
-      success: true,
-      challengeCreated:
-        gasResult.challengeCreated !== false,
-      message:
-        gasResult.message ||
-        'Jika akun memiliki email terdaftar, kode pemulihan akan dikirim.'
-    });
-  } catch (error: any) {
-    console.error(
-      '[Auth] Request password reset gagal:',
-      error
-    );
-
-    return res.status(502).json({
-      success: false,
-      message:
-        error?.message ||
-        'Gagal menghubungi layanan pemulihan password.'
-    });
-  }
-});
-
-// POST /api/auth/reset-password
-// Konfirmasi reset wajib menggunakan kode OTP yang dikirim ke email akun.
-app.post('/api/auth/reset-password', async (req, res) => {
-  const {
-    identifier,
-    code,
-    otp,
-    newPassword
-  } = req.body || {};
-
-  if (
-    !identifier ||
-    !String(identifier).trim() ||
-    !code && !otp
-  ) {
-    return res.status(400).json({
-      success: false,
-      message:
-        'Identitas akun dan kode pemulihan wajib diisi.'
-    });
-  }
-
-  if (
-    !newPassword ||
-    String(newPassword).length < 6
-  ) {
-    return res.status(400).json({
-      success: false,
-      message:
-        'Kata sandi baru minimal 6 karakter.'
-    });
-  }
-
-  const payload = {
-    action: 'AUTH_RESET_PASSWORD',
-    identifier:
-      String(identifier).trim().toLowerCase(),
-    code:
-      String(code || otp).trim(),
-    newPassword:
-      String(newPassword)
-  };
-
-  try {
-    const gasResult =
-      await forwardAuthToGoogleAppsScript(
-        payload
-      );
-
-    if (!gasResult?.success) {
-      return res.status(400).json({
-        success: false,
-        message:
-          gasResult?.message ||
-          'Kata sandi gagal diperbarui.'
-      });
-    }
-
-    return res.json({
-      success: true,
-      message:
-        gasResult.message ||
-        'Kata sandi berhasil diperbarui di Google Spreadsheet.'
-    });
-  } catch (error: any) {
-    console.error(
-      '[Auth] Reset password gagal:',
-      error
-    );
-
-    return res.status(502).json({
-      success: false,
-      message:
-        error?.message ||
-        'Gagal menyimpan kata sandi ke Google Spreadsheet.'
-    });
-  }
 });
 
 // POST /api/auth/change-password
@@ -1993,6 +1775,188 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(502).json({
       success: false,
       message: error?.message || 'Gagal menyimpan kata sandi ke Google Spreadsheet.'
+    });
+  }
+});
+
+// POST /api/auth/reset-password - Public forgot-password persistence
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { identifier, userId, email, memberId, newPassword } = req.body || {};
+  const password = String(newPassword || '');
+
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
+  }
+
+  const cleanIdentifier = String(identifier || '').trim();
+  const cleanUserId = String(userId || '').trim();
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanMemberId = String(memberId || '').trim();
+
+  if (!cleanIdentifier && !cleanUserId && !cleanEmail && !cleanMemberId) {
+    return res.status(400).json({ success: false, message: 'Identitas akun wajib diisi.' });
+  }
+
+  const matchedUser = db.users.find(u =>
+    (cleanUserId && String(u.id || '') === cleanUserId) ||
+    (cleanEmail && String(u.email || '').trim().toLowerCase() === cleanEmail) ||
+    (cleanMemberId && String(u.memberId || '') === cleanMemberId)
+  );
+  const matchedMember = db.members.find(m =>
+    (cleanMemberId && String(m.id || '') === cleanMemberId) ||
+    (cleanEmail && String(m.email || '').trim().toLowerCase() === cleanEmail)
+  );
+
+  if (!matchedUser && !matchedMember) {
+    return res.status(404).json({ success: false, message: 'Akun tidak ditemukan.' });
+  }
+
+  const normalizedIdentifier = cleanIdentifier.toLowerCase();
+  const identifierMatches =
+    (matchedUser && (String(matchedUser.id || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedUser.username || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedUser.email || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedUser.memberId || '').toLowerCase() === normalizedIdentifier)) ||
+    (matchedMember && (String(matchedMember.id || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedMember.nationalMemberNumber || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedMember.email || '').toLowerCase() === normalizedIdentifier ||
+      String(matchedMember.phone || '').toLowerCase() === normalizedIdentifier));
+
+  if (!identifierMatches) {
+    return res.status(400).json({ success: false, message: 'Identitas akun tidak sesuai dengan data akun yang ditemukan.' });
+  }
+
+  try {
+    const passwordHash = hashPassword(password);
+    const gasResult = await forwardToGoogleAppsScript({
+      action: 'AUTH_RESET_PASSWORD',
+      identifier: cleanIdentifier,
+      userId: cleanUserId || String(matchedUser?.id || matchedMember?.userId || '').trim(),
+      email: cleanEmail || String(matchedUser?.email || matchedMember?.email || '').trim().toLowerCase(),
+      memberId: cleanMemberId || String(matchedUser?.memberId || matchedMember?.id || '').trim(),
+      passwordHash
+    }, DEFAULT_APPS_SCRIPT_URL);
+
+    if (!gasResult?.success) {
+      return res.status(400).json({
+        success: false,
+        message: gasResult?.message || 'Kata sandi gagal diperbarui di Google Spreadsheet.'
+      });
+    }
+
+    const matchingUsers = db.users
+      .map((user, index) => ({ user, index }))
+      .filter(({ user }) =>
+        (cleanUserId && String(user.id || '') === cleanUserId) ||
+        (cleanEmail && String(user.email || '').trim().toLowerCase() === cleanEmail) ||
+        (cleanMemberId && String(user.memberId || '') === cleanMemberId)
+      );
+
+    for (const { user, index } of matchingUsers) {
+      db.users[index] = { ...user, passwordHash };
+    }
+    if (matchingUsers.length > 0) saveDatabase();
+
+    return res.json({
+      success: true,
+      message: 'Kata sandi berhasil diperbarui dan disimpan di Google Spreadsheet.'
+    });
+  } catch (error: any) {
+    console.error('[Auth] Reset password ke Google Apps Script gagal:', error);
+    return res.status(502).json({
+      success: false,
+      message: error?.message || 'Gagal menyimpan kata sandi ke Google Spreadsheet.'
+    });
+  }
+});
+
+// POST /api/admin/reset-member-password - Super Admin membantu anggota yang lupa password
+app.post('/api/admin/reset-member-password', async (req, res) => {
+  const session = getSessionUser(req);
+  if (!session) {
+    return res.status(401).json({ success: false, message: 'Sesi administrator tidak ditemukan. Silakan masuk kembali.' });
+  }
+  if (session.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat mereset kata sandi anggota.' });
+  }
+
+  const { memberId, userId, email, newPassword } = req.body || {};
+  const password = String(newPassword || '');
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, message: 'Kata sandi baru minimal 6 karakter.' });
+  }
+
+  const cleanMemberId = String(memberId || '').trim();
+  const cleanUserId = String(userId || '').trim();
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!cleanMemberId && !cleanUserId && !cleanEmail) {
+    return res.status(400).json({ success: false, message: 'Identitas anggota tidak lengkap.' });
+  }
+
+  const member = db.members.find(m =>
+    (cleanMemberId && String(m.id || '') === cleanMemberId) ||
+    (cleanEmail && String(m.email || '').trim().toLowerCase() === cleanEmail)
+  );
+  const user = db.users.find(u =>
+    (cleanUserId && String(u.id || '') === cleanUserId) ||
+    (cleanMemberId && String(u.memberId || '') === cleanMemberId) ||
+    (cleanEmail && String(u.email || '').trim().toLowerCase() === cleanEmail)
+  );
+
+  if (!member && !user) {
+    return res.status(404).json({ success: false, message: 'Akun anggota tidak ditemukan di database aplikasi.' });
+  }
+
+  const resolvedMemberId = cleanMemberId || String(member?.id || user?.memberId || '').trim();
+  const resolvedUserId = cleanUserId || String(user?.id || member?.userId || '').trim();
+  const resolvedEmail = cleanEmail || String(user?.email || member?.email || '').trim().toLowerCase();
+
+  try {
+    const passwordHash = hashPassword(password);
+    const gasResult = await forwardAuthToGoogleAppsScript({
+      action: 'AUTH_RESET_PASSWORD',
+      userId: resolvedUserId,
+      memberId: resolvedMemberId,
+      email: resolvedEmail,
+      passwordHash,
+      resetByUserId: session.userId,
+      resetByUsername: session.username,
+      resetByName: session.name
+    });
+
+    if (!gasResult?.success) {
+      return res.status(400).json({
+        success: false,
+        message: gasResult?.message || 'Kata sandi gagal diperbarui di Google Spreadsheet.'
+      });
+    }
+
+    if (user) {
+      user.passwordHash = passwordHash;
+    }
+
+    db.auditLogs.unshift({
+      id: `audit-password-reset-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      userId: session.userId,
+      userName: session.name || session.username || 'Super Admin',
+      action: 'RESET_MEMBER_PASSWORD',
+      entityType: 'MEMBER',
+      entityId: resolvedMemberId || resolvedUserId,
+      description: `Super Admin mereset kata sandi anggota ${member?.fullName || resolvedEmail || resolvedMemberId}.`
+    });
+    if (db.auditLogs.length > 500) db.auditLogs.pop();
+    saveDatabase();
+
+    return res.json({
+      success: true,
+      message: 'Kata sandi anggota berhasil diperbarui dan disimpan di Google Spreadsheet.'
+    });
+  } catch (error: any) {
+    console.error('[Admin] Reset password anggota ke Google Apps Script gagal:', error);
+    return res.status(502).json({
+      success: false,
+      message: error?.message || 'Gagal menyimpan kata sandi anggota ke Google Spreadsheet.'
     });
   }
 });
