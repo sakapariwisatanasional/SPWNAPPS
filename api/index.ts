@@ -2429,11 +2429,14 @@ app.get('/api/spreadsheet-data', async (req, res) => {
   }
 
   const sheet = String(req.query?.sheet || 'Anggota').trim() || 'Anggota';
-  // The browser may not choose an arbitrary Apps Script deployment. The
-  // server-side configured deployment is the only upstream allowed here.
+  // Prefer the URL supplied by the active Dashboard/browser configuration,
+  // then fall back to the server configuration and environment. Every value is
+  // strictly validated as a Google Apps Script /exec URL before it is used.
+  const requestedScriptUrl = normalizeManualAppsScriptUrl(req.query?.scriptUrl);
   const configuredScriptUrl = normalizeManualAppsScriptUrl(db.config.scriptUrl);
   const envScriptUrl = normalizeManualAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_URL);
-  const scriptUrl = configuredScriptUrl || envScriptUrl;
+  const defaultScriptUrl = normalizeManualAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
+  const scriptUrl = requestedScriptUrl || configuredScriptUrl || envScriptUrl || defaultScriptUrl;
 
   if (!scriptUrl) {
     return res.status(400).json({
@@ -3807,3 +3810,4 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Vercel serverless entrypoint: export the Express app directly.
 export default app;
 export { app };
+
