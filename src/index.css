@@ -1,69 +1,52 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    /* --- Wonderful Indonesia Core Palette --- */
-    --wi-crimson: #E31E24;     /* Merah Semangat & Bendera */
-    --wi-gold: #F9B233;        /* Kuning Surya & Kehangatan */
-    --wi-forest: #00A859;      /* Hijau Rimba Khatulistiwa */
-    --wi-ocean: #00A8CC;       /* Biru Bahari Tropis */
-    --wi-purple: #7C3AED;      /* Ungu Seni & Budaya Nusantara */
+:root {
+  /* --- Wonderful Indonesia Palette --- */
+  --wi-crimson: #E31E24;
+  --wi-gold: #F9B233;
+  --wi-forest: #00A859;
+  --wi-ocean: #00A8CC;
+  --wi-purple: #7C3AED;
 
-    /* --- 4 Krida Saka Pariwisata Resmi --- */
-    --krida-pemandu: #E31E24;
-    --krida-pemandu-soft: #FEF2F2;
-    --krida-penyuluh: #00A8CC;
-    --krida-penyuluh-soft: #F0FDFA;
-    --krida-mice: #7C3AED;
-    --krida-mice-soft: #F5F3FF;
-    --krida-kuliner: #F9B233;
-    --krida-kuliner-soft: #FFFBEB;
+  /* --- 4 Krida Saka Pariwisata --- */
+  --krida-pemandu: #E31E24;
+  --krida-penyuluh: #00A8CC;
+  --krida-mice: #7C3AED;
+  --krida-kuliner: #F9B233;
 
-    /* --- Base Surface & Contrast --- */
-    --bg-canvas: #F8FAFC;
-    --card-surface: #FFFFFF;
-    --text-main: #0F172A;
-    --text-muted: #64748B;
-    
-    /* --- Modern Youthful Radius --- */
-    --radius-btn: 14px;
-    --radius-card: 22px;
-    --radius-modal: 26px;
-  }
-
-  body {
-    background-color: var(--bg-canvas);
-    color: var(--text-main);
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+  /* --- Radius Standar --- */
+  --radius-btn: 14px;
+  --radius-card: 20px;
+  --radius-modal: 24px;
 }
 
-/* --- Card & Micro-Interaction Helpers --- */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #F8FAFC;
+  color: #0F172A;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Helper Class Modern Card & UI */
 .card-youth {
   background: #FFFFFF;
   border-radius: var(--radius-card);
-  box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05), 0 4px 12px -2px rgba(15, 23, 42, 0.02);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
   border: 1px solid rgba(226, 232, 240, 0.8);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .card-youth:hover {
   transform: translateY(-3px);
-  box-shadow: 0 20px 35px -8px rgba(15, 23, 42, 0.08), 0 8px 16px -4px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 16px 32px -4px rgba(15, 23, 42, 0.08);
 }
 
-/* Gradient Badge & KTA Wonderful Indonesia */
 .gradient-wi-primary {
   background: linear-gradient(135deg, #E31E24 0%, #EA580C 50%, #F9B233 100%);
 }
 
-.gradient-wi-krida {
-  background: linear-gradient(135deg, #E31E24 0%, #7C3AED 50%, #00A8CC 100%);
-}
-
-/* Sembunyikan scrollbar horizontal tetapi tetap bisa di-swipe jempol */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
