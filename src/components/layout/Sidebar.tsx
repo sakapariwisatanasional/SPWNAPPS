@@ -1,12 +1,16 @@
 import React from 'react';
-import {
-  LayoutDashboard,
-  Users,
-  Compass,
-  Award,
-  CalendarDays,
-  MapPin,
-  History,
+import { 
+  LayoutDashboard, 
+  Users, 
+  Compass, 
+  Award, 
+  CalendarDays, 
+  MapPin, 
+  ShieldCheck, 
+  History, 
+  LogOut, 
+  ExternalLink,
+  ChevronRight,
   Sparkles,
   CreditCard,
   Utensils,
@@ -15,11 +19,8 @@ import {
   FileSpreadsheet,
   FolderOpen,
   BookOpen,
-  ShoppingBag,
-  Globe2,
-  type LucideIcon,
+  ShoppingBag
 } from 'lucide-react';
-
 import { CurrentUser } from '../../types';
 import { SakaLogo } from '../common/SakaLogo';
 
@@ -35,134 +36,6 @@ interface SidebarProps {
   onOpenDriveModal?: () => void;
 }
 
-interface SidebarItemProps {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-  currentTab: string;
-  onClick: () => void;
-  badge?: string;
-  badgeTone?: 'purple' | 'amber' | 'emerald' | 'slate';
-  disabled?: boolean;
-}
-
-const ADMIN_ROLES = [
-  'SUPER_ADMIN',
-  'ADMIN_NATIONAL',
-  'ADMIN_PROVINCE',
-  'ADMIN_REGENCY',
-  'ADMIN_BRANCH',
-] as const;
-
-const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN: 'SUPER ADMIN',
-  ADMIN_NATIONAL: 'ADMIN NASIONAL',
-  ADMIN_PROVINCE: 'ADMIN PROVINSI',
-  ADMIN_REGENCY: 'ADMIN KABUPATEN',
-  ADMIN_BRANCH: 'ADMIN KECAMATAN',
-  MEMBER: 'ANGGOTA',
-};
-
-const BADGE_TONE_CLASSES: Record<
-  NonNullable<SidebarItemProps['badgeTone']>,
-  string
-> = {
-  purple:
-    'bg-purple-500/10 text-purple-300 border border-purple-400/15',
-  amber:
-    'bg-amber-500/10 text-amber-300 border border-amber-400/15',
-  emerald:
-    'bg-emerald-500/10 text-emerald-300 border border-emerald-400/15',
-  slate:
-    'bg-slate-800/80 text-slate-300 border border-slate-700/70',
-};
-
-const SidebarItem: React.FC<SidebarItemProps> = ({
-  id,
-  label,
-  icon: Icon,
-  currentTab,
-  onClick,
-  badge,
-  badgeTone = 'slate',
-  disabled = false,
-}) => {
-  const isActive = currentTab === id;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-current={isActive ? 'page' : undefined}
-      className={[
-        'group relative w-full min-h-10 flex items-center gap-3',
-        'px-3 py-2.5 rounded-xl',
-        'text-left text-sm font-medium',
-        'transition-colors duration-150',
-        'focus:outline-none focus-visible:ring-2',
-        'focus-visible:ring-purple-400/70',
-        'focus-visible:ring-offset-2',
-        'focus-visible:ring-offset-slate-950',
-        'disabled:pointer-events-none disabled:opacity-50',
-        isActive
-          ? 'bg-purple-500/10 text-white'
-          : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-100',
-      ].join(' ')}
-    >
-      {/* Active indicator */}
-      {isActive && (
-        <span
-          aria-hidden="true"
-          className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-purple-400"
-        />
-      )}
-
-      <Icon
-        aria-hidden="true"
-        className={[
-          'w-[18px] h-[18px] shrink-0 transition-colors',
-          isActive
-            ? 'text-purple-400'
-            : 'text-slate-500 group-hover:text-slate-300',
-        ].join(' ')}
-      />
-
-      <span className="flex-1 min-w-0 truncate">{label}</span>
-
-      {badge && (
-        <span
-          className={[
-            'shrink-0 inline-flex items-center',
-            'px-1.5 py-0.5 rounded-md',
-            'text-[9px] leading-none font-semibold',
-            'tracking-wide',
-            BADGE_TONE_CLASSES[badgeTone],
-          ].join(' ')}
-        >
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-};
-
-interface SidebarSectionLabelProps {
-  children: React.ReactNode;
-}
-
-const SidebarSectionLabel: React.FC<SidebarSectionLabelProps> = ({
-  children,
-}) => {
-  return (
-    <div className="px-3 pt-4 pb-1.5 first:pt-1">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {children}
-      </p>
-    </div>
-  );
-};
-
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
@@ -172,483 +45,354 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile = false,
   onCloseMobile,
   onOpenSpreadsheetModal,
-  onOpenDriveModal,
+  onOpenDriveModal
 }) => {
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
-
-  const isAdmin = ADMIN_ROLES.includes(
-    currentUser.role as (typeof ADMIN_ROLES)[number],
-  );
-
+  const isAdmin = ['SUPER_ADMIN', 'ADMIN_NATIONAL', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
   const isMember = currentUser.role === 'MEMBER';
-
-  const roleLabel =
-    ROLE_LABELS[currentUser.role] ||
-    currentUser.role.replace(/_/g, ' ');
 
   const handleItemClick = (tab: string) => {
     onSelectTab(tab);
-    onCloseMobile?.();
+    if (onCloseMobile) {
+      onCloseMobile();
+    }
   };
-
-  const handleActionClick = (action: () => void) => {
-    action();
-    onCloseMobile?.();
-  };
-
-  const dashboardLabel = isSuperAdmin
-    ? 'Dashboard Super Admin'
-    : currentUser.role === 'ADMIN_NATIONAL'
-      ? 'Dashboard Admin Nasional'
-      : currentUser.role === 'ADMIN_PROVINCE'
-        ? 'Dashboard Kwarda'
-        : currentUser.role === 'ADMIN_REGENCY'
-          ? 'Dashboard Kwarcab'
-          : 'Dashboard Kecamatan';
-
-  const administrationLabel =
-    isSuperAdmin || currentUser.role === 'ADMIN_NATIONAL'
-      ? 'Administrasi Nasional'
-      : 'Administrasi Wilayah';
 
   const content = (
-    <div
-      className={[
-        'app-sidebar relative z-20 flex h-full w-72 sm:w-80 lg:w-64',
-        'flex-shrink-0 flex-col',
-        'bg-slate-950 text-white',
-        'border-r border-slate-800/80',
-        'shadow-2xl',
-        'select-none',
-      ].join(' ')}
-    >
-      {/* =========================================================
-          BACKGROUND DECORATION
-          ========================================================= */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-purple-950/30 via-purple-950/10 to-transparent"
-      />
+    <div className="app-sidebar w-72 sm:w-80 lg:w-64 h-full bg-slate-950 text-white flex flex-col flex-shrink-0 border-r border-slate-800/80 select-none shadow-2xl z-20 relative">
+      {/* Subtle Purple Glow Overlay */}
+      <div className="absolute top-0 left-0 right-0 h-56 bg-gradient-to-b from-purple-900/25 via-fuchsia-900/10 to-transparent pointer-events-none" />
 
-      {/* =========================================================
-          BRAND HEADER
-          ========================================================= */}
-      <header className="relative z-10 flex items-center justify-between border-b border-slate-800/80 px-4 py-4 sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <SakaLogo
-            size={40}
-            id="sidebar-saka-logo"
-          />
-
-          <div className="min-w-0 leading-none">
-            <h1 className="truncate font-heading text-sm font-extrabold uppercase tracking-wide text-white">
-              Saka{' '}
-              <span className="text-purple-400">
-                Pariwisata
-              </span>
+      {/* Brand Header with SakaLogo & Mobile Close Button */}
+      <div className="p-4 sm:p-5 border-b border-slate-800/80 relative z-10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <SakaLogo size={40} id="sidebar-saka-logo" />
+          <div className="leading-none">
+            <h1 className="font-extrabold text-sm tracking-wide uppercase font-heading text-white">
+              Saka <span className="text-purple-400">Pariwisata</span>
             </h1>
-
-            <p className="mt-1.5 text-[9px] font-medium uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-[10px] text-purple-200/60 uppercase tracking-widest font-medium mt-1">
               Kwartir Nasional
             </p>
           </div>
         </div>
 
-        {/* Mobile close */}
+        {/* Mobile Close Button */}
         {onCloseMobile && (
           <button
-            type="button"
             onClick={onCloseMobile}
-            aria-label="Tutup menu navigasi"
-            className={[
-              'lg:hidden flex h-9 w-9 shrink-0 items-center justify-center',
-              'rounded-xl border border-slate-800',
-              'bg-slate-900/80 text-slate-400',
-              'transition-colors',
-              'hover:bg-slate-800 hover:text-white',
-              'focus:outline-none focus-visible:ring-2',
-              'focus-visible:ring-purple-400/70',
-              'focus-visible:ring-offset-2',
-              'focus-visible:ring-offset-slate-950',
-            ].join(' ')}
+            className="lg:hidden w-10 h-10 rounded-2xl bg-slate-900/90 text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center border border-slate-800 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 transition-all focus:outline-none focus:ring-2 focus:ring-purple-400/60 focus:ring-offset-2 focus:ring-offset-slate-950"
+            aria-label="Tutup Menu"
           >
-            <X
-              aria-hidden="true"
-              className="h-4 w-4"
-            />
+            <X className="w-4 h-4" />
           </button>
         )}
-      </header>
+      </div>
 
-      {/* =========================================================
-          NAVIGATION
-          ========================================================= */}
-      <nav
-        aria-label="Navigasi utama"
-        className="relative z-10 flex-1 overflow-y-auto px-2.5 pb-5 custom-scrollbar"
-      >
-        {/* -------------------------------------------------------
-            CONTEXT / ROLE
-            ------------------------------------------------------- */}
-        <div className="mx-1 mb-1 flex items-center justify-between gap-2 border-b border-slate-800/70 px-2 pb-3 pt-3">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">
-            Navigasi
-          </span>
-
-          <span
-            title={`Peran: ${roleLabel}`}
-            className="max-w-[120px] truncate rounded-md border border-slate-800 bg-slate-900/70 px-2 py-1 font-mono text-[8px] font-medium uppercase tracking-wide text-slate-500"
-          >
-            {roleLabel}
+      {/* Navigation List */}
+      <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto custom-scrollbar relative z-10">
+        {/* Main Section */}
+        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest px-3.5 py-2.5 min-h-10 mb-1 flex items-center justify-between">
+          <span>Menu Utama</span>
+          <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-800/50 px-2 py-0.5 rounded font-mono">
+            {currentUser.role.replace('_', ' ')}
           </span>
         </div>
 
-        {/* =======================================================
-            UTAMA
-            ======================================================= */}
-        <SidebarSectionLabel>
-          Utama
-        </SidebarSectionLabel>
-
-        <SidebarItem
-          id="landing"
-          label="Beranda"
-          icon={Home}
-          currentTab={currentTab}
+        {/* Landing Page */}
+        <button
           onClick={() => handleItemClick('landing')}
-        />
+          aria-current={currentTab === 'landing' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            currentTab === 'landing'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+          }`}
+        >
+          <Home className={`w-4 h-4 ${currentTab === 'landing' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Halaman Utama (Landing)</span>
+        </button>
 
+        {/* Dashboard Menu Item - Adapted to Role */}
         {isAdmin && (
-          <SidebarItem
-            id="dashboard"
-            label={dashboardLabel}
-            icon={LayoutDashboard}
-            currentTab={currentTab}
+          <button
             onClick={() => handleItemClick('dashboard')}
-          />
+            aria-current={currentTab === 'dashboard' ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+              currentTab === 'dashboard'
+                ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+                : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+            }`}
+          >
+            <LayoutDashboard className={`w-4 h-4 ${currentTab === 'dashboard' ? 'text-purple-400' : 'text-slate-400'}`} />
+            <span className="flex-1 truncate">
+              {isSuperAdmin ? 'Dashboard Super Admin' : 
+               currentUser.role === 'ADMIN_NATIONAL' ? 'Dashboard Admin Nasional' :
+               currentUser.role === 'ADMIN_PROVINCE' ? 'Dashboard Kwarda' :
+               currentUser.role === 'ADMIN_REGENCY' ? 'Dashboard Kwarcab' : 'Dashboard Kecamatan'}
+            </span>
+            {currentTab === 'dashboard' && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />}
+          </button>
         )}
 
+        {/* Member Personal KTA */}
         {isMember && (
-          <SidebarItem
-            id="my-card"
-            label="Kartu Anggota"
-            icon={CreditCard}
-            currentTab={currentTab}
+          <button
             onClick={() => handleItemClick('my-card')}
-          />
+            aria-current={currentTab === 'my-card' ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+              currentTab === 'my-card'
+                ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+                : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+            }`}
+          >
+            <CreditCard className={`w-4 h-4 ${currentTab === 'my-card' ? 'text-purple-400' : 'text-slate-400'}`} />
+            <span className="flex-1">Kartu Anggota (KTA)</span>
+            {currentTab === 'my-card' && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />}
+          </button>
         )}
 
+        {/* Member Management (Admin & Operator Only) */}
         {isAdmin && (
-          <SidebarItem
-            id="members"
-            label="Manajemen Anggota"
-            icon={Users}
-            currentTab={currentTab}
+          <button
             onClick={() => handleItemClick('members')}
-          />
+            aria-current={currentTab === 'members' ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+              currentTab === 'members'
+                ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+                : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+            }`}
+          >
+            <Users className={`w-4 h-4 ${currentTab === 'members' ? 'text-purple-400' : 'text-slate-400'}`} />
+            <span className="flex-1">Manajemen Anggota</span>
+          </button>
         )}
 
-        {/* =======================================================
-            EKSPLORASI
-            ======================================================= */}
-        <SidebarSectionLabel>
-          Eksplorasi
-        </SidebarSectionLabel>
-
-        <SidebarItem
-          id="tours"
-          label="Paket Wisata"
-          icon={Compass}
-          currentTab={currentTab}
+        {/* Tourism Directory */}
+        <button
           onClick={() => handleItemClick('tours')}
-        />
+          aria-current={currentTab === 'tours' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            currentTab === 'tours'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+          }`}
+        >
+          <Compass className={`w-4 h-4 ${currentTab === 'tours' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Paket Wisata</span>
+        </button>
 
-        <SidebarItem
-          id="culinary-souvenirs"
-          label="Kuliner & Cinderamata"
-          icon={Utensils}
-          currentTab={currentTab}
-          badge="4 Krida"
-          badgeTone="amber"
+        {/* Kuliner & Cinderamata Daerah */}
+        <button
           onClick={() => handleItemClick('culinary-souvenirs')}
-        />
+          aria-current={currentTab === 'culinary-souvenirs' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            currentTab === 'culinary-souvenirs'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+          }`}
+        >
+          <Utensils className={`w-4 h-4 ${currentTab === 'culinary-souvenirs' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Kuliner & Cinderamata</span>
+          <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded-md font-bold">4 Krida</span>
+        </button>
 
-        <SidebarItem
-          id="skills"
-          label="Direktori Keahlian"
-          icon={Award}
-          currentTab={currentTab}
-          onClick={() => handleItemClick('skills')}
-        />
-
-        <SidebarItem
-          id="activities"
-          label="Agenda & Kegiatan"
-          icon={CalendarDays}
-          currentTab={currentTab}
-          onClick={() => handleItemClick('activities')}
-        />
-
-        {/* =======================================================
-            PEMBELAJARAN
-            ======================================================= */}
-        <SidebarSectionLabel>
-          Pembelajaran
-        </SidebarSectionLabel>
-
-        <SidebarItem
-          id="krida-modules"
-          label="Modul & SKK"
-          icon={BookOpen}
-          currentTab={currentTab}
-          badge="23 SKK"
-          badgeTone="purple"
-          onClick={() => handleItemClick('krida-modules')}
-        />
-
-        {/* =======================================================
-            PORTAL
-            ======================================================= */}
-        <SidebarSectionLabel>
-          Portal
-        </SidebarSectionLabel>
-
-        <SidebarItem
-          id="verify-portal"
-          label="Portal Publik"
-          icon={Globe2}
-          currentTab={currentTab}
-          onClick={() => handleItemClick('verify-portal')}
-        />
-
-        <SidebarItem
-          id="official-store"
-          label="Official Merchandise"
-          icon={ShoppingBag}
-          currentTab={currentTab}
-          badge="Soon"
-          badgeTone="amber"
+        {/* Official Store */}
+        <button
           onClick={() => handleItemClick('official-store')}
-        />
+          aria-current={currentTab === 'official-store' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            currentTab === 'official-store'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+          }`}
+        >
+          <ShoppingBag className={`w-4 h-4 ${currentTab === 'official-store' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Official Merchandise</span>
+          <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded-md font-bold">Soon</span>
+        </button>
 
-        {/* =======================================================
-            ADMINISTRASI
-            ======================================================= */}
+        {/* Skills & Certification */}
+        <button
+          onClick={() => handleItemClick('skills')}
+          aria-current={currentTab === 'skills' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            currentTab === 'skills'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+          }`}
+        >
+          <Award className={`w-4 h-4 ${currentTab === 'skills' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Direktori Keahlian</span>
+        </button>
+
+        {/* Modul SKK & Silabus 4 Krida */}
+        <button
+          onClick={() => handleItemClick('krida-modules')}
+          aria-current={currentTab === 'krida-modules' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            currentTab === 'krida-modules'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+          }`}
+        >
+          <BookOpen className={`w-4 h-4 ${currentTab === 'krida-modules' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Modul & SKK 4 Krida</span>
+          <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded-md font-bold">23 SKK</span>
+        </button>
+
+        {/* Activities / Agenda */}
+        <button
+          onClick={() => handleItemClick('activities')}
+          aria-current={currentTab === 'activities' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            currentTab === 'activities'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+          }`}
+        >
+          <CalendarDays className={`w-4 h-4 ${currentTab === 'activities' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Agenda & Kegiatan</span>
+        </button>
+
+        {/* Public Portal (Wisata, Talenta, Verifikasi) */}
+        <button
+          onClick={() => handleItemClick('verify-portal')}
+          aria-current={currentTab === 'verify-portal' ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            currentTab === 'verify-portal'
+              ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+              : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+          }`}
+        >
+          <Compass className={`w-4 h-4 ${currentTab === 'verify-portal' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Portal Publik & Wisata</span>
+        </button>
+
+        {/* Administration Section (Only for Admins) */}
         {isAdmin && (
-          <>
-            <SidebarSectionLabel>
-              {administrationLabel}
-            </SidebarSectionLabel>
+          <div className="pt-4">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest px-3.5 py-2.5 min-h-10 mb-1">
+              {isSuperAdmin || currentUser.role === 'ADMIN_NATIONAL' ? 'Administrasi Nasional' : 'Administrasi Wilayah'}
+            </div>
 
-            {(isSuperAdmin ||
-              currentUser.role === 'ADMIN_NATIONAL' ||
-              currentUser.role === 'ADMIN_PROVINCE') && (
-              <SidebarItem
-                id="territories"
-                label="Master Wilayah"
-                icon={MapPin}
-                currentTab={currentTab}
+            {/* Master Wilayah: Super Admin & Province Admins */}
+            {(isSuperAdmin || currentUser.role === 'ADMIN_NATIONAL' || currentUser.role === 'ADMIN_PROVINCE') && (
+              <button
                 onClick={() => handleItemClick('territories')}
-              />
+                aria-current={currentTab === 'territories' ? 'page' : undefined}
+                className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+                  currentTab === 'territories'
+                    ? 'bg-gradient-to-r from-purple-600/20 via-fuchsia-600/15 to-transparent text-purple-200 font-semibold border border-purple-400/30 shadow-sm'
+                    : 'text-slate-400 hover:bg-slate-900/90 hover:text-slate-100 hover:border-slate-800'
+                }`}
+              >
+                <MapPin className={`w-4 h-4 ${currentTab === 'territories' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span className="flex-1">Master Wilayah</span>
+              </button>
             )}
 
+            {/* Audit Trail & Log: SUPER ADMIN ONLY */}
             {isSuperAdmin && (
-              <SidebarItem
-                id="audit-logs"
-                label="Audit Trail & Log"
-                icon={History}
-                currentTab={currentTab}
+              <button
                 onClick={() => handleItemClick('audit-logs')}
-              />
+                aria-current={currentTab === 'audit-logs' ? 'page' : undefined}
+                className={`w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+                  currentTab === 'audit-logs'
+                    ? 'bg-emerald-600/15 text-emerald-400 font-semibold border border-emerald-500/20 shadow-sm'
+                    : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
+                }`}
+              >
+                <History className={`w-4 h-4 ${currentTab === 'audit-logs' ? 'text-emerald-400' : 'text-slate-400'}`} />
+                <span className="flex-1">Audit Trail & Log</span>
+              </button>
             )}
 
-            {/* Google Spreadsheet */}
+            {/* Google Spreadsheet & Google Drive: SUPER ADMIN KWARTIR NASIONAL ONLY */}
             {isSuperAdmin && onOpenSpreadsheetModal && (
               <button
-                type="button"
-                onClick={() =>
-                  handleActionClick(onOpenSpreadsheetModal)
-                }
-                title="Akses Database Google Spreadsheet"
-                className={[
-                  'group mt-1 flex min-h-10 w-full items-center gap-3',
-                  'rounded-xl px-3 py-2.5',
-                  'text-left text-sm font-medium',
-                  'text-emerald-300',
-                  'bg-emerald-500/[0.06]',
-                  'border border-emerald-500/10',
-                  'transition-colors',
-                  'hover:bg-emerald-500/[0.10]',
-                  'hover:border-emerald-500/20',
-                  'focus:outline-none focus-visible:ring-2',
-                  'focus-visible:ring-emerald-400/60',
-                  'focus-visible:ring-offset-2',
-                  'focus-visible:ring-offset-slate-950',
-                ].join(' ')}
+                onClick={() => {
+                  onOpenSpreadsheetModal();
+                  if (onCloseMobile) onCloseMobile();
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-800/40 mt-1"
+                title="Akses Database Google Spreadsheet (Super Admin Kwarnas)"
               >
-                <FileSpreadsheet
-                  aria-hidden="true"
-                  className="h-[18px] w-[18px] shrink-0 text-emerald-400"
-                />
-
-                <span className="min-w-0 flex-1 truncate">
-                  Database Spreadsheet
-                </span>
-
-                <span className="shrink-0 rounded-md border border-emerald-400/10 bg-emerald-400/10 px-1.5 py-0.5 font-mono text-[8px] font-medium uppercase tracking-wide text-emerald-300">
-                  Kwarnas
-                </span>
+                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                <span className="flex-1">Database Spreadsheet</span>
+                <span className="text-[9px] px-1.5 py-0.5 bg-emerald-900 text-emerald-200 rounded font-mono">Kwarnas</span>
               </button>
             )}
 
-            {/* Google Drive */}
             {isSuperAdmin && onOpenDriveModal && (
               <button
-                type="button"
-                onClick={() =>
-                  handleActionClick(onOpenDriveModal)
-                }
-                title="Akses Media Google Drive Repository"
-                className={[
-                  'group mt-1 flex min-h-10 w-full items-center gap-3',
-                  'rounded-xl px-3 py-2.5',
-                  'text-left text-sm font-medium',
-                  'text-purple-300',
-                  'bg-purple-500/[0.06]',
-                  'border border-purple-500/10',
-                  'transition-colors',
-                  'hover:bg-purple-500/[0.10]',
-                  'hover:border-purple-500/20',
-                  'focus:outline-none focus-visible:ring-2',
-                  'focus-visible:ring-purple-400/60',
-                  'focus-visible:ring-offset-2',
-                  'focus-visible:ring-offset-slate-950',
-                ].join(' ')}
+                onClick={() => {
+                  onOpenDriveModal();
+                  if (onCloseMobile) onCloseMobile();
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl font-medium text-sm transition-all text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 bg-purple-950/40 text-purple-300 hover:bg-purple-950/70 border border-purple-800/40 mt-1"
+                title="Akses Media Google Drive Repository (Super Admin Kwarnas)"
               >
-                <FolderOpen
-                  aria-hidden="true"
-                  className="h-[18px] w-[18px] shrink-0 text-purple-400"
-                />
-
-                <span className="min-w-0 flex-1 truncate">
-                  Media Google Drive
-                </span>
-
-                <span className="shrink-0 rounded-md border border-purple-400/10 bg-purple-400/10 px-1.5 py-0.5 font-mono text-[8px] font-medium uppercase tracking-wide text-purple-300">
-                  Cloud
-                </span>
+                <FolderOpen className="w-4 h-4 text-purple-400" />
+                <span className="flex-1">Media Google Drive</span>
+                <span className="text-[9px] px-1.5 py-0.5 bg-purple-900 text-purple-200 rounded font-mono">Cloud</span>
               </button>
             )}
-          </>
+          </div>
         )}
 
-        {/* =======================================================
-            QUICK ACTION
-            ======================================================= */}
-        <div className="px-1 pb-2 pt-5">
-          <div className="mb-2 px-2">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-slate-600">
-              Aksi Cepat
-            </p>
-          </div>
-
+        {/* Quick Action Button */}
+        <div className="pt-4 px-1 pb-6">
           <button
-            type="button"
-            onClick={() =>
-              handleActionClick(onOpenRegisterModal)
-            }
-            className={[
-              'group flex min-h-10 w-full items-center justify-center gap-2',
-              'rounded-xl px-3 py-2.5',
-              'bg-gradient-to-r from-emerald-500 to-teal-500',
-              'text-xs font-bold text-slate-950',
-              'shadow-lg shadow-emerald-950/20',
-              'transition-all duration-150',
-              'hover:-translate-y-0.5',
-              'hover:from-emerald-400 hover:to-teal-400',
-              'active:translate-y-0 active:scale-[0.98]',
-              'focus:outline-none focus-visible:ring-2',
-              'focus-visible:ring-emerald-300/80',
-              'focus-visible:ring-offset-2',
-              'focus-visible:ring-offset-slate-950',
-            ].join(' ')}
+            onClick={() => {
+              onOpenRegisterModal();
+              if (onCloseMobile) onCloseMobile();
+            }}
+            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-semibold text-xs min-h-11 py-3 px-3 rounded-2xl flex items-center justify-center gap-2.5 shadow-md shadow-emerald-950/60 transition-all hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 focus-visible:ring-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
-            <Sparkles
-              aria-hidden="true"
-              className="h-4 w-4 transition-transform group-hover:rotate-6"
-            />
-
+            <Sparkles className="w-4 h-4" />
             <span>Daftar Anggota Baru</span>
           </button>
         </div>
       </nav>
 
-      {/* =========================================================
-          USER FOOTER
-          ========================================================= */}
-      <footer className="relative z-10 border-t border-slate-800/80 bg-slate-950/90 p-2.5">
-        <div className="flex items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-900/50 px-3 py-2.5">
-          <div className="relative shrink-0">
-            <img
-              src={currentUser.avatarUrl}
-              alt=""
-              aria-hidden="true"
-              className="h-9 w-9 rounded-lg border border-slate-700 object-cover"
-            />
-
-            {/* Online indicator */}
-            <span
-              aria-hidden="true"
-              className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-slate-950 bg-emerald-400"
-            />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-semibold text-slate-200">
-              {currentUser.name}
-            </p>
-
-            <p
-              className="mt-0.5 truncate text-[10px] font-medium text-slate-500"
-              title={currentUser.jurisdictionName || 'Nasional'}
-            >
+      {/* User Footer Profile */}
+      <div className="p-3 border-t border-slate-800/80 bg-slate-950/60">
+        <div className="bg-gradient-to-r from-slate-800/80 to-slate-800/50 rounded-2xl p-3 flex items-center gap-3 border border-slate-700/70 shadow-sm">
+          <img
+            src={currentUser.avatarUrl}
+            alt={currentUser.name}
+            className="w-9 h-9 rounded-xl object-cover border border-slate-600 flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-slate-200 truncate">{currentUser.name}</p>
+            <p className="text-[10px] text-emerald-400 font-medium truncate">
               {currentUser.jurisdictionName || 'Nasional'}
             </p>
           </div>
         </div>
-      </footer>
+      </div>
     </div>
   );
 
   return (
     <>
-      {/* =========================================================
-          DESKTOP SIDEBAR
-          ========================================================= */}
-      <aside className="hidden h-full flex-shrink-0 lg:flex">
+      {/* Desktop Persistent Sidebar */}
+      <aside className="hidden lg:flex h-full flex-shrink-0">
         {content}
       </aside>
 
-      {/* =========================================================
-          MOBILE DRAWER
-          ========================================================= */}
+      {/* Mobile Drawer with Backdrop */}
       {isOpenMobile && (
-        <div
-          className="fixed inset-0 z-50 flex lg:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Menu navigasi"
-        >
-          {/* Backdrop */}
-          <button
-            type="button"
-            aria-label="Tutup menu navigasi"
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          {/* Dark Backdrop */}
+          <div 
+            className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm transition-opacity animate-in fade-in"
             onClick={onCloseMobile}
-            className="fixed inset-0 cursor-default bg-slate-950/80 backdrop-blur-sm animate-in fade-in"
           />
 
-          {/* Drawer */}
-          <div className="relative z-10 flex h-full w-full max-w-xs animate-in slide-in-from-left duration-200">
+          {/* Drawer Slide-in */}
+          <div className="relative z-10 flex h-full max-w-xs w-full animate-in slide-in-from-left duration-200 shadow-2xl">
             {content}
           </div>
         </div>
