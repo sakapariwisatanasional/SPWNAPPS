@@ -157,7 +157,7 @@ const adminMenu = [
 
 
 
-export default function Sidebar({
+export function Sidebar({
 
   activePage =
   "dashboard",
