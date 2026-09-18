@@ -1,118 +1,326 @@
-import React from 'react';
-import { 
-  Home, 
-  Compass, 
-  Utensils, 
-  Users, 
-  CreditCard, 
-  Menu,
-  ChevronUp
-} from 'lucide-react';
-import { CurrentUser } from '../../types';
+import React from "react";
+
+import {
+  Home,
+  Compass,
+  CalendarDays,
+  CreditCard,
+  User
+} from "lucide-react";
+
+
+
+/**
+ * =====================================================
+ * SPWN APPS V2
+ * Mobile Bottom Navigation
+ *
+ * Saka Pariwisata UI
+ * =====================================================
+ */
+
+
 
 interface MobileBottomNavProps {
-  currentTab: string;
-  onSelectTab: (tab: string) => void;
-  currentUser: CurrentUser;
-  onOpenMobileMenu: () => void;
+
+
+  activePage?:
+  string;
+
+
+  onNavigate?:
+  (page:string)=>void;
+
+
 }
 
-export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
-  currentTab,
-  onSelectTab,
-  currentUser,
-  onOpenMobileMenu
-}) => {
-  const isMember = currentUser.role === 'MEMBER';
 
-  return (
-    <div className="app-mobile-nav lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/80 px-2 pt-1.5 pb-1.5 shadow-[0_-10px_32px_rgba(15,23,42,0.08)] safe-area-bottom">
-      <nav className="flex items-stretch justify-around gap-1 max-w-lg mx-auto w-full">
-        {/* 1. Landing Page / Beranda */}
-        <button
-          onClick={() => onSelectTab('landing')}
-          className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 min-h-[58px] rounded-2xl transition-all duration-200 cursor-pointer active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/60 focus-visible:ring-offset-1 ${
-            currentTab === 'landing'
-              ? 'text-fuchsia-700 font-bold bg-fuchsia-50'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-          }`}
-          aria-label="Beranda"
-        >
-          <div className="relative">
-            <Home className={`w-5 h-5 ${currentTab === 'landing' ? 'text-fuchsia-700 stroke-[2.5]' : 'text-slate-400'}`} />
-            {currentTab === 'landing' && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-fuchsia-600 rounded-full animate-pulse" />
-            )}
-          </div>
-          <span className="text-[10px] mt-1 leading-tight font-medium">Beranda</span>
-        </button>
 
-        {/* 2. Paket Wisata (Carousel & List) */}
-        <button
-          onClick={() => onSelectTab('tours')}
-          className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 min-h-[58px] rounded-2xl transition-all duration-200 cursor-pointer active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/60 focus-visible:ring-offset-1 ${
-            currentTab === 'tours'
-              ? 'text-fuchsia-700 font-bold bg-fuchsia-50'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-          }`}
-          aria-label="Paket Wisata"
-        >
-          <Compass className={`w-5 h-5 ${currentTab === 'tours' ? 'text-fuchsia-700 stroke-[2.5]' : 'text-slate-400'}`} />
-          <span className="text-[10px] mt-1 leading-tight font-medium">Wisata</span>
-        </button>
 
-        {/* 3. Kuliner & Cinderamata */}
-        <button
-          onClick={() => onSelectTab('culinary-souvenirs')}
-          className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 min-h-[58px] rounded-2xl transition-all duration-200 cursor-pointer active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/60 focus-visible:ring-offset-1 relative ${
-            currentTab === 'culinary-souvenirs'
-              ? 'text-fuchsia-700 font-bold bg-fuchsia-50'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-          }`}
-          aria-label="Kuliner dan Cinderamata"
-        >
-          <div className="relative">
-            <Utensils className={`w-5 h-5 ${currentTab === 'culinary-souvenirs' ? 'text-fuchsia-700 stroke-[2.5]' : 'text-slate-400'}`} />
-            <span className="absolute -top-1.5 -right-3 text-[8px] bg-amber-500 text-slate-950 font-extrabold px-1 rounded-full border border-white">
-              Baru
-            </span>
-          </div>
-          <span className="text-[10px] mt-1 leading-tight font-medium">Kuliner</span>
-        </button>
 
-        {/* 4. Keanggotaan / KTA */}
-        <button
-          onClick={() => onSelectTab(isMember ? 'my-card' : 'members')}
-          className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 min-h-[58px] rounded-2xl transition-all duration-200 cursor-pointer active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/60 focus-visible:ring-offset-1 ${
-            (currentTab === 'members' || currentTab === 'my-card')
-              ? 'text-fuchsia-700 font-bold bg-fuchsia-50'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-          }`}
-          aria-label={isMember ? 'KTA Saya' : 'Anggota'}
-        >
-          {isMember ? (
-            <CreditCard className={`w-5 h-5 ${(currentTab === 'members' || currentTab === 'my-card') ? 'text-fuchsia-700 stroke-[2.5]' : 'text-slate-400'}`} />
-          ) : (
-            <Users className={`w-5 h-5 ${(currentTab === 'members' || currentTab === 'my-card') ? 'text-fuchsia-700 stroke-[2.5]' : 'text-slate-400'}`} />
-          )}
-          <span className="text-[10px] mt-1 leading-tight font-medium">
-            {isMember ? 'KTA Saya' : 'Anggota'}
-          </span>
-        </button>
+const menus = [
 
-        {/* 5. Menu Lainnya (Drawer trigger) */}
-        <button
-          onClick={onOpenMobileMenu}
-          className="flex flex-col items-center justify-center flex-1 py-1.5 px-1 min-h-[58px] rounded-2xl text-slate-600 hover:text-fuchsia-700 hover:bg-slate-50 transition-all duration-200 cursor-pointer active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/60 focus-visible:ring-offset-1"
-          aria-label="Menu Lengkap" title="Buka menu lengkap"
-        >
-          <div className="relative w-8 h-8 rounded-xl bg-slate-100 hover:bg-fuchsia-50 border border-slate-200 hover:border-fuchsia-200 flex items-center justify-center transition-all duration-200">
-            <Menu className="w-4 h-4 text-slate-700" />
-            <ChevronUp className="absolute -top-1 -right-1 w-3 h-3 text-fuchsia-600 bg-white rounded-full" />
-          </div>
-          <span className="text-[10px] mt-0.5 leading-tight font-medium">Menu</span>
-        </button>
-      </nav>
-    </div>
-  );
-};
+
+  {
+
+    id:
+    "dashboard",
+
+    label:
+    "Home",
+
+    icon:
+    Home,
+
+  },
+
+
+  {
+
+    id:
+    "krida",
+
+    label:
+    "Krida",
+
+    icon:
+    Compass,
+
+  },
+
+
+  {
+
+    id:
+    "activity",
+
+    label:
+    "Aktivitas",
+
+    icon:
+    CalendarDays,
+
+  },
+
+
+  {
+
+    id:
+    "member-card",
+
+    label:
+    "Kartu",
+
+    icon:
+    CreditCard,
+
+  },
+
+
+  {
+
+    id:
+    "profile",
+
+    label:
+    "Profil",
+
+    icon:
+    User,
+
+  },
+
+
+];
+
+
+
+
+
+export function MobileBottomNav({
+
+  activePage =
+  "dashboard",
+
+
+  onNavigate,
+
+
+}:MobileBottomNavProps){
+
+
+
+return (
+
+
+
+<nav
+
+
+className="
+
+fixed
+
+bottom-0
+
+left-0
+
+right-0
+
+
+z-50
+
+
+lg:hidden
+
+
+bg-white/95
+
+backdrop-blur-md
+
+
+border-t
+
+border-gray-100
+
+
+px-3
+
+py-2
+
+
+"
+
+>
+
+
+<div
+
+
+className="
+
+flex
+
+items-center
+
+justify-around
+
+"
+
+>
+
+
+{
+
+
+menus.map((item)=>{
+
+
+const Icon =
+item.icon;
+
+
+
+const active =
+activePage === item.id;
+
+
+
+return (
+
+
+<button
+
+
+key={item.id}
+
+
+onClick={()=>onNavigate?.(item.id)}
+
+
+className={
+
+`
+
+flex
+
+flex-col
+
+items-center
+
+justify-center
+
+
+gap-1
+
+
+min-w-[56px]
+
+py-2
+
+
+rounded-2xl
+
+
+transition-all
+
+duration-300
+
+
+${
+active
+
+?
+
+"text-[#E31E24] bg-red-50"
+
+:
+
+"text-gray-500"
+
+}
+
+`
+
+}
+
+
+>
+
+
+<Icon
+
+size={22}
+
+strokeWidth={
+
+active ? 2.5 : 2
+
+}
+
+/>
+
+
+<span
+
+
+className="
+
+text-[11px]
+
+font-medium
+
+"
+
+>
+
+
+{item.label}
+
+
+</span>
+
+
+
+</button>
+
+
+);
+
+
+})
+
+}
+
+
+</div>
+
+
+
+</nav>
+
+
+);
+
+
+}
