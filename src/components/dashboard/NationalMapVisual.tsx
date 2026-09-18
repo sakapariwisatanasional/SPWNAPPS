@@ -1,127 +1,80 @@
-import React, { useMemo, useState } from 'react';
-import { Compass, Search, MapPin, ArrowUpRight, X } from 'lucide-react';
+import React from "react";
+import { MapPin } from "lucide-react";
 
-export interface NationalMapVisualProps {
+interface NationalMapVisualProps {
   members?: any[];
-  onSelectKwarda?: (kwardaName: string) => void;
+  [key:string]: any;
 }
 
-export const NationalMapVisual: React.FC<NationalMapVisualProps> = ({
-  members = [],
-  onSelectKwarda,
+export const NationalMapVisual:React.FC<NationalMapVisualProps> = ({
+  members = []
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
 
-  // Proteksi array anggota
-  const safeMembers = useMemo(() => {
-    return Array.isArray(members) ? members : [];
-  }, [members]);
-
-  // Agregasi jumlah anggota per Kwarda secara aman
-  const kwardaStats = useMemo(() => {
-    const counts: Record<string, number> = {};
-    safeMembers.forEach((m) => {
-      const region = m?.kwarda?.trim() || 'Nasional / Belum Terdata';
-      counts[region] = (counts[region] || 0) + 1;
-    });
-
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [safeMembers]);
-
-  // Filter Kwarda dengan pencarian
-  const filteredKwarda = useMemo(() => {
-    const q = (searchTerm || '').trim().toLowerCase();
-    if (!q) return kwardaStats;
-    return kwardaStats.filter((k) => k.name.toLowerCase().includes(q));
-  }, [kwardaStats, searchTerm]);
+  const total = Array.isArray(members) ? members.length : 0;
 
   return (
-    <div className="space-y-4">
-      {/* Banner Rekapitulasi */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-sky-50/50 border border-emerald-100/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+    <div className="
+      relative min-h-[280px]
+      rounded-[2rem]
+      overflow-hidden
+      bg-gradient-to-br
+      from-teal-50 via-white to-amber-50
+      border border-slate-200
+      p-6
+    ">
+
+      <div className="
+        absolute inset-0
+        opacity-20
+        bg-[radial-gradient(circle_at_center,_#00A8A8_1px,transparent_1px)]
+        bg-[length:24px_24px]
+      " />
+
+      <div className="relative z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white flex items-center justify-center shadow-sm shrink-0">
-            <Compass className="w-5 h-5" />
+          <div className="
+            w-12 h-12 rounded-2xl
+            bg-teal-100 text-teal-700
+            flex items-center justify-center
+          ">
+            <MapPin />
           </div>
+
           <div>
-            <h4 className="text-xs font-bold text-slate-800">
-              Sebaran Personel Nasional
-            </h4>
-            <p className="text-[11px] text-slate-500">
-              Tersebar di {kwardaStats.length} Kwartir Daerah se-Indonesia
+            <h3 className="font-black text-slate-900">
+              Persebaran Saka Pariwisata Nasional
+            </h3>
+            <p className="text-sm text-slate-500">
+              Monitoring anggota seluruh Indonesia
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Cari Kwarda..."
-              aria-label="Cari Kwarda"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 pr-8 py-2 text-xs bg-white/95 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 w-36 sm:w-44 min-h-10 shadow-sm"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm('')}
-                aria-label="Hapus pencarian"
-                title="Hapus pencarian"
-                className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+
+        <div className="
+          mt-10
+          flex items-center justify-center
+          min-h-[140px]
+        ">
+          <div className="
+            text-center
+            rounded-3xl
+            bg-white
+            shadow-sm
+            border
+            p-8
+          ">
+            <p className="text-4xl font-black text-red-600">
+              {total}
+            </p>
+            <p className="text-sm text-slate-500">
+              Total Anggota
+            </p>
           </div>
-          <span className="text-xs font-bold text-emerald-700 bg-white/95 px-3 py-2 rounded-xl border border-emerald-200 shrink-0 shadow-sm min-h-10 flex items-center">
-            {safeMembers.length.toLocaleString('id-ID')} Personel
-          </span>
         </div>
+
       </div>
 
-      {/* Grid Distribusi Kwarda */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
-        {filteredKwarda.length > 0 ? (
-          filteredKwarda.map((item, idx) => (
-            <div
-              key={idx}
-              onClick={() => onSelectKwarda && onSelectKwarda(item.name)}
-              role={onSelectKwarda ? 'button' : undefined}
-              tabIndex={onSelectKwarda ? 0 : undefined}
-              onKeyDown={(e) => {
-                if (onSelectKwarda && (e.key === 'Enter' || e.key === ' ')) {
-                  e.preventDefault();
-                  onSelectKwarda(item.name);
-                }
-              }}
-              className="group p-3 rounded-xl border border-slate-100 bg-white hover:bg-emerald-50/70 hover:border-emerald-200 hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col justify-between shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                  <MapPin className="w-3.5 h-3.5" />
-                </span>
-                <span className="text-[11px] font-semibold text-slate-700 truncate" title={item.name}>
-                  {item.name}
-                </span>
-                <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 ml-auto shrink-0 transition-colors" />
-              </div>
-              <div className="flex items-center justify-between mt-2 text-[10px] text-slate-400">
-                <span>Anggota</span>
-                <span className="font-bold text-emerald-600">{item.count.toLocaleString('id-ID')}</span>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="col-span-full py-8 text-center text-xs text-slate-400">
-            Kwarda tidak ditemukan
-          </div>
-        )}
-      </div>
     </div>
   );
 };
