@@ -91,7 +91,7 @@ class SpreadsheetService {
         const serverConfig = data.config as Partial<SpreadsheetConfig>;
         const currentLocalUrl = this.normalizeAppsScriptUrl(this.config.scriptUrl);
         const serverUrl = this.normalizeAppsScriptUrl(serverConfig.scriptUrl);
-        const activeScriptUrl = serverUrl || currentLocalUrl || DEFAULT_GAS_WEB_APP_URL;
+        const activeScriptUrl = DEFAULT_GAS_WEB_APP_URL; 
         this.config = {
           ...this.config,
           ...serverConfig,
@@ -262,8 +262,8 @@ class SpreadsheetService {
     const previousConfig = this.config;
     this.config = { ...this.config, ...updates };
     if (updates.scriptUrl !== undefined) {
-      const normalizedScriptUrl = this.normalizeAppsScriptUrl(updates.scriptUrl);
-      this.config.scriptUrl = normalizedScriptUrl || this.config.scriptUrl || DEFAULT_GAS_WEB_APP_URL;
+      // URL GAS adalah konfigurasi bawaan aplikasi; setting manual tidak diperlukan.
+      this.config.scriptUrl = DEFAULT_GAS_WEB_APP_URL;
     }
     localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
     this.notifySyncState();
@@ -352,7 +352,7 @@ class SpreadsheetService {
   }
 
   private async handleAutoSyncMutation(event: any) {
-    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
     if (!scriptUrl) return;
 
     this.syncState.isSaving = true;
@@ -461,7 +461,7 @@ class SpreadsheetService {
    * Hapus baris dari Google Spreadsheet berdasarkan ID atau Nomor KTA
    */
   public async deleteRowFromSpreadsheet(sheet: string, id: string, secondaryId?: string): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
     if (!scriptUrl) return { success: true, message: 'Tersimpan lokal.' };
 
     try {
@@ -589,7 +589,6 @@ class SpreadsheetService {
         const response = await fetch(`/api/spreadsheet-data?${params.toString()}`, {
           method: 'GET',
           cache: 'no-store',
-          credentials: 'same-origin',
           headers: {
             'Cache-Control': 'no-cache, no-store, max-age=0',
             'Pragma': 'no-cache',
@@ -602,8 +601,7 @@ class SpreadsheetService {
         try { data = text ? JSON.parse(text) : null; } catch {}
 
         if (!response.ok) {
-          const detail = data?.message || data?.error || text?.trim();
-          throw new Error(detail ? `HTTP ${response.status}: ${detail}` : `HTTP ${response.status}`);
+          throw new Error(data?.message || `HTTP ${response.status}`);
         }
 
         if (data?.success === false) {
@@ -707,7 +705,7 @@ class SpreadsheetService {
     }
 
     const provinceId = foundProv ? foundProv.id : '00';
-    const provinceName = foundProv ? foundProv.name : (rawProvince || 'KWARTIR NASIONAL');
+    const provinceName = foundProv ? foundProv.name : (rawProvince || 'Kwartir Nasional');
 
     let foundReg = REGENCIES_DATA.find(r => 
       (r.provinceId === provinceId || !foundProv) && 
@@ -715,7 +713,7 @@ class SpreadsheetService {
     );
 
     const regencyId = foundReg ? foundReg.id : (provinceId === '00' ? '00.00' : `${provinceId}.00`);
-    const regencyName = foundReg ? foundReg.name : (rawRegency || (provinceId === '00' ? 'TINGKAT NASIONAL' : 'Kabupaten/Kota belum ditentukan'));
+    const regencyName = foundReg ? foundReg.name : (rawRegency || (provinceId === '00' ? 'Pusat Nasional' : 'Kabupaten/Kota belum ditentukan'));
 
     return {
       provinceId,
@@ -807,7 +805,7 @@ class SpreadsheetService {
           ) || /kwartir\s+nasional|tingkat\s+nasional|pusat\s+nasional/i.test(String(rawReg || ''));
 
           const territory = isNationalRow
-            ? { provinceId: '00', provinceName: 'KWARTIR NASIONAL', regencyId: '00.00', regencyName: 'TINGKAT NASIONAL' }
+            ? { provinceId: '00', provinceName: 'Kwartir Nasional', regencyId: '00.00', regencyName: 'Pusat Nasional' }
             : this.resolveTerritory(rawProv, rawReg);
 
           const rawDistrict = this.getRowValue(row, [
@@ -926,13 +924,13 @@ class SpreadsheetService {
             joinYear: new Date().getFullYear(),
             educationLevel: 'SMA/SMK',
             occupation: 'Anggota Pramuka',
-            bio: `Anggota resmi Saka Pariwisata ${territory.provinceName}. Terdata di Pusat Data Saka Pariwisata Nasional.`,
+            bio: `Anggota resmi Saka Pariwisata ${territory.provinceName}. Terdata langsung dari Google Spreadsheet.`,
             status: statusRaw === 'ACTIVE' || statusRaw === 'PENDING' ? statusRaw : 'ACTIVE',
             registeredAt: pendingMember?.registeredAt || this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_12']) || new Date().toISOString(),
             verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
             isOperator: role !== 'MEMBER',
             operatorRole: role !== 'MEMBER' ? role : undefined,
-            operatorJurisdictionName: role === 'SUPER_ADMIN' || role === 'ADMIN_NATIONAL' ? 'KWARTIR NASIONAL' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? (rawDistrict || territory.regencyName) : undefined,
+            operatorJurisdictionName: role === 'SUPER_ADMIN' || role === 'ADMIN_NATIONAL' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? (rawDistrict || territory.regencyName) : undefined,
             skills: memberSkills,
             certifications: memberCerts,
             locationHistory: []
@@ -1028,7 +1026,7 @@ class SpreadsheetService {
               email: newM.email,
               name: newM.fullName,
               role: parsedRole,
-              jurisdictionName: parsedRole === 'SUPER_ADMIN' || parsedRole === 'ADMIN_NATIONAL' ? 'KWARTIR NASIONAL' : `${newM.districtName}, ${newM.regencyName}`,
+              jurisdictionName: parsedRole === 'SUPER_ADMIN' || parsedRole === 'ADMIN_NATIONAL' ? 'Kwartir Nasional' : `${newM.districtName}, ${newM.regencyName}`,
               jurisdictionId: parsedRole === 'SUPER_ADMIN' || parsedRole === 'ADMIN_NATIONAL' ? '00' : newM.regencyId,
               avatarUrl: newM.avatarUrl,
               memberId: newM.id
@@ -1179,7 +1177,7 @@ class SpreadsheetService {
               provinceName: prov,
               regencyId: '32.04',
               regencyName: reg,
-              districtId: '32.04.010',
+              districtId: '32.04.01',
               districtName: 'Sentra Saka',
               authorMemberId: 'mem-jabar-01',
               authorName: author,
@@ -1347,8 +1345,7 @@ class SpreadsheetService {
   }
 
   public getEffectiveAppsScriptUrl(): string {
-    const configured = this.normalizeAppsScriptUrl(this.config.scriptUrl);
-    return configured || DEFAULT_GAS_WEB_APP_URL;
+    return DEFAULT_GAS_WEB_APP_URL;
   }
 
   /**
@@ -1671,7 +1668,7 @@ class SpreadsheetService {
    * Kirim data paket wisata ke Google Spreadsheet
    */
   public async appendTourToSpreadsheet(tour: TourPackage): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
     if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
 
     try {
@@ -1712,7 +1709,7 @@ class SpreadsheetService {
    * Kirim data produk kuliner & cinderamata ke Google Spreadsheet
    */
   public async appendCulinaryToSpreadsheet(item: CulinarySouvenirItem): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
     if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
 
     try {
@@ -1753,7 +1750,7 @@ class SpreadsheetService {
    * Kirim agenda kegiatan / event ke Google Spreadsheet
    */
   public async appendActivityToSpreadsheet(activity: any): Promise<{ success: boolean; message: string }> {
-    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
     if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
 
     try {
@@ -1796,7 +1793,7 @@ class SpreadsheetService {
    * Unggah seluruh data lokal ke Google Spreadsheet secara menyeluruh (Batch Sync)
    */
   public async pushAllDataToSpreadsheet(): Promise<{ success: boolean; message: string; counts: { members: number; tours: number; culinary: number; activities: number } }> {
-    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
     const members = storage.getMembers();
     const tours = storage.getTourPackages();
     const culinary = storage.getCulinarySouvenirs();
@@ -2141,7 +2138,7 @@ class SpreadsheetService {
    * Inisialisasi struktur subfolder di Google Drive folder 16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh
    */
   public async setupDriveFolders(): Promise<{ success: boolean; directActionUrl?: string; message: string }> {
-    const scriptUrl = this.getEffectiveAppsScriptUrl();
+    const scriptUrl = DEFAULT_GAS_WEB_APP_URL;
     if (!scriptUrl) {
       return {
         success: false,
@@ -2404,82 +2401,6 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-
-function resetPasswordInUsersSheet_(body) {
-  var ss = getActiveOrConfiguredSpreadsheet();
-  if (!ss) throw new Error('Spreadsheet tidak dapat dibuka.');
-
-  var sheet = ss.getSheetByName('Users');
-  if (!sheet) throw new Error('Sheet Users tidak ditemukan.');
-
-  var values = sheet.getDataRange().getValues();
-  if (!values || values.length === 0) throw new Error('Sheet Users belum memiliki header.');
-
-  var headers = values[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
-  function findColumn_(aliases) {
-    for (var i = 0; i < aliases.length; i++) {
-      var idx = headers.indexOf(String(aliases[i]).toLowerCase());
-      if (idx >= 0) return idx;
-    }
-    return -1;
-  }
-
-  var idCol = findColumn_(['id', 'user id', 'userid', 'user_id']);
-  var usernameCol = findColumn_(['username', 'user name', 'nama pengguna', 'nama user']);
-  var emailCol = findColumn_(['email', 'alamat email']);
-  var memberIdCol = findColumn_(['member id', 'memberid', 'member_id', 'id anggota']);
-  var passwordCol = findColumn_(['password hash', 'passwordhash', 'password_hash', 'password', 'kata sandi', 'kata sandi hash']);
-
-  if (passwordCol < 0) {
-    passwordCol = headers.length;
-    sheet.getRange(1, passwordCol + 1).setValue('Password Hash');
-  }
-
-  var targetUserId = String(body.userId || '').trim();
-  var targetUsername = String(body.username || '').trim().toLowerCase();
-  var targetEmail = String(body.email || '').trim().toLowerCase();
-  var targetMemberId = String(body.memberId || '').trim();
-  var targetIdentifier = String(body.identifier || '').trim().toLowerCase();
-  var targetRow = -1;
-
-  for (var r = 1; r < values.length; r++) {
-    var row = values[r];
-    var rowId = idCol >= 0 ? String(row[idCol] || '').trim() : '';
-    var rowUsername = usernameCol >= 0 ? String(row[usernameCol] || '').trim().toLowerCase() : '';
-    var rowEmail = emailCol >= 0 ? String(row[emailCol] || '').trim().toLowerCase() : '';
-    var rowMemberId = memberIdCol >= 0 ? String(row[memberIdCol] || '').trim() : '';
-
-    var matched =
-      (targetUserId && rowId === targetUserId) ||
-      (targetUsername && rowUsername === targetUsername) ||
-      (targetEmail && rowEmail === targetEmail) ||
-      (targetMemberId && rowMemberId === targetMemberId) ||
-      (targetIdentifier && (rowId.toLowerCase() === targetIdentifier || rowUsername === targetIdentifier || rowEmail === targetIdentifier || rowMemberId.toLowerCase() === targetIdentifier));
-
-    if (matched) {
-      targetRow = r + 1;
-      break;
-    }
-  }
-
-  if (targetRow < 0) throw new Error('Akun pada sheet Users tidak ditemukan.');
-
-  var passwordHash = String(body.passwordHash || '').trim();
-  if (!passwordHash) throw new Error('Password hash kosong.');
-
-  sheet.getRange(targetRow, passwordCol + 1).setValue(passwordHash);
-  SpreadsheetApp.flush();
-
-  return {
-    status: 'success',
-    success: true,
-    action: 'AUTH_RESET_PASSWORD',
-    userId: targetUserId,
-    memberId: targetMemberId,
-    message: 'Kata sandi berhasil diperbarui pada sheet Users.'
-  };
-}
-
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -2508,13 +2429,6 @@ function doPost(e) {
 
     var ss = getActiveOrConfiguredSpreadsheet();
     var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
-
-    // 0. RESET PASSWORD — update Users sheet with the server-generated hash.
-    if (body.action === "AUTH_RESET_PASSWORD") {
-      var resetResult = resetPasswordInUsersSheet_(body);
-      return ContentService.createTextOutput(JSON.stringify(resetResult))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
 
     // 1. AKSI INISIALISASI STRUKTUR SUBFOLDER DI GOOGLE DRIVE (TANPA DUPLIKASI)
     if (body.action === "SETUP_DRIVE_FOLDERS" || (e.parameter && e.parameter.action === "SETUP_DRIVE_FOLDERS")) {
