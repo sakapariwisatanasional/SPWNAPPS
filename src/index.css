@@ -1,20 +1,14 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 
 /* =====================================================
    SPWN APPS V2
    Saka Pariwisata Design System
-   Wonderful Indonesia Theme
+   Tailwind CSS v4 Compatible
 ===================================================== */
 
 
 :root {
-
-  /* ===============================
-     BRAND COLORS
-  =============================== */
 
   --spwn-primary: #E31E24;
   --spwn-primary-dark: #B91C1C;
@@ -26,105 +20,63 @@
   --spwn-success: #2E8B57;
 
 
-  /* ===============================
-     KRIDA COLORS
-  =============================== */
+  /* KRIDA */
 
   --krida-pemandu: #E31E24;
 
-  --krida-penyuluh:
-  #00A8A8;
+  --krida-penyuluh: #00A8A8;
 
-  --krida-mice:
-  #7C3AED;
+  --krida-mice: #7C3AED;
 
-  --krida-kuliner:
-  #F9B233;
+  --krida-kuliner: #F9B233;
 
 
 
-  /* ===============================
-     BACKGROUND
-  =============================== */
+  /* SURFACE */
 
   --background:
   #F8FAFC;
-
 
   --surface:
   #FFFFFF;
 
 
-  --surface-soft:
-  #F1F5F9;
-
-
-
-  /* ===============================
-     TEXT
-  =============================== */
+  /* TEXT */
 
   --text-primary:
   #111827;
-
 
   --text-secondary:
   #6B7280;
 
 
-  --text-muted:
-  #94A3B8;
-
-
-
-  /* ===============================
-     BORDER
-  =============================== */
+  /* BORDER */
 
   --border:
   #E5E7EB;
 
 
+  /* RADIUS */
 
-  /* ===============================
-     RADIUS
-  =============================== */
+  --radius-card:
+  20px;
 
   --radius-button:
   14px;
 
 
-  --radius-input:
-  14px;
-
-
-  --radius-card:
-  20px;
-
-
-  --radius-modal:
-  24px;
-
-
-
-  /* ===============================
-     SHADOW
-  =============================== */
+  /* SHADOW */
 
   --shadow-card:
   0 8px 24px rgba(0,0,0,.06);
-
-
-  --shadow-hover:
-  0 12px 32px rgba(0,0,0,.12);
 
 }
 
 
 
-/* =====================================================
-   GLOBAL RESET
-===================================================== */
+/* ===============================
+ GLOBAL
+================================ */
 
 
 * {
@@ -161,256 +113,175 @@ body {
 
 
   font-family:
-
   Inter,
   ui-sans-serif,
   system-ui,
-  -apple-system,
-  BlinkMacSystemFont,
-  "Segoe UI",
   sans-serif;
 
-
-  -webkit-font-smoothing:
-  antialiased;
-
 }
 
 
 
-/* =====================================================
-   SCROLLBAR
-===================================================== */
+/* ===============================
+ CARD SYSTEM
+================================ */
 
 
-::-webkit-scrollbar {
+.spwn-card {
 
-  width:
-  8px;
-
-}
-
-
-::-webkit-scrollbar-track {
 
   background:
-  #F1F5F9;
+  white;
+
+
+  border-radius:
+  var(--radius-card);
+
+
+  box-shadow:
+  var(--shadow-card);
+
+
+  transition:
+  all .3s ease;
 
 }
 
 
-::-webkit-scrollbar-thumb {
+
+.spwn-card:hover {
+
+
+  transform:
+  translateY(-4px);
+
+
+  box-shadow:
+  0 12px 32px rgba(0,0,0,.12);
+
+}
+
+
+
+/* ===============================
+ BUTTON SYSTEM
+================================ */
+
+
+.spwn-button-primary {
+
 
   background:
-  #CBD5E1;
+  var(--spwn-primary);
+
+
+  color:
+  white;
+
+
+  padding:
+  12px 20px;
+
+
+  border-radius:
+  var(--radius-button);
+
+
+  font-weight:
+  600;
+
+
+  transition:
+  all .25s ease;
+
+}
+
+
+
+.spwn-button-primary:hover {
+
+
+  background:
+  var(--spwn-primary-dark);
+
+
+  transform:
+  translateY(-2px);
+
+}
+
+
+
+
+.spwn-button-secondary {
+
+
+  background:
+  white;
+
+
+  color:
+  var(--spwn-primary);
+
+
+  border:
+  1px solid var(--spwn-primary);
+
+
+  padding:
+  12px 20px;
+
+
+  border-radius:
+  var(--radius-button);
+
+
+  font-weight:
+  600;
+
+}
+
+
+
+/* ===============================
+ CHIP
+================================ */
+
+
+.spwn-chip {
+
+
+  background:
+  white;
+
+
+  border:
+  1px solid var(--border);
 
 
   border-radius:
   999px;
 
-}
 
+  padding:
+  8px 16px;
 
-::-webkit-scrollbar-thumb:hover {
 
-  background:
-  #94A3B8;
+  font-size:
+  14px;
 
-}
 
-
-
-/* =====================================================
-   COMPONENT BASE STYLE
-===================================================== */
-
-
-@layer components {
-
-
-  .spwn-card {
-
-    @apply bg-white;
-
-    border-radius:
-    var(--radius-card);
-
-
-    box-shadow:
-    var(--shadow-card);
-
-
-    transition:
-    all .3s ease;
-
-  }
-
-
-  .spwn-card:hover {
-
-    transform:
-    translateY(-4px);
-
-
-    box-shadow:
-    var(--shadow-hover);
-
-  }
-
-
-
-
-  .spwn-button-primary {
-
-
-    @apply text-white font-semibold;
-
-
-    background:
-    var(--spwn-primary);
-
-
-    border-radius:
-    var(--radius-button);
-
-
-    transition:
-    all .25s ease;
-
-
-  }
-
-
-
-  .spwn-button-primary:hover {
-
-
-    background:
-    var(--spwn-primary-dark);
-
-
-    transform:
-    translateY(-2px);
-
-  }
-
-
-
-
-  .spwn-button-secondary {
-
-
-    @apply font-semibold;
-
-
-    background:
-    white;
-
-
-    color:
-    var(--spwn-primary);
-
-
-    border:
-    1px solid var(--spwn-primary);
-
-
-    border-radius:
-    var(--radius-button);
-
-  }
-
-
-
-  .spwn-chip {
-
-
-    @apply px-4 py-2 text-sm font-medium;
-
-
-    background:
-    white;
-
-
-    border:
-    1px solid var(--border);
-
-
-    border-radius:
-    999px;
-
-
-    transition:
-    all .2s ease;
-
-  }
-
-
-
-  .spwn-chip:hover {
-
-
-    border-color:
-    var(--spwn-primary);
-
-
-    color:
-    var(--spwn-primary);
-
-  }
-
+  font-weight:
+  500;
 
 
 }
 
 
 
-/* =====================================================
-   ANIMATION
-===================================================== */
-
-
-@keyframes fadeIn {
-
-
-  from {
-
-    opacity:
-    0;
-
-    transform:
-    translateY(10px);
-
-  }
-
-
-  to {
-
-    opacity:
-    1;
-
-    transform:
-    translateY(0);
-
-  }
-
-}
-
-
-
-.animate-fade-in {
-
-
-  animation:
-  fadeIn .4s ease forwards;
-
-}
-
-
-
-/* =====================================================
-   IMAGE STYLE
-===================================================== */
+/* ===============================
+ IMAGE
+================================ */
 
 
 .spwn-image {
@@ -436,29 +307,88 @@ body {
 
 
 
-/* =====================================================
-   MOBILE OPTIMIZATION
-===================================================== */
+/* ===============================
+ ANIMATION
+================================ */
+
+
+@keyframes fadeIn {
+
+
+from {
+
+opacity:0;
+
+transform:
+translateY(10px);
+
+}
+
+
+to {
+
+opacity:1;
+
+transform:
+translateY(0);
+
+}
+
+
+}
+
+
+
+.animate-fade-in {
+
+
+animation:
+fadeIn .4s ease forwards;
+
+}
+
+
+
+/* ===============================
+ SCROLLBAR
+================================ */
+
+
+::-webkit-scrollbar {
+
+width:
+8px;
+
+}
+
+
+::-webkit-scrollbar-thumb {
+
+background:
+#CBD5E1;
+
+
+border-radius:
+999px;
+
+}
+
+
+
+/* ===============================
+ MOBILE
+================================ */
 
 
 @media(max-width:768px){
 
 
-  body {
+.spwn-card {
 
-    overflow-x:
-    hidden;
+border-radius:
+18px;
 
-  }
-
-
-  .spwn-card {
-
-
-    border-radius:
-    18px;
-
-  }
+}
 
 
 }
