@@ -449,3 +449,277 @@
 .spwn-hero-panel { min-height: 450px; }
 @media (max-width: 1023px) { .spwn-hero-panel { min-height: 500px; } }
 @media (max-width: 639px) { .spwn-hero-panel { min-height: 540px; } }
+
+/* =========================================================
+   SPWNAPPS DESIGN FOUNDATION v4 — INTERNATIONAL PRODUCT UI
+   ---------------------------------------------------------
+   Presentation layer only. This layer standardizes the visual
+   language across the application without changing routes,
+   state, API calls, data processing, permissions or business logic.
+   ========================================================= */
+:root {
+  --spwn-primary: #7b2cbf;
+  --spwn-primary-strong: #6420a2;
+  --spwn-primary-hover: #6f27ac;
+  --spwn-primary-soft: #f6efff;
+  --spwn-secondary: #d926a9;
+  --spwn-teal: #159f9a;
+  --spwn-blue: #159fe0;
+  --spwn-green: #64c51d;
+  --spwn-orange: #ff9f1c;
+  --spwn-surface: #ffffff;
+  --spwn-surface-soft: #faf9fd;
+  --spwn-ink: #28243a;
+  --spwn-muted: #687084;
+  --spwn-border: #e7e3ee;
+  --spwn-border-strong: #d9d2e4;
+  --spwn-success: #159f6b;
+  --spwn-warning: #d97706;
+  --spwn-danger: #dc3d5b;
+  --spwn-info: #159fe0;
+  --spwn-radius-sm: .625rem;
+  --spwn-radius-control: .8rem;
+  --spwn-radius-card: 1rem;
+  --spwn-radius-panel: 1.25rem;
+  --spwn-focus: rgba(123,44,191,.24);
+  --spwn-shadow-sm: 0 1px 2px rgba(40,36,58,.04), 0 5px 16px rgba(40,36,58,.035);
+  --spwn-shadow-md: 0 10px 30px rgba(40,36,58,.07);
+}
+
+/* A predictable, calm selection treatment improves perceived polish. */
+::selection {
+  background: rgba(123,44,191,.16);
+  color: var(--spwn-ink);
+}
+
+/* Global focus treatment: visible, consistent and keyboard-friendly. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 3px solid var(--spwn-focus) !important;
+  outline-offset: 2px !important;
+}
+
+/* Reusable foundation classes for pages/components that opt into the system. */
+.spwn-page {
+  color: var(--spwn-ink);
+}
+
+.spwn-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.spwn-page-title {
+  margin: 0;
+  color: var(--spwn-ink);
+  font-size: clamp(1.25rem, 2vw, 1.7rem);
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+
+.spwn-page-subtitle {
+  margin-top: .35rem;
+  color: var(--spwn-muted);
+  font-size: .82rem;
+  line-height: 1.55;
+}
+
+.spwn-section-label {
+  color: #777286;
+  font-size: .68rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.spwn-card {
+  background: var(--spwn-surface);
+  border: 1px solid var(--spwn-border);
+  border-radius: var(--spwn-radius-card);
+  box-shadow: var(--spwn-shadow-sm);
+}
+
+.spwn-card-interactive {
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
+}
+
+.spwn-card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--spwn-border-strong);
+  box-shadow: var(--spwn-shadow-md);
+}
+
+.spwn-control {
+  min-height: 42px;
+  border: 1px solid var(--spwn-border-strong);
+  border-radius: var(--spwn-radius-control);
+  background: #fff;
+  color: var(--spwn-ink);
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+.spwn-control:hover {
+  border-color: #c9c0d8;
+}
+
+.spwn-control:focus {
+  border-color: #9b72d6;
+  box-shadow: 0 0 0 3px rgba(123,44,191,.10);
+  outline: none;
+}
+
+.spwn-icon-button {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--spwn-border);
+  border-radius: var(--spwn-radius-control);
+  background: #fff;
+  color: #666075;
+  transition: transform .16s ease, color .16s ease, background-color .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+.spwn-icon-button:hover {
+  color: var(--spwn-primary);
+  background: var(--spwn-primary-soft);
+  border-color: #d9c9ed;
+  transform: translateY(-1px);
+}
+
+.spwn-icon-button:active {
+  transform: scale(.97);
+}
+
+.spwn-primary-action {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  padding: .65rem .9rem;
+  border: 1px solid transparent;
+  border-radius: var(--spwn-radius-control);
+  background: linear-gradient(135deg, var(--spwn-primary), var(--spwn-secondary));
+  color: #fff;
+  font-size: .76rem;
+  font-weight: 800;
+  box-shadow: 0 7px 18px rgba(123,44,191,.16);
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+
+.spwn-primary-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(123,44,191,.21);
+  filter: saturate(1.04);
+}
+
+.spwn-secondary-action {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  padding: .65rem .9rem;
+  border: 1px solid var(--spwn-border-strong);
+  border-radius: var(--spwn-radius-control);
+  background: #fff;
+  color: #514b63;
+  font-size: .76rem;
+  font-weight: 800;
+  transition: transform .16s ease, background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.spwn-secondary-action:hover {
+  color: var(--spwn-primary);
+  background: var(--spwn-primary-soft);
+  border-color: #d8c8eb;
+  transform: translateY(-1px);
+}
+
+.spwn-danger-action {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  padding: .65rem .9rem;
+  border: 1px solid #f2ccd5;
+  border-radius: var(--spwn-radius-control);
+  background: #fff7f8;
+  color: #c52f4c;
+  font-size: .76rem;
+  font-weight: 800;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.spwn-danger-action:hover {
+  background: #fff0f3;
+  border-color: #e9aebe;
+}
+
+.spwn-status {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  min-height: 26px;
+  padding: .28rem .55rem;
+  border-radius: 999px;
+  font-size: .68rem;
+  line-height: 1;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.spwn-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.spwn-status-success { color: #087d53; background: #eaf9f2; }
+.spwn-status-warning { color: #a65d05; background: #fff5df; }
+.spwn-status-danger { color: #b62f48; background: #fff0f3; }
+.spwn-status-info { color: #087cae; background: #eaf8fe; }
+.spwn-status-neutral { color: #666075; background: #f2f0f5; }
+
+.spwn-divider {
+  height: 1px;
+  background: var(--spwn-border);
+}
+
+/* Better touch comfort on small screens without forcing desktop layouts to change. */
+@media (max-width: 640px) {
+  .spwn-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .spwn-page-title { font-size: 1.25rem; }
+  .spwn-primary-action,
+  .spwn-secondary-action,
+  .spwn-danger-action { min-height: 44px; }
+  .spwn-icon-button { width: 42px; height: 42px; min-width: 42px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spwn-card-interactive,
+  .spwn-icon-button,
+  .spwn-primary-action,
+  .spwn-secondary-action,
+  .spwn-danger-action {
+    transition: none !important;
+  }
+}
