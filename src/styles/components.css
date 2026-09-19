@@ -1,0 +1,40 @@
+@layer components {
+
+  .spwn-card {
+    @apply bg-white border border-slate-200 rounded-3xl shadow-sm;
+  }
+
+
+  .spwn-card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
+  }
+
+
+  .spwn-button-primary {
+    @apply px-5 py-3 rounded-2xl font-bold text-white;
+    background:#E31E24;
+  }
+
+
+  .spwn-button-primary:hover {
+    background:#B91C1C;
+  }
+
+
+  .spwn-button-secondary {
+    @apply px-5 py-3 rounded-2xl font-bold;
+    background:#F9B233;
+    color:#0F172A;
+  }
+
+
+  .spwn-chip {
+    @apply px-4 py-2 rounded-full text-sm font-bold border;
+  }
+
+
+  .spwn-section-title {
+    @apply text-xl font-black text-slate-900;
+  }
+
+}
