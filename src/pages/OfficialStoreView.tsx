@@ -22,17 +22,17 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 md:p-8 space-y-6">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/30 p-4 md:p-8 space-y-6">
 
       <section
         className="
-          rounded-[2rem]
-          p-8
+          rounded-[2.5rem]
+          p-8 md:p-10 shadow-2xl
           text-white
           bg-gradient-to-br
-          from-amber-500
-          via-orange-500
-          to-red-600
+          from-emerald-950
+          via-teal-700
+          to-amber-500
         "
       >
         <div className="flex items-center gap-3">
@@ -78,8 +78,9 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
           grid
           grid-cols-1
           sm:grid-cols-2
-          lg:grid-cols-4
-          gap-5
+          lg:grid-cols-3
+          xl:grid-cols-4
+          gap-6
         "
       >
 
@@ -94,16 +95,17 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               rounded-[2rem]
               overflow-hidden
               border
-              border-slate-200
-              hover:-translate-y-1
-              hover:shadow-xl
-              transition
+              border-slate-200/80
+              shadow-sm
+              hover:-translate-y-2
+              hover:shadow-2xl
+              transition-all duration-300
             "
           >
 
             <div
               className={`
-                h-48
+                h-56
                 bg-gradient-to-br
                 ${item.accentClass || "from-slate-700 to-slate-400"}
                 flex
@@ -113,8 +115,8 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
             >
 
               <ShoppingBag
-                size={64}
-                className="text-white"
+                size={72}
+                className="text-white/90"
               />
 
             </div>
@@ -122,7 +124,7 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
             <div className="p-5">
 
-              <h3 className="font-black text-lg">
+              <h3 className="font-black text-lg leading-tight">
                 {item.name}
               </h3>
 
