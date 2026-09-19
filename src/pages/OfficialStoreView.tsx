@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Search, ShoppingBag, Star, Tag, CheckCircle2 } from "lucide-react";
 import { OFFICIAL_MERCHANDISE_PRODUCTS } from "../data/officialMerchandiseData";
+import { spreadsheetService } from "../services/spreadsheetService";
 import { OfficialMerchandiseDetailModal } from "../components/store/OfficialMerchandiseDetailModal";
 
 interface OfficialStoreViewProps {
@@ -23,20 +24,10 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
   const loadOfficialStore = async () => {
     try {
-      const response = await fetch("/api/spreadsheet-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "GET_OFFICIAL_STORE"
-        })
-      });
+      const rows = await spreadsheetService.fetchSheetRows("Official_Store");
 
-      const result = await response.json();
-
-      if (result?.success && Array.isArray(result.data)) {
-        const mapped = result.data.map((item:any)=>({
+      if (Array.isArray(rows) && rows.length > 0) {
+        const mapped = rows.map((item:any)=>({
           id: item.ID,
           name: item["Nama Produk"],
           category: item.Kategori,
@@ -47,7 +38,7 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
           image: item["Foto Produk"],
           gallery: item.Gallery,
           stock: item.Stok,
-          featured: item.Featured,
+          featured: item.Featured === true || item.Featured === "TRUE",
           purchaseEnabled: item.Status === "ACTIVE",
           accentClass: "from-emerald-700 to-teal-400"
         }));
@@ -55,7 +46,7 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
         setProducts(mapped);
       }
     } catch(error) {
-      console.warn("Official Store API fallback", error);
+      console.warn("Official Store memakai fallback lokal:", error);
     }
   };
 
