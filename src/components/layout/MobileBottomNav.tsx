@@ -1,85 +1,145 @@
 import React from "react";
-
 import {
   Home,
   Compass,
+  Map,
   CalendarDays,
   CreditCard,
-  User,
-  Store
+  ShoppingBag
 } from "lucide-react";
 
 interface MobileBottomNavProps {
-  activePage?: string;
-  onNavigate?: (page: string) => void;
+  currentTab?: string;
+  onSelectTab?: (tab: string) => void;
+  currentUser?: any;
+  onOpenMobileMenu?: () => void;
+  [key: string]: any;
 }
 
-const menus = [
-  { id: "dashboard", label: "Home", icon: Home },
-  { id: "krida", label: "Krida", icon: Compass },
-  { id: "activity", label: "Aktivitas", icon: CalendarDays },
-  { id: "member-card", label: "Kartu", icon: CreditCard },
-  { id: "store", label: "Store", icon: Store },
+const navigationItems = [
+  {
+    id: "dashboard",
+    label: "Home",
+    icon: Home
+  },
+  {
+    id: "krida",
+    label: "Krida",
+    icon: Compass
+  },
+  {
+    id: "tourism",
+    label: "Wisata",
+    icon: Map
+  },
+  {
+    id: "activities",
+    label: "Aktivitas",
+    icon: CalendarDays
+  },
+  {
+    id: "member",
+    label: "Kartu",
+    icon: CreditCard
+  },
+  {
+    id: "store",
+    label: "Store",
+    icon: ShoppingBag
+  }
 ];
 
-export function MobileBottomNav({
-  activePage = "dashboard",
-  onNavigate,
-}: MobileBottomNavProps) {
+export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
+  currentTab = "dashboard",
+  onSelectTab
+}) => {
+
   return (
     <nav
       className="
-        fixed bottom-0 left-0 right-0 z-50 lg:hidden
-        px-4 pb-4 pt-2
+        fixed
+        bottom-0
+        left-0
+        right-0
+        z-50
+        lg:hidden
+        px-3 pb-3
       "
     >
+
       <div
         className="
-          bg-white/90 backdrop-blur-xl
+          bg-white/90
+          backdrop-blur-xl
           border border-slate-200
           rounded-[2rem]
           shadow-xl
-          flex items-center justify-around
           px-2 py-2
+          flex items-center
+          justify-around
         "
       >
-        {menus.map((item) => {
+
+        {navigationItems.map((item)=>{
+
           const Icon = item.icon;
-          const active = activePage === item.id;
+          const active = currentTab === item.id;
 
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate?.(item.id)}
-              className={`
-                relative flex flex-col items-center justify-center
-                min-w-[58px] py-2 rounded-2xl
-                transition-all duration-300
-                ${
-                  active
-                    ? "text-red-600 bg-red-50 font-bold scale-105"
-                    : "text-slate-500 hover:text-red-600"
-                }
-              `}
+              onClick={()=>onSelectTab?.(item.id)}
+              className="
+                relative
+                flex flex-col
+                items-center
+                justify-center
+                gap-1
+                min-w-[48px]
+                py-2
+                transition
+              "
             >
-              {active && (
-                <span className="absolute -top-1 w-8 h-1 rounded-full bg-gradient-to-r from-red-600 via-amber-400 to-teal-500" />
-              )}
 
-              <Icon
-                size={22}
-                strokeWidth={active ? 2.7 : 2}
-              />
+              <div
+                className={`
+                  w-10 h-10
+                  rounded-2xl
+                  flex items-center justify-center
+                  transition-all
+                  ${
+                    active
+                    ? "bg-red-600 text-white shadow-md"
+                    : "text-slate-500"
+                  }
+                `}
+              >
+                <Icon size={20}/>
+              </div>
 
-              <span className="text-[10px] mt-1">
+              <span
+                className={`
+                  text-[11px]
+                  font-bold
+                  ${
+                    active
+                    ? "text-red-600"
+                    : "text-slate-500"
+                  }
+                `}
+              >
                 {item.label}
               </span>
+
             </button>
           );
+
         })}
+
       </div>
+
     </nav>
   );
-}
+};
 
 export default MobileBottomNav;
