@@ -732,35 +732,35 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       {/* =======================================================
           MAIN MEMBERS TABLE
       ======================================================== */}
-      <div className="bg-white rounded-[1.75rem] border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-[1.75rem] border border-slate-200 shadow-xs overflow-hidden max-w-full">
 
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="hidden md:block w-full max-w-full overflow-x-auto overflow-y-hidden">
+          <table className="w-full table-fixed text-left text-xs">
 
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
 
-                <th className="py-3.5 px-4">
+                <th className="py-3.5 px-4 w-[28%]">
                   Identitas Anggota
                 </th>
 
-                <th className="py-3.5 px-4">
+                <th className="py-3.5 px-4 w-[16%]">
                   No. Anggota Nasional
                 </th>
 
-                <th className="py-3.5 px-4">
+                <th className="py-3.5 px-4 w-[22%]">
                   Wilayah & Kwartir
                 </th>
 
-                <th className="py-3.5 px-4">
+                <th className="py-3.5 px-4 w-[14%]">
                   Krida
                 </th>
 
-                <th className="py-3.5 px-4">
+                <th className="py-3.5 px-4 w-[10%]">
                   Status
                 </th>
 
-                <th className="py-3.5 px-4 text-right">
+                <th className="py-3.5 px-4 w-[10%] text-right">
                   <span className="sr-only">
                     Aksi & Administrasi
                   </span>
