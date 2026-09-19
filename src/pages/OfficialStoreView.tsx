@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { Search, ShoppingBag, Star, Tag } from "lucide-react";
 import { OFFICIAL_MERCHANDISE_PRODUCTS } from "../data/officialMerchandiseData";
+import { OfficialMerchandiseDetailModal } from "../components/store/OfficialMerchandiseDetailModal";
 
 interface OfficialStoreViewProps {
   onSelectProduct?: (item: any) => void;
+  [key: string]: any;
 }
 
 export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
@@ -11,8 +13,9 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 }) => {
 
   const [search, setSearch] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
-  const filtered = useMemo(() => {
+  const filteredProducts = useMemo(() => {
     return OFFICIAL_MERCHANDISE_PRODUCTS.filter((item: any) =>
       String(item?.name || "")
         .toLowerCase()
@@ -27,46 +30,49 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
       <section
         className="
           rounded-[2.5rem]
-          p-8 md:p-10 shadow-2xl
+          p-8 md:p-10
           text-white
+          shadow-2xl
           bg-gradient-to-br
           from-emerald-950
           via-teal-700
           to-amber-500
         "
       >
-        <div className="flex items-center gap-3">
-          <ShoppingBag size={34} />
 
-          <h1 className="text-3xl font-black">
-            Official Store Saka Pariwisata
-          </h1>
+        <div className="flex items-center gap-3">
+          <ShoppingBag size={38} />
+
+          <div>
+            <h1 className="text-3xl md:text-4xl font-black">
+              Official Store Saka Pariwisata
+            </h1>
+
+            <p className="mt-2 text-white/90">
+              Official merchandise Saka Pariwisata Nasional.
+              Apparel, identitas, dan perlengkapan kegiatan anggota.
+            </p>
+          </div>
         </div>
 
-        <p className="mt-3 text-white/90 max-w-xl">
-          Official Merchandise Saka Pariwisata Nasional.
-          Apparel, identitas, dan perlengkapan kegiatan anggota.
-        </p>
 
-        <div
-          className="
-            mt-6
-            bg-white
-            rounded-2xl
-            flex
-            items-center
-            px-4
-            py-3
-            text-slate-700
-          "
-        >
-          <Search size={18} />
+        <div className="
+          mt-6
+          bg-white
+          rounded-2xl
+          flex
+          items-center
+          px-4
+          py-3
+          text-slate-700
+        ">
+          <Search size={18}/>
 
           <input
             className="ml-3 flex-1 outline-none"
             placeholder="Cari merchandise..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e)=>setSearch(e.target.value)}
           />
         </div>
 
@@ -84,11 +90,14 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
         "
       >
 
-        {filtered.map((item: any) => (
+        {filteredProducts.map((item:any)=>(
 
           <button
             key={item.id}
-            onClick={() => onSelectProduct?.(item)}
+            onClick={()=>{
+              setSelectedProduct(item);
+              onSelectProduct?.(item);
+            }}
             className="
               text-left
               bg-white
@@ -99,70 +108,92 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               shadow-sm
               hover:-translate-y-2
               hover:shadow-2xl
-              transition-all duration-300
+              transition-all
             "
           >
 
             <div
               className={`
                 h-56
-                bg-gradient-to-br
-                ${item.accentClass || "from-slate-700 to-slate-400"}
                 flex
                 items-center
                 justify-center
+                bg-gradient-to-br
+                ${item.accentClass || "from-emerald-900 to-teal-500"}
               `}
             >
-
               <ShoppingBag
                 size={72}
                 className="text-white/90"
               />
-
             </div>
 
 
             <div className="p-5">
+
+              <div className="flex flex-wrap gap-2 mb-3">
+
+                {item.featured && (
+                  <span className="
+                    rounded-full
+                    bg-amber-100
+                    px-3 py-1
+                    text-xs
+                    font-bold
+                    text-amber-700
+                  ">
+                    Featured
+                  </span>
+                )}
+
+                <span className="
+                  rounded-full
+                  bg-emerald-100
+                  px-3 py-1
+                  text-xs
+                  font-bold
+                  text-emerald-700
+                ">
+                  Official
+                </span>
+
+              </div>
+
 
               <h3 className="font-black text-lg leading-tight">
                 {item.name}
               </h3>
 
 
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-1
-                  text-amber-500
-                  mt-3
-                  text-sm
-                "
-              >
-                <Star size={14} fill="currentColor" />
-                Produk Official
+              <div className="
+                flex
+                items-center
+                gap-1
+                text-amber-500
+                mt-3
+                text-sm
+              ">
+                <Star size={14} fill="currentColor"/>
+                Merchandise Resmi
               </div>
 
 
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-2
-                  text-xs
-                  text-slate-500
-                  mt-3
-                "
-              >
-                <Tag size={14} />
+              <div className="
+                flex
+                items-center
+                gap-2
+                text-xs
+                text-slate-500
+                mt-3
+              ">
+                <Tag size={14}/>
                 {item.category || "Merchandise"}
               </div>
 
 
-              <div className="mt-4 font-bold text-orange-600">
+              <div className="mt-4 font-black text-orange-600">
                 Rp {Number(item.price || 0).toLocaleString("id-ID")}
               </div>
-
 
             </div>
 
@@ -172,9 +203,14 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
       </section>
 
+
+      <OfficialMerchandiseDetailModal
+        item={selectedProduct}
+        onClose={()=>setSelectedProduct(null)}
+      />
+
     </main>
   );
 };
-
 
 export default OfficialStoreView;
