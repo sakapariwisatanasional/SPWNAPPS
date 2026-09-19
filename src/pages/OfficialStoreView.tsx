@@ -4,6 +4,28 @@ import { OFFICIAL_MERCHANDISE_PRODUCTS } from "../data/officialMerchandiseData";
 import { spreadsheetService } from "../services/spreadsheetService";
 import { OfficialMerchandiseDetailModal } from "../components/store/OfficialMerchandiseDetailModal";
 
+
+const normalizeImageUrl = (raw: unknown): string => {
+  if (typeof raw !== "string") return "";
+  const value = raw.trim();
+  if (!value) return "";
+  if (value.startsWith("data:image/") || value.startsWith("blob:") || value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/")) {
+    const idMatch = value.match(/(?:\/file\/d\/|[?&]id=|\/d\/)([a-zA-Z0-9_-]{10,})/);
+    if (idMatch?.[1] && value.includes("drive.google.com")) return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+    return value;
+  }
+  const idMatch = value.match(/^[a-zA-Z0-9_-]{10,}$/);
+  return idMatch?.[0] ? `https://lh3.googleusercontent.com/d/${idMatch[0]}` : value;
+};
+
+const firstImage = (...values: unknown[]): string => {
+  for (const value of values) {
+    const normalized = normalizeImageUrl(value);
+    if (normalized) return normalized;
+  }
+  return "";
+};
+
 interface OfficialStoreViewProps {
   onSelectProduct?: (item: any) => void;
   [key: string]: any;
@@ -34,9 +56,12 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
           description: item.Deskripsi,
           price: item.Harga,
           material: item.Material,
-          imageUrl: item["Foto Produk"],
-          image: item["Foto Produk"],
-          gallery: item.Gallery,
+          imageUrl: firstImage(item["Foto Produk"], item.image, item.thumbnail, item["Image URL"]),
+          image: firstImage(item["Foto Produk"], item.image, item.thumbnail, item["Image URL"]),
+          gallery: String(item.Gallery || "")
+            .split(/[,|\n]+/)
+            .map((value: string) => normalizeImageUrl(value))
+            .filter(Boolean),
           stock: item.Stok,
           featured: item.Featured === true || item.Featured === "TRUE",
           purchaseEnabled: item.Status === "ACTIVE",
@@ -184,23 +209,17 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               ${item?.accentClass || "from-emerald-700 to-teal-400"}
             `}>
 
-              {item?.imageUrl || item?.image || item?.thumbnail ? (
+              {firstImage(item?.imageUrl, item?.image, item?.thumbnail) ? (
 
                 <img
-                  src={
-                    item.imageUrl ||
-                    item.image ||
-                    item.thumbnail
-                  }
+                  src={firstImage(item?.imageUrl, item?.image, item?.thumbnail)}
                   alt={item?.name || "Produk"}
-                  onError={(e)=>{
-                    e.currentTarget.style.display="none";
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/saka_logo.png";
+                    e.currentTarget.className = "h-32 w-32 object-contain";
                   }}
-                  className="
-                    h-full
-                    w-full
-                    object-cover
-                  "
+                  className="h-full w-full object-cover"
                 />
 
               ) : (
