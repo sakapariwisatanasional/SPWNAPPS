@@ -24,6 +24,7 @@ const TAB_ROUTES: Record<string, string> = {
   members: '/members',
   tours: '/tours',
   'culinary-souvenirs': '/culinary',
+  'official-store': '/store',
   skills: '/skills',
   'krida-modules': '/krida',
   activities: '/activities',
@@ -77,6 +78,7 @@ const ROUTE_TO_TAB: Record<string, string> = {
   '/tours': 'tours',
   '/culinary': 'culinary-souvenirs',
   '/culinary-souvenirs': 'culinary-souvenirs',
+  '/store': 'official-store',
   '/skills': 'skills',
   '/krida': 'krida-modules',
   '/krida-modules': 'krida-modules',
@@ -195,9 +197,38 @@ export default function App() {
 
   // Synchronize URL and History when changing tabs
   const handleNavigateTab = (tab: string) => {
-    setCurrentTab(tab);
+    // Normalisasi ID menu dari Sidebar dan MobileBottomNav
+    const aliases: Record<string, string> = {
+      home: 'dashboard',
+      dashboard: 'dashboard',
+
+      krida: 'krida-modules',
+      'krida-modules': 'krida-modules',
+
+      tourism: 'tours',
+      wisata: 'tours',
+      tours: 'tours',
+
+      activity: 'activities',
+      activities: 'activities',
+
+      member: 'my-card',
+      'my-card': 'my-card',
+
+      store: 'official-store',
+      'official-store': 'official-store',
+
+      profil: 'profile',
+      profile: 'profile'
+    };
+
+    const normalizedTab = aliases[tab] || tab;
+
+    setCurrentTab(normalizedTab);
     setSearchQuery('');
-    const targetPath = TAB_ROUTES[tab] || '/';
+
+    const targetPath = TAB_ROUTES[normalizedTab] || '/';
+
     if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
       window.history.pushState(null, '', targetPath);
     }
@@ -803,6 +834,15 @@ export default function App() {
               <ProfileView
                 currentUser={currentUser}
                 members={members}
+              />
+            )}
+
+            {currentTab === 'official-store' && (
+              <CulinarySouvenirGallerySection
+                items={culinaryItems}
+                currentUser={currentUser}
+                members={members}
+                onSelectItemDetail={(item) => setSelectedCulinaryDetail(item)}
               />
             )}
           </div>
