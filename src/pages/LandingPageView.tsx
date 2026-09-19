@@ -20,186 +20,156 @@ interface LandingPageViewProps {
   onSelectTab?: (view: string) => void;
 }
 
+const fallbackImages = [
+  "https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e",
+  "https://images.unsplash.com/photo-1528127269322-539801943592",
+  "https://images.unsplash.com/photo-1537996194471-e657df975ab4"
+];
+
 export const LandingPageView: React.FC<LandingPageViewProps> = ({
-  currentUser,
   members = [],
   tours = [],
   culinaryItems = [],
   activities = [],
   onSelectTab
 }) => {
+  const stats = [
+    { label: "Anggota", value: members.length, icon: Users },
+    { label: "Aktivitas", value: activities.length, icon: CalendarDays },
+    { label: "Destinasi", value: tours.length, icon: MapPin },
+    { label: "Produk Kreatif", value: culinaryItems.length, icon: ShoppingBag }
+  ];
+
   return (
     <main className="min-h-screen bg-slate-50">
-
       <section className="p-4 md:p-8">
-        <div className="rounded-[2.5rem] overflow-hidden bg-gradient-to-br from-red-600 via-amber-500 to-teal-500 text-white p-8 md:p-12 shadow-xl">
-
-          <div className="max-w-4xl">
-            <div className="flex items-center gap-2 text-sm font-bold opacity-90">
+        <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-red-600 via-orange-500 to-teal-500 p-8 md:p-12 text-white shadow-xl">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-2 text-sm font-bold">
               <Sparkles size={18}/>
               SAKA PARIWISATA NASIONAL
             </div>
 
-            <h1 className="text-4xl md:text-6xl font-black mt-5 leading-tight">
+            <h1 className="mt-5 text-4xl md:text-6xl font-black leading-tight">
               Jelajah Nusantara,
               <br/>
               Berkarya untuk Pariwisata Indonesia
             </h1>
 
-            <p className="mt-5 text-lg opacity-90 max-w-2xl">
+            <p className="mt-5 max-w-xl text-white/90">
               Platform digital Saka Pariwisata untuk anggota,
               kegiatan, destinasi wisata, serta produk kreatif daerah.
             </p>
 
             <button
-              onClick={() => onSelectTab?.("dashboard")}
-              className="mt-8 bg-white text-slate-900 px-6 py-3 rounded-2xl font-black flex items-center gap-2"
+              onClick={() => onSelectTab?.("tours")}
+              className="mt-8 rounded-full bg-white px-6 py-3 font-bold text-slate-800 flex items-center gap-2"
             >
-              Mulai Jelajah
-              <ArrowRight size={18}/>
+              Mulai Jelajah <ArrowRight size={18}/>
             </button>
           </div>
 
-        </div>
-      </section>
-
-
-      <section className="px-4 md:px-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-
-        {[
-          {
-            icon: Users,
-            value: members.length,
-            label: "Anggota"
-          },
-          {
-            icon: CalendarDays,
-            value: activities.length,
-            label: "Aktivitas"
-          },
-          {
-            icon: MapPin,
-            value: tours.length,
-            label: "Destinasi"
-          },
-          {
-            icon: ShoppingBag,
-            value: culinaryItems.length,
-            label: "Produk Kreatif"
-          }
-        ].map((item) => (
-          <div key={item.label} className="bg-white rounded-3xl p-5 border shadow-sm">
-            <item.icon/>
-            <div className="text-3xl font-black mt-3">
-              {item.value}
-            </div>
-            <div className="text-slate-500">
-              {item.label}
+          <div className="hidden lg:block absolute right-10 bottom-0">
+            <div className="rounded-3xl bg-white/20 backdrop-blur p-6">
+              <Compass size={100}/>
             </div>
           </div>
-        ))}
-
+        </div>
       </section>
 
-
-      <section className="p-4 md:p-8">
-
-        <div className="flex justify-between items-center mb-5">
-          <h2 className="text-2xl font-black">
-            Wisata Nusantara
-          </h2>
-          <Compass/>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-5">
-
-          {tours.slice(0,6).map((tour:any,index:number)=>(
-            <article
-              key={tour.id || index}
-              className="bg-white rounded-3xl border overflow-hidden"
-            >
-              <div className="h-40 bg-slate-200 flex items-center justify-center">
-                {tour.image ? (
-                  <img
-                    src={tour.image}
-                    alt={tour.name || tour.title}
-                    className="w-full h-full object-cover"
-                  />
-                ):(
-                  <MapPin/>
-                )}
-              </div>
-
-              <div className="p-5">
-                <h3 className="font-black text-lg">
-                  {tour.name || tour.title || "Destinasi Wisata"}
-                </h3>
-                <p className="text-slate-500 text-sm mt-2">
-                  {tour.location || "Indonesia"}
-                </p>
-              </div>
-
-            </article>
-          ))}
-
-        </div>
-
-      </section>
-
-
-      <section className="p-4 md:p-8">
-
-        <h2 className="text-2xl font-black mb-5">
-          Kuliner & Cinderamata
-        </h2>
-
-        <div className="grid md:grid-cols-3 gap-5">
-
-          {culinaryItems.slice(0,6).map((item:any,index:number)=>(
-            <div
-              key={item.id || index}
-              className="bg-white rounded-3xl border p-5"
-            >
-              <ShoppingBag/>
-              <h3 className="font-black mt-4">
-                {item.name || item.title || "Produk Daerah"}
-              </h3>
-              <p className="text-slate-500 mt-2">
-                {item.region || item.location || "Nusantara"}
-              </p>
+      <section className="px-4 md:px-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-3xl border bg-white p-6 shadow-sm">
+              <Icon className="text-slate-700"/>
+              <div className="mt-4 text-3xl font-black">{item.value}</div>
+              <div className="text-slate-500">{item.label}</div>
             </div>
-          ))}
-
-        </div>
-
+          );
+        })}
       </section>
 
+      <section className="p-4 md:p-8 space-y-10">
+        <ContentSection
+          title="Wisata Nusantara"
+          items={tours}
+          icon={<MapPin/>}
+          empty="Belum ada destinasi"
+          render={(item:any,index:number)=>(
+            <Card
+              image={item.image || item.imageUrl || fallbackImages[index % fallbackImages.length]}
+              title={item.name}
+              subtitle={item.location}
+              description={item.description}
+            />
+          )}
+        />
 
-      <section className="p-4 md:p-8">
+        <ContentSection
+          title="Kuliner & Cinderamata"
+          items={culinaryItems}
+          icon={<ShoppingBag/>}
+          empty="Belum ada produk kreatif"
+          render={(item:any,index:number)=>(
+            <Card
+              image={item.image || fallbackImages[index % fallbackImages.length]}
+              title={item.name}
+              subtitle={item.region}
+              description={item.description}
+            />
+          )}
+        />
 
-        <h2 className="text-2xl font-black mb-5">
-          Aktivitas Terbaru
-        </h2>
-
-        <div className="space-y-3">
-
-          {activities.slice(0,5).map((activity:any,index:number)=>(
-            <div
-              key={activity.id || index}
-              className="bg-white rounded-2xl border p-5"
-            >
-              <b>
-                {activity.title || activity.name || "Kegiatan Saka Pariwisata"}
-              </b>
+        <ContentSection
+          title="Aktivitas Terbaru"
+          items={activities}
+          icon={<CalendarDays/>}
+          empty="Belum ada aktivitas"
+          render={(item:any)=>(
+            <div className="rounded-2xl border bg-white p-5">
+              <h3 className="font-black">{item.title}</h3>
+              <p className="text-slate-500 mt-2">{item.description}</p>
             </div>
-          ))}
-
-        </div>
-
+          )}
+        />
       </section>
-
     </main>
   );
 };
+
+function ContentSection({title,items,icon,render,empty}:any){
+  return (
+    <section>
+      <h2 className="text-2xl font-black mb-5 flex gap-2 items-center">
+        {icon}{title}
+      </h2>
+      {items.length===0 ? (
+        <p className="text-slate-500">{empty}</p>
+      ):(
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {items.map(render)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Card({image,title,subtitle,description}:any){
+  return (
+    <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+      <img
+        src={image}
+        className="h-48 w-full object-cover"
+        alt={title}
+      />
+      <div className="p-5">
+        <h3 className="font-black text-lg">{title}</h3>
+        <p className="text-sm text-teal-600">{subtitle}</p>
+        <p className="mt-3 text-slate-500 text-sm">{description}</p>
+      </div>
+    </div>
+  );
+}
 
 export default LandingPageView;
