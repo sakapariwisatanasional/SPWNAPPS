@@ -506,14 +506,14 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
           </div>
 
           {/* Statistics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
 
-            <div className="bg-white border border-slate-200 rounded-[1.35rem] p-4 shadow-xs">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+            <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm hover:shadow-md transition-all duration-200">
+              <p className="text-[10px] uppercase tracking-[0.12em] font-extrabold text-slate-400">
                 Total Wilayah
               </p>
 
-              <p className="text-2xl font-black text-slate-900 mt-1">
+              <p className="text-3xl font-black tracking-tight text-slate-900 mt-1">
                 {safeMembers.length}
               </p>
 
@@ -522,12 +522,12 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               </p>
             </div>
 
-            <div className="bg-white border border-emerald-200 rounded-[1.35rem] p-4 shadow-xs">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-600">
+            <div className="bg-white border border-emerald-200 rounded-[1.5rem] p-5 shadow-sm hover:shadow-md transition-all duration-200">
+              <p className="text-[10px] uppercase tracking-[0.12em] font-extrabold text-emerald-600">
                 Aktif
               </p>
 
-              <p className="text-2xl font-black text-emerald-700 mt-1">
+              <p className="text-3xl font-black tracking-tight text-emerald-700 mt-1">
                 {activeCount}
               </p>
 
@@ -536,12 +536,12 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               </p>
             </div>
 
-            <div className="bg-white border border-amber-200 rounded-[1.35rem] p-4 shadow-xs">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-amber-600">
+            <div className="bg-white border border-amber-200 rounded-[1.5rem] p-5 shadow-sm hover:shadow-md transition-all duration-200">
+              <p className="text-[10px] uppercase tracking-[0.12em] font-extrabold text-amber-600">
                 Menunggu
               </p>
 
-              <p className="text-2xl font-black text-amber-700 mt-1">
+              <p className="text-3xl font-black tracking-tight text-amber-700 mt-1">
                 {pendingCount}
               </p>
 
@@ -550,12 +550,12 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
               </p>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-[1.35rem] p-4 shadow-xs">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+            <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm hover:shadow-md transition-all duration-200">
+              <p className="text-[10px] uppercase tracking-[0.12em] font-extrabold text-slate-500">
                 Nonaktif
               </p>
 
-              <p className="text-2xl font-black text-slate-700 mt-1">
+              <p className="text-3xl font-black tracking-tight text-slate-700 mt-1">
                 {inactiveCount}
               </p>
 
