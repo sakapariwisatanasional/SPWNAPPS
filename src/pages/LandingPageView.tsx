@@ -5,7 +5,6 @@ import {
   MapPin,
   ShoppingBag,
   ArrowRight,
-  Compass,
   Sparkles,
   Map
 } from "lucide-react";
@@ -18,7 +17,7 @@ interface LandingPageViewProps {
   onSelectTab?: (tab: string) => void;
 }
 
-const FALLBACK_IMAGES = {
+const FALLBACK = {
   tourism:
     "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1200&q=80",
   culinary:
@@ -27,256 +26,151 @@ const FALLBACK_IMAGES = {
     "https://images.unsplash.com/photo-1590736969955-71cc94901144?auto=format&fit=crop&w=1200&q=80"
 };
 
-export const LandingPageView: React.FC<LandingPageViewProps> = ({
+export default function LandingPageView({
   members = [],
   tours = [],
   culinaryItems = [],
   activities = [],
   onSelectTab
-}) => {
+}: LandingPageViewProps) {
 
   const stats = [
-    {
-      title: "Anggota",
-      value: members.length,
-      icon: Users,
-      subtitle: "Aktif Nasional"
-    },
-    {
-      title: "Aktivitas",
-      value: activities.length,
-      icon: CalendarDays,
-      subtitle: "Kegiatan Terbaru"
-    },
-    {
-      title: "Destinasi",
-      value: tours.length,
-      icon: MapPin,
-      subtitle: "Wisata Nusantara"
-    },
-    {
-      title: "Produk Kreatif",
-      value: culinaryItems.length,
-      icon: ShoppingBag,
-      subtitle: "Kuliner & Kriya"
-    }
+    {title:"Anggota", value:members.length, icon:Users, info:"Aktif Nasional"},
+    {title:"Aktivitas", value:activities.length, icon:CalendarDays, info:"Kegiatan Terbaru"},
+    {title:"Destinasi", value:tours.length, icon:MapPin, info:"Wisata Nusantara"},
+    {title:"Produk Kreatif", value:culinaryItems.length, icon:ShoppingBag, info:"Kuliner & Kriya"}
   ];
 
   return (
     <main className="min-h-screen bg-slate-50">
 
       <section className="p-6">
-        <div className="relative overflow-hidden rounded-[36px] bg-gradient-to-br from-red-600 via-orange-500 to-teal-500 p-8 md:p-12 text-white shadow-xl">
+        <div className="relative overflow-hidden rounded-[40px] bg-gradient-to-br from-red-600 via-orange-500 to-teal-500 p-10 text-white shadow-xl">
 
-          <div className="max-w-xl relative z-10">
-
+          <div className="relative z-10 max-w-2xl">
             <div className="flex items-center gap-2 text-sm font-bold">
               <Sparkles size={18}/>
               SAKA PARIWISATA NASIONAL
             </div>
 
-            <h1 className="mt-6 text-4xl md:text-6xl font-black leading-tight">
+            <h1 className="mt-6 text-5xl font-black leading-tight">
               Jelajah Nusantara,
               <br/>
               Berkarya untuk Pariwisata Indonesia
             </h1>
 
-            <p className="mt-5 text-white/90">
+            <p className="mt-5 text-white/90 text-lg">
               Platform digital Saka Pariwisata untuk anggota,
               kegiatan, destinasi wisata, serta produk kreatif daerah.
             </p>
 
             <button
               onClick={()=>onSelectTab?.("tours")}
-              className="mt-8 rounded-full bg-white px-7 py-3 text-slate-900 font-bold flex items-center gap-2 hover:scale-105 transition"
+              className="mt-8 rounded-full bg-white px-7 py-3 text-slate-900 font-bold flex gap-2 items-center"
             >
-              Mulai Jelajah
-              <ArrowRight size={18}/>
+              Mulai Jelajah <ArrowRight size={18}/>
             </button>
-
           </div>
 
-
-          <div className="hidden lg:block absolute right-12 top-12">
-
-            <div className="relative">
-
-              <div className="w-72 h-72 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
-                <Map size={130}/>
-              </div>
-
-              <div className="absolute -bottom-4 -left-8 bg-white text-slate-900 rounded-2xl px-5 py-3 shadow-lg">
-                <div className="text-xs text-slate-500">
-                  Jelajah Indonesia
-                </div>
-                <div className="font-black">
-                  Nusantara
-                </div>
-              </div>
-
+          <div className="absolute right-10 top-10 hidden lg:block">
+            <div className="h-72 w-72 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
+              <Map size={120}/>
             </div>
 
+            <div className="absolute left-0 bottom-0 bg-white text-slate-900 rounded-2xl px-5 py-3 shadow-xl">
+              <small>Destinasi Pilihan</small>
+              <div className="font-black">Nusantara</div>
+            </div>
           </div>
 
         </div>
       </section>
 
 
-      <section className="px-6 grid grid-cols-2 xl:grid-cols-4 gap-5">
-
-        {stats.map((item)=>{
-
-          const Icon=item.icon;
-
-          return (
-            <div
-              key={item.title}
-              className="bg-white rounded-3xl border p-6 shadow-sm hover:shadow-lg transition"
-            >
-
-              <Icon size={32}/>
-
-              <div className="mt-5 text-4xl font-black">
-                {item.value}
-              </div>
-
-              <div className="font-bold">
-                {item.title}
-              </div>
-
-              <div className="text-sm text-slate-500">
-                {item.subtitle}
-              </div>
-
-            </div>
-          )
-
-        })}
-
+      <section className="px-6 grid grid-cols-2 xl:grid-cols-4 gap-6">
+        {stats.map(({title,value,icon:Icon,info})=>(
+          <div key={title}
+            className="bg-white rounded-3xl border p-6 shadow-sm hover:shadow-xl transition">
+            <Icon size={34}/>
+            <div className="mt-5 text-4xl font-black">{value}</div>
+            <div className="font-bold text-lg">{title}</div>
+            <div className="text-slate-500">{info}</div>
+          </div>
+        ))}
       </section>
 
 
       <section className="p-6 space-y-12">
-
-        <ContentSection
-          title="Wisata Nusantara"
-          icon={<MapPin/>}
-          items={tours}
-          type="tourism"
-        />
-
-
-        <ContentSection
-          title="Kuliner & Cinderamata"
-          icon={<ShoppingBag/>}
-          items={culinaryItems}
-          type="culinary"
-        />
-
-
-        <ContentSection
-          title="Aktivitas Terbaru"
-          icon={<CalendarDays/>}
-          items={activities}
-          type="activity"
-        />
-
+        <Section title="Wisata Nusantara" icon={<MapPin/>} items={tours} type="tourism"/>
+        <Section title="Kuliner & Cinderamata" icon={<ShoppingBag/>} items={culinaryItems} type="culinary"/>
+        <Section title="Aktivitas Terbaru" icon={<CalendarDays/>} items={activities} type="activity"/>
       </section>
 
     </main>
   );
-};
-
-
-function ContentSection({
-  title,
-  icon,
-  items,
-  type
-}:any){
-
-return (
-<section>
-
-<h2 className="text-3xl font-black flex items-center gap-3 mb-6">
-{icon}
-{title}
-</h2>
-
-<div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-
-{
-items.map((item:any)=>(
-<Card
-key={item.id}
-item={item}
-type={type}
-/>
-))
 }
 
-</div>
 
-</section>
-)
+function Section({title,icon,items,type}:any){
+ return (
+  <section>
+   <h2 className="text-3xl font-black flex items-center gap-3 mb-6">
+    {icon}{title}
+   </h2>
 
+   <div className="grid lg:grid-cols-3 gap-6">
+    {items.map((item:any)=>(
+      <Card key={item.id} item={item} type={type}/>
+    ))}
+   </div>
+  </section>
+ )
 }
 
 
 function Card({item,type}:any){
 
-const image =
-item.image ||
-(type==="culinary"
-? FALLBACK_IMAGES.culinary
-: type==="tourism"
-? FALLBACK_IMAGES.tourism
-: FALLBACK_IMAGES.craft);
+ const image =
+ item.image ||
+ (type==="tourism" ? FALLBACK.tourism :
+ type==="culinary" ? FALLBACK.culinary :
+ FALLBACK.craft);
 
+ return (
+  <div className="bg-white rounded-3xl border overflow-hidden shadow-sm hover:-translate-y-1 hover:shadow-xl transition">
 
-return (
+   <img
+    src={image}
+    alt={item.name || item.title}
+    className="w-full h-64 object-cover"
+    onError={(e)=>{
+      e.currentTarget.src =
+      type==="tourism" ? FALLBACK.tourism :
+      type==="culinary" ? FALLBACK.culinary :
+      FALLBACK.craft;
+    }}
+   />
 
-<div className="overflow-hidden rounded-3xl bg-white border shadow-sm hover:shadow-xl hover:-translate-y-1 transition">
+   <div className="p-6">
 
-<img
-src={image}
-alt={item.name || item.title}
-loading="lazy"
-className="h-60 w-full object-cover"
-onError={(e)=>{
-e.currentTarget.src =
-type==="culinary"
-? FALLBACK_IMAGES.culinary
-: FALLBACK_IMAGES.tourism;
-}}
-/>
+    <h3 className="text-2xl font-black">
+      {item.name || item.title}
+    </h3>
 
-<div className="p-6">
+    <div className="mt-2 text-teal-600 font-semibold">
+      {item.location || item.region}
+    </div>
 
-<h3 className="text-xl font-black">
-{item.name || item.title}
-</h3>
+    <p className="mt-3 text-slate-500">
+      {item.description}
+    </p>
 
-<div className="mt-1 text-teal-600 font-medium">
-{item.location || item.region}
-</div>
+    <button className="mt-5 flex items-center gap-2 font-bold">
+      Lihat Detail <ArrowRight size={16}/>
+    </button>
 
-<p className="mt-3 text-slate-500">
-{item.description}
-</p>
+   </div>
 
-<button className="mt-5 flex items-center gap-2 font-bold text-sm">
-Lihat Detail
-<ArrowRight size={16}/>
-</button>
-
-</div>
-
-</div>
-
-)
-
+  </div>
+ )
 }
-
-
-export default LandingPageView;
