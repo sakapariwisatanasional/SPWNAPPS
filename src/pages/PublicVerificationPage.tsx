@@ -98,9 +98,9 @@ export const PublicVerificationPage: React.FC<PublicVerificationPageProps> = ({ 
     : '';
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-purple-50 text-slate-900 flex flex-col">
 
-      <header className="border-b border-slate-200 bg-white/95 backdrop-blur-sm sticky top-0 z-20">
+      <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-xl sticky top-0 z-20 shadow-sm">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
 
           <div className="flex items-center gap-3 min-w-0">
@@ -154,12 +154,12 @@ export const PublicVerificationPage: React.FC<PublicVerificationPageProps> = ({ 
           )}
 
           {!loading && member && (
-            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden">
+            <div className="bg-white rounded-[2.25rem] border border-slate-200/80 shadow-2xl overflow-hidden">
 
               <div
                 className={`px-6 py-7 sm:px-8 text-white text-center relative overflow-hidden ${
                   isVerified
-                    ? 'bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-950'
+                    ? 'bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-900'
                     : 'bg-gradient-to-br from-amber-700 via-orange-800 to-slate-900'
                 }`}
               >
@@ -193,17 +193,17 @@ export const PublicVerificationPage: React.FC<PublicVerificationPageProps> = ({ 
                   </span>
 
                   <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold font-heading">
-                    Hasil Verifikasi KTA
+                    KTA Digital Terverifikasi
                   </h1>
 
                   <p className="mt-1 text-xs text-purple-200/80">
-                    Sistem Verifikasi Digital Nasional Kwartir Gerakan Pramuka
+                    Sistem verifikasi resmi Saka Pariwisata Kwartir Nasional
                   </p>
 
                 </div>
               </div>
 
-              <div className="p-5 sm:p-8 space-y-6">
+              <div className="p-5 sm:p-8 space-y-6 bg-white">
 
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 p-5 rounded-[1.5rem] bg-purple-50/60 border border-purple-100">
 
