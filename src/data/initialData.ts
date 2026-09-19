@@ -72,12 +72,14 @@ export const INITIAL_TOUR_PACKAGES: TourPackage[] = [
     id: 'tour-borobudur',
     name: 'Wisata Candi Borobudur',
     location: 'Magelang, Jawa Tengah',
+    imageUrl: '/images/borobudur.jpg',
     description: 'Destinasi wisata budaya dan sejarah Indonesia.'
   },
   {
     id: 'tour-bromo',
     name: 'Gunung Bromo',
     location: 'Jawa Timur',
+    imageUrl: '/images/bromo.jpg',
     description: 'Pesona alam pegunungan dan sunrise Nusantara.'
   }
 ];
@@ -118,12 +120,14 @@ export const INITIAL_CULINARY_SOUVENIRS: CulinarySouvenirItem[] = [
     id: 'kuliner-rendang',
     name: 'Rendang Nusantara',
     region: 'Sumatera Barat',
+    imageUrl: '/images/rendang.jpg',
     description: 'Kuliner khas Indonesia.'
   },
   {
     id: 'kriya-batik',
     name: 'Batik Nusantara',
     region: 'Jawa',
+    imageUrl: '/images/batik.jpg',
     description: 'Produk kriya budaya Indonesia.'
   }
 ];
