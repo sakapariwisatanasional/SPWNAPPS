@@ -28,13 +28,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     };
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 space-y-6">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/40 p-6 space-y-6">
 
       <section className="
         rounded-[2rem]
         p-8
-        bg-gradient-to-br from-red-600 via-orange-500 to-teal-500
-        text-white shadow-xl
+        bg-gradient-to-br from-emerald-950 via-teal-700 to-amber-500
+        text-white shadow-2xl
       ">
 
         <div className="flex items-center gap-5">
@@ -66,7 +66,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       <section className="
         bg-white rounded-[2rem]
         border p-8
-        grid md:grid-cols-2 gap-6
+        grid md:grid-cols-2 gap-5
       ">
 
         <Info
@@ -118,7 +118,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </h2>
 
         <div className="
-          rounded-2xl bg-slate-50 p-5
+          rounded-2xl bg-gradient-to-r from-emerald-50 to-slate-50 p-5
         ">
 
           <p>
@@ -154,7 +154,7 @@ rounded-2xl
 p-5
 ">
 
-<div className="text-red-600">
+<div className="text-emerald-700">
 {icon}
 </div>
 
