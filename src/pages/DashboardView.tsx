@@ -1,6 +1,3 @@
-
-    
-  
 import React from "react";
 import {
   Compass,
@@ -98,3 +95,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       </section>
 
+
+      <section className="bg-white rounded-[2rem] p-6 border">
+        <h2 className="text-2xl font-black">
+          Aktivitas Terbaru
+        </h2>
+
+        {activities.length === 0 ? (
+          <p className="text-slate-500 mt-3">
+            Belum ada aktivitas.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {activities.slice(0,3).map((item:any) => (
+              <div key={item.id} className="p-4 rounded-2xl bg-slate-50">
+                <b>{item.title || item.name}</b>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+
+      <section>
+        <h2 className="text-2xl font-black mb-4">
+          Kuliner & Cinderamata Nusantara
+        </h2>
+
+        <CulinarySouvenirGallerySection
+          items={culinaryItems}
+          currentUser={currentUser}
+          members={members}
+          onSelectItemDetail={onSelectCulinaryDetail}
+        />
+      </section>
+
+
+    </main>
+  );
+};
+
+export default DashboardView;
