@@ -115,6 +115,8 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
             <div
               className={`
                 h-56
+                relative
+                overflow-hidden
                 flex
                 items-center
                 justify-center
@@ -122,10 +124,18 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
                 ${item.accentClass || "from-emerald-900 to-teal-500"}
               `}
             >
-              <ShoppingBag
-                size={72}
-                className="text-white/90"
-              />
+              {(item.image || item.imageUrl) ? (
+                <img
+                  src={item.image || item.imageUrl}
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <ShoppingBag
+                  size={72}
+                  className="text-white/90"
+                />
+              )}
             </div>
 
 
@@ -191,8 +201,22 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               </div>
 
 
-              <div className="mt-4 font-black text-orange-600">
-                Rp {Number(item.price || 0).toLocaleString("id-ID")}
+              <div className="mt-4 flex items-center justify-between">
+                <div className="font-black text-orange-600">
+                  Rp {Number(item.price || 0).toLocaleString("id-ID")}
+                </div>
+
+                <span className="
+                  rounded-full
+                  bg-slate-100
+                  px-3
+                  py-1
+                  text-xs
+                  font-bold
+                  text-slate-600
+                ">
+                  Detail
+                </span>
               </div>
 
             </div>
