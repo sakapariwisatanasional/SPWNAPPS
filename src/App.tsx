@@ -858,7 +858,6 @@ export default function App() {
             {currentTab === 'official-store' && (
               <OfficialStoreView
                 products={culinaryItems}
-                onSelectProduct={(item) => setSelectedCulinaryDetail(item)}
                 currentUser={currentUser}
                 members={members}
               />
