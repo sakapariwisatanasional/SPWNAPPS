@@ -1,133 +1,59 @@
-import { Skill, Member, TourPackage, Activity, AuditLog, CurrentUser, CulinarySouvenirItem } from '../types';
+// initialData.ts V3
+// Data awal dengan dukungan image untuk LandingPageView
 
-export const MASTER_SKILLS: Skill[] = [
+export const INITIAL_TOUR_PACKAGES = [
   {
-    id: 'skill-tour-guide',
-    name: 'Pemandu Wisata & Tour Guide',
-    category: 'Pemanduan & Tour Guide',
-    description: 'Keahlian memandu wisatawan domestik dan mancanegara dengan standar BNSP/HPI.'
+    id: "tour-borobudur",
+    name: "Wisata Candi Borobudur",
+    location: "Magelang, Jawa Tengah",
+    image:
+      "https://images.unsplash.com/photo-1584810359583-96fc3448beaa?auto=format&fit=crop&w=900&q=80",
+    description:
+      "Destinasi wisata budaya dan sejarah Indonesia."
   },
   {
-    id: 'skill-storytelling',
-    name: 'Cultural Storytelling & Sejarah',
-    category: 'Budaya & Storytelling',
-    description: 'Penyampaian narasi sejarah, cagar budaya, mitologi lokal, dan kearifan lokal.'
-  },
-  {
-    id: 'skill-fotografi',
-    name: 'Fotografi Destinasi & Landscape',
-    category: 'Fotografi & Media',
-    description: 'Pengambilan gambar estetika tinggi untuk promosi daya tarik wisata dan media sosial.'
-  },
-  {
-    id: 'skill-videografi',
-    name: 'Videografi & Drone Operator',
-    category: 'Fotografi & Media',
-    description: 'Pembuatan video sinematik pariwisata, reels, vlog perjalanan, dan pemetaan udara.'
-  },
-  {
-    id: 'skill-ekowisata',
-    name: 'Konservasi & Ekowisata Alam',
-    category: 'Ekowisata & Alam',
-    description: 'Manajemen jejak ekologis, trekking hutan lindung, edukasi flora-fauna, dan birdwatching.'
-  },
-  {
-    id: 'skill-digital-marketing',
-    name: 'Digital Marketing & Content Creator',
-    category: 'Digital Marketing & UMKM',
-    description: 'Promosi wisata berbasis TikTok/Instagram, SEO travel, dan kampanye digital destinasi.'
-  },
-  {
-    id: 'skill-hospitality',
-    name: 'Homestay & Hospitality Service',
-    category: 'Hospitality & Kuliner',
-    description: 'Standar kebersihan CHSE, pelayanan tamu desa wisata, dan manajemen akomodasi lokal.'
-  },
-  {
-    id: 'skill-kuliner',
-    name: 'Eksplorasi Kuliner Tradisional',
-    category: 'Hospitality & Kuliner',
-    description: 'Pengembangan produk oleh-oleh khas daerah dan gastro-tourism nusantara.'
-  },
-  {
-    id: 'skill-mice',
-    name: 'MICE & Event Organizer Wisata',
-    category: 'MICE & Event',
-    description: 'Penyelenggaraan festival budaya, perkemahan akbar kepariwisataan, dan expo travel.'
-  },
-  {
-    id: 'skill-bahasa-inggris',
-    name: 'Pemandu Bahasa Asing (English/Mandarin)',
-    category: 'Pemanduan & Tour Guide',
-    description: 'Komunikasi fasih untuk memandu turis mancanegara di objek wisata prioritas.'
+    id: "tour-bromo",
+    name: "Gunung Bromo",
+    location: "Jawa Timur",
+    image:
+      "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=900&q=80",
+    description:
+      "Pesona alam pegunungan dan sunrise Nusantara."
   }
 ];
 
-// Database Awal Murni (Kosong secara default, data dimuat secara langsung dari Google Spreadsheet)
-export const INITIAL_MEMBERS: Member[] = [];
-
-// Database Paket Wisata (Kosong secara default, bersumber dari Google Spreadsheet)
-export const INITIAL_TOUR_PACKAGES: TourPackage[] = [
+export const INITIAL_CULINARY_SOUVENIRS = [
   {
-    id: 'tour-borobudur',
-    name: 'Wisata Candi Borobudur',
-    location: 'Magelang, Jawa Tengah',
-    imageUrl: '/images/borobudur.jpg',
-    description: 'Destinasi wisata budaya dan sejarah Indonesia.'
+    id: "kuliner-rendang",
+    name: "Rendang Nusantara",
+    region: "Sumatera Barat",
+    image:
+      "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=900&q=80",
+    description:
+      "Kuliner khas Indonesia."
   },
   {
-    id: 'tour-bromo',
-    name: 'Gunung Bromo',
-    location: 'Jawa Timur',
-    imageUrl: '/images/bromo.jpg',
-    description: 'Pesona alam pegunungan dan sunrise Nusantara.'
+    id: "kriya-batik",
+    name: "Batik Nusantara",
+    region: "Jawa",
+    image:
+      "https://images.unsplash.com/photo-1590736969955-71cc94901144?auto=format&fit=crop&w=900&q=80",
+    description:
+      "Produk kriya budaya Indonesia."
   }
 ];
 
-// Database Agenda & Kegiatan Saka Pariwisata (Kosong secara default, bersumber dari Google Spreadsheet)
-export const INITIAL_ACTIVITIES: Activity[] = [
+export const INITIAL_ACTIVITIES = [
   {
-    id: 'activity-jelajah',
-    title: 'Jelajah Wisata Nusantara',
-    description: 'Eksplorasi dan promosi destinasi wisata.'
+    id: "activity-jelajah",
+    title: "Jelajah Wisata Nusantara",
+    description:
+      "Eksplorasi dan promosi destinasi wisata."
   },
   {
-    id: 'activity-pelatihan',
-    title: 'Pelatihan Pemandu Wisata',
-    description: 'Peningkatan kompetensi anggota Saka Pariwisata.'
-  }
-];
-
-// Database Riwayat Audit Log (Kosong)
-export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
-
-// Profil Pengguna Default (Pengunjung Publik / Tamu)
-export const DEFAULT_PUBLIC_USER: CurrentUser = {
-  id: 'user-public-guest',
-  username: 'pengunjung',
-  email: 'tamu@sakapariwisata.id',
-  name: 'Pengunjung Publik',
-  role: 'PUBLIC',
-  jurisdictionName: 'Pengunjung Umum',
-  avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
-};
-
-export const DEMO_USERS: CurrentUser[] = [DEFAULT_PUBLIC_USER];
-
-// Database Kuliner & Cinderamata Daerah (Kosong secara default, bersumber dari Google Spreadsheet)
-export const INITIAL_CULINARY_SOUVENIRS: CulinarySouvenirItem[] = [
-  {
-    id: 'kuliner-rendang',
-    name: 'Rendang Nusantara',
-    region: 'Sumatera Barat',
-    imageUrl: '/images/rendang.jpg',
-    description: 'Kuliner khas Indonesia.'
-  },
-  {
-    id: 'kriya-batik',
-    name: 'Batik Nusantara',
-    region: 'Jawa',
-    imageUrl: '/images/batik.jpg',
-    description: 'Produk kriya budaya Indonesia.'
+    id: "activity-pelatihan",
+    title: "Pelatihan Pemandu Wisata",
+    description:
+      "Peningkatan kompetensi anggota Saka Pariwisata."
   }
 ];
