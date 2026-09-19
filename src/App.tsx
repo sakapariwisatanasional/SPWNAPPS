@@ -797,6 +797,14 @@ export default function App() {
                 }}
               />
             )}
+
+
+            {currentTab === 'profile' && (
+              <ProfileView
+                currentUser={currentUser}
+                members={members}
+              />
+            )}
           </div>
         </main>
 
