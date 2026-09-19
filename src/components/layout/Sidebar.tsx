@@ -27,12 +27,12 @@ const menuItems = [
     icon: Home
   },
   {
-    id: "krida",
+    id: "krida-modules",
     label: "Krida",
     icon: Compass
   },
   {
-    id: "tourism",
+    id: "tours",
     label: "Wisata Nusantara",
     icon: Map
   },
@@ -42,12 +42,12 @@ const menuItems = [
     icon: CalendarDays
   },
   {
-    id: "member",
+    id: "my-card",
     label: "Kartu Saya",
     icon: CreditCard
   },
   {
-    id: "store",
+    id: "official-store",
     label: "Store",
     icon: ShoppingBag
   },
@@ -81,32 +81,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className="
-        hidden lg:flex
-        flex-col
-        w-72
-        min-h-screen
-        bg-white/90
-        backdrop-blur-xl
+        hidden lg:flex flex-col
+        w-72 min-h-screen
+        bg-white/90 backdrop-blur-xl
         border-r border-slate-200
         px-5 py-6
       "
     >
 
       <div className="flex items-center gap-3 mb-10">
-
         <div
           className="
-            w-14 h-14
-            rounded-3xl
-            bg-gradient-to-br
-            from-red-600
-            via-amber-400
-            to-teal-500
-            flex items-center justify-center
-            text-white
-            font-black
-            text-2xl
-            shadow-lg
+          w-14 h-14 rounded-3xl
+          bg-gradient-to-br from-red-600 via-amber-400 to-teal-500
+          flex items-center justify-center
+          text-white font-black text-2xl shadow-lg
           "
         >
           S
@@ -120,13 +109,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Saka Pariwisata
           </p>
         </div>
-
       </div>
 
 
       <nav className="flex-1 space-y-2">
 
-        {menus.map((item) => {
+        {menus.map((item:any)=>{
 
           const Icon = item.icon;
           const active = currentTab === item.id;
@@ -134,29 +122,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => onSelectTab?.(item.id)}
+              onClick={()=>onSelectTab?.(item.id)}
               className={`
-                w-full
-                flex items-center gap-4
-                px-4 py-3.5
-                rounded-2xl
-                transition-all duration-300
-                ${
-                  active
-                    ? "bg-red-50 text-red-600 font-bold shadow-sm"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-red-600"
-                }
+              w-full flex items-center gap-4
+              px-4 py-3.5 rounded-2xl
+              transition-all duration-300
+              ${
+                active
+                ? "bg-red-50 text-red-600 font-bold shadow-sm"
+                : "text-slate-600 hover:bg-slate-50 hover:text-red-600"
+              }
               `}
             >
-
-              <Icon size={21} />
-
-              <span>
-                {item.label}
-              </span>
-
+              <Icon size={21}/>
+              <span>{item.label}</span>
             </button>
-          );
+          )
 
         })}
 
@@ -167,13 +148,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={onLogout}
           className="
-            flex items-center gap-3
-            px-4 py-3
-            rounded-2xl
-            text-slate-500
-            hover:bg-red-50
-            hover:text-red-600
-            transition
+          flex items-center gap-3 px-4 py-3
+          rounded-2xl text-slate-500
+          hover:bg-red-50 hover:text-red-600
+          transition
           "
         >
           <LogOut size={20}/>
