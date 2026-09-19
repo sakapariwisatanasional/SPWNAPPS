@@ -902,21 +902,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onSelectTab={handleNavigate}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-[1.75rem] p-6 shadow-sm border border-slate-200/80">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+
+          <div className="min-w-0 bg-white rounded-[1.75rem] p-6 shadow-sm border border-slate-200/80 overflow-hidden">
             <TourPackageCarouselSection
               packages={safeTourPackages}
             />
           </div>
 
-          <div className="bg-white rounded-[1.75rem] p-6 shadow-sm border border-slate-200/80">
-            <CulinarySouvenirGallerySection
-              items={safeCulinaryItems}
-              currentUser={currentUser}
-              members={safeMembers}
-              onOpenFormModal={onOpenCulinaryFormModal}
-            />
+          <div className="min-w-0 w-full bg-white rounded-[1.75rem] p-6 shadow-sm border border-slate-200/80 overflow-hidden">
+            <div className="w-full max-w-full">
+              <CulinarySouvenirGallerySection
+                items={safeCulinaryItems}
+                currentUser={currentUser}
+                members={safeMembers}
+                onOpenFormModal={onOpenCulinaryFormModal}
+              />
+            </div>
           </div>
+
         </div>
       </div>
     </div>
