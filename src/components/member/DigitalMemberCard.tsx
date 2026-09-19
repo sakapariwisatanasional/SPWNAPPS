@@ -1,6 +1,3 @@
-
-    
-  
 import React from "react";
 import { QrCode, ShieldCheck } from "lucide-react";
 
@@ -60,4 +57,3 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
 };
 
 export default DigitalMemberCard;
-
