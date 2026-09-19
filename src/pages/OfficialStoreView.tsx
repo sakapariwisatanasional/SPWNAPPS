@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Search, ShoppingBag, Star, Tag, CheckCircle2 } from "lucide-react";
 import { OFFICIAL_MERCHANDISE_PRODUCTS } from "../data/officialMerchandiseData";
 import { OfficialMerchandiseDetailModal } from "../components/store/OfficialMerchandiseDetailModal";
@@ -14,18 +14,62 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [products, setProducts] = useState<any[]>(OFFICIAL_MERCHANDISE_PRODUCTS);
+
+
+  useEffect(() => {
+    loadOfficialStore();
+  }, []);
+
+  const loadOfficialStore = async () => {
+    try {
+      const response = await fetch("/api/spreadsheet-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "GET_OFFICIAL_STORE"
+        })
+      });
+
+      const result = await response.json();
+
+      if (result?.success && Array.isArray(result.data)) {
+        const mapped = result.data.map((item:any)=>({
+          id: item.ID,
+          name: item["Nama Produk"],
+          category: item.Kategori,
+          description: item.Deskripsi,
+          price: item.Harga,
+          material: item.Material,
+          imageUrl: item["Foto Produk"],
+          image: item["Foto Produk"],
+          gallery: item.Gallery,
+          stock: item.Stok,
+          featured: item.Featured,
+          purchaseEnabled: item.Status === "ACTIVE",
+          accentClass: "from-emerald-700 to-teal-400"
+        }));
+
+        setProducts(mapped);
+      }
+    } catch(error) {
+      console.warn("Official Store API fallback", error);
+    }
+  };
 
 
   const filteredProducts = useMemo(() => {
     const keyword = search.toLowerCase();
 
-    return OFFICIAL_MERCHANDISE_PRODUCTS.filter((item:any) =>
+    return products.filter((item:any) =>
       String(item?.name || "")
         .toLowerCase()
         .includes(keyword)
     );
 
-  }, [search]);
+  }, [search, products]);
 
 
   const handleSelectProduct = (item:any) => {
