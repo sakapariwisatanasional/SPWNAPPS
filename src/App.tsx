@@ -1,3 +1,6 @@
+
+    
+  
 import React, { useState, useEffect } from 'react';
 import { 
   Member, 
@@ -28,8 +31,7 @@ const TAB_ROUTES: Record<string, string> = {
   activities: '/activities',
   'verify-portal': '/verify',
   territories: '/territories',
-  'audit-logs': '/audit',
-  'official-store': '/store'
+  'audit-logs': '/audit'
 };
 
 const PUBLIC_TABS = new Set([
@@ -39,8 +41,7 @@ const PUBLIC_TABS = new Set([
   'skills',
   'krida-modules',
   'activities',
-  'verify-portal',
-  'official-store'
+  'verify-portal'
 ]);
 
 const ADMIN_ROLES = new Set([
@@ -86,12 +87,14 @@ const ROUTE_TO_TAB: Record<string, string> = {
   '/verify-portal': 'verify-portal',
   '/territories': 'territories',
   '/audit': 'audit-logs',
-  '/audit-logs': 'audit-logs',
-  '/store': 'official-store',
-  '/official-store': 'official-store'
+  '/audit-logs': 'audit-logs'
 };
 
 // Layout Components
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+import { MobileBottomNav } from './components/layout/MobileBottomNav';
+
+// Page Views
+import { LandingPageView } from './pages/LandingPageView';
 
