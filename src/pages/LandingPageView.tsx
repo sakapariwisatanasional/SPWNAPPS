@@ -26,7 +26,7 @@ const FALLBACK = {
     "https://images.unsplash.com/photo-1590736969955-71cc94901144?auto=format&fit=crop&w=1200&q=80"
 };
 
-export default function LandingPageView({
+export function LandingPageView({
   members = [],
   tours = [],
   culinaryItems = [],
@@ -174,3 +174,6 @@ function Card({item,type}:any){
   </div>
  )
 }
+
+
+export default LandingPageView;
