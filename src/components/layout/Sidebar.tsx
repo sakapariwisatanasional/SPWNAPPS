@@ -52,7 +52,7 @@ const menuItems = [
     icon: ShoppingBag
   },
   {
-    id: "my-card",
+    id: "profile",
     label: "Profil",
     icon: User
   }
