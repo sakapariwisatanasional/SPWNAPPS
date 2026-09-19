@@ -75,13 +75,14 @@ export const OfficialMerchandiseDetailModal: React.FC<OfficialMerchandiseDetailM
             {item?.image || item?.imageUrl ? (
 
               <img
-                src={item.image || item.imageUrl}
+                src={item.imageUrl || item.image}
                 alt={productName}
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
                 }}
                 className="
-                  w-full h-full
+                  w-full
+                  min-h-[320px]
                   object-cover
                 "
               />
