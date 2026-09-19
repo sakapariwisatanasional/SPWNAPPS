@@ -1,145 +1,98 @@
 import React from "react";
-import { X, ShoppingBag, Tag, Star } from "lucide-react";
+import { X, ShoppingBag, Tag, Star, CheckCircle2 } from "lucide-react";
 
-interface OfficialMerchandiseDetailModalProps {
+interface Props {
   item?: any;
   onClose?: () => void;
 }
 
-export const OfficialMerchandiseDetailModal: React.FC<OfficialMerchandiseDetailModalProps> = ({
+export const OfficialMerchandiseDetailModal: React.FC<Props> = ({
   item,
   onClose
 }) => {
   if (!item) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-3xl rounded-[2rem] bg-white shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/40 p-4 flex items-center justify-center">
+      <div className="bg-white w-full max-w-4xl rounded-[2rem] overflow-hidden shadow-2xl">
 
-        <div
-          className={`
-            h-64
+        <div className="grid md:grid-cols-2">
+
+          <div className={`
+            min-h-[320px]
+            flex items-center justify-center
             bg-gradient-to-br
             ${item.accentClass || "from-emerald-900 to-teal-500"}
-            flex items-center justify-center
-            relative
-          `}
-        >
-          <button
-            onClick={onClose}
-            className="absolute right-5 top-5 rounded-full bg-white/20 p-2 text-white hover:bg-white/30"
-          >
-            <X size={20} />
-          </button>
+          `}>
+            {item.image ? (
+              <img
+                src={item.image}
+                alt={item.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <ShoppingBag size={90} className="text-white"/>
+            )}
+          </div>
 
-          <ShoppingBag
-            size={90}
-            className="text-white/90"
-          />
-        </div>
+          <div className="p-7 space-y-5">
 
+            <button
+              onClick={onClose}
+              className="float-right rounded-full bg-slate-100 p-2"
+            >
+              <X size={18}/>
+            </button>
 
-        <div className="p-6 md:p-8 space-y-5">
-
-          <div>
-            <div className="flex flex-wrap gap-2 mb-3">
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
-                Official Merchandise
+            <div className="flex gap-2 flex-wrap">
+              <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">
+                Official
               </span>
 
               {item.featured && (
-                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+                <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">
                   Featured
                 </span>
               )}
             </div>
 
-            <h2 className="text-2xl md:text-3xl font-black">
+            <h2 className="text-3xl font-black">
               {item.name}
             </h2>
 
-            <p className="mt-2 text-slate-500">
+            <p className="text-slate-500">
               {item.description}
             </p>
-          </div>
 
-
-          <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
-            <span className="text-slate-500">
-              Harga
-            </span>
-
-            <strong className="text-xl text-orange-600">
+            <div className="text-2xl font-black text-orange-600">
               Rp {Number(item.price || 0).toLocaleString("id-ID")}
-            </strong>
-          </div>
-
-
-          <div className="grid md:grid-cols-2 gap-4">
-
-            <div className="rounded-2xl border p-4">
-              <div className="flex items-center gap-2 font-bold">
-                <Tag size={16}/>
-                Kategori
-              </div>
-
-              <p className="mt-2 text-slate-500">
-                {item.category || "-"}
-              </p>
             </div>
 
-
-            <div className="rounded-2xl border p-4">
-              <div className="flex items-center gap-2 font-bold">
-                <Star size={16}/>
-                Tag
+            {item.material && (
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <b>Material</b>
+                <p className="text-slate-500 mt-1">{item.material}</p>
               </div>
+            )}
 
-              <p className="mt-2 text-slate-500">
-                {(item.tags || []).join(", ")}
-              </p>
+            <div className="flex gap-2 text-sm">
+              <Tag size={16}/>
+              {item.category}
             </div>
+
+            {item.stockStatus === "READY_STOCK" && (
+              <div className="flex items-center gap-2 text-green-700 font-bold">
+                <CheckCircle2 size={16}/>
+                Ready Stock
+              </div>
+            )}
+
+            <button className="w-full rounded-2xl bg-emerald-700 py-3 text-white font-black">
+              Pesan Merchandise
+            </button>
 
           </div>
-
-
-          {item.sizes && (
-            <div>
-              <h3 className="font-bold mb-2">
-                Pilihan Ukuran
-              </h3>
-
-              <div className="flex flex-wrap gap-2">
-                {item.sizes.map((size:string) => (
-                  <span
-                    key={size}
-                    className="rounded-xl border px-4 py-2 text-sm font-semibold"
-                  >
-                    {size}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-
-          <button
-            className="
-              w-full
-              rounded-2xl
-              bg-emerald-700
-              py-3
-              font-black
-              text-white
-              hover:bg-emerald-800
-              transition
-            "
-          >
-            Pesan Merchandise
-          </button>
-
         </div>
-
       </div>
     </div>
   );
