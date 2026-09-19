@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Search, ShoppingBag, Star, Tag } from "lucide-react";
+import { Search, ShoppingBag, Star, Tag, CheckCircle2 } from "lucide-react";
 import { OFFICIAL_MERCHANDISE_PRODUCTS } from "../data/officialMerchandiseData";
 import { OfficialMerchandiseDetailModal } from "../components/store/OfficialMerchandiseDetailModal";
 
@@ -25,23 +25,20 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/30 p-4 md:p-8 space-y-6">
+    <main className="min-h-screen bg-slate-50 p-4 md:p-8 space-y-6">
 
-      <section
-        className="
-          rounded-[2.5rem]
-          p-8 md:p-10
-          text-white
-          shadow-2xl
-          bg-gradient-to-br
-          from-emerald-950
-          via-teal-700
-          to-amber-500
-        "
-      >
-
-        <div className="flex items-center gap-3">
-          <ShoppingBag size={38} />
+      <section className="
+        rounded-[2.5rem]
+        p-8 md:p-10
+        text-white
+        shadow-xl
+        bg-gradient-to-br
+        from-emerald-950
+        via-teal-700
+        to-amber-500
+      ">
+        <div className="flex items-center gap-4">
+          <ShoppingBag size={40}/>
 
           <div>
             <h1 className="text-3xl md:text-4xl font-black">
@@ -55,15 +52,9 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
           </div>
         </div>
 
-
         <div className="
-          mt-6
-          bg-white
-          rounded-2xl
-          flex
-          items-center
-          px-4
-          py-3
+          mt-6 bg-white rounded-2xl
+          flex items-center px-4 py-3
           text-slate-700
         ">
           <Search size={18}/>
@@ -75,20 +66,17 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
             onChange={(e)=>setSearch(e.target.value)}
           />
         </div>
-
       </section>
 
 
-      <section
-        className="
-          grid
-          grid-cols-1
-          sm:grid-cols-2
-          lg:grid-cols-3
-          xl:grid-cols-4
-          gap-6
-        "
-      >
+      <section className="
+        grid
+        grid-cols-1
+        sm:grid-cols-2
+        lg:grid-cols-3
+        xl:grid-cols-4
+        gap-6
+      ">
 
         {filteredProducts.map((item:any)=>(
 
@@ -103,32 +91,32 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               bg-white
               rounded-[2rem]
               overflow-hidden
-              border
-              border-slate-200/80
+              border border-slate-200
               shadow-sm
               hover:-translate-y-2
               hover:shadow-2xl
-              transition-all
+              transition-all duration-300
             "
           >
 
-            <div
-              className={`
-                h-56
-                relative
-                overflow-hidden
-                flex
-                items-center
-                justify-center
-                bg-gradient-to-br
-                ${item.accentClass || "from-emerald-900 to-teal-500"}
-              `}
-            >
+            <div className={`
+              h-56
+              overflow-hidden
+              relative
+              flex items-center justify-center
+              bg-gradient-to-br
+              ${item.accentClass || "from-emerald-900 to-teal-500"}
+            `}>
+
               {(item.image || item.imageUrl) ? (
                 <img
                   src={item.image || item.imageUrl}
                   alt={item.name}
-                  className="w-full h-full object-cover"
+                  className="
+                    w-full h-full object-cover
+                    transition-transform duration-500
+                    hover:scale-110
+                  "
                 />
               ) : (
                 <ShoppingBag
@@ -136,6 +124,7 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
                   className="text-white/90"
                 />
               )}
+
             </div>
 
 
@@ -145,43 +134,51 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
                 {item.featured && (
                   <span className="
-                    rounded-full
-                    bg-amber-100
+                    rounded-full bg-amber-100
                     px-3 py-1
-                    text-xs
-                    font-bold
-                    text-amber-700
+                    text-xs font-bold text-amber-700
                   ">
                     Featured
                   </span>
                 )}
 
                 <span className="
-                  rounded-full
-                  bg-emerald-100
+                  rounded-full bg-emerald-100
                   px-3 py-1
-                  text-xs
-                  font-bold
-                  text-emerald-700
+                  text-xs font-bold text-emerald-700
                 ">
                   Official
                 </span>
 
+                {item.purchaseEnabled && (
+                  <span className="
+                    flex items-center gap-1
+                    rounded-full bg-green-100
+                    px-3 py-1
+                    text-xs font-bold text-green-700
+                  ">
+                    <CheckCircle2 size={12}/>
+                    Ready Stock
+                  </span>
+                )}
+
               </div>
 
 
-              <h3 className="font-black text-lg leading-tight">
+              <h3 className="
+                font-black text-lg
+                leading-tight
+                line-clamp-2
+                min-h-[3.5rem]
+              ">
                 {item.name}
               </h3>
 
 
               <div className="
-                flex
-                items-center
-                gap-1
+                flex items-center gap-1
                 text-amber-500
-                mt-3
-                text-sm
+                mt-3 text-sm
               ">
                 <Star size={14} fill="currentColor"/>
                 Merchandise Resmi
@@ -189,11 +186,8 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
 
               <div className="
-                flex
-                items-center
-                gap-2
-                text-xs
-                text-slate-500
+                flex items-center gap-2
+                text-xs text-slate-500
                 mt-3
               ">
                 <Tag size={14}/>
@@ -201,7 +195,9 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               </div>
 
 
-              <div className="mt-4 flex items-center justify-between">
+              <div className="
+                mt-4 flex items-center justify-between
+              ">
                 <div className="font-black text-orange-600">
                   Rp {Number(item.price || 0).toLocaleString("id-ID")}
                 </div>
@@ -209,11 +205,9 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
                 <span className="
                   rounded-full
                   bg-slate-100
-                  px-3
-                  py-1
-                  text-xs
-                  font-bold
-                  text-slate-600
+                  px-3 py-1
+                  text-xs font-bold
+                  text-slate-700
                 ">
                   Detail
                 </span>
