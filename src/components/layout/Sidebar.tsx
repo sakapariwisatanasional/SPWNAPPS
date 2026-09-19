@@ -52,7 +52,7 @@ const menuItems = [
     icon: ShoppingBag
   },
   {
-    id: "profile",
+    id: "my-card",
     label: "Profil",
     icon: User
   }
@@ -70,8 +70,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ...(isAdmin
       ? [
           {
-            id: "admin",
-            label: "Admin Panel",
+            id: "audit-logs",
+            label: "Audit Log",
             icon: ShieldCheck
           }
         ]
