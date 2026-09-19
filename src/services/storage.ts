@@ -179,6 +179,23 @@ class StorageService {
 
   constructor() {
     this.initDefaultData();
+
+    // Fallback data publik awal jika database/cloud masih kosong
+    if (this.cloudTours.length === 0) {
+      this.cloudTours = [...INITIAL_TOUR_PACKAGES];
+    }
+
+    if (this.cloudActivities.length === 0) {
+      this.cloudActivities = [...INITIAL_ACTIVITIES];
+    }
+
+    if (this.cloudCulinarySouvenirs.length === 0) {
+      this.cloudCulinarySouvenirs = [...INITIAL_CULINARY_SOUVENIRS];
+    }
+
+    if (this.cloudMembers.length === 0) {
+      this.cloudMembers = [...INITIAL_MEMBERS];
+    }
   }
 
   private initDefaultData() {
