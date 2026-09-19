@@ -19,7 +19,8 @@ import { spreadsheetService } from './services/spreadsheetService';
 const TAB_ROUTES: Record<string, string> = {
   landing: '/',
   dashboard: '/dashboard',
-  'my-card': '/profile',
+  'my-card': '/my-card',
+  profile: '/profile',
   members: '/members',
   tours: '/tours',
   'culinary-souvenirs': '/culinary',
@@ -52,7 +53,7 @@ const ADMIN_ROLES = new Set([
 function canAccessTab(tab: string, role: string): boolean {
   const normalizedRole = role || 'PUBLIC';
   if (PUBLIC_TABS.has(tab)) return true;
-  if (tab === 'my-card') return normalizedRole !== 'PUBLIC';
+  if (tab === 'my-card' || tab === 'profile') return normalizedRole !== 'PUBLIC';
   if (tab === 'dashboard' || tab === 'members') return ADMIN_ROLES.has(normalizedRole);
   if (tab === 'territories') return normalizedRole === 'ADMIN_NATIONAL' || normalizedRole === 'ADMIN_PROVINCE' || normalizedRole === 'SUPER_ADMIN';
   if (tab === 'audit-logs') return normalizedRole === 'SUPER_ADMIN';
@@ -70,7 +71,7 @@ const ROUTE_TO_TAB: Record<string, string> = {
   '/': 'landing',
   '/landing': 'landing',
   '/dashboard': 'dashboard',
-  '/profile': 'my-card',
+  '/profile': 'profile',
   '/my-card': 'my-card',
   '/members': 'members',
   '/tours': 'tours',
@@ -102,6 +103,7 @@ import { ActivitiesView } from './pages/ActivitiesView';
 import { TerritoryManagementView } from './pages/TerritoryManagementView';
 import { AuditLogsView } from './pages/AuditLogsView';
 import { MyCardView } from './pages/MyCardView';
+import { ProfileView } from './pages/ProfileView';
 import { KridaModulesView } from './pages/KridaModulesView';
 import { KridaMaterialEditorModal } from './components/krida/KridaMaterialEditorModal';
 import { PublicPortalView } from './pages/PublicPortalView';
