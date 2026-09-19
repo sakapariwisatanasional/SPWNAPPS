@@ -35,6 +35,7 @@ const TAB_ROUTES: Record<string, string> = {
 
 const PUBLIC_TABS = new Set([
   'landing',
+  'official-store',
   'tours',
   'culinary-souvenirs',
   'skills',
@@ -55,6 +56,7 @@ function canAccessTab(tab: string, role: string): boolean {
   const normalizedRole = role || 'PUBLIC';
   if (PUBLIC_TABS.has(tab)) return true;
   if (tab === 'my-card' || tab === 'profile') return normalizedRole !== 'PUBLIC';
+  if (tab === 'official-store') return true;
   if (tab === 'dashboard' || tab === 'members') return ADMIN_ROLES.has(normalizedRole);
   if (tab === 'territories') return normalizedRole === 'ADMIN_NATIONAL' || normalizedRole === 'ADMIN_PROVINCE' || normalizedRole === 'SUPER_ADMIN';
   if (tab === 'audit-logs') return normalizedRole === 'SUPER_ADMIN';
@@ -70,7 +72,9 @@ function getSafeTabForRole(role: string): string {
 
 const ROUTE_TO_TAB: Record<string, string> = {
   '/': 'landing',
+  'official-store',
   '/landing': 'landing',
+  'official-store',
   '/dashboard': 'dashboard',
   '/profile': 'profile',
   '/my-card': 'my-card',
