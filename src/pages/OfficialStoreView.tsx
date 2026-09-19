@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Search, ShoppingBag, Star, Tag, CheckCircle2 } from "lucide-react";
 import { OFFICIAL_MERCHANDISE_PRODUCTS } from "../data/officialMerchandiseData";
-import { DEFAULT_GAS_WEB_APP_URL } from "../services/spreadsheetService";
 import { OfficialMerchandiseDetailModal } from "../components/store/OfficialMerchandiseDetailModal";
 
 interface OfficialStoreViewProps {
@@ -15,63 +14,18 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const [products, setProducts] = useState<any[]>(OFFICIAL_MERCHANDISE_PRODUCTS);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadOfficialStore();
-  }, []);
-
-  const loadOfficialStore = async () => {
-    try {
-      const response = await fetch(DEFAULT_GAS_WEB_APP_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8"
-        },
-        body: JSON.stringify({
-          action: "GET_OFFICIAL_STORE"
-        })
-      });
-
-      const result = await response.json();
-
-      if (result?.success && Array.isArray(result.data)) {
-        const mapped = result.data.map((item:any) => ({
-          id: item.ID,
-          name: item["Nama Produk"],
-          category: item.Kategori,
-          description: item.Deskripsi,
-          price: item.Harga,
-          image: item["Foto Produk"],
-          imageUrl: item["Foto Produk"],
-          gallery: item.Gallery,
-          stock: item.Stok,
-          featured: item.Featured,
-          purchaseEnabled: item.Status === "ACTIVE",
-          accentClass: "from-emerald-700 to-teal-400"
-        }));
-
-        setProducts(mapped);
-      }
-    } catch (error) {
-      console.warn("Official Store API fallback:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
 
   const filteredProducts = useMemo(() => {
     const keyword = search.toLowerCase();
 
-    return products.filter((item:any) =>
+    return OFFICIAL_MERCHANDISE_PRODUCTS.filter((item:any) =>
       String(item?.name || "")
         .toLowerCase()
         .includes(keyword)
     );
 
-  }, [search, products]);
+  }, [search]);
 
 
   const handleSelectProduct = (item:any) => {
@@ -195,10 +149,14 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               ${item?.accentClass || "from-emerald-700 to-teal-400"}
             `}>
 
-              {item?.image || item?.imageUrl ? (
+              {item?.imageUrl || item?.image || item?.thumbnail ? (
 
                 <img
-                  src={item.image || item.imageUrl}
+                  src={
+                    item.imageUrl ||
+                    item.image ||
+                    item.thumbnail
+                  }
                   alt={item?.name || "Produk"}
                   onError={(e)=>{
                     e.currentTarget.style.display="none";
