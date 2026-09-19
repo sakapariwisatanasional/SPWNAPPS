@@ -72,10 +72,10 @@ export const OfficialMerchandiseDetailModal: React.FC<OfficialMerchandiseDetailM
             `}
           >
 
-            {item?.image || item?.imageUrl ? (
+            {item?.["Foto Produk"] || item?.imageUrl || item?.image ? (
 
               <img
-                src={item.imageUrl || item.image}
+                src={item["Foto Produk"] || item.imageUrl || item.image}
                 alt={productName}
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
