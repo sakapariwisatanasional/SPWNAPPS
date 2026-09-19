@@ -67,10 +67,34 @@ export const MASTER_SKILLS: Skill[] = [
 export const INITIAL_MEMBERS: Member[] = [];
 
 // Database Paket Wisata (Kosong secara default, bersumber dari Google Spreadsheet)
-export const INITIAL_TOUR_PACKAGES: TourPackage[] = [];
+export const INITIAL_TOUR_PACKAGES: TourPackage[] = [
+  {
+    id: 'tour-borobudur',
+    name: 'Wisata Candi Borobudur',
+    location: 'Magelang, Jawa Tengah',
+    description: 'Destinasi wisata budaya dan sejarah Indonesia.'
+  },
+  {
+    id: 'tour-bromo',
+    name: 'Gunung Bromo',
+    location: 'Jawa Timur',
+    description: 'Pesona alam pegunungan dan sunrise Nusantara.'
+  }
+];
 
 // Database Agenda & Kegiatan Saka Pariwisata (Kosong secara default, bersumber dari Google Spreadsheet)
-export const INITIAL_ACTIVITIES: Activity[] = [];
+export const INITIAL_ACTIVITIES: Activity[] = [
+  {
+    id: 'activity-jelajah',
+    title: 'Jelajah Wisata Nusantara',
+    description: 'Eksplorasi dan promosi destinasi wisata.'
+  },
+  {
+    id: 'activity-pelatihan',
+    title: 'Pelatihan Pemandu Wisata',
+    description: 'Peningkatan kompetensi anggota Saka Pariwisata.'
+  }
+];
 
 // Database Riwayat Audit Log (Kosong)
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
@@ -89,4 +113,17 @@ export const DEFAULT_PUBLIC_USER: CurrentUser = {
 export const DEMO_USERS: CurrentUser[] = [DEFAULT_PUBLIC_USER];
 
 // Database Kuliner & Cinderamata Daerah (Kosong secara default, bersumber dari Google Spreadsheet)
-export const INITIAL_CULINARY_SOUVENIRS: CulinarySouvenirItem[] = [];
+export const INITIAL_CULINARY_SOUVENIRS: CulinarySouvenirItem[] = [
+  {
+    id: 'kuliner-rendang',
+    name: 'Rendang Nusantara',
+    region: 'Sumatera Barat',
+    description: 'Kuliner khas Indonesia.'
+  },
+  {
+    id: 'kriya-batik',
+    name: 'Batik Nusantara',
+    region: 'Jawa',
+    description: 'Produk kriya budaya Indonesia.'
+  }
+];
