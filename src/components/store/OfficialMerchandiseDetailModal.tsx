@@ -6,6 +6,17 @@ import {
   CheckCircle2
 } from "lucide-react";
 
+
+const normalizeImageUrl = (raw: unknown): string => {
+  if (typeof raw !== "string") return "";
+  const value = raw.trim();
+  if (!value) return "";
+  const idMatch = value.match(/(?:\/file\/d\/|[?&]id=|\/d\/)([a-zA-Z0-9_-]{10,})/);
+  if (idMatch?.[1] && value.includes("drive.google.com")) return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(value)) return `https://lh3.googleusercontent.com/d/${value}`;
+  return value;
+};
+
 interface OfficialMerchandiseDetailModalProps {
   item?: any;
   onClose?: () => void;
@@ -72,19 +83,17 @@ export const OfficialMerchandiseDetailModal: React.FC<OfficialMerchandiseDetailM
             `}
           >
 
-            {item?.["Foto Produk"] || item?.imageUrl || item?.image ? (
+            {normalizeImageUrl(item?.["Foto Produk"] || item?.imageUrl || item?.image) ? (
 
               <img
-                src={item["Foto Produk"] || item.imageUrl || item.image}
+                src={normalizeImageUrl(item?.["Foto Produk"] || item?.imageUrl || item?.image)}
                 alt={productName}
                 onError={(e) => {
-                  e.currentTarget.style.display = "none";
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/saka_logo.png";
+                  e.currentTarget.className = "w-32 min-h-32 object-contain";
                 }}
-                className="
-                  w-full
-                  min-h-[320px]
-                  object-cover
-                "
+                className="w-full min-h-[320px] object-cover"
               />
 
             ) : (
