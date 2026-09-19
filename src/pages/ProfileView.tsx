@@ -37,7 +37,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         text-white shadow-2xl
       ">
 
-        <div className="flex items-center gap-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
 
           <div className="
             w-24 h-24 rounded-full
@@ -49,13 +49,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
 
           <div>
-            <h1 className="text-4xl font-black">
-              {user.name || "Anggota"}
-            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl md:text-4xl font-black">
+                {user.name || "Anggota"}
+              </h1>
+
+              <span className="rounded-full bg-white/20 px-4 py-1 text-sm font-bold flex items-center gap-2">
+                <BadgeCheck size={16}/>
+                Aktif
+              </span>
+            </div>
 
             <p className="mt-2 text-white/90">
               Profil Anggota Saka Pariwisata
             </p>
+
+            <div className="mt-4 inline-flex rounded-full bg-black/20 px-4 py-2 text-sm font-bold">
+              {user.role || "Anggota"}
+            </div>
           </div>
 
         </div>
@@ -73,6 +84,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           icon={<User/>}
           label="Nama Lengkap"
           value={user.name || "-"}
+          accent="emerald"
         />
 
         <Info
@@ -118,15 +130,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </h2>
 
         <div className="
-          rounded-2xl bg-gradient-to-r from-emerald-50 to-slate-50 p-5
+          rounded-2xl bg-gradient-to-r from-emerald-50 to-slate-50 p-5 border border-emerald-100
         ">
 
-          <p>
-            Data keanggotaan Saka Pariwisata
+          <p className="font-bold">
+            {String(user.role || '').toUpperCase().includes('ADMIN')
+              ? 'Akses Administrator Saka Pariwisata'
+              : 'Data keanggotaan Saka Pariwisata'}
           </p>
 
           <p className="text-slate-500 mt-2">
-            Profil dapat diperbarui melalui fitur koreksi data.
+            {String(user.role || '').toUpperCase().includes('ADMIN')
+              ? 'Memiliki akses pengelolaan data anggota, aktivitas, dan layanan sistem.'
+              : 'Profil dapat diperbarui melalui fitur koreksi data.'}
           </p>
 
         </div>
@@ -152,9 +168,17 @@ items-center
 bg-slate-50
 rounded-2xl
 p-5
+border border-slate-100
+hover:shadow-md
+transition
 ">
 
-<div className="text-emerald-700">
+<div className="
+text-emerald-700
+bg-emerald-100
+rounded-xl
+p-3
+">
 {icon}
 </div>
 
