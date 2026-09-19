@@ -189,8 +189,24 @@ export default function App() {
   // Resolve initial tab directly from URL pathname so direct links work immediately
   const getInitialTab = (): string => {
     if (typeof window === 'undefined') return 'landing';
+
     const pathname = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+
     if (pathname.startsWith('/verify')) return 'verify-portal';
+
+    // Jika user sudah login, jangan membuka halaman terakhir secara paksa.
+    // Admin selalu masuk ke dashboard, sedangkan member tetap ke KTA.
+    try {
+      const storedUser = storage.getCurrentUser();
+
+      if (storedUser?.role && storedUser.role !== 'PUBLIC') {
+        if (storedUser.role === 'MEMBER') return 'my-card';
+        return 'dashboard';
+      }
+    } catch {
+      // fallback menggunakan route
+    }
+
     return ROUTE_TO_TAB[pathname] || 'landing';
   };
 
