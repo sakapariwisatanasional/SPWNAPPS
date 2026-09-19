@@ -460,7 +460,9 @@ class StorageService {
   // =========================================================
 
   public getMembers(): Member[] {
-    return [...this.cloudMembers];
+    return this.cloudMembers.length > 0
+      ? [...this.cloudMembers]
+      : [...INITIAL_MEMBERS];
   }
 
   /**
@@ -2505,7 +2507,9 @@ class StorageService {
   // =========================================================
 
   public getTourPackages(): TourPackage[] {
-    return [...this.cloudTours];
+    return this.cloudTours.length > 0
+      ? [...this.cloudTours]
+      : [...INITIAL_TOUR_PACKAGES];
   }
 
   public setTourPackages(tours: TourPackage[]) {
@@ -2624,7 +2628,9 @@ class StorageService {
   // =========================================================
 
   public getActivities(): Activity[] {
-    return [...this.cloudActivities];
+    return this.cloudActivities.length > 0
+      ? [...this.cloudActivities]
+      : [...INITIAL_ACTIVITIES];
   }
 
   public setActivities(activities: Activity[]) {
@@ -2744,7 +2750,9 @@ class StorageService {
   // =========================================================
 
   public getCulinarySouvenirs(): CulinarySouvenirItem[] {
-    return [...this.cloudCulinarySouvenirs];
+    return this.cloudCulinarySouvenirs.length > 0
+      ? [...this.cloudCulinarySouvenirs]
+      : [...INITIAL_CULINARY_SOUVENIRS];
   }
 
   public setCulinarySouvenirs(items: CulinarySouvenirItem[]) {
