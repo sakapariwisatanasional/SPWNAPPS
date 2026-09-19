@@ -353,9 +353,9 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       {/* =======================================================
           PAGE HEADER
       ======================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[2rem] bg-white/70 backdrop-blur p-5 border border-slate-200/70 shadow-sm">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold font-heading text-slate-900">
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight font-heading text-slate-900">
             Manajemen Keanggotaan Terpadu
           </h2>
 
@@ -735,7 +735,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
       <div className="bg-white rounded-[1.75rem] border border-slate-200 shadow-xs overflow-hidden max-w-full">
 
         <div className="hidden md:block w-full max-w-full overflow-x-auto overflow-y-hidden">
-          <table className="w-full table-fixed text-left text-xs">
+          <table className="w-full table-fixed text-left text-xs [&_th]:tracking-wide">
 
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
