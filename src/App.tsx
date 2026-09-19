@@ -1,6 +1,3 @@
-
-    
-  
 import React, { useState, useEffect } from 'react';
 import { 
   Member, 
@@ -97,4 +94,4 @@ const ROUTE_TO_TAB: Record<string, string> = {
 // Layout Components
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
-
+export default App;
