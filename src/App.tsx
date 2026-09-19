@@ -994,6 +994,7 @@ export default function App() {
       {selectedCulinaryDetail && (
         <CulinarySouvenirDetailModal
           item={selectedCulinaryDetail}
+          currentUser={currentUser}
           onClose={() => setSelectedCulinaryDetail(null)}
         />
       )}
