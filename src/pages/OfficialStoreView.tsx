@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Search, ShoppingBag, Star, Tag, CheckCircle2 } from "lucide-react";
 import { OFFICIAL_MERCHANDISE_PRODUCTS } from "../data/officialMerchandiseData";
+import { DEFAULT_GAS_WEB_APP_URL } from "../services/spreadsheetService";
 import { OfficialMerchandiseDetailModal } from "../components/store/OfficialMerchandiseDetailModal";
 
 interface OfficialStoreViewProps {
@@ -23,43 +24,38 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
   const loadOfficialStore = async () => {
     try {
-      const response = await fetch(
-        import.meta.env.VITE_GAS_API_URL,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            action: "GET_OFFICIAL_STORE"
-          })
-        }
-      );
+      const response = await fetch(DEFAULT_GAS_WEB_APP_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify({
+          action: "GET_OFFICIAL_STORE"
+        })
+      });
 
       const result = await response.json();
 
       if (result?.success && Array.isArray(result.data)) {
-        const mapped = result.data.map((item:any)=>({
+        const mapped = result.data.map((item:any) => ({
           id: item.ID,
           name: item["Nama Produk"],
           category: item.Kategori,
           description: item.Deskripsi,
           price: item.Harga,
           image: item["Foto Produk"],
+          imageUrl: item["Foto Produk"],
           gallery: item.Gallery,
           stock: item.Stok,
           featured: item.Featured,
-          purchaseEnabled: item.Status === "ACTIVE"
+          purchaseEnabled: item.Status === "ACTIVE",
+          accentClass: "from-emerald-700 to-teal-400"
         }));
 
         setProducts(mapped);
       }
-
-    } catch(error) {
-      console.warn(
-        "Official Store API fallback:",
-        error
-      );
+    } catch (error) {
+      console.warn("Official Store API fallback:", error);
     } finally {
       setLoading(false);
     }
@@ -158,13 +154,6 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
       </section>
 
-
-
-      {loading && (
-        <div className="rounded-2xl bg-white p-6 text-center shadow">
-          Memuat Official Store...
-        </div>
-      )}
 
 
       <section className="
