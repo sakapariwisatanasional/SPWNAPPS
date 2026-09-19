@@ -1136,7 +1136,11 @@ class SpreadsheetService {
 
           // Spreadsheet adalah source of truth. Jika sheet valid dan kosong,
           // cache lokal juga harus dikosongkan agar data lama tidak muncul lagi.
-          storage.setTourPackages(mergedTours);
+          storage.setTourPackages(
+          mergedTours.length > 0
+            ? mergedTours
+            : existingTours
+        );
         }
       } catch (e) {
         console.warn('Tour packages sync notice:', e);
@@ -1199,7 +1203,11 @@ class SpreadsheetService {
           });
 
           // Sheet valid + kosong berarti tidak ada produk tersimpan di cloud.
-          storage.setCulinarySouvenirs(mergedCulinary);
+          storage.setCulinarySouvenirs(
+          mergedCulinary.length > 0
+            ? mergedCulinary
+            : existingCulinary
+        );
         }
       } catch (e) {
         console.warn('Culinary sync notice:', e);
@@ -1274,7 +1282,11 @@ class SpreadsheetService {
           });
 
           // Sheet valid + kosong harus menimpa cache lokal dengan array kosong.
-          storage.setActivities(mergedActivities);
+          storage.setActivities(
+          mergedActivities.length > 0
+            ? mergedActivities
+            : existingActivities
+        );
         }
       } catch (e) {
         console.warn('Activities sync notice:', e);
