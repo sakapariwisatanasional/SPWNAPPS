@@ -35,10 +35,30 @@ export function LandingPageView({
 }: LandingPageViewProps) {
 
   const stats = [
-    {title:"Anggota", value:members.length, icon:Users, info:"Aktif Nasional"},
-    {title:"Aktivitas", value:activities.length, icon:CalendarDays, info:"Kegiatan Terbaru"},
-    {title:"Destinasi", value:tours.length, icon:MapPin, info:"Wisata Nusantara"},
-    {title:"Produk Kreatif", value:culinaryItems.length, icon:ShoppingBag, info:"Kuliner & Kriya"}
+    {
+      title: "Anggota",
+      value: members.length,
+      info: "Aktif Nasional",
+      icon: Users
+    },
+    {
+      title: "Aktivitas",
+      value: activities.length,
+      info: "Kegiatan Terbaru",
+      icon: CalendarDays
+    },
+    {
+      title: "Destinasi",
+      value: tours.length,
+      info: "Wisata Nusantara",
+      icon: MapPin
+    },
+    {
+      title: "Produk Kreatif",
+      value: culinaryItems.length,
+      info: "Kuliner & Kriya",
+      icon: ShoppingBag
+    }
   ];
 
   return (
@@ -59,27 +79,22 @@ export function LandingPageView({
               Berkarya untuk Pariwisata Indonesia
             </h1>
 
-            <p className="mt-5 text-white/90 text-lg">
+            <p className="mt-5 text-lg text-white/90">
               Platform digital Saka Pariwisata untuk anggota,
               kegiatan, destinasi wisata, serta produk kreatif daerah.
             </p>
 
             <button
               onClick={()=>onSelectTab?.("tours")}
-              className="mt-8 rounded-full bg-white px-7 py-3 text-slate-900 font-bold flex gap-2 items-center"
+              className="mt-8 rounded-full bg-white px-7 py-3 text-slate-900 font-bold flex items-center gap-2"
             >
               Mulai Jelajah <ArrowRight size={18}/>
             </button>
           </div>
 
-          <div className="absolute right-10 top-10 hidden lg:block">
-            <div className="h-72 w-72 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
+          <div className="hidden lg:flex absolute right-12 top-12">
+            <div className="w-72 h-72 rounded-full bg-white/20 backdrop-blur items-center justify-center flex">
               <Map size={120}/>
-            </div>
-
-            <div className="absolute left-0 bottom-0 bg-white text-slate-900 rounded-2xl px-5 py-3 shadow-xl">
-              <small>Destinasi Pilihan</small>
-              <div className="font-black">Nusantara</div>
             </div>
           </div>
 
@@ -88,22 +103,36 @@ export function LandingPageView({
 
 
       <section className="px-6 grid grid-cols-2 xl:grid-cols-4 gap-6">
-        {stats.map(({title,value,icon:Icon,info})=>(
+        {stats.map(({title,value,info,icon:Icon})=>(
           <div key={title}
-            className="bg-white rounded-3xl border p-6 shadow-sm hover:shadow-xl transition">
+            className="bg-white rounded-3xl border p-6 shadow-sm hover:shadow-lg transition">
             <Icon size={34}/>
-            <div className="mt-5 text-4xl font-black">{value}</div>
+            <div className="mt-4 text-4xl font-black">{value}</div>
             <div className="font-bold text-lg">{title}</div>
-            <div className="text-slate-500">{info}</div>
+            <div className="text-slate-500 text-sm">{info}</div>
           </div>
         ))}
       </section>
 
 
       <section className="p-6 space-y-12">
-        <Section title="Wisata Nusantara" icon={<MapPin/>} items={tours} type="tourism"/>
-        <Section title="Kuliner & Cinderamata" icon={<ShoppingBag/>} items={culinaryItems} type="culinary"/>
-        <Section title="Aktivitas Terbaru" icon={<CalendarDays/>} items={activities} type="activity"/>
+
+        <ContentSection
+          title="Wisata Nusantara"
+          icon={<MapPin/>}
+          items={tours}
+          type="tourism"
+        />
+
+        <ContentSection
+          title="Kuliner & Cinderamata"
+          icon={<ShoppingBag/>}
+          items={culinaryItems}
+          type="culinary"
+        />
+
+        <ActivitySection activities={activities}/>
+
       </section>
 
     </main>
@@ -111,69 +140,108 @@ export function LandingPageView({
 }
 
 
-function Section({title,icon,items,type}:any){
- return (
-  <section>
-   <h2 className="text-3xl font-black flex items-center gap-3 mb-6">
-    {icon}{title}
-   </h2>
+function ContentSection({title,icon,items,type}:any){
 
-   <div className="grid lg:grid-cols-3 gap-6">
-    {items.map((item:any)=>(
-      <Card key={item.id} item={item} type={type}/>
-    ))}
-   </div>
-  </section>
- )
+return (
+<section>
+
+<h2 className="text-3xl font-black flex items-center gap-3 mb-6">
+{icon}
+{title}
+</h2>
+
+<div className="grid lg:grid-cols-3 gap-6">
+{items.map((item:any)=>(
+<LargeCard key={item.id} item={item} type={type}/>
+))}
+</div>
+
+</section>
+)
+
 }
 
 
-function Card({item,type}:any){
+function LargeCard({item,type}:any){
 
- const image =
- item.image ||
- (type==="tourism" ? FALLBACK.tourism :
- type==="culinary" ? FALLBACK.culinary :
- FALLBACK.craft);
+const image =
+item.image ||
+(type==="tourism" ? FALLBACK.tourism : FALLBACK.culinary);
 
- return (
-  <div className="bg-white rounded-3xl border overflow-hidden shadow-sm hover:-translate-y-1 hover:shadow-xl transition">
+return (
+<div className="bg-white rounded-3xl overflow-hidden border shadow-sm hover:shadow-xl transition">
 
-   <img
-    src={image}
-    alt={item.name || item.title}
-    className="w-full h-64 object-cover"
-    onError={(e)=>{
-      e.currentTarget.src =
-      type==="tourism" ? FALLBACK.tourism :
-      type==="culinary" ? FALLBACK.culinary :
-      FALLBACK.craft;
-    }}
-   />
+<img
+src={image}
+alt={item.name}
+className="h-64 w-full object-cover"
+onError={(e)=>e.currentTarget.src=FALLBACK.tourism}
+/>
 
-   <div className="p-6">
+<div className="p-6">
 
-    <h3 className="text-2xl font-black">
-      {item.name || item.title}
-    </h3>
+<h3 className="text-2xl font-black">
+{item.name}
+</h3>
 
-    <div className="mt-2 text-teal-600 font-semibold">
-      {item.location || item.region}
-    </div>
+<div className="mt-2 text-teal-600">
+{item.location || item.region}
+</div>
 
-    <p className="mt-3 text-slate-500">
-      {item.description}
-    </p>
+<p className="mt-3 text-slate-500">
+{item.description}
+</p>
 
-    <button className="mt-5 flex items-center gap-2 font-bold">
-      Lihat Detail <ArrowRight size={16}/>
-    </button>
+<button className="mt-5 flex gap-2 font-bold text-sm">
+Lihat Detail <ArrowRight size={16}/>
+</button>
 
-   </div>
+</div>
 
-  </div>
- )
+</div>
+)
+
 }
 
+
+function ActivitySection({activities}:any){
+
+return (
+<section>
+
+<h2 className="text-3xl font-black flex items-center gap-3 mb-6">
+<CalendarDays/>
+Aktivitas Terbaru
+</h2>
+
+<div className="grid lg:grid-cols-2 gap-5">
+
+{activities.map((item:any)=>(
+<div
+key={item.id}
+className="bg-white rounded-2xl border p-6 shadow-sm hover:shadow-lg transition"
+>
+
+<h3 className="font-black text-xl">
+{item.title}
+</h3>
+
+<p className="mt-2 text-slate-500">
+{item.description}
+</p>
+
+<button className="mt-4 flex gap-2 text-sm font-bold">
+Lihat Detail <ArrowRight size={15}/>
+</button>
+
+</div>
+))}
+
+</div>
+
+</section>
+)
+
+}
 
 export default LandingPageView;
