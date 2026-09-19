@@ -38,23 +38,19 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
     "";
 
   return (
-    <section
-      className="
-        relative
-        overflow-hidden
-        rounded-[2rem]
-        p-6
-        md:p-8
-        min-h-[230px]
-        text-white
-        bg-gradient-to-br
-        from-red-600
-        via-amber-400
-        to-teal-500
-        shadow-xl
-      "
-    >
-
+    <section className="
+      relative
+      overflow-hidden
+      rounded-[2rem]
+      p-6 md:p-8
+      min-h-[230px]
+      text-white
+      bg-gradient-to-br
+      from-red-600
+      via-amber-400
+      to-teal-500
+      shadow-xl
+    ">
       <div className="
         absolute
         -right-10
@@ -62,7 +58,7 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
         w-48 h-48
         rounded-full
         bg-white/20
-      "/>
+      " />
 
       <div className="
         relative
@@ -70,20 +66,11 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
         justify-between
         gap-5
       ">
-
         <div className="flex-1">
 
-          <div className="
-            flex
-            items-center
-            gap-2
-            text-sm
-            font-bold
-            opacity-90
-          ">
+          <div className="text-sm font-bold opacity-90">
             🇮🇩 SAKA PARIWISATA
           </div>
-
 
           <div className="
             mt-8
@@ -91,10 +78,23 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
             items-center
             gap-4
           ">
-
             {photo ? (
               <img
                 src={photo}
                 alt={name}
                 className="
+                  w-20 h-20
+                  rounded-2xl
+                  object-cover
+                  border-2
+                  border-white/50
+                "
+              />
+            ) : (
+              <div className="
+                w-20 h-20
+                rounded-2xl
+                bg-white/20
+                flex
+                items-center
 
