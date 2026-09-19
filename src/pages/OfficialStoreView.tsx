@@ -15,17 +15,38 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
+
   const filteredProducts = useMemo(() => {
-    return OFFICIAL_MERCHANDISE_PRODUCTS.filter((item: any) =>
+    const keyword = search.toLowerCase();
+
+    return OFFICIAL_MERCHANDISE_PRODUCTS.filter((item:any) =>
       String(item?.name || "")
         .toLowerCase()
-        .includes(search.toLowerCase())
+        .includes(keyword)
     );
+
   }, [search]);
 
 
+  const handleSelectProduct = (item:any) => {
+    setSelectedProduct(item);
+    onSelectProduct?.(item);
+  };
+
+
+  const handleCloseDetail = () => {
+    setSelectedProduct(null);
+  };
+
+
   return (
-    <main className="min-h-screen bg-slate-50 p-4 md:p-8 space-y-6">
+    <main className="
+      min-h-screen
+      bg-slate-50
+      p-4 md:p-8
+      space-y-6
+    ">
+
 
       <section className="
         rounded-[2.5rem]
@@ -37,11 +58,17 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
         via-teal-700
         to-amber-500
       ">
+
         <div className="flex items-center gap-4">
+
           <ShoppingBag size={40}/>
 
           <div>
-            <h1 className="text-3xl md:text-4xl font-black">
+
+            <h1 className="
+              text-3xl md:text-4xl
+              font-black
+            ">
               Official Store Saka Pariwisata
             </h1>
 
@@ -49,24 +76,38 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               Official merchandise Saka Pariwisata Nasional.
               Apparel, identitas, dan perlengkapan kegiatan anggota.
             </p>
+
           </div>
+
         </div>
 
+
         <div className="
-          mt-6 bg-white rounded-2xl
-          flex items-center px-4 py-3
+          mt-6
+          flex items-center
+          rounded-2xl
+          bg-white
+          px-4 py-3
           text-slate-700
         ">
+
           <Search size={18}/>
 
           <input
-            className="ml-3 flex-1 outline-none"
+            className="
+              ml-3
+              flex-1
+              outline-none
+            "
             placeholder="Cari merchandise..."
             value={search}
             onChange={(e)=>setSearch(e.target.value)}
           />
+
         </div>
+
       </section>
+
 
 
       <section className="
@@ -81,48 +122,55 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
         {filteredProducts.map((item:any)=>(
 
           <button
-            key={item.id}
-            onClick={()=>{
-              setSelectedProduct(item);
-              onSelectProduct?.(item);
-            }}
+            key={item?.id}
+            onClick={()=>handleSelectProduct(item)}
             className="
-              text-left
-              bg-white
-              rounded-[2rem]
               overflow-hidden
-              border border-slate-200
+              rounded-[2rem]
+              border
+              border-slate-200
+              bg-white
+              text-left
               shadow-sm
+              transition-all
               hover:-translate-y-2
               hover:shadow-2xl
-              transition-all duration-300
             "
           >
 
             <div className={`
-              h-56
-              overflow-hidden
               relative
-              flex items-center justify-center
+              flex
+              h-56
+              items-center
+              justify-center
+              overflow-hidden
               bg-gradient-to-br
-              ${item.accentClass || "from-emerald-900 to-teal-500"}
+              ${item?.accentClass || "from-emerald-700 to-teal-400"}
             `}>
 
-              {(item.image || item.imageUrl) ? (
+              {item?.image || item?.imageUrl ? (
+
                 <img
                   src={item.image || item.imageUrl}
-                  alt={item.name}
+                  alt={item?.name || "Produk"}
+                  onError={(e)=>{
+                    e.currentTarget.style.display="none";
+                  }}
                   className="
-                    w-full h-full object-cover
-                    transition-transform duration-500
-                    hover:scale-110
+                    h-full
+                    w-full
+                    object-cover
                   "
                 />
+
               ) : (
+
                 <ShoppingBag
                   size={72}
                   className="text-white/90"
                 />
+
               )}
 
             </div>
@@ -130,32 +178,43 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
 
             <div className="p-5">
 
-              <div className="flex flex-wrap gap-2 mb-3">
+              <div className="mb-3 flex flex-wrap gap-2">
 
-                {item.featured && (
+                {item?.featured && (
                   <span className="
-                    rounded-full bg-amber-100
+                    rounded-full
+                    bg-amber-100
                     px-3 py-1
-                    text-xs font-bold text-amber-700
+                    text-xs
+                    font-bold
+                    text-amber-700
                   ">
                     Featured
                   </span>
                 )}
 
+
                 <span className="
-                  rounded-full bg-emerald-100
+                  rounded-full
+                  bg-emerald-100
                   px-3 py-1
-                  text-xs font-bold text-emerald-700
+                  text-xs
+                  font-bold
+                  text-emerald-700
                 ">
                   Official
                 </span>
 
-                {item.purchaseEnabled && (
+
+                {item?.purchaseEnabled && (
                   <span className="
                     flex items-center gap-1
-                    rounded-full bg-green-100
+                    rounded-full
+                    bg-green-100
                     px-3 py-1
-                    text-xs font-bold text-green-700
+                    text-xs
+                    font-bold
+                    text-green-700
                   ">
                     <CheckCircle2 size={12}/>
                     Ready Stock
@@ -165,55 +224,72 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
               </div>
 
 
+
               <h3 className="
-                font-black text-lg
-                leading-tight
-                line-clamp-2
                 min-h-[3.5rem]
+                line-clamp-2
+                text-lg
+                font-black
               ">
-                {item.name}
+                {item?.name || "Produk Merchandise"}
               </h3>
 
 
+
               <div className="
+                mt-3
                 flex items-center gap-1
+                text-sm
                 text-amber-500
-                mt-3 text-sm
               ">
                 <Star size={14} fill="currentColor"/>
                 Merchandise Resmi
               </div>
 
 
+
               <div className="
-                flex items-center gap-2
-                text-xs text-slate-500
                 mt-3
+                flex items-center gap-2
+                text-xs
+                text-slate-500
               ">
                 <Tag size={14}/>
-                {item.category || "Merchandise"}
+                {item?.category || "Merchandise"}
               </div>
 
 
+
               <div className="
-                mt-4 flex items-center justify-between
+                mt-4
+                flex
+                items-center
+                justify-between
               ">
-                <div className="font-black text-orange-600">
-                  Rp {Number(item.price || 0).toLocaleString("id-ID")}
-                </div>
+
+                <span className="
+                  font-black
+                  text-orange-600
+                ">
+                  Rp {Number(item?.price || 0).toLocaleString("id-ID")}
+                </span>
+
 
                 <span className="
                   rounded-full
                   bg-slate-100
                   px-3 py-1
-                  text-xs font-bold
+                  text-xs
+                  font-bold
                   text-slate-700
                 ">
                   Detail
                 </span>
+
               </div>
 
             </div>
+
 
           </button>
 
@@ -222,13 +298,19 @@ export const OfficialStoreView: React.FC<OfficialStoreViewProps> = ({
       </section>
 
 
-      <OfficialMerchandiseDetailModal
-        item={selectedProduct}
-        onClose={()=>setSelectedProduct(null)}
-      />
+      {selectedProduct && (
+
+        <OfficialMerchandiseDetailModal
+          item={selectedProduct}
+          onClose={handleCloseDetail}
+        />
+
+      )}
+
 
     </main>
   );
 };
+
 
 export default OfficialStoreView;
