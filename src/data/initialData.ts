@@ -1,5 +1,19 @@
-// initialData.ts FINAL
-// Compatible dengan storage.ts yang membutuhkan INITIAL_MEMBERS
+// initialData.ts FINAL COMPATIBLE
+// Mempertahankan export yang dibutuhkan storage.ts
+
+export const DEFAULT_PUBLIC_USER: any = {
+  id: "PUBLIC",
+  name: "Guest User",
+  role: "PUBLIC"
+};
+
+export const DEMO_USERS: any[] = [
+  {
+    id: "admin-demo",
+    name: "Super Admin Kwartir Nasional",
+    role: "SUPER_ADMIN"
+  }
+];
 
 export const INITIAL_MEMBERS: any[] = [
   {
@@ -55,3 +69,7 @@ export const INITIAL_CULINARY_SOUVENIRS: any[] = [
     description: "Produk kriya budaya Indonesia."
   }
 ];
+
+export const INITIAL_AUDIT_LOGS: any[] = [];
+
+export const MASTER_SKILLS: any[] = [];
