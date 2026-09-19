@@ -3,136 +3,168 @@ import {
   ArrowRight,
   Sparkles,
   Map,
-  LogIn
+  LogIn,
+  Users,
+  CalendarDays,
+  MapPin,
+  ShoppingBag
 } from "lucide-react";
+
+import { CulinarySouvenirGallerySection } from "../components/dashboard/CulinarySouvenirGallerySection";
 
 interface LandingPageViewProps {
   members?: any[];
   tours?: any[];
   culinaryItems?: any[];
   activities?: any[];
-  onSelectTab?: (tab: string) => void;
-  onLogin?: () => void;
+  onSelectTab?: (tab:string)=>void;
+  onLogin?: ()=>void;
 }
 
+const fallbackImage =
+"https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=900&q=80";
+
 export function LandingPageView({
-  onSelectTab,
-  onLogin
-}: LandingPageViewProps) {
+ members=[],
+ tours=[],
+ culinaryItems=[],
+ activities=[],
+ onSelectTab,
+ onLogin
+}:LandingPageViewProps){
 
-  return (
-    <main className="min-h-screen bg-slate-50">
+ const stats=[
+  {title:"Anggota",value:members.length,icon:Users},
+  {title:"Aktivitas",value:activities.length,icon:CalendarDays},
+  {title:"Destinasi",value:tours.length,icon:MapPin},
+  {title:"Produk Kreatif",value:culinaryItems.length,icon:ShoppingBag}
+ ];
 
-      <section className="p-6">
+ return (
+ <main className="min-h-screen bg-slate-50">
 
-        <div className="
-          relative overflow-hidden
-          rounded-[40px]
-          bg-gradient-to-br
-          from-red-600 via-orange-500 to-teal-500
-          p-10 md:p-12
-          text-white
-          shadow-xl
-        ">
+ <section className="p-6">
+ <div className="relative overflow-hidden rounded-[40px] p-10 md:p-12 text-white shadow-xl bg-gradient-to-br from-red-600 via-orange-500 to-teal-500">
 
-          <div className="
-            absolute top-6 right-6
-            hidden md:block
-          ">
+ <button
+ onClick={()=>{
+   if(onLogin) onLogin();
+   else onSelectTab?.("dashboard");
+ }}
+ className="absolute right-8 top-8 flex items-center gap-2 rounded-full bg-white/20 border border-white/40 px-6 py-3 font-bold hover:bg-white hover:text-slate-900 transition"
+ >
+ <LogIn size={18}/>
+ Masuk Dashboard
+ </button>
 
-            <button
-              onClick={onLogin}
-              className="
-                flex items-center gap-2
-                rounded-full
-                bg-white/20
-                border border-white/40
-                backdrop-blur
-                px-6 py-3
-                font-bold
-                hover:bg-white
-                hover:text-slate-900
-                transition
-              "
-            >
-              <LogIn size={18}/>
-              Masuk Dashboard
-            </button>
+ <div className="max-w-3xl">
+ <div className="flex gap-2 items-center font-bold">
+ <Sparkles size={18}/>
+ SAKA PARIWISATA NASIONAL
+ </div>
 
-          </div>
+ <h1 className="mt-6 text-5xl font-black leading-tight">
+ Jelajah Nusantara,
+ <br/>
+ Berkarya untuk Pariwisata Indonesia
+ </h1>
 
+ <p className="mt-5 text-white/90 text-lg">
+ Platform digital Saka Pariwisata untuk anggota,
+ destinasi, kegiatan, dan produk kreatif daerah.
+ </p>
 
-          <div className="relative z-10 max-w-2xl">
+ <button
+ onClick={()=>onSelectTab?.("tours")}
+ className="mt-8 bg-white text-slate-900 rounded-full px-7 py-3 font-bold flex gap-2 items-center"
+ >
+ Mulai Jelajah <ArrowRight size={18}/>
+ </button>
 
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <Sparkles size={18}/>
-              SAKA PARIWISATA NASIONAL
-            </div>
+ </div>
 
+ <div className="hidden lg:flex absolute right-20 bottom-12 w-72 h-72 rounded-full bg-white/20 items-center justify-center">
+ <Map size={120}/>
+ </div>
 
-            <h1 className="
-              mt-6
-              text-4xl md:text-6xl
-              font-black
-              leading-tight
-            ">
-              Jelajah Nusantara,
-              <br/>
-              Berkarya untuk Pariwisata Indonesia
-            </h1>
-
-
-            <p className="
-              mt-5
-              text-lg
-              text-white/90
-            ">
-              Platform digital Saka Pariwisata
-              untuk anggota, destinasi,
-              kegiatan, dan produk kreatif daerah.
-            </p>
+ </div>
+ </section>
 
 
-            <button
-              onClick={()=>onSelectTab?.("tours")}
-              className="
-                mt-8
-                rounded-full
-                bg-white
-                px-7 py-3
-                text-slate-900
-                font-bold
-                flex items-center gap-2
-                hover:scale-105
-                transition
-              "
-            >
-              Mulai Jelajah
-              <ArrowRight size={18}/>
-            </button>
-
-          </div>
+ <section className="px-6 grid grid-cols-2 xl:grid-cols-4 gap-5">
+ {stats.map(({title,value,icon:Icon})=>(
+ <div key={title} className="bg-white rounded-3xl border p-6 shadow-sm">
+ <Icon size={32}/>
+ <div className="text-4xl font-black mt-4">{value}</div>
+ <div className="font-bold">{title}</div>
+ </div>
+ ))}
+ </section>
 
 
-          <div className="
-            hidden lg:flex
-            absolute
-            right-14 bottom-12
-            w-72 h-72
-            rounded-full
-            bg-white/20
-            backdrop-blur
-            items-center justify-center
-          ">
-            <Map size={120}/>
-          </div>
+ <section className="p-6 space-y-10">
 
-        </div>
+ <LandingSection title="Wisata Nusantara">
+ <div className="grid md:grid-cols-2 gap-5">
+ {tours.slice(0,4).map((item:any)=>(
+ <Card key={item.id} item={item}/>
+ ))}
+ </div>
+ </LandingSection>
 
-      </section>
 
-    </main>
-  );
+ <LandingSection title="Kuliner & Cinderamata">
+ <div className="grid md:grid-cols-2 gap-5">
+ {culinaryItems.slice(0,4).map((item:any)=>(
+ <Card key={item.id} item={item}/>
+ ))}
+ </div>
+ </LandingSection>
+
+
+ <LandingSection title="Aktivitas Terbaru">
+ <div className="grid md:grid-cols-2 gap-5">
+ {activities.slice(0,4).map((item:any)=>(
+ <div key={item.id} className="bg-white rounded-3xl border p-6">
+ <b>{item.title || item.name}</b>
+ <p className="text-slate-500 mt-2">{item.description}</p>
+ </div>
+ ))}
+ </div>
+ </LandingSection>
+
+ </section>
+
+ </main>
+ );
+}
+
+
+function LandingSection({title,children}:any){
+ return(
+ <section>
+ <h2 className="text-2xl font-black mb-5">{title}</h2>
+ {children}
+ </section>
+ )
+}
+
+
+function Card({item}:any){
+ return(
+ <div className="bg-white rounded-3xl overflow-hidden border shadow-sm">
+ <img
+ src={item.image || fallbackImage}
+ className="h-56 w-full object-cover"
+ onError={(e:any)=>e.currentTarget.src=fallbackImage}
+ />
+ <div className="p-5">
+ <h3 className="font-black text-xl">{item.name}</h3>
+ <p className="text-teal-600 mt-2">{item.location || item.region}</p>
+ <p className="text-slate-500 mt-2">{item.description}</p>
+ </div>
+ </div>
+ )
 }
 
 export default LandingPageView;
