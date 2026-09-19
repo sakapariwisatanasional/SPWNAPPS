@@ -35,7 +35,6 @@ const TAB_ROUTES: Record<string, string> = {
 
 const PUBLIC_TABS = new Set([
   'landing',
-  'official-store',
   'tours',
   'culinary-souvenirs',
   'skills',
@@ -72,9 +71,7 @@ function getSafeTabForRole(role: string): string {
 
 const ROUTE_TO_TAB: Record<string, string> = {
   '/': 'landing',
-  'official-store',
   '/landing': 'landing',
-  'official-store',
   '/dashboard': 'dashboard',
   '/profile': 'profile',
   '/my-card': 'my-card',
