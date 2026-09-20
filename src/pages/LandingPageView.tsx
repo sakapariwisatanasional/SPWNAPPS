@@ -52,7 +52,7 @@ export function LandingPageView({
   const stats = [
     {
       title: "Anggota",
-      value: publicStats?.total ?? members.length,
+      value: (publicStats?.total && publicStats.total > 0) ? publicStats.total : members.length,
       icon: Users
     },
     { title: "Aktivitas", value: activities.length, icon: CalendarDays },
