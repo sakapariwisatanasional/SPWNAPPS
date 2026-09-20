@@ -276,6 +276,49 @@ export default function App() {
   const [culinaryItems, setCulinaryItems] = useState<CulinarySouvenirItem[]>([]);
   const [officialStoreItems, setOfficialStoreItems] = useState<any[]>([]);
 
+  // Public landing statistic from GAS API (dynamic from spreadsheet)
+  useEffect(() => {
+
+    const loadPublicStatistic = async () => {
+
+      try {
+
+        const scriptUrl =
+          "https://script.google.com/macros/s/AKfycbzo5kpGHe8uGv5lBX8m4gU5bcF5OvyyPwRlU7ExhArEtQVUTbpN0FjG9fTG468gxha5vg/exec";
+
+        const response = await fetch(
+          scriptUrl + "?action=public_statistic"
+        );
+
+        const result = await response.json();
+
+        if (result?.success && result?.data) {
+
+          setPublicStats({
+            total: Number(result.data.total || 0),
+            active: Number(result.data.active || 0),
+            inactive: Number(result.data.inactive || 0)
+          });
+
+        }
+
+      } catch (error) {
+
+        console.error(
+          "Gagal mengambil statistik publik:",
+          error
+        );
+
+      }
+
+    };
+
+
+    loadPublicStatistic();
+
+  }, []);
+
+
   // Auth & Spreadsheet Modals State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState<'login' | 'register' | 'forgot'>('login');
@@ -306,40 +349,6 @@ export default function App() {
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [liveSyncToast, setLiveSyncToast] = useState<{ message: string; visible: boolean } | null>(null);
-
-  // Statistik publik landing page dari GAS (source of truth)
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadPublicStats = async () => {
-      try {
-        const gasUrl = (import.meta as any).env?.VITE_GAS_URL || '';
-        if (!gasUrl) return;
-
-        const response = await fetch(
-          `${gasUrl}?action=public_statistic&_t=${Date.now()}`
-        );
-
-        const result = await response.json();
-
-        if (!cancelled && result?.success && result?.data) {
-          setPublicStats({
-            total: Number(result.data.total || 0),
-            active: Number(result.data.active || 0),
-            inactive: Number(result.data.inactive || 0)
-          });
-        }
-      } catch (error) {
-        console.warn('[App] Public statistic gagal dimuat:', error);
-      }
-    };
-
-    void loadPublicStats();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Verifikasi sesi backend dengan mempertahankan sesi login lokal
   useEffect(() => {
