@@ -1,211 +1,85 @@
-// SPWNAPP Official Store Service FINAL
-// Khusus Official Merchandise Nasional Saka Pariwisata
+// officialStoreService_FINAL.ts
+// Service Official Store Nasional SPWNAPP
 
 const OFFICIAL_STORE_API =
   "https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec";
 
 
-// Normalisasi data dari Spreadsheet
-function normalizeProduct(product:any){
-
-  return {
-
-    id: product.id || product.ID,
-
-    name:
-      product.name ||
-      product.namaProduk ||
-      product.NamaProduk ||
-      "",
-
-    category:
-      product.category ||
-      product.kategori ||
-      "",
-
-    description:
-      product.description ||
-      product.deskripsi ||
-      "",
-
-    price:
-      Number(
-        product.price ||
-        product.harga ||
-        0
-      ),
-
-    stock:
-      Number(
-        product.stock ||
-        product.stok ||
-        0
-      ),
-
-    imageUrl:
-      product.imageUrl ||
-      product.fotoProduk ||
-      product.foto ||
-      "",
-
-    status:
-      product.status ||
-      "ACTIVE"
-
-  };
-
-}
-
-
-
-
 export async function getOfficialStoreProducts(){
 
-  try{
-
-    const response =
-      await fetch(
-        `${OFFICIAL_STORE_API}?action=GET_OFFICIAL_STORE`,
-        {
-          cache:"no-store"
-        }
-      );
-
-
-    const result =
-      await response.json();
-
-
-    if(result.success){
-
-      return (
-        result.data ||
-        result.products ||
-        []
-      ).map(normalizeProduct);
-
+  const res = await fetch(
+    `${OFFICIAL_STORE_API}?action=GET_OFFICIAL_STORE`,
+    {
+      cache:"no-store"
     }
+  );
 
+  const json = await res.json();
 
-    return [];
-
-
-  }catch(error){
-
-    console.error(
-      "[Official Store API]",
-      error
-    );
-
-    return [];
-
-  }
-
-}
-
-
-
-
-
-export async function createOfficialProduct(data:any){
-
-  const response =
-    await fetch(
-      OFFICIAL_STORE_API,
-      {
-
-        method:"POST",
-
-        headers:{
-          "Content-Type":
-          "text/plain;charset=utf-8"
-        },
-
-        body:JSON.stringify({
-
-          action:
-          "CREATE_OFFICIAL_STORE",
-
-          data
-
-        })
-
-      }
-    );
-
-
-  return response.json();
+  return (json.products || json.data || []).map((p:any)=>({
+    id:p.id || p.ID,
+    sku:p.sku || p.SKU || "",
+    name:p.name || p.namaProduk || "",
+    shortName:p.shortName || "",
+    category:p.category || p.kategori || "",
+    description:p.description || "",
+    price:Number(p.price || p.harga || 0),
+    stock:Number(p.stock || p.stok || 0),
+    imageUrl:p.imageUrl || p.fotoProduk || "",
+    active:p.active !== false
+  }));
 
 }
 
 
+async function postOfficial(action:string,data:any){
 
+  const res = await fetch(
+    OFFICIAL_STORE_API,
+    {
+      method:"POST",
+      headers:{
+        "Content-Type":"text/plain;charset=utf-8"
+      },
+      body:JSON.stringify({
+        action,
+        data
+      })
+    }
+  );
 
-
-export async function updateOfficialProduct(data:any){
-
-  const response =
-    await fetch(
-      OFFICIAL_STORE_API,
-      {
-
-        method:"POST",
-
-        headers:{
-          "Content-Type":
-          "text/plain;charset=utf-8"
-        },
-
-        body:JSON.stringify({
-
-          action:
-          "UPDATE_OFFICIAL_STORE",
-
-          data
-
-        })
-
-      }
-    );
-
-
-  return response.json();
+  return res.json();
 
 }
 
 
+export function createOfficialProduct(data:any){
+
+  return postOfficial(
+    "CREATE_OFFICIAL_STORE",
+    data
+  );
+
+}
 
 
+export function updateOfficialProduct(data:any){
 
-export async function deleteOfficialProduct(id:string){
+  return postOfficial(
+    "UPDATE_OFFICIAL_STORE",
+    data
+  );
 
-  const response =
-    await fetch(
-      OFFICIAL_STORE_API,
-      {
-
-        method:"POST",
-
-        headers:{
-          "Content-Type":
-          "text/plain;charset=utf-8"
-        },
-
-        body:JSON.stringify({
-
-          action:
-          "DELETE_OFFICIAL_STORE",
-
-          data:{
-            id
-          }
-
-        })
-
-      }
-    );
+}
 
 
-  return response.json();
+export function deleteOfficialProduct(id:string){
+
+  return postOfficial(
+    "DELETE_OFFICIAL_STORE",
+    {
+      id
+    }
+  );
 
 }
