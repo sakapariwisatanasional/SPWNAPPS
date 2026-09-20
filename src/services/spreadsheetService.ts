@@ -54,6 +54,49 @@ export interface SpreadsheetRowMember {
 
 class SpreadsheetService {
   private config: SpreadsheetConfig;
+
+
+  /**
+   * Permission helper
+   * Terhubung dengan AuthService + PermissionService.
+   */
+  private getCurrentUser(): any {
+    try {
+      return storage.getCurrentUser();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private getUserLevel(): number {
+    const user:any = this.getCurrentUser();
+
+    if (!user) return 1;
+
+    if (user.level !== undefined && user.level !== null) {
+      return Number(user.level) || 1;
+    }
+
+    switch (String(user.role || '').toUpperCase()) {
+      case 'SUPER_ADMIN':
+        return 5;
+      case 'ADMIN_NATIONAL':
+        return 4;
+      case 'ADMIN_REGION':
+      case 'ADMIN_PROVINCE':
+      case 'ADMIN_REGENCY':
+        return 3;
+      case 'MEMBER':
+        return 2;
+      default:
+        return 1;
+    }
+  }
+
+  private canAccessSpreadsheet(): boolean {
+    return this.getUserLevel() >= 4;
+  }
+
   private isPushing = false;
   private isSettingUp = false;
   private isSyncing = false;
@@ -632,6 +675,18 @@ class SpreadsheetService {
   /**
    * Mengambil data mentah baris dari Google Spreadsheet menggunakan Google Visualization API
    */
+
+  /**
+   * Debug permission user aktif.
+   */
+  public getPermissionStatus() {
+    return {
+      user: this.getCurrentUser(),
+      level: this.getUserLevel(),
+      canAccessSpreadsheet: this.canAccessSpreadsheet()
+    };
+  }
+
   public async fetchSheetRows(sheetName: string = 'Anggota'): Promise<Record<string, any>[]> {
     // Semua pembacaan Spreadsheet browser melewati proxy Vercel. Ini menghindari
     // masalah redirect/CORS Google Apps Script dan memastikan URL GAS yang dipilih
@@ -2920,38 +2975,6 @@ function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
   public async verifyKTA(verifyId: string) {
     return this.spwnRequest('verify_kta', { verifyId });
   }
-
-}
-async function testMemberAPI(){
-
-  const url =
-  "https://script.google.com/macros/s/AKfycbzo5kpGHe8uGv5lBX8m4gU5bcF5OvyyPwRlU7ExhArEtQVUTbpN0FjG9fTG468gxha5vg/exec";
-
-
-  const response =
-    await fetch(
-      url,
-      {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-
-          action:"member_search",
-
-          keyword:""
-
-        })
-      }
-    );
-
-
-  const data =
-    await response.json();
-
-
-  console.log(data);
 
 }
 
