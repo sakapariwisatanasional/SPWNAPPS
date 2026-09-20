@@ -133,6 +133,10 @@ import { MemberTransferModal } from './components/member/MemberTransferModal';
 import { DriveMediaRepositoryModal } from './components/common/DriveMediaRepositoryModal';
 import { CulinarySouvenirGallerySection } from './components/dashboard/CulinarySouvenirGallerySection';
 import { OfficialStoreView } from './pages/OfficialStoreView';
+import {
+ StoreManagementView
+}
+from './pages/admin/StoreManagementView';
 
 // Error Boundary Component
 class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
