@@ -8,7 +8,8 @@ import {
   ShoppingBag,
   User,
   ShieldCheck,
-  LogOut
+  LogOut,
+  Settings
 } from "lucide-react";
 
 interface SidebarProps {
@@ -58,15 +59,35 @@ const menuItems = [
   }
 ];
 
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab = "dashboard",
   onSelectTab,
+  currentUser,
   isAdmin = false,
   onLogout
 }) => {
 
+  const role = currentUser?.role || "PUBLIC";
+
+  const canManageStore =
+    role === "SUPER_ADMIN" ||
+    role === "ADMIN_NATIONAL";
+
+
   const menus = [
     ...menuItems,
+
+    ...(canManageStore
+      ? [
+          {
+            id: "store-management",
+            label: "Store Management",
+            icon: Settings
+          }
+        ]
+      : []),
+
     ...(isAdmin
       ? [
           {
@@ -77,6 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ]
       : [])
   ];
+
 
   return (
     <aside
