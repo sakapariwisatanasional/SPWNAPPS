@@ -14,6 +14,7 @@ import {
 import { storage } from './services/storage';
 import { DEFAULT_PUBLIC_USER } from './data/initialData';
 import { spreadsheetService } from './services/spreadsheetService';
+import { getOfficialStoreProducts } from './services/officialStoreService';
 
 // Route Mappings for Full SPA Navigation
 const TAB_ROUTES: Record<string, string> = {
@@ -265,6 +266,7 @@ export default function App() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [culinaryItems, setCulinaryItems] = useState<CulinarySouvenirItem[]>([]);
+  const [officialStoreItems, setOfficialStoreItems] = useState<any[]>([]);
 
   // Auth & Spreadsheet Modals State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -364,6 +366,13 @@ export default function App() {
       const usr = storage.getCurrentUser();
       if (usr && usr.role) setCurrentUser(usr);
     };
+
+    const loadOfficialStore = async () => {
+      const products = await getOfficialStoreProducts();
+      setOfficialStoreItems(products);
+    };
+
+    void loadOfficialStore();
 
     const hydrateFromCloud = async () => {
       try {
@@ -861,7 +870,7 @@ export default function App() {
 
             {currentTab === 'official-store' && (
               <OfficialStoreView
-                products={culinaryItems}
+                products={officialStoreItems}
                 currentUser={currentUser}
                 members={members}
               />
