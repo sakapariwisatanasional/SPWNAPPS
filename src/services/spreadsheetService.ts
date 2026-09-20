@@ -122,60 +122,6 @@ class SpreadsheetService {
   };
 
 
-  /**
-   * SPWN API Connector
-   * Layer baru untuk AuthService, MemberService, dan KTAService.
-   * Sistem legacy spreadsheet tetap dipertahankan.
-   */
-  private async callSPWNAPI(action: string, payload: Record<string, any> = {}): Promise<any> {
-    const response = await fetch(SPWN_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        action,
-        ...payload
-      })
-    });
-
-    const result = await response.json();
-
-    if (!result || result.success === false) {
-      throw new Error(result?.message || `SPWN API ${action} gagal`);
-    }
-
-    return result;
-  }
-
-  public async loginUser(email: string, password: string): Promise<any> {
-    return this.callSPWNAPI('login', {
-      email,
-      password
-    });
-  }
-
-  public async getMemberStatistic(): Promise<any> {
-    return this.callSPWNAPI('member_statistic');
-  }
-
-  public async getMemberProfile(memberId: string): Promise<any> {
-    return this.callSPWNAPI('member_profile', {
-      memberId
-    });
-  }
-
-  public async verifyKTA(verifyId: string): Promise<any> {
-    return this.callSPWNAPI('verify_kta', {
-      verifyId
-    });
-  }
-
-  public async generateKTA(memberId: string): Promise<any> {
-    return this.callSPWNAPI('generate_kta', {
-      memberId
-    });
-  }
 
   constructor() {
     this.config = this.loadConfig();
@@ -688,6 +634,13 @@ class SpreadsheetService {
   }
 
   public async fetchSheetRows(sheetName: string = 'Anggota'): Promise<Record<string, any>[]> {
+
+    // RAW spreadsheet hanya boleh diakses oleh Super Admin Nasional/Admin level tinggi.
+    // Public dan Member wajib memakai endpoint publik/profile yang sudah disediakan.
+    if (!this.canAccessSpreadsheet()) {
+      throw new Error('Akses spreadsheet mentah hanya tersedia untuk Super Admin Nasional.');
+    }
+
     // Semua pembacaan Spreadsheet browser melewati proxy Vercel. Ini menghindari
     // masalah redirect/CORS Google Apps Script dan memastikan URL GAS yang dipilih
     // SuperAdmin benar-benar dipakai oleh seluruh halaman.
