@@ -26,6 +26,7 @@ const TAB_ROUTES: Record<string, string> = {
   tours: '/tours',
   'culinary-souvenirs': '/culinary',
   'official-store': '/store',
+  'store-management': '/store-management',
   skills: '/skills',
   'krida-modules': '/krida',
   activities: '/activities',
@@ -57,6 +58,7 @@ function canAccessTab(tab: string, role: string): boolean {
   if (PUBLIC_TABS.has(tab)) return true;
   if (tab === 'my-card' || tab === 'profile') return normalizedRole !== 'PUBLIC';
   if (tab === 'official-store') return true;
+  if (tab === 'store-management') return normalizedRole === 'ADMIN_NATIONAL' || normalizedRole === 'SUPER_ADMIN';
   if (tab === 'dashboard' || tab === 'members') return ADMIN_ROLES.has(normalizedRole);
   if (tab === 'territories') return normalizedRole === 'ADMIN_NATIONAL' || normalizedRole === 'ADMIN_PROVINCE' || normalizedRole === 'SUPER_ADMIN';
   if (tab === 'audit-logs') return normalizedRole === 'SUPER_ADMIN';
@@ -81,6 +83,7 @@ const ROUTE_TO_TAB: Record<string, string> = {
   '/culinary': 'culinary-souvenirs',
   '/culinary-souvenirs': 'culinary-souvenirs',
   '/store': 'official-store',
+  '/store-management': 'store-management',
   '/skills': 'skills',
   '/krida': 'krida-modules',
   '/krida-modules': 'krida-modules',
@@ -873,6 +876,12 @@ export default function App() {
                 products={officialStoreItems}
                 currentUser={currentUser}
                 members={members}
+              />
+            )}
+
+            {currentTab === 'store-management' && (
+              <StoreManagementView
+                currentUser={currentUser}
               />
             )}
           </div>
