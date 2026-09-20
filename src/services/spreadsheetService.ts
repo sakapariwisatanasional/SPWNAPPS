@@ -741,7 +741,22 @@ class SpreadsheetService {
 
     try {
       // 1. Sinkronisasi Data Anggota
-      const rows = await this.fetchSheetRows('Anggota');
+      // Raw Spreadsheet Anggota hanya boleh dibaca Super Admin.
+      // User selain Super Admin tidak boleh memanggil fetchSheetRows('Anggota')
+      // karena backend memang memblokir akses tersebut.
+      const currentUser = storage.getCurrentUser();
+      const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+
+      let rows: Record<string, any>[] = [];
+
+      if (isSuperAdmin) {
+        rows = await this.fetchSheetRows('Anggota');
+      } else {
+        // Non Super Admin memakai data cache/member session yang sudah tersedia.
+        // Jangan mencoba membaca spreadsheet mentah.
+        rows = [];
+      }
+
       let memberCount = 0;
       let addedMemberCount = 0;
       const newlyDiscoveredMembers: Member[] = [];
