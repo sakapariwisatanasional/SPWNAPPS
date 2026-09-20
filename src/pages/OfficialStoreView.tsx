@@ -1,188 +1,160 @@
 import React, { useEffect, useState } from "react";
-import { getStoreProducts } from "../services/storeService";
+import { getOfficialStoreProducts } from "../services/officialStoreService";
 
-interface OfficialStoreProps {
-  products?: any[];
+
+interface Props {
   currentUser?: any;
-  members?: any[];
 }
 
+
+function normalizeImageUrl(url:string){
+
+  if(!url) return "";
+
+  if(url.includes("lh3.googleusercontent.com")){
+    return url;
+  }
+
+  const match = url.match(/\/d\/([^/]+)/);
+
+  if(match){
+    return `https://lh3.googleusercontent.com/d/${match[1]}`;
+  }
+
+  return url;
+
+}
+
+
+
 export function OfficialStoreView({
-  products: fallbackProducts = [],
-  currentUser,
-  members
-}: OfficialStoreProps) {
+  currentUser
+}:Props){
 
-  const [products, setProducts] = useState<any[]>(fallbackProducts);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [products,setProducts] = useState<any[]>([]);
+  const [loading,setLoading] = useState(true);
 
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
+  useEffect(()=>{
 
+    async function load(){
 
-  async function loadProducts() {
+      const data = await getOfficialStoreProducts();
 
-    try {
-
-      setLoading(true);
-
-      const data = await getStoreProducts();
-
-      if (data && data.length > 0) {
-        setProducts(data);
-      } else {
-        setProducts(fallbackProducts);
-      }
-
-      setError(false);
-
-    } catch (err) {
-
-      console.error(
-        "[Official Store] Failed loading products",
-        err
-      );
-
-      setProducts(fallbackProducts);
-      setError(true);
-
-    } finally {
+      setProducts(data || []);
 
       setLoading(false);
 
     }
 
-  }
+    load();
+
+  },[]);
 
 
-  function formatRupiah(value: any) {
 
-    const number = Number(value || 0);
+  const rupiah=(value:any)=>{
 
     return new Intl.NumberFormat(
       "id-ID",
       {
-        style: "currency",
-        currency: "IDR",
-        maximumFractionDigits: 0
+        style:"currency",
+        currency:"IDR",
+        maximumFractionDigits:0
       }
-    ).format(number);
+    ).format(Number(value || 0));
 
-  }
-
-
-  function handleImageError(
-    e: React.SyntheticEvent<HTMLImageElement>
-  ) {
-
-    e.currentTarget.src =
-      "/images/store/default-product.png";
-
-  }
+  };
 
 
   return (
 
     <div className="p-6">
 
-      <div className="mb-6">
+      <h1 className="text-3xl font-bold text-blue-900">
+        Official Store
+      </h1>
 
-        <h1 className="text-3xl font-bold text-blue-900">
-          Official Store
-        </h1>
-
-        <p className="text-gray-500 mt-2">
-          Merchandise resmi Saka Pariwisata
-        </p>
-
-      </div>
+      <p className="text-gray-500 mb-6">
+        Merchandise resmi Saka Pariwisata
+      </p>
 
 
       {loading && (
-        <div className="text-gray-500">
+        <p className="text-gray-500">
           Memuat produk...
-        </div>
+        </p>
       )}
 
 
-      {error && (
-        <div className="mb-4 text-sm text-yellow-700 bg-yellow-50 p-3 rounded-lg">
-          Data toko online menggunakan data cadangan sementara.
-        </div>
+      {!loading && products.length===0 && (
+        <p className="text-gray-500">
+          Belum ada merchandise tersedia.
+        </p>
       )}
 
 
-      {!loading && products.length === 0 && (
 
-        <div className="text-gray-500">
-          Belum ada produk tersedia.
-        </div>
+      <div className="grid md:grid-cols-3 gap-6">
 
-      )}
-
-
-      <div className="grid md:grid-cols-3 gap-5">
-
-        {products.map((product) => (
+        {products.map((product)=>(
 
           <div
-            key={product.ID || product.id}
-            className="bg-white rounded-xl shadow p-4"
+            key={product.id}
+            className="bg-white rounded-2xl shadow overflow-hidden"
           >
 
-            <img
-              src={
-                product["Foto Produk"] ||
-                product.image ||
-                "/images/store/default-product.png"
-              }
+            <div className="aspect-square bg-gray-100">
 
-              onError={handleImageError}
+              {product.imageUrl ? (
 
-              className="w-full aspect-square object-cover rounded-lg"
+                <img
+                  src={normalizeImageUrl(product.imageUrl)}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                  onError={(e)=>{
+                    e.currentTarget.style.display="none";
+                  }}
+                />
 
-              alt={
-                product["Nama Produk"] ||
-                product.name ||
-                "Produk"
-              }
+              ) : (
 
-            />
+                <div className="h-full flex items-center justify-center text-gray-400">
+                  No Image
+                </div>
 
+              )}
 
-            <h3 className="font-bold mt-3">
-
-              {
-                product["Nama Produk"] ||
-                product.name ||
-                "Produk"
-              }
-
-            </h3>
+            </div>
 
 
-            <p className="text-blue-700 font-semibold mt-2">
+            <div className="p-5">
 
-              {
-                formatRupiah(
-                  product.Harga ||
-                  product.price
-                )
-              }
-
-            </p>
+              <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                Official
+              </span>
 
 
-            {product.Stok !== undefined && (
+              <h3 className="font-bold text-lg mt-3">
+                {product.name}
+              </h3>
 
-              <p className="text-sm text-gray-500 mt-1">
-                Stok: {product.Stok}
+
+              <p className="text-blue-700 font-bold mt-3">
+                {rupiah(product.price)}
               </p>
 
-            )}
+
+              <p className="text-sm text-gray-500 mt-2">
+                Stok tersedia: {product.stock}
+              </p>
+
+
+              <button className="mt-4 w-full rounded-lg bg-blue-900 text-white py-2">
+                Detail Produk
+              </button>
+
+            </div>
 
           </div>
 
