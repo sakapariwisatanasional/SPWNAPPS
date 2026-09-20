@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import {
   getOfficialStoreProducts,
   createOfficialProduct,
@@ -10,141 +10,216 @@ import {
 export function StoreManagementView(){
 
   const [products,setProducts] = useState<any[]>([]);
-  const [form,setForm] = useState<any>({
-    namaProduk:"",
-    kategori:"APPAREL",
-    harga:0,
-    stok:0,
-    fotoProduk:"",
-    status:"ACTIVE"
-  });
-
+  const [loading,setLoading] = useState(true);
   const [editing,setEditing] = useState<any>(null);
 
+  const emptyForm = {
+    name:"",
+    category:"APPAREL",
+    description:"",
+    price:"",
+    stock:"",
+    imageUrl:"",
+    status:"ACTIVE"
+  };
 
-  async function load(){
+  const [form,setForm] = useState<any>(emptyForm);
+
+
+  async function loadProducts(){
+
+    setLoading(true);
+
     const data = await getOfficialStoreProducts();
+
     setProducts(data || []);
+
+    setLoading(false);
+
   }
 
 
   useEffect(()=>{
-    load();
+    loadProducts();
   },[]);
 
 
 
-  function change(e:any){
+  function handleChange(e:any){
+
     setForm({
       ...form,
       [e.target.name]:e.target.value
     });
+
   }
 
 
 
-  async function save(){
+  async function saveProduct(){
+
+    const payload = {
+      ...form,
+      price:Number(form.price),
+      stock:Number(form.stock)
+    };
+
 
     if(editing){
+
       await updateOfficialProduct({
-        ...form,
-        id:editing.id
+        id:editing.id,
+        ...payload
       });
+
     }else{
-      await createOfficialProduct(form);
+
+      await createOfficialProduct(payload);
+
     }
 
-    setForm({
-      namaProduk:"",
-      kategori:"APPAREL",
-      harga:0,
-      stok:0,
-      fotoProduk:"",
-      status:"ACTIVE"
-    });
 
     setEditing(null);
-    load();
+    setForm(emptyForm);
+
+    loadProducts();
 
   }
 
 
 
-  async function remove(id:string){
+  async function removeProduct(id:string){
 
-    if(confirm("Hapus produk ini?")){
+    if(confirm("Hapus merchandise ini?")){
+
       await deleteOfficialProduct(id);
-      load();
+
+      loadProducts();
+
     }
+
+  }
+
+
+
+  function editProduct(product:any){
+
+    setEditing(product);
+
+    setForm({
+      name:product.name || "",
+      category:product.category || "APPAREL",
+      description:product.description || "",
+      price:product.price || "",
+      stock:product.stock || "",
+      imageUrl:product.imageUrl || "",
+      status:product.status || "ACTIVE"
+    });
 
   }
 
 
 
   return (
+
     <div className="p-6">
 
-      <h1 className="text-3xl font-bold text-blue-900">
-        Official Store Management
-      </h1>
+      <div className="flex justify-between items-center mb-6">
 
-      <p className="text-gray-500 mb-6">
-        Kelola merchandise resmi Nasional Saka Pariwisata
-      </p>
+        <div>
+          <h1 className="text-3xl font-bold text-blue-900">
+            Official Store Management
+          </h1>
 
-
-      <div className="bg-white rounded-xl p-5 shadow mb-6">
-
-        <input
-          className="border p-2 rounded w-full mb-3"
-          name="namaProduk"
-          placeholder="Nama Produk"
-          value={form.namaProduk}
-          onChange={change}
-        />
-
-
-        <input
-          className="border p-2 rounded w-full mb-3"
-          name="kategori"
-          placeholder="Kategori"
-          value={form.kategori}
-          onChange={change}
-        />
-
-
-        <input
-          className="border p-2 rounded w-full mb-3"
-          name="harga"
-          placeholder="Harga"
-          type="number"
-          value={form.harga}
-          onChange={change}
-        />
-
-
-        <input
-          className="border p-2 rounded w-full mb-3"
-          name="stok"
-          placeholder="Stok"
-          type="number"
-          value={form.stok}
-          onChange={change}
-        />
-
-
-        <input
-          className="border p-2 rounded w-full mb-3"
-          name="fotoProduk"
-          placeholder="Link Google Drive / Image URL"
-          value={form.fotoProduk}
-          onChange={change}
-        />
+          <p className="text-gray-500">
+            Kelola merchandise resmi Nasional Saka Pariwisata
+          </p>
+        </div>
 
 
         <button
-          className="bg-blue-900 text-white px-5 py-2 rounded"
-          onClick={save}
+          className="bg-blue-900 text-white px-5 py-3 rounded-xl"
+          onClick={()=>{
+            setEditing(null);
+            setForm(emptyForm);
+          }}
+        >
+          + Tambah Merchandise
+        </button>
+
+      </div>
+
+
+
+      <div className="bg-white rounded-2xl shadow p-6 mb-8">
+
+        <h2 className="font-bold text-xl mb-4">
+          {editing ? "Edit Produk" : "Tambah Produk"}
+        </h2>
+
+
+        <div className="grid md:grid-cols-2 gap-4">
+
+
+          <input
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            placeholder="Nama Produk"
+            className="border rounded-lg p-3"
+          />
+
+
+          <input
+            name="category"
+            value={form.category}
+            onChange={handleChange}
+            placeholder="Kategori"
+            className="border rounded-lg p-3"
+          />
+
+
+          <input
+            name="price"
+            value={form.price}
+            onChange={handleChange}
+            placeholder="Harga"
+            className="border rounded-lg p-3"
+          />
+
+
+          <input
+            name="stock"
+            value={form.stock}
+            onChange={handleChange}
+            placeholder="Stok"
+            className="border rounded-lg p-3"
+          />
+
+
+          <input
+            name="imageUrl"
+            value={form.imageUrl}
+            onChange={handleChange}
+            placeholder="Link gambar Google Drive"
+            className="border rounded-lg p-3 md:col-span-2"
+          />
+
+
+          <textarea
+            name="description"
+            value={form.description}
+            onChange={handleChange}
+            placeholder="Deskripsi produk"
+            className="border rounded-lg p-3 md:col-span-2"
+          />
+
+        </div>
+
+
+        <button
+          onClick={saveProduct}
+          className="mt-5 bg-green-600 text-white px-6 py-3 rounded-xl"
         >
           Simpan Produk
         </button>
@@ -153,54 +228,78 @@ export function StoreManagementView(){
 
 
 
-      <div className="grid md:grid-cols-3 gap-5">
 
-        {products.map((p:any)=>(
+      <div className="grid md:grid-cols-3 gap-6">
+
+
+        {loading && (
+          <p>Memuat produk...</p>
+        )}
+
+
+
+        {products.map((product)=>(
 
           <div
-            key={p.id}
-            className="bg-white rounded-xl shadow p-4"
+            key={product.id}
+            className="bg-white rounded-2xl shadow overflow-hidden"
           >
 
-            <h3 className="font-bold">
-              {p.name || p.namaProduk}
-            </h3>
+            <div className="h-48 bg-gray-100">
 
-            <p>
-              Rp {Number(p.price || p.harga).toLocaleString("id-ID")}
-            </p>
+              {product.imageUrl ? (
 
-            <p>
-              Stok: {p.stock || p.stok}
-            </p>
+                <img
+                  src={product.imageUrl}
+                  className="w-full h-full object-cover"
+                />
 
+              ) : (
 
-            <div className="flex gap-2 mt-4">
+                <div className="h-full flex items-center justify-center text-gray-400">
+                  No Image
+                </div>
 
-              <button
-                className="bg-gray-200 px-3 py-1 rounded"
-                onClick={()=>{
-                  setEditing(p);
-                  setForm({
-                    namaProduk:p.name || p.namaProduk,
-                    kategori:p.category || p.kategori,
-                    harga:p.price || p.harga,
-                    stok:p.stock || p.stok,
-                    fotoProduk:p.imageUrl || p.fotoProduk,
-                    status:p.status
-                  });
-                }}
-              >
-                Edit
-              </button>
+              )}
+
+            </div>
 
 
-              <button
-                className="bg-red-500 text-white px-3 py-1 rounded"
-                onClick={()=>remove(p.id)}
-              >
-                Hapus
-              </button>
+            <div className="p-5">
+
+              <h3 className="font-bold">
+                {product.name}
+              </h3>
+
+
+              <p>
+                Rp {product.price.toLocaleString("id-ID")}
+              </p>
+
+
+              <p className="text-gray-500">
+                Stok: {product.stock}
+              </p>
+
+
+              <div className="flex gap-2 mt-4">
+
+                <button
+                  onClick={()=>editProduct(product)}
+                  className="bg-gray-200 px-4 py-2 rounded-lg"
+                >
+                  Edit
+                </button>
+
+
+                <button
+                  onClick={()=>removeProduct(product.id)}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg"
+                >
+                  Hapus
+                </button>
+
+              </div>
 
             </div>
 
@@ -211,5 +310,7 @@ export function StoreManagementView(){
       </div>
 
     </div>
+
   );
+
 }
