@@ -15,7 +15,7 @@
 
 const STORE_API_URL =
   import.meta.env.VITE_STORE_API_URL ||
-  "PASTE_GAS_WEB_APP_URL_DISINI";
+  "https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec";
 
 
 export interface StoreProduct {
