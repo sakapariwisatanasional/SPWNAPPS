@@ -5,6 +5,19 @@
  * Tidak melakukan autentikasi melalui Spreadsheet Anggota
  */
 
+
+
+// Konfigurasi lama tetap dipertahankan untuk kompatibilitas komponen database
+export const DEFAULT_SPREADSHEET_ID = "";
+export const DEFAULT_SPREADSHEET_URL = "";
+
+export interface SpreadsheetConfig {
+  spreadsheetId?: string;
+  spreadsheetUrl?: string;
+  sheetName?: string;
+  scriptUrl?: string;
+}
+
 class SpreadsheetService {
 
   private async spwnRequest(
