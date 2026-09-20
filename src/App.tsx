@@ -262,6 +262,11 @@ export default function App() {
 
   // Reactive State from storage service
   const [members, setMembers] = useState<Member[]>([]);
+  const [publicStats, setPublicStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0
+  });
   const [cloudSync, setCloudSync] = useState(spreadsheetService.getSyncState());
   const [tours, setTours] = useState<TourPackage[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -301,6 +306,40 @@ export default function App() {
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [liveSyncToast, setLiveSyncToast] = useState<{ message: string; visible: boolean } | null>(null);
+
+  // Statistik publik landing page dari GAS (source of truth)
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPublicStats = async () => {
+      try {
+        const gasUrl = (import.meta as any).env?.VITE_GAS_URL || '';
+        if (!gasUrl) return;
+
+        const response = await fetch(
+          `${gasUrl}?action=public_statistic&_t=${Date.now()}`
+        );
+
+        const result = await response.json();
+
+        if (!cancelled && result?.success && result?.data) {
+          setPublicStats({
+            total: Number(result.data.total || 0),
+            active: Number(result.data.active || 0),
+            inactive: Number(result.data.inactive || 0)
+          });
+        }
+      } catch (error) {
+        console.warn('[App] Public statistic gagal dimuat:', error);
+      }
+    };
+
+    void loadPublicStats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Verifikasi sesi backend dengan mempertahankan sesi login lokal
   useEffect(() => {
@@ -594,6 +633,7 @@ export default function App() {
         <LandingPageView
           currentUser={currentUser}
           members={members}
+          publicStats={publicStats}
           tours={tours}
           culinaryItems={culinaryItems}
           activities={activities}
