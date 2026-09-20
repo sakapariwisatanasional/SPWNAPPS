@@ -44,7 +44,7 @@ onNavigate?:
 
 
 
-export default function StoreManagementView(
+export function StoreManagementView(
 {
 onNavigate
 }:Props
