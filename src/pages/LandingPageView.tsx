@@ -4,6 +4,11 @@ import { SakaLogo } from "../components/common/SakaLogo";
 
 interface LandingPageViewProps {
   members?: any[];
+  publicStats?: {
+    total?: number;
+    active?: number;
+    inactive?: number;
+  };
   tours?: any[];
   culinaryItems?: any[];
   activities?: any[];
@@ -36,6 +41,7 @@ const kridaList = [
 
 export function LandingPageView({
   members = [],
+  publicStats,
   tours = [],
   culinaryItems = [],
   activities = [],
@@ -44,7 +50,11 @@ export function LandingPageView({
 }: LandingPageViewProps) {
 
   const stats = [
-    { title: "Anggota", value: members.length, icon: Users },
+    {
+      title: "Anggota",
+      value: publicStats?.total ?? members.length,
+      icon: Users
+    },
     { title: "Aktivitas", value: activities.length, icon: CalendarDays },
     { title: "Destinasi", value: tours.length, icon: MapPin },
     { title: "Produk Kreatif", value: culinaryItems.length, icon: ShoppingBag }
