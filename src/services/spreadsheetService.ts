@@ -12,6 +12,14 @@ const SPREADSHEET_CONFIG_KEY = 'saka_spreadsheet_config_v1';
 // Pengguna/anggota tidak perlu memasukkan atau menyimpan URL secara manual.
 export const DEFAULT_GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyePD0yr_xJE2R9MeVugBzE_49DkHaSzJJBJQsl033bgiGhbu-5nFuLxFf1oy2rN0QN7w/exec';
 
+/**
+ * SPWN API Backend Baru
+ * Dipakai bersama GAS SPWN_API_Service.gs
+ */
+export const SPWN_API_URL =
+  'https://script.google.com/macros/s/AKfycbzo5kpGHe8uGv5lBX8m4gU5bcF5OvyyPwRlU7ExhArEtQVUTbpN0FjG9fTG468gxha5vg/exec';
+
+
 export interface SpreadsheetConfig {
   spreadsheetId: string;
   spreadsheetUrl: string;
@@ -741,22 +749,7 @@ class SpreadsheetService {
 
     try {
       // 1. Sinkronisasi Data Anggota
-      // Raw Spreadsheet Anggota hanya boleh dibaca Super Admin.
-      // User selain Super Admin tidak boleh memanggil fetchSheetRows('Anggota')
-      // karena backend memang memblokir akses tersebut.
-      const currentUser = storage.getCurrentUser();
-      const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
-
-      let rows: Record<string, any>[] = [];
-
-      if (isSuperAdmin) {
-        rows = await this.fetchSheetRows('Anggota');
-      } else {
-        // Non Super Admin memakai data cache/member session yang sudah tersedia.
-        // Jangan mencoba membaca spreadsheet mentah.
-        rows = [];
-      }
-
+      const rows = await this.fetchSheetRows('Anggota');
       let memberCount = 0;
       let addedMemberCount = 0;
       const newlyDiscoveredMembers: Member[] = [];
@@ -2816,6 +2809,62 @@ function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
 }
 `;
   }
+
+  // ============================================================
+  // SPWN API CONNECTOR (Backend Baru)
+  // ============================================================
+
+  private async spwnRequest(action: string, payload: Record<string, any> = {}) {
+    const response = await fetch(SPWN_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action,
+        ...payload
+      })
+    });
+
+    return await response.json();
+  }
+
+  public async loginUser(email: string, password: string) {
+    return this.spwnRequest('login', { email, password });
+  }
+
+  public async resetPassword(email: string, newPassword: string) {
+    return this.spwnRequest('reset_password', { email, newPassword });
+  }
+
+  public async getMemberStatistic() {
+    return this.spwnRequest('member_statistic');
+  }
+
+  public async getMemberProfile(memberId: string) {
+    return this.spwnRequest('member_profile', { memberId });
+  }
+
+  public async searchMember(keyword: string) {
+    return this.spwnRequest('member_search', { keyword });
+  }
+
+  public async generateKTA(memberId: string, templateId?: string) {
+    return this.spwnRequest('kta_generate', { memberId, templateId });
+  }
+
+  public async renderKTA(memberId: string, templateId?: string) {
+    return this.spwnRequest('kta_render', { memberId, templateId });
+  }
+
+  public async exportKTA(memberId: string, templateId?: string) {
+    return this.spwnRequest('kta_export', { memberId, templateId });
+  }
+
+  public async verifyKTA(verifyId: string) {
+    return this.spwnRequest('verify_kta', { verifyId });
+  }
+
 }
 
 export const spreadsheetService = new SpreadsheetService();
