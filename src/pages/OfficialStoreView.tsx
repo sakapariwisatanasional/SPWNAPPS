@@ -35,7 +35,7 @@ onNavigate?:
 
 
 
-export default function OfficialStoreView(
+export function OfficialStoreView(
 {
 onNavigate
 }:Props
