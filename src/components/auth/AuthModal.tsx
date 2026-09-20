@@ -304,15 +304,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           pass
         );
 
-      const result = await response.json().catch(() => null);
-
       const loginUser =
         result?.user ||
         result?.data?.user ||
         result?.data;
 
       if (
-        response.ok &&
         result &&
         result.success &&
         loginUser
