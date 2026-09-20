@@ -2922,6 +2922,38 @@ function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
   }
 
 }
+async function testMemberAPI(){
+
+  const url =
+  "https://script.google.com/macros/s/AKfycbzo5kpGHe8uGv5lBX8m4gU5bcF5OvyyPwRlU7ExhArEtQVUTbpN0FjG9fTG468gxha5vg/exec";
+
+
+  const response =
+    await fetch(
+      url,
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+
+          action:"member_search",
+
+          keyword:""
+
+        })
+      }
+    );
+
+
+  const data =
+    await response.json();
+
+
+  console.log(data);
+
+}
 
 export const spreadsheetService = new SpreadsheetService();
 
