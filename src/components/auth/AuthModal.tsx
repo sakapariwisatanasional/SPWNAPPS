@@ -298,20 +298,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     try {
-      const GAS_URL =
-        'https://script.google.com/macros/s/AKfycbzo5kpGHe8uGv5lBX8m4gU5bcF5OvyyPwRlU7ExhArEtQVUTbpN0FjG9fTG468gxha5vg/exec';
-
-      const response = await fetch(GAS_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'login',
-          email: ident,
-          password: pass
-        })
-      });
+      const result =
+        await spreadsheetService.loginUser(
+          ident,
+          pass
+        );
 
       const result = await response.json().catch(() => null);
 
