@@ -4,7 +4,7 @@ import {
   createOfficialProduct,
   updateOfficialProduct,
   deleteOfficialProduct
-} from "../services/officialStoreService";
+} from "../../services/officialStoreService";
 
 
 export function StoreManagementView(){
