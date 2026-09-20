@@ -298,33 +298,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const GAS_URL =
+        'https://script.google.com/macros/s/AKfycbzo5kpGHe8uGv5lBX8m4gU5bcF5OvyyPwRlU7ExhArEtQVUTbpN0FjG9fTG468gxha5vg/exec';
+
+      const response = await fetch(GAS_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify({
-          username: ident,
+          action: 'login',
+          email: ident,
           password: pass
         })
       });
 
       const result = await response.json().catch(() => null);
 
+      const loginUser =
+        result?.user ||
+        result?.data?.user ||
+        result?.data;
+
       if (
         response.ok &&
         result &&
         result.success &&
-        result.user
+        loginUser
       ) {
         if (result.token) {
           storage.setAuthToken(result.token);
         }
 
-        storage.setCurrentUser(result.user);
+        storage.setCurrentUser(loginUser);
 
-        onLoginSuccess(result.user);
+        onLoginSuccess(loginUser);
 
         storage.syncWithServer().catch(() => {});
 
