@@ -10,6 +10,7 @@ import { storage } from '../../services/storage';
 import { PROVINCES_DATA } from '../../data/indonesiaTerritories';
 import { formatGoogleDriveUrl } from '../../services/driveRepository';
 import { spreadsheetService } from '../../services/spreadsheetService';
+import { SakaLogo } from '../common/SakaLogo';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -923,7 +924,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* ======================================================
             HEADER
         ====================================================== */}
-        <div className="relative bg-gradient-to-r from-emerald-800 to-teal-900 p-6 text-white shrink-0">
+        <div className="relative bg-gradient-to-r from-blue-900 via-blue-700 to-cyan-600 p-6 text-white shrink-0">
 
           <button
             onClick={onClose}
@@ -934,8 +935,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <div className="flex items-center gap-3 mb-2">
 
-            <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <Compass className="w-6 h-6 text-amber-300 animate-pulse" />
+            <div className="p-1 bg-white rounded-xl shadow-md">
+              <SakaLogo size={42} variant="full" />
             </div>
 
             <div>
