@@ -44,14 +44,21 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   const [galleryFilter, setGalleryFilter] = useState<'ALL' | 'WISATA' | 'KULINER' | 'CINDERAMATA'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Handler cerdas agar tombol dashboard selalu berfungsi
-  const handleDashboardClick = () => {
-    if (onNavigateDashboard) {
-      onNavigateDashboard();
-    } else {
-      // Fallback jika App.tsx belum mem-passing prop
-      window.dispatchEvent(new CustomEvent('spwn_navigate', { detail: 'dashboard' }));
+  // Handler transisi dashboard anti-macet
+  const handleDashboardClick = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
+    console.log('[LandingPage] Membuka Dashboard...');
+
+    // 1. Panggil fungsi bawaan dari App.tsx jika tersedia
+    if (typeof onNavigateDashboard === 'function') {
+      onNavigateDashboard();
+    }
+
+    // 2. Dispatch custom event ke window sebagai jaminan penangkapan oleh App.tsx
+    window.dispatchEvent(new CustomEvent('spwn_navigate_view', { detail: 'dashboard' }));
   };
 
   const memberUploads: MemberUploadItem[] = useMemo(() => [
@@ -630,9 +637,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </p>
         <button
           type="button"
-          onClick={() => {
+          onClick={(e) => {
             if (currentUser) {
-              handleDashboardClick();
+              handleDashboardClick(e);
             } else {
               onOpenAuth('register');
             }
