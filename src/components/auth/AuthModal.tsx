@@ -33,14 +33,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // ============================================================
-  // LOGIN (Menggunakan State + Ref langsung untuk anti-kosong)
+  // LOGIN (Menggunakan Ref langsung + State agar kebal reset)
   // ============================================================
-  const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  
   const loginIdentRef = useRef<HTMLInputElement>(null);
   const loginPassRef = useRef<HTMLInputElement>(null);
+  const [loginError, setLoginError] = useState('');
 
   // ============================================================
   // REGISTER
@@ -103,16 +100,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [forgotError, setForgotError] = useState('');
 
   // ============================================================
-  // RESET FORM
+  // RESET FORM HANYA KETIKA MODAL BARU PERTAMA DIBUKA
   // ============================================================
+  const prevIsOpenRef = useRef(false);
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       setTab(initialTab);
       setLoginError('');
       setRegError('');
       setRegSuccessMsg('');
       setForgotError('');
     }
+    prevIsOpenRef.current = isOpen;
   }, [isOpen, initialTab]);
 
   // ============================================================
@@ -265,45 +264,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // ============================================================
-  // LOGIN LOGIC (MULTI-TIER EXTRACTION)
+  // LOGIN SUBMIT HANDLER (Membaca DOM murni, Anti-Reset)
   // ============================================================
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
+  const triggerLogin = async () => {
     setLoginError('');
-    setIsLoading(true);
 
-    // 1. Ekstraksi multi-level: Ref DOM -> FormData -> State
-    const refIdent = loginIdentRef.current?.value || '';
-    const refPass = loginPassRef.current?.value || '';
+    // Baca langsung dari elemen DOM input melalui ref atau getElementById
+    const identInput = loginIdentRef.current || (document.getElementById('spwn_login_identifier') as HTMLInputElement);
+    const passInput = loginPassRef.current || (document.getElementById('spwn_login_password') as HTMLInputElement);
 
-    let formIdent = '';
-    let formPass = '';
-    try {
-      const formData = new FormData(e.currentTarget);
-      formIdent = (formData.get('loginIdentifier') as string) || '';
-      formPass = (formData.get('loginPassword') as string) || '';
-    } catch (_) {}
+    const ident = (identInput?.value || '').trim();
+    const pass = passInput?.value || '';
 
-    const finalIdent = (refIdent || formIdent || loginIdentifier || '').trim();
-    const finalPass = (refPass || formPass || loginPassword || '');
-
-    console.log('[AuthModal Login] Memulai autentikasi:', {
-      identLength: finalIdent.length,
-      passLength: finalPass.length,
-      identValue: finalIdent
+    console.log('[AuthModal TriggerLogin] Data input terbaca:', {
+      ident: ident,
+      identLength: ident.length,
+      passLength: pass.length
     });
 
-    if (!finalIdent || !finalPass) {
-      setIsLoading(false);
+    if (!ident || !pass) {
       setLoginError('Nama pengguna dan kata sandi wajib diisi.');
       return;
     }
 
-    try {
-      const result = await spreadsheetService.loginUser(finalIdent, finalPass);
+    setIsLoading(true);
 
-      console.log('[AuthModal Login] Respon dari server loginUser:', result);
+    try {
+      const result = await spreadsheetService.loginUser(ident, pass);
+
+      console.log('[AuthModal TriggerLogin] Hasil loginUser:', result);
 
       const loginUser =
         result?.user ||
@@ -324,7 +313,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      // Jika server mengembalikan pesan error, tampilkan
       const message = result?.message || 'Kombinasi akun dan kata sandi tidak sesuai.';
       setLoginError(message);
     } catch (apiErr: any) {
@@ -339,7 +327,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // ============================================================
-  // REGISTER LOGIC
+  // REGISTER
   // ============================================================
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -614,7 +602,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setTimeout(() => {
         setTab('login');
         setForgotStep('request');
-        setLoginIdentifier(forgotIdentifier.trim());
         setForgotOtp('');
         setForgotNewPassword('');
         setForgotConfirmPassword('');
@@ -641,7 +628,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="relative bg-gradient-to-r from-blue-900 via-blue-700 to-cyan-600 p-6 text-white shrink-0">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors text-white/80 hover:text-white"
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors text-white/80 hover:text-white cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -669,7 +656,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 setTab('login');
                 setLoginError('');
               }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 tab === 'login'
                   ? 'bg-white text-emerald-900 shadow-md'
                   : 'text-white/80 hover:text-white hover:bg-white/5'
@@ -686,7 +673,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 setRegError('');
                 setRegSuccessMsg('');
               }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 tab === 'register'
                   ? 'bg-white text-emerald-900 shadow-md'
                   : 'text-white/80 hover:text-white hover:bg-white/5'
@@ -701,9 +688,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* BODY */}
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar text-xs">
 
-          {/* LOGIN TAB */}
+          {/* ====================================================
+              LOGIN TAB (Didesain Anti-Reset & Uncontrolled Input)
+          ==================================================== */}
           {tab === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-4">
               {loginError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -719,15 +708,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     ref={loginIdentRef}
+                    id="spwn_login_identifier"
+                    name="spwn_login_identifier"
                     type="text"
-                    name="loginIdentifier"
-                    id="loginIdentifier"
                     autoComplete="username"
-                    required
-                    value={loginIdentifier}
-                    onChange={e => setLoginIdentifier(e.target.value)}
+                    defaultValue="admin_saka"
                     placeholder="Contoh: admin_saka atau email@domain.com"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') triggerLogin();
+                    }}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all text-slate-900"
                   />
                 </div>
               </div>
@@ -743,7 +733,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setTab('forgot');
                       setForgotStep('request');
                     }}
-                    className="text-[11px] text-emerald-700 hover:text-emerald-800 font-medium"
+                    className="text-[11px] text-emerald-700 hover:text-emerald-800 font-medium cursor-pointer"
                   >
                     Lupa sandi?
                   </button>
@@ -753,20 +743,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     ref={loginPassRef}
+                    id="spwn_login_password"
+                    name="spwn_login_password"
                     type={showPassword ? 'text' : 'password'}
-                    name="loginPassword"
-                    id="loginPassword"
                     autoComplete="current-password"
-                    required
-                    value={loginPassword}
-                    onChange={e => setLoginPassword(e.target.value)}
                     placeholder="Masukkan kata sandi"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') triggerLogin();
+                    }}
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all text-slate-900"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -774,9 +764,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <button
-                type="submit"
+                type="button"
+                onClick={triggerLogin}
                 disabled={isLoading}
-                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isLoading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -787,7 +778,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </>
                 )}
               </button>
-            </form>
+            </div>
           )}
 
           {/* REGISTER TAB */}
@@ -957,7 +948,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="absolute inset-0 bg-slate-900/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[9px] font-bold"
+                        className="absolute inset-0 bg-slate-900/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[9px] font-bold cursor-pointer"
                       >
                         <Camera className="w-4 h-4 mb-0.5 text-emerald-300" />
                         <span>Ganti</span>
@@ -1027,7 +1018,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                               setRegAvatarUrl(url);
                               setRegPhotoInputUrl('');
                             }}
-                            className={`w-6 h-6 rounded-md overflow-hidden border transition-all ${
+                            className={`w-6 h-6 rounded-md overflow-hidden border transition-all cursor-pointer ${
                               regAvatarUrl === url
                                 ? 'border-emerald-600 scale-105 shadow-xs'
                                 : 'border-transparent opacity-60'
@@ -1263,7 +1254,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold"
+                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold cursor-pointer"
                   >
                     {isLoading ? 'Mengirim Kode...' : 'Kirim Kode Pemulihan'}
                   </button>
@@ -1326,7 +1317,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold"
+                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold cursor-pointer"
                   >
                     {isLoading ? 'Menyimpan...' : 'Verifikasi & Simpan Password'}
                   </button>
@@ -1339,7 +1330,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setForgotOtp('');
                       setForgotError('');
                     }}
-                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-emerald-700"
+                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-emerald-700 cursor-pointer"
                   >
                     Kirim kode baru
                   </button>
