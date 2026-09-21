@@ -1,20 +1,46 @@
 // src/services/spreadsheetService.ts - SPWNApp Client Data Service
 
+export const DEFAULT_SPREADSHEET_ID =
+  import.meta.env.VITE_DEFAULT_SPREADSHEET_ID || '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
+
+export const DEFAULT_SPREADSHEET_URL =
+  import.meta.env.VITE_DEFAULT_SPREADSHEET_URL ||
+  `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit`;
+
 export interface SpreadsheetConfig {
   scriptUrl: string;
+  spreadsheetId?: string;
+  spreadsheetUrl?: string;
+  autoSync?: boolean;
+  syncInterval?: number;
 }
 
 class SpreadsheetService {
   private config: SpreadsheetConfig = {
     scriptUrl: import.meta.env.VITE_SPREADSHEET_SCRIPT_URL || '',
+    spreadsheetId: DEFAULT_SPREADSHEET_ID,
+    spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
+    autoSync: false,
+    syncInterval: 30,
   };
 
   public getConfig(): SpreadsheetConfig {
+    // Muat konfigurasi tersimpan dari localStorage jika tersedia
+    try {
+      const saved = localStorage.getItem('spwn_spreadsheet_config');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        this.config = { ...this.config, ...parsed };
+      }
+    } catch (_) {}
     return this.config;
   }
 
   public setConfig(newConfig: Partial<SpreadsheetConfig>) {
     this.config = { ...this.config, ...newConfig };
+    try {
+      localStorage.setItem('spwn_spreadsheet_config', JSON.stringify(this.config));
+    } catch (_) {}
   }
 
   // ============================================================
@@ -24,7 +50,7 @@ class SpreadsheetService {
     const cleanIdent = String(identifier || '').trim();
     const cleanPass = String(password || '');
 
-    // Payload dikemas dengan semua kemungkinan kunci yang diminta backend
+    // Payload dikemas dengan semua variasi kunci agar server/backend tidak mendeteksi kosong
     const payload = {
       action: 'LOGIN_USER',
       identifier: cleanIdent,
@@ -40,7 +66,7 @@ class SpreadsheetService {
     });
 
     try {
-      // 1. Prioritas pertama: Kirim ke endpoint internal Vercel / Next API
+      // 1. Coba kirim ke endpoint internal API
       const localResponse = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -57,7 +83,7 @@ class SpreadsheetService {
         }
       }
 
-      // 2. Jika ada fallback ke /api/index
+      // 2. Coba kirim ke route /api utama
       const apiIndexResponse = await fetch('/api', {
         method: 'POST',
         headers: {
@@ -74,8 +100,9 @@ class SpreadsheetService {
         }
       }
 
-      // 3. Jika menggunakan Google Apps Script Deployment URL langsung
-      const scriptUrl = this.config.scriptUrl;
+      // 3. Coba kirim langsung ke Google Apps Script Deployment URL
+      const currentConfig = this.getConfig();
+      const scriptUrl = currentConfig.scriptUrl;
       if (scriptUrl) {
         const gasResponse = await fetch(scriptUrl, {
           method: 'POST',
@@ -116,7 +143,7 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // UPLOAD IMAGE KE DRIVE
+  // UPLOAD IMAGE KE GOOGLE DRIVE
   // ============================================================
   async uploadImageToDrive(base64Data: string, fileName: string, category: string = 'AVATAR'): Promise<any> {
     try {
@@ -127,8 +154,9 @@ class SpreadsheetService {
         category: category,
       };
 
-      if (this.config.scriptUrl) {
-        const response = await fetch(this.config.scriptUrl, {
+      const scriptUrl = this.getConfig().scriptUrl;
+      if (scriptUrl) {
+        const response = await fetch(scriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload),
@@ -149,7 +177,7 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // REGISTER MEMBER
+  // REGISTER MEMBER KE SPREADSHEET
   // ============================================================
   async registerMember(params: {
     memberData: any;
@@ -164,8 +192,9 @@ class SpreadsheetService {
         ...params,
       };
 
-      if (this.config.scriptUrl) {
-        const response = await fetch(this.config.scriptUrl, {
+      const scriptUrl = this.getConfig().scriptUrl;
+      if (scriptUrl) {
+        const response = await fetch(scriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload),
@@ -185,6 +214,31 @@ class SpreadsheetService {
       };
     } catch (error: any) {
       throw error;
+    }
+  }
+
+  // ============================================================
+  // SYNC & HEALTH CHECK SPREADSHEET
+  // ============================================================
+  async testConnection(scriptUrl?: string): Promise<{ success: boolean; message: string }> {
+    const targetUrl = scriptUrl || this.getConfig().scriptUrl;
+    if (!targetUrl) {
+      return { success: false, message: 'URL Web App Google Apps Script belum diisi.' };
+    }
+
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'PING' }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data && (data.success || data.status === 'online')) {
+        return { success: true, message: 'Koneksi ke Spreadsheet berhasil!' };
+      }
+      return { success: true, message: 'Koneksi terhubung ke Google Apps Script.' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Gagal menghubungi Google Apps Script.' };
     }
   }
 }
