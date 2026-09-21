@@ -1,7 +1,62 @@
 // src/services/spreadsheetService.ts - SPWNApp Client Data Service
 
+export const SPWN_DATABASE = {
+  MEMBER: {
+    ID: "14hfb6-gk-5Hds4qLhFVOj3wOJcLnmX-oLI0OVlB4bzk",
+    SHEETS: {
+      ANGGOTA: "Anggota",
+      USERS: "Users",
+      KTA_SETTING: "KTA_Setting",
+      KTA_TEMPLATE: "KTA_Template",
+      KTA_HISTORY: "KTA_History",
+      KRIDA: "Krida_Master",
+      ROLE_MASTER: "Role_Master",
+      PENGATURAN: "Pengaturan",
+      PASSWORD_RESET: "Password_Reset"
+    }
+  },
+  CONTENT: {
+    ID: "1wyT_mGS_Gk45R6ZTu4586ErrmTnu47DSH6OyI7zkDhM",
+    SHEETS: {
+      AGENDA: "Agenda_Kegiatan",
+      BERITA: "Berita",
+      ARTIKEL: "Artikel",
+      GALERI: "Galeri",
+      PENGUMUMAN: "Pengumuman"
+    }
+  },
+  TRAVEL: {
+    ID: "1VmI-POsa2Mdf0MFcE0XEO5x-AepcTysnP6y02YCkOGI",
+    SHEETS: {
+      PAKET: "Paket Wisata",
+      DESTINASI: "Destinasi",
+      MITRA: "Mitra_Wisata",
+      REVIEW: "Review"
+    }
+  },
+  COMMERCE: {
+    ID: "1t2wgchBJTpJOCVgPeRaiioGO3RzzShEKyKbV6r9E75A",
+    SHEETS: {
+      PRODUCTS: "Products",
+      CATEGORIES: "Categories",
+      SKU: "SKU_Master",
+      INVENTORY: "Inventory",
+      ORDERS: "Orders",
+      SUPPLIERS: "Suppliers"
+    }
+  }
+} as const;
+
+export const SPWN_SYSTEM = {
+  APP_NAME: "SPWN Apps",
+  VERSION: "2.0.0",
+  ENVIRONMENT: "DEVELOPMENT",
+  TIMEZONE: "Asia/Jakarta",
+  API_VERSION: "v1"
+} as const;
+
 export const DEFAULT_SPREADSHEET_ID =
-  import.meta.env.VITE_DEFAULT_SPREADSHEET_ID || '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
+  import.meta.env.VITE_DEFAULT_SPREADSHEET_ID || SPWN_DATABASE.MEMBER.ID;
 
 export const DEFAULT_SPREADSHEET_URL =
   import.meta.env.VITE_DEFAULT_SPREADSHEET_URL ||
@@ -76,9 +131,6 @@ class SpreadsheetService {
     } catch (_) {}
   }
 
-  // ============================================================
-  // SERVER CONFIG FETCHER
-  // ============================================================
   async fetchServerConfig(): Promise<SpreadsheetConfig> {
     try {
       const res = await fetch('/api/config', { cache: 'no-store' }).catch(() => null);
@@ -98,13 +150,9 @@ class SpreadsheetService {
     return this.getConfig();
   }
 
-  // ============================================================
-  // CLOUD SNAPSHOT (Mencegah kegagalan snapshot awal)
-  // ============================================================
   async fetchCloudSnapshot(): Promise<any> {
     const targetUrl = this.getConfig().scriptUrl;
     if (!targetUrl) {
-      // Jika belum disetel, kembalikan null dengan anggun agar cache lokal yang dirender
       return null;
     }
 
@@ -131,9 +179,6 @@ class SpreadsheetService {
     }
   }
 
-  // ============================================================
-  // SYNC STATE & SUBSCRIPTION
-  // ============================================================
   public getSyncState(): SyncState {
     try {
       const savedState = localStorage.getItem('spwn_sync_state');
@@ -188,9 +233,6 @@ class SpreadsheetService {
     } catch (_) {}
   }
 
-  // ============================================================
-  // SYNC DATA DENGAN SPREADSHEET
-  // ============================================================
   async syncData(): Promise<{ success: boolean; message: string }> {
     this.updateSyncState({ status: 'syncing', message: 'Sedang menyinkronkan data...' });
     const targetUrl = this.getConfig().scriptUrl;
@@ -228,9 +270,6 @@ class SpreadsheetService {
     }
   }
 
-  // ============================================================
-  // LOGIN USER
-  // ============================================================
   async loginUser(identifier: string, password: string): Promise<any> {
     const cleanIdent = String(identifier || '').trim();
     const cleanPass = String(password || '');
@@ -309,9 +348,6 @@ class SpreadsheetService {
     }
   }
 
-  // ============================================================
-  // UPLOAD IMAGE KE GOOGLE DRIVE
-  // ============================================================
   async uploadImageToDrive(base64Data: string, fileName: string, category: string = 'AVATAR'): Promise<any> {
     try {
       const payload = {
@@ -343,9 +379,6 @@ class SpreadsheetService {
     }
   }
 
-  // ============================================================
-  // REGISTER MEMBER KE SPREADSHEET
-  // ============================================================
   async registerMember(params: {
     memberData: any;
     password: string;
@@ -384,9 +417,6 @@ class SpreadsheetService {
     }
   }
 
-  // ============================================================
-  // TEST CONNECTION
-  // ============================================================
   async testConnection(scriptUrl?: string): Promise<{ success: boolean; message: string }> {
     const targetUrl = scriptUrl || this.getConfig().scriptUrl;
     if (!targetUrl) {
