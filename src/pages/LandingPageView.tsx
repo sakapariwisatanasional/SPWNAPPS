@@ -44,6 +44,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   const [galleryFilter, setGalleryFilter] = useState<'ALL' | 'WISATA' | 'KULINER' | 'CINDERAMATA'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Handler cerdas agar tombol dashboard selalu berfungsi
+  const handleDashboardClick = () => {
+    if (onNavigateDashboard) {
+      onNavigateDashboard();
+    } else {
+      // Fallback jika App.tsx belum mem-passing prop
+      window.dispatchEvent(new CustomEvent('spwn_navigate', { detail: 'dashboard' }));
+    }
+  };
+
   const memberUploads: MemberUploadItem[] = useMemo(() => [
     {
       id: 'MW-01',
@@ -163,7 +173,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   return (
     <div className="w-full min-h-screen bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-white overflow-hidden">
       {/* NAVBAR */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80 px-4 md:px-8 py-3.5 transition-all">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 md:px-8 py-3.5 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-1 bg-white rounded-xl shadow-md">
@@ -183,8 +193,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             {currentUser ? (
               <button
                 type="button"
-                onClick={onNavigateDashboard}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/30 flex items-center gap-2 cursor-pointer transition-all"
+                onClick={handleDashboardClick}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 flex items-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 <span>Buka Dashboard</span>
@@ -264,10 +274,15 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 </button>
               </>
             ) : (
-              <div className="flex items-center gap-3 p-3 px-6 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-200">
-                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-                <span className="font-semibold">Sesi Aktif: Kak {currentUser.name || currentUser.username}</span>
-              </div>
+              <button
+                type="button"
+                onClick={handleDashboardClick}
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-base shadow-xl shadow-emerald-950/40 hover:scale-105 transition-all flex items-center justify-center gap-3 cursor-pointer"
+              >
+                <LayoutDashboard className="w-5 h-5" />
+                <span>Masuk ke Dashboard ({currentUser.name || currentUser.username})</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
             )}
           </div>
         </div>
@@ -615,8 +630,14 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </p>
         <button
           type="button"
-          onClick={() => onOpenAuth(currentUser ? undefined : 'register')}
-          className="px-8 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm shadow-xl shadow-emerald-950/40 transition-all cursor-pointer"
+          onClick={() => {
+            if (currentUser) {
+              handleDashboardClick();
+            } else {
+              onOpenAuth('register');
+            }
+          }}
+          className="px-8 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm shadow-xl shadow-emerald-950/40 transition-all cursor-pointer hover:scale-105 active:scale-95"
         >
           {currentUser ? 'Kelola Konten di Dashboard' : 'Gabung & Pasang Produk Sekarang'}
         </button>
