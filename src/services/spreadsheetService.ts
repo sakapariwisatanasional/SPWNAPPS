@@ -22,6 +22,8 @@ export interface SyncState {
   message?: string;
 }
 
+type SyncStateListener = (state: SyncState) => void;
+
 class SpreadsheetService {
   private config: SpreadsheetConfig = {
     scriptUrl: import.meta.env.VITE_SPREADSHEET_SCRIPT_URL || '',
@@ -37,6 +39,8 @@ class SpreadsheetService {
     totalSynced: 0,
     message: 'Siap melakukan sinkronisasi.',
   };
+
+  private listeners: Set<SyncStateListener> = new Set();
 
   constructor() {
     this.initFromStorage();
@@ -73,7 +77,31 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // SYNC STATE & STATUS METHODS (Mencegah error getSyncState)
+  // SERVER CONFIG FETCHER (Mencegah error fetchServerConfig)
+  // ============================================================
+  async fetchServerConfig(): Promise<SpreadsheetConfig> {
+    try {
+      // 1. Coba ambil konfigurasi publik dari API backend jika tersedia
+      const res = await fetch('/api/config', { cache: 'no-store' }).catch(() => null);
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data && data.scriptUrl) {
+          this.setConfig({
+            scriptUrl: data.scriptUrl,
+            spreadsheetId: data.spreadsheetId || this.config.spreadsheetId,
+            spreadsheetUrl: data.spreadsheetUrl || this.config.spreadsheetUrl,
+          });
+          return this.config;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Kembalikan konfigurasi lokal/env yang ada
+    return this.getConfig();
+  }
+
+  // ============================================================
+  // SYNC STATE & SUBSCRIPTION (Mencegah error subscribeSyncState)
   // ============================================================
   public getSyncState(): SyncState {
     try {
@@ -85,11 +113,29 @@ class SpreadsheetService {
     return this.syncState;
   }
 
+  public subscribeSyncState(listener: SyncStateListener): () => void {
+    this.listeners.add(listener);
+    // Panggil langsung sekali dengan state terkini
+    listener(this.getSyncState());
+
+    // Kembalikan fungsi unsubscribe
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
   public updateSyncState(patch: Partial<SyncState>) {
     this.syncState = { ...this.syncState, ...patch };
     try {
       localStorage.setItem('spwn_sync_state', JSON.stringify(this.syncState));
     } catch (_) {}
+
+    // Notifikasi semua komponen yang subscribe
+    this.listeners.forEach((listener) => {
+      try {
+        listener(this.syncState);
+      } catch (_) {}
+    });
   }
 
   public getSyncLogs(): any[] {
@@ -116,7 +162,7 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // SYNC DATA DENGAN SPREADSHEET
+  // SINKRONISASI DATA KE SPREADSHEET
   // ============================================================
   async syncData(): Promise<{ success: boolean; message: string }> {
     this.updateSyncState({ status: 'syncing', message: 'Sedang menyinkronkan data...' });
@@ -172,6 +218,7 @@ class SpreadsheetService {
     };
 
     try {
+      // 1. Endpoint internal /api/auth/login
       const localResponse = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,6 +233,7 @@ class SpreadsheetService {
         }
       }
 
+      // 2. Endpoint /api utama
       const apiIndexResponse = await fetch('/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -200,6 +248,7 @@ class SpreadsheetService {
         }
       }
 
+      // 3. Google Apps Script Web App langsung
       const scriptUrl = this.getConfig().scriptUrl;
       if (scriptUrl) {
         const gasResponse = await fetch(scriptUrl, {
@@ -211,6 +260,7 @@ class SpreadsheetService {
         return gasData;
       }
 
+      // 4. Fallback lokal jika offline
       if (cleanIdent && cleanPass) {
         return {
           success: true,
@@ -271,7 +321,7 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // REGISTER MEMBER KE SPREADSHEET
+  // REGISTER MEMBER
   // ============================================================
   async registerMember(params: {
     memberData: any;
