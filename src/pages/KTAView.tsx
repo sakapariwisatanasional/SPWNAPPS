@@ -11,7 +11,6 @@ export interface KTAViewProps {
 export const KTAView: React.FC<KTAViewProps> = ({ currentUser, memberData, onBack }) => {
   const [activeSide, setActiveSide] = useState<'DEPAN' | 'BELAKANG'>('DEPAN');
 
-  // Fallback data agar tampilan KTA tidak pernah kosong
   const name = memberData?.fullName || currentUser?.name || currentUser?.username || 'Kader Saka Pariwisata';
   const ktaNumber = memberData?.id || currentUser?.id || 'SPW-3204-00291';
   const role = currentUser?.role === 'SUPER_ADMIN' ? 'Pimpinan Saka Nasional' : (memberData?.currentPosition || 'Anggota Saka Pariwisata');
@@ -32,7 +31,7 @@ export const KTAView: React.FC<KTAViewProps> = ({ currentUser, memberData, onBac
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-600 mb-2 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Kembali</span>
+              <span>Kembali ke Beranda</span>
             </button>
           )}
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-2">
@@ -79,7 +78,6 @@ export const KTAView: React.FC<KTAViewProps> = ({ currentUser, memberData, onBac
         <div className="relative w-full max-w-[500px] aspect-[85.6/53.98] rounded-2xl overflow-hidden shadow-2xl border border-slate-300 bg-slate-900 select-none">
           {activeSide === 'DEPAN' ? (
             <div className="relative w-full h-full">
-              {/* Template Depan KTA */}
               <img
                 src="/assets/kta/KTA_MASTER_DEPAN.png"
                 alt="KTA Depan"
@@ -88,8 +86,6 @@ export const KTAView: React.FC<KTAViewProps> = ({ currentUser, memberData, onBac
                   (e.target as HTMLElement).style.display = 'none';
                 }}
               />
-
-              {/* Overlay Informasi Anggota */}
               <div className="absolute inset-0 p-5 flex flex-col justify-between text-slate-900 pointer-events-none">
                 <div className="flex justify-between items-start">
                   <div className="space-y-0.5">
@@ -105,7 +101,7 @@ export const KTAView: React.FC<KTAViewProps> = ({ currentUser, memberData, onBac
                     <img src={photoUrl} alt={name} className="w-full h-full object-cover" />
                   </div>
                   <div className="space-y-0.5">
-                    <h3 className="text-sm md:text-base font-black text-slate-900 uppercase leading-tight drop-shadow-xs">
+                    <h3 className="text-sm md:text-base font-black text-slate-900 uppercase leading-tight">
                       {name}
                     </h3>
                     <p className="text-[10px] font-bold text-slate-700">{krida}</p>
@@ -116,7 +112,6 @@ export const KTAView: React.FC<KTAViewProps> = ({ currentUser, memberData, onBac
             </div>
           ) : (
             <div className="relative w-full h-full">
-              {/* Template Belakang KTA */}
               <img
                 src="/assets/kta/KTA_MASTER_BELAKANG.png"
                 alt="KTA Belakang"
