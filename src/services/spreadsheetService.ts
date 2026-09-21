@@ -152,6 +152,14 @@ class SpreadsheetService {
     this.syncState.pollingIntervalSeconds = Math.round(safeInterval / 1000);
 
     const run = () => {
+
+      // Sinkronisasi spreadsheet mentah hanya boleh berjalan untuk Super Admin Nasional.
+      // Member dan user publik menggunakan API/service tanpa membaca sheet langsung.
+      const currentUser = storage.getCurrentUser();
+      if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
+        return;
+      }
+
       if (this.config.autoSync === false) return;
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       void this.syncFromSpreadsheet(true).catch(() => {});
@@ -727,6 +735,18 @@ class SpreadsheetService {
    * Tarik data dari Google Spreadsheet dan perbarui state aplikasi secara real-time
    */
   public async syncFromSpreadsheet(silent: boolean = false): Promise<{ success: boolean; count: number; message: string }> {
+
+    // Proteksi akses: hanya Super Admin Nasional yang boleh melakukan sync raw spreadsheet.
+    // Login member tidak boleh memicu pembacaan sheet Anggota.
+    const currentUser = storage.getCurrentUser();
+    if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
+      return {
+        success: false,
+        count: 0,
+        message: 'Sinkronisasi spreadsheet hanya tersedia untuk Super Admin Nasional.'
+      };
+    }
+
     // IMPORTANT: Google Spreadsheet adalah sumber kebenaran data publik.
     // Browser hanya menyimpan cache untuk rendering cepat; setiap refresh awal
     // dan polling berikutnya mengambil snapshot terbaru dari Spreadsheet.
