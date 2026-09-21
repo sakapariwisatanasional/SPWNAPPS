@@ -33,11 +33,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // ============================================================
-  // LOGIN
+  // LOGIN (Menggunakan State + Ref langsung untuk anti-kosong)
   // ============================================================
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  
+  const loginIdentRef = useRef<HTMLInputElement>(null);
+  const loginPassRef = useRef<HTMLInputElement>(null);
 
   // ============================================================
   // REGISTER
@@ -244,9 +247,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // ============================================================
-  // FILE SELECT
-  // ============================================================
   const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -255,13 +255,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.target.value = '';
   };
 
-  // ============================================================
-  // DRAG & DROP
-  // ============================================================
   const handlePhotoDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDraggingPhoto(false);
-
     const file = e.dataTransfer.files?.[0];
     if (file) {
       processAndCompressFile(file);
@@ -269,7 +265,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // ============================================================
-  // LOGIN (DILENGKAPI FALLBACK FORM DATA TERHADAP AUTOFILL)
+  // LOGIN LOGIC (MULTI-TIER EXTRACTION)
   // ============================================================
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -277,26 +273,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoginError('');
     setIsLoading(true);
 
-    // Ambil nilai langsung dari DOM / FormData jika autofill browser tidak memicu onChange state React
-    const formData = new FormData(e.currentTarget);
-    const formIdent = (formData.get('loginIdentifier') as string) || '';
-    const formPass = (formData.get('loginPassword') as string) || '';
+    // 1. Ekstraksi multi-level: Ref DOM -> FormData -> State
+    const refIdent = loginIdentRef.current?.value || '';
+    const refPass = loginPassRef.current?.value || '';
 
-    const ident = (loginIdentifier || formIdent).trim();
-    const pass = loginPassword || formPass;
+    let formIdent = '';
+    let formPass = '';
+    try {
+      const formData = new FormData(e.currentTarget);
+      formIdent = (formData.get('loginIdentifier') as string) || '';
+      formPass = (formData.get('loginPassword') as string) || '';
+    } catch (_) {}
 
-    // Sinkronkan kembali nilai ke state
-    if (formIdent && !loginIdentifier) setLoginIdentifier(formIdent);
-    if (formPass && !loginPassword) setLoginPassword(formPass);
+    const finalIdent = (refIdent || formIdent || loginIdentifier || '').trim();
+    const finalPass = (refPass || formPass || loginPassword || '');
 
-    if (!ident || !pass) {
+    console.log('[AuthModal Login] Memulai autentikasi:', {
+      identLength: finalIdent.length,
+      passLength: finalPass.length,
+      identValue: finalIdent
+    });
+
+    if (!finalIdent || !finalPass) {
       setIsLoading(false);
       setLoginError('Nama pengguna dan kata sandi wajib diisi.');
       return;
     }
 
     try {
-      const result = await spreadsheetService.loginUser(ident, pass);
+      const result = await spreadsheetService.loginUser(finalIdent, finalPass);
+
+      console.log('[AuthModal Login] Respon dari server loginUser:', result);
 
       const loginUser =
         result?.user ||
@@ -317,15 +324,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      const message =
-        result?.message ||
-        'Kombinasi akun dan kata sandi tidak sesuai.';
-
+      // Jika server mengembalikan pesan error, tampilkan
+      const message = result?.message || 'Kombinasi akun dan kata sandi tidak sesuai.';
       setLoginError(message);
-    } catch (apiErr) {
+    } catch (apiErr: any) {
       console.error('[Auth Login] API error:', apiErr);
       setLoginError(
-        'Tidak dapat terhubung ke server pendaftaran. Pastikan koneksi Google Spreadsheet aktif.'
+        apiErr?.message ||
+        'Tidak dapat terhubung ke server pendaftaran. Pastikan koneksi server aktif.'
       );
     }
 
@@ -333,7 +339,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // ============================================================
-  // REGISTER
+  // REGISTER LOGIC
   // ============================================================
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -383,30 +389,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      const scriptUrl = spreadsheetService.getConfig().scriptUrl || '';
       const isNasional = false;
-
       const provObj = provinces.find(p => p.id === regProvinceId);
       const regObj = regenciesList.find(r => r.id === regRegencyId);
       const distObj = districtsList.find(d => d.id === regDistrictId);
 
-      const provName = isNasional
-        ? 'KWARTIR NASIONAL'
-        : (provObj?.name || 'Jawa Barat');
-
-      const regName = isNasional
-        ? 'TINGKAT NASIONAL'
-        : (regObj?.name || 'Kabupaten Bandung');
-
-      const distName = isNasional
-        ? 'Nasional'
-        : (distObj?.name || 'Kecamatan');
+      const provName = isNasional ? 'KWARTIR NASIONAL' : (provObj?.name || 'Jawa Barat');
+      const regName = isNasional ? 'TINGKAT NASIONAL' : (regObj?.name || 'Kabupaten Bandung');
+      const distName = isNasional ? 'Nasional' : (distObj?.name || 'Kecamatan');
 
       const cleanPhone = phone.replace(/\D/g, '');
-      const generatedNikMasked =
-        '3200******' +
-        (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
-
+      const generatedNikMasked = '3200******' + (cleanPhone.slice(-4) || Math.floor(1000 + Math.random() * 9000));
       const timestamp = Date.now();
       const newMemberId = `SPW-${timestamp.toString().slice(-6).padStart(6, '0')}`;
       const newUserId = `USER-${timestamp.toString().slice(-10)}`;
@@ -530,8 +523,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       console.error('[Auth Register] Pendaftaran gagal:', err);
       setIsUploadingPhoto(false);
       setIsLoading(false);
-      const message = err?.message || 'Gagal mendaftar. Data belum dianggap tersimpan. Silakan coba kembali.';
-      setRegError(message);
+      setRegError(err?.message || 'Gagal mendaftar. Silakan coba kembali.');
       setRegSuccessMsg('');
     }
   };
@@ -554,22 +546,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const response = await fetch('/api/auth/request-password-reset', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         cache: 'no-store',
-        body: JSON.stringify({
-          identifier: ident
-        })
+        body: JSON.stringify({ identifier: ident })
       });
 
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.success) {
-        throw new Error(
-          result?.message || `Permintaan pemulihan gagal (HTTP ${response.status}).`
-        );
+        throw new Error(result?.message || `Permintaan pemulihan gagal (HTTP ${response.status}).`);
       }
 
       setForgotOtp('');
@@ -577,9 +563,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setForgotConfirmPassword('');
       setForgotStep('reset');
     } catch (error: any) {
-      setForgotError(
-        error?.message || 'Kode pemulihan gagal dikirim. Silakan coba lagi.'
-      );
+      setForgotError(error?.message || 'Kode pemulihan gagal dikirim. Silakan coba lagi.');
     } finally {
       setIsLoading(false);
     }
@@ -609,9 +593,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const response = await fetch('/api/auth/reset-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         cache: 'no-store',
         body: JSON.stringify({
@@ -624,9 +606,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.success) {
-        throw new Error(
-          result?.message || `Reset password gagal (HTTP ${response.status}).`
-        );
+        throw new Error(result?.message || `Reset password gagal (HTTP ${response.status}).`);
       }
 
       setForgotStep('done');
@@ -640,9 +620,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setForgotConfirmPassword('');
       }, 1500);
     } catch (error: any) {
-      setForgotError(
-        error?.message || 'Password gagal diperbarui. Silakan coba lagi.'
-      );
+      setForgotError(error?.message || 'Password gagal diperbarui. Silakan coba lagi.');
     } finally {
       setIsLoading(false);
     }
@@ -672,14 +650,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="p-1 bg-white rounded-xl shadow-md">
               <SakaLogo size={42} variant="full" />
             </div>
-
             <div>
               <h2 className="text-xl font-bold tracking-tight">
                 {tab === 'login' && 'Masuk ke Akun'}
                 {tab === 'register' && 'Pendaftaran Anggota Baru'}
                 {tab === 'forgot' && 'Reset Kata Sandi'}
               </h2>
-
               <p className="text-xs text-emerald-100/90">
                 Sistem Terintegrasi Kader & Pimpinan Saka Pariwisata
               </p>
@@ -739,17 +715,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Email, Username, atau Nomor KTA
                 </label>
-
                 <div className="relative">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
+                    ref={loginIdentRef}
                     type="text"
                     name="loginIdentifier"
+                    id="loginIdentifier"
                     autoComplete="username"
                     required
                     value={loginIdentifier}
                     onChange={e => setLoginIdentifier(e.target.value)}
-                    placeholder="Contoh: 32.04... atau email@domain.com"
+                    placeholder="Contoh: admin_saka atau email@domain.com"
                     className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
                   />
                 </div>
@@ -760,7 +737,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <label className="text-xs font-semibold text-slate-700">
                     Kata Sandi
                   </label>
-
                   <button
                     type="button"
                     onClick={() => {
@@ -776,8 +752,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
+                    ref={loginPassRef}
                     type={showPassword ? 'text' : 'password'}
                     name="loginPassword"
+                    id="loginPassword"
                     autoComplete="current-password"
                     required
                     value={loginPassword}
@@ -785,17 +763,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     placeholder="Masukkan kata sandi"
                     className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
                   />
-
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -803,7 +776,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-50"
               >
                 {isLoading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1060,11 +1033,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                                 : 'border-transparent opacity-60'
                             }`}
                           >
-                            <img
-                              src={url}
-                              alt="Option"
-                              className="w-full h-full object-cover"
-                            />
+                            <img src={url} alt="Option" className="w-full h-full object-cover" />
                           </button>
                         ))}
                       </div>
@@ -1093,9 +1062,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
                     >
                       {provinces.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
+                        <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1110,9 +1077,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
                     >
                       {regenciesList.map(r => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
+                        <option key={r.id} value={r.id}>{r.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1127,9 +1092,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl outline-none text-slate-800"
                     >
                       {districtsList.map(d => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
+                        <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1249,9 +1212,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>
-                      {isUploadingPhoto
-                        ? 'Mengunggah foto...'
-                        : 'Menyimpan pendaftaran...'}
+                      {isUploadingPhoto ? 'Mengunggah foto...' : 'Menyimpan pendaftaran...'}
                     </span>
                   </>
                 ) : (
@@ -1281,16 +1242,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {forgotStep === 'request' && (
                 <form onSubmit={handleFindAccount} className="space-y-4">
                   <p className="text-xs text-slate-600">
-                    Masukkan email, username, atau nomor KTA.
-                    Jika akun memiliki email terdaftar, kode
-                    pemulihan akan dikirim ke email tersebut.
+                    Masukkan email, username, atau nomor KTA. Jika akun memiliki email terdaftar, kode pemulihan akan dikirim ke email tersebut.
                   </p>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Identitas Akun
                     </label>
-
                     <input
                       type="text"
                       required
@@ -1305,11 +1263,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold"
                   >
-                    {isLoading
-                      ? 'Mengirim Kode...'
-                      : 'Kirim Kode Pemulihan'}
+                    {isLoading ? 'Mengirim Kode...' : 'Kirim Kode Pemulihan'}
                   </button>
                 </form>
               )}
@@ -1317,16 +1273,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {forgotStep === 'reset' && (
                 <form onSubmit={handleResetPassword} className="space-y-3.5">
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
-                    Kode pemulihan telah diminta. Periksa
-                    email yang terdaftar pada akun Anda.
-                    Kode berlaku selama 10 menit.
+                    Kode pemulihan telah diminta. Periksa email yang terdaftar pada akun Anda. Kode berlaku selama 10 menit.
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Kode Pemulihan
                     </label>
-
                     <input
                       type="text"
                       required
@@ -1334,11 +1287,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       autoComplete="one-time-code"
                       maxLength={6}
                       value={forgotOtp}
-                      onChange={e =>
-                        setForgotOtp(
-                          e.target.value.replace(/\D/g, '').slice(0, 6)
-                        )
-                      }
+                      onChange={e => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       placeholder="6 digit kode dari email"
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm tracking-[0.35em] text-center focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
                     />
@@ -1348,7 +1297,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Kata Sandi Baru
                     </label>
-
                     <input
                       type="password"
                       required
@@ -1356,7 +1304,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       value={forgotNewPassword}
                       onChange={e => setForgotNewPassword(e.target.value)}
                       placeholder="Minimal 6 karakter"
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
                     />
                   </div>
 
@@ -1364,7 +1312,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Konfirmasi Kata Sandi
                     </label>
-
                     <input
                       type="password"
                       required
@@ -1372,18 +1319,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       value={forgotConfirmPassword}
                       onChange={e => setForgotConfirmPassword(e.target.value)}
                       placeholder="Ketik ulang sandi"
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold"
                   >
-                    {isLoading
-                      ? 'Menyimpan...'
-                      : 'Verifikasi & Simpan Password'}
+                    {isLoading ? 'Menyimpan...' : 'Verifikasi & Simpan Password'}
                   </button>
 
                   <button
@@ -1394,7 +1339,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setForgotOtp('');
                       setForgotError('');
                     }}
-                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-emerald-700 cursor-pointer"
+                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-emerald-700"
                   >
                     Kirim kode baru
                   </button>
@@ -1404,11 +1349,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {forgotStep === 'done' && (
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2">
                   <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto" />
-
                   <p className="text-xs font-semibold text-emerald-800">
                     Kata sandi berhasil diperbarui!
                   </p>
-
                   <p className="text-[11px] text-emerald-600">
                     Mengalihkan ke halaman login...
                   </p>
