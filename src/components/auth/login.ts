@@ -21,6 +21,12 @@ export default async function handler(
 
   try {
 
+    console.log(
+      "[AUTH BODY RAW]",
+      req.body
+    );
+
+
     let body:any = req.body;
 
 
@@ -40,7 +46,7 @@ export default async function handler(
 
 
     console.log(
-      "[LOGIN REQUEST]",
+      "[AUTH BODY PARSED]",
       body
     );
 
@@ -58,13 +64,27 @@ export default async function handler(
       "";
 
 
+    console.log(
+      "[AUTH CREDENTIAL CHECK]",
+      {
+        email,
+        hasPassword: !!password
+      }
+    );
+
+
     if (!email || !password) {
 
       return res.status(400).json({
 
         success:false,
 
-        message:"Email/username dan password wajib diisi"
+        message:"Email/username dan password wajib diisi",
+
+        debug:{
+          emailReceived: email,
+          passwordReceived: !!password
+        }
 
       });
 
@@ -96,8 +116,20 @@ export default async function handler(
       );
 
 
+    console.log(
+      "[GAS RESPONSE STATUS]",
+      response.status
+    );
+
+
     const text =
       await response.text();
+
+
+    console.log(
+      "[GAS RESPONSE BODY]",
+      text
+    );
 
 
     let result:any;
@@ -115,7 +147,7 @@ export default async function handler(
 
         message:"Response Google Apps Script tidak valid",
 
-        raw:text.substring(0,300)
+        raw:text.substring(0,500)
 
       });
 
