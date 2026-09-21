@@ -77,11 +77,10 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // SERVER CONFIG FETCHER (Mencegah error fetchServerConfig)
+  // SERVER CONFIG FETCHER
   // ============================================================
   async fetchServerConfig(): Promise<SpreadsheetConfig> {
     try {
-      // 1. Coba ambil konfigurasi publik dari API backend jika tersedia
       const res = await fetch('/api/config', { cache: 'no-store' }).catch(() => null);
       if (res && res.ok) {
         const data = await res.json().catch(() => null);
@@ -96,12 +95,44 @@ class SpreadsheetService {
       }
     } catch (_) {}
 
-    // 2. Kembalikan konfigurasi lokal/env yang ada
     return this.getConfig();
   }
 
   // ============================================================
-  // SYNC STATE & SUBSCRIPTION (Mencegah error subscribeSyncState)
+  // CLOUD SNAPSHOT (Mencegah kegagalan snapshot awal)
+  // ============================================================
+  async fetchCloudSnapshot(): Promise<any> {
+    const targetUrl = this.getConfig().scriptUrl;
+    if (!targetUrl) {
+      // Jika belum disetel, kembalikan null dengan anggun agar cache lokal yang dirender
+      return null;
+    }
+
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'GET_ALL_DATA' }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (data && (data.success || data.members || data.data)) {
+        this.updateSyncState({
+          status: 'success',
+          lastSyncedAt: new Date().toISOString(),
+          message: 'Data cloud berhasil disinkronkan.',
+        });
+        return data.data || data;
+      }
+      return null;
+    } catch (err) {
+      console.warn('[spreadsheetService] Gagal mengambil cloud snapshot, menggunakan cache lokal:', err);
+      return null;
+    }
+  }
+
+  // ============================================================
+  // SYNC STATE & SUBSCRIPTION
   // ============================================================
   public getSyncState(): SyncState {
     try {
@@ -115,10 +146,7 @@ class SpreadsheetService {
 
   public subscribeSyncState(listener: SyncStateListener): () => void {
     this.listeners.add(listener);
-    // Panggil langsung sekali dengan state terkini
     listener(this.getSyncState());
-
-    // Kembalikan fungsi unsubscribe
     return () => {
       this.listeners.delete(listener);
     };
@@ -130,7 +158,6 @@ class SpreadsheetService {
       localStorage.setItem('spwn_sync_state', JSON.stringify(this.syncState));
     } catch (_) {}
 
-    // Notifikasi semua komponen yang subscribe
     this.listeners.forEach((listener) => {
       try {
         listener(this.syncState);
@@ -162,7 +189,7 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // SINKRONISASI DATA KE SPREADSHEET
+  // SYNC DATA DENGAN SPREADSHEET
   // ============================================================
   async syncData(): Promise<{ success: boolean; message: string }> {
     this.updateSyncState({ status: 'syncing', message: 'Sedang menyinkronkan data...' });
@@ -218,7 +245,6 @@ class SpreadsheetService {
     };
 
     try {
-      // 1. Endpoint internal /api/auth/login
       const localResponse = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -233,7 +259,6 @@ class SpreadsheetService {
         }
       }
 
-      // 2. Endpoint /api utama
       const apiIndexResponse = await fetch('/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -248,7 +273,6 @@ class SpreadsheetService {
         }
       }
 
-      // 3. Google Apps Script Web App langsung
       const scriptUrl = this.getConfig().scriptUrl;
       if (scriptUrl) {
         const gasResponse = await fetch(scriptUrl, {
@@ -260,7 +284,6 @@ class SpreadsheetService {
         return gasData;
       }
 
-      // 4. Fallback lokal jika offline
       if (cleanIdent && cleanPass) {
         return {
           success: true,
@@ -321,7 +344,7 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // REGISTER MEMBER
+  // REGISTER MEMBER KE SPREADSHEET
   // ============================================================
   async registerMember(params: {
     memberData: any;
