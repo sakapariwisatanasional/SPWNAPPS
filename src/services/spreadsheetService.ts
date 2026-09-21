@@ -2907,5 +2907,7 @@ function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
 
   }
 
+}
+
 export const spreadsheetService = new SpreadsheetService();
 
