@@ -21,21 +21,51 @@ export default async function handler(
 
   try {
 
+    let body:any = req.body;
+
+
+    if (typeof body === "string") {
+
+      try {
+
+        body = JSON.parse(body);
+
+      } catch {
+
+        body = {};
+
+      }
+
+    }
+
+
+    console.log(
+      "[LOGIN REQUEST]",
+      body
+    );
+
+
     const email =
-      req.body?.email ||
-      req.body?.username ||
+      body?.email ||
+      body?.username ||
+      body?.ident ||
       "";
 
+
     const password =
-      req.body?.password ||
+      body?.password ||
+      body?.pass ||
       "";
 
 
     if (!email || !password) {
 
       return res.status(400).json({
+
         success:false,
+
         message:"Email/username dan password wajib diisi"
+
       });
 
     }
@@ -45,15 +75,23 @@ export default async function handler(
       await fetch(
         GAS_URL,
         {
+
           method:"POST",
+
           headers:{
             "Content-Type":"application/json"
           },
+
           body:JSON.stringify({
+
             action:"login",
+
             email,
+
             password
+
           })
+
         }
       );
 
@@ -64,6 +102,7 @@ export default async function handler(
 
     let result:any;
 
+
     try {
 
       result = JSON.parse(text);
@@ -71,9 +110,13 @@ export default async function handler(
     } catch {
 
       return res.status(502).json({
+
         success:false,
+
         message:"Response Google Apps Script tidak valid",
-        raw:text.substring(0,200)
+
+        raw:text.substring(0,300)
+
       });
 
     }
@@ -82,18 +125,23 @@ export default async function handler(
     return res.status(200).json(result);
 
 
+
   } catch(error:any) {
 
 
     console.error(
-      "[AUTH LOGIN API ERROR]",
+      "[AUTH LOGIN ERROR]",
       error
     );
 
 
     return res.status(500).json({
+
       success:false,
-      message:error.message || "Server login gagal"
+
+      message:error?.message ||
+        "Terjadi kesalahan server"
+
     });
 
 
