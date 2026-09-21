@@ -15,6 +15,13 @@ export interface SpreadsheetConfig {
   syncInterval?: number;
 }
 
+export interface SyncState {
+  status: 'idle' | 'syncing' | 'success' | 'error';
+  lastSyncedAt: string | null;
+  totalSynced: number;
+  message?: string;
+}
+
 class SpreadsheetService {
   private config: SpreadsheetConfig = {
     scriptUrl: import.meta.env.VITE_SPREADSHEET_SCRIPT_URL || '',
@@ -24,13 +31,35 @@ class SpreadsheetService {
     syncInterval: 30,
   };
 
+  private syncState: SyncState = {
+    status: 'idle',
+    lastSyncedAt: null,
+    totalSynced: 0,
+    message: 'Siap melakukan sinkronisasi.',
+  };
+
+  constructor() {
+    this.initFromStorage();
+  }
+
+  private initFromStorage() {
+    try {
+      const savedConfig = localStorage.getItem('spwn_spreadsheet_config');
+      if (savedConfig) {
+        this.config = { ...this.config, ...JSON.parse(savedConfig) };
+      }
+      const savedState = localStorage.getItem('spwn_sync_state');
+      if (savedState) {
+        this.syncState = { ...this.syncState, ...JSON.parse(savedState) };
+      }
+    } catch (_) {}
+  }
+
   public getConfig(): SpreadsheetConfig {
-    // Muat konfigurasi tersimpan dari localStorage jika tersedia
     try {
       const saved = localStorage.getItem('spwn_spreadsheet_config');
       if (saved) {
-        const parsed = JSON.parse(saved);
-        this.config = { ...this.config, ...parsed };
+        this.config = { ...this.config, ...JSON.parse(saved) };
       }
     } catch (_) {}
     return this.config;
@@ -44,13 +73,95 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // LOGIN USER (MENGIRIM MULTI-FIELD AGAR TIDAK TERBACA KOSONG)
+  // SYNC STATE & STATUS METHODS (Mencegah error getSyncState)
+  // ============================================================
+  public getSyncState(): SyncState {
+    try {
+      const savedState = localStorage.getItem('spwn_sync_state');
+      if (savedState) {
+        this.syncState = { ...this.syncState, ...JSON.parse(savedState) };
+      }
+    } catch (_) {}
+    return this.syncState;
+  }
+
+  public updateSyncState(patch: Partial<SyncState>) {
+    this.syncState = { ...this.syncState, ...patch };
+    try {
+      localStorage.setItem('spwn_sync_state', JSON.stringify(this.syncState));
+    } catch (_) {}
+  }
+
+  public getSyncLogs(): any[] {
+    try {
+      const logs = localStorage.getItem('spwn_sync_logs');
+      return logs ? JSON.parse(logs) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public addSyncLog(message: string, status: 'success' | 'error' | 'info' = 'info') {
+    try {
+      const logs = this.getSyncLogs();
+      const newLog = {
+        id: `LOG-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        message,
+        status,
+      };
+      const updated = [newLog, ...logs].slice(0, 50);
+      localStorage.setItem('spwn_sync_logs', JSON.stringify(updated));
+    } catch (_) {}
+  }
+
+  // ============================================================
+  // SYNC DATA DENGAN SPREADSHEET
+  // ============================================================
+  async syncData(): Promise<{ success: boolean; message: string }> {
+    this.updateSyncState({ status: 'syncing', message: 'Sedang menyinkronkan data...' });
+    const targetUrl = this.getConfig().scriptUrl;
+
+    if (!targetUrl) {
+      this.updateSyncState({ status: 'error', message: 'URL Google Apps Script belum disetel.' });
+      this.addSyncLog('Gagal sync: URL Script kosong', 'error');
+      return { success: false, message: 'URL Script belum disetel.' };
+    }
+
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'SYNC_ALL' }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (data && data.success) {
+        this.updateSyncState({
+          status: 'success',
+          lastSyncedAt: new Date().toISOString(),
+          message: 'Sinkronisasi berhasil.',
+        });
+        this.addSyncLog('Sinkronisasi data ke spreadsheet berhasil.', 'success');
+        return { success: true, message: 'Sinkronisasi berhasil.' };
+      }
+
+      this.updateSyncState({ status: 'success', lastSyncedAt: new Date().toISOString() });
+      return { success: true, message: 'Data terhubung.' };
+    } catch (err: any) {
+      this.updateSyncState({ status: 'error', message: err?.message || 'Gagal sinkronisasi.' });
+      this.addSyncLog(`Error sync: ${err?.message}`, 'error');
+      return { success: false, message: err?.message || 'Gagal sinkronisasi.' };
+    }
+  }
+
+  // ============================================================
+  // LOGIN USER
   // ============================================================
   async loginUser(identifier: string, password: string): Promise<any> {
     const cleanIdent = String(identifier || '').trim();
     const cleanPass = String(password || '');
 
-    // Payload dikemas dengan semua variasi kunci agar server/backend tidak mendeteksi kosong
     const payload = {
       action: 'LOGIN_USER',
       identifier: cleanIdent,
@@ -60,18 +171,10 @@ class SpreadsheetService {
       pass: cleanPass,
     };
 
-    console.log('[spreadsheetService] Mengirim data login:', {
-      identifier: payload.identifier,
-      passLength: cleanPass.length,
-    });
-
     try {
-      // 1. Coba kirim ke endpoint internal API
       const localResponse = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
         body: JSON.stringify(payload),
       }).catch(() => null);
@@ -83,12 +186,9 @@ class SpreadsheetService {
         }
       }
 
-      // 2. Coba kirim ke route /api utama
       const apiIndexResponse = await fetch('/api', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
         body: JSON.stringify(payload),
       }).catch(() => null);
@@ -100,23 +200,17 @@ class SpreadsheetService {
         }
       }
 
-      // 3. Coba kirim langsung ke Google Apps Script Deployment URL
-      const currentConfig = this.getConfig();
-      const scriptUrl = currentConfig.scriptUrl;
+      const scriptUrl = this.getConfig().scriptUrl;
       if (scriptUrl) {
         const gasResponse = await fetch(scriptUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8',
-          },
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload),
         });
-
         const gasData = await gasResponse.json();
         return gasData;
       }
 
-      // 4. Default fallback: Autentikasi lokal bila server offline
       if (cleanIdent && cleanPass) {
         return {
           success: true,
@@ -218,7 +312,7 @@ class SpreadsheetService {
   }
 
   // ============================================================
-  // SYNC & HEALTH CHECK SPREADSHEET
+  // TEST CONNECTION
   // ============================================================
   async testConnection(scriptUrl?: string): Promise<{ success: boolean; message: string }> {
     const targetUrl = scriptUrl || this.getConfig().scriptUrl;
