@@ -2789,7 +2789,6 @@ function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
 }
 `;
   }
-}
 
 
   /**
